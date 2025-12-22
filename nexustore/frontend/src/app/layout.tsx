@@ -1,12 +1,15 @@
-export default function Home() {
+import './globals.css';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-3xl font-bold">
-        NexuStore
-      </h1>
-      <p className="mt-2 text-gray-600">
-        Modern e-commerce platform
-      </p>
-    </main>
+    <html lang="en">
+      <body>
+        {children}
+      </body>
+    </html>
   );
 }

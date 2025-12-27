@@ -77,6 +77,8 @@ export async function forgotPassword(data: { email: string }) {
   if (!res.ok) {
     throw new Error("Failed to send OTP");
   }
+
+  return res.json();
 }
 
 export async function resetPassword(data: {
@@ -93,4 +95,40 @@ export async function resetPassword(data: {
   if (!res.ok) {
     throw new Error("Reset failed");
   }
+
+  return res.json();
+}
+
+export async function updateProfile(data: {
+  profile: {
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    profile_image?: string;
+  };
+  address: {
+    company?: string;
+    address_line1?: string;
+    address_line2?: string;
+    city?: string;
+    postal_code?: string;
+    region?: string;
+    country?: string;
+    phone?: string;
+    is_default?: boolean;
+  };
+}) {
+  const res = await fetch(`${API_URL}/auth/profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Profile update failed");
+  }
+
+  return res.json();
 }

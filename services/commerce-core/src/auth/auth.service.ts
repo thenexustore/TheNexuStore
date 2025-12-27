@@ -30,8 +30,8 @@ export class AuthService {
     const hash = await bcrypt.hash(data.password, 10);
     const otp = this.generateOtp();
 
-    console.log('REGISTER OTP:', data.email, otp);
     await this.mail.sendOtp(data.email, otp);
+
     await this.prisma.customer.create({
       data: {
         email: data.email,
@@ -85,7 +85,6 @@ export class AuthService {
     return {
       accessToken: this.jwt.sign(
         { sub: user.id, role: user.role },
-        { expiresIn: '15m' },
       ),
     };
   }
@@ -95,8 +94,8 @@ export class AuthService {
     if (!user) return { success: true };
 
     const otp = this.generateOtp();
-    console.log('RESET OTP:', email, otp);
     await this.mail.sendOtp(email, otp);
+
     await this.prisma.customer.update({
       where: { email },
       data: {
@@ -154,8 +153,96 @@ export class AuthService {
     return {
       accessToken: this.jwt.sign(
         { sub: user.id, role: user.role },
-        { expiresIn: '15m' },
       ),
+    };
+  }
+
+  async updateProfile(customerId: string, body: any) {
+    const { profile, address } = body;
+
+    let customer;
+
+    if (profile) {
+      customer = await this.prisma.customer.update({
+        where: { id: customerId },
+        data: {
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone,
+          profile_image: profile.profile_image,
+        },
+      });
+    } else {
+      customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+      });
+    }
+
+    if (address) {
+      const fullName = `${customer.first_name} ${customer.last_name}`;
+
+      const existingAddress = await this.prisma.customerAddress.findFirst({
+        where: { customer_id: customerId },
+      });
+
+      if (existingAddress) {
+        await this.prisma.customerAddress.update({
+          where: { id: existingAddress.id },
+          data: {
+            company: address.company,
+            address_line1: address.address_line1,
+            address_line2: address.address_line2,
+            city: address.city,
+            postal_code: address.postal_code,
+            region: address.region,
+            country: address.country,
+            phone: address.phone,
+            is_default: address.is_default ?? false,
+            full_name: fullName,
+          },
+        });
+      } else {
+        await this.prisma.customerAddress.create({
+          data: {
+            customer_id: customerId,
+            full_name: fullName,
+            company: address.company,
+            address_line1: address.address_line1,
+            address_line2: address.address_line2,
+            city: address.city,
+            postal_code: address.postal_code,
+            region: address.region,
+            country: address.country,
+            phone: address.phone,
+            is_default: address.is_default ?? false,
+            type: 'SHIPPING',
+          },
+        });
+      }
+    }
+
+    return { success: true };
+  }
+
+  async getMe(customerId: string) {
+    const user = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      include: {
+        addresses: true,
+      },
+    });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+      profile_image: user.profile_image,
+      createdAt: user.created_at,
+      address: user.addresses?.[0] || null,
     };
   }
 }

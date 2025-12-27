@@ -21,7 +21,7 @@ export default function LoginPage() {
 
     try {
       await loginUser({ email, password });
-      router.push("/account");
+      router.push("/store");
     } catch {
       setError("Invalid email or password");
     } finally {

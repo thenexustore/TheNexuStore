@@ -12,7 +12,7 @@ export default function HomePage() {
       const user = await getMe();
 
       if (user) {
-        router.replace("/account");
+        router.replace("/store");
       } else {
         router.replace("/login");
       }

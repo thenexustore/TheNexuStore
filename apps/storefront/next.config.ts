@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  devIndicators: false,
+  devIndicators: {
+    position: "bottom-right",
+  },
 
   images: {
     remotePatterns: [
@@ -9,6 +11,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "developers.google.com",
         pathname: "/identity/images/**",
+      },
+      {
+        protocol: "https",
+        hostname: "picsum.photos",
+        pathname: "/**",
       },
     ],
   },

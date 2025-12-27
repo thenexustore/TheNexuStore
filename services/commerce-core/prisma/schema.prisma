@@ -215,6 +215,10 @@ model Product {
   short_description String?
   status            ProductStatus @default(DRAFT)
   main_category_id  String?       @map("main_category_id")
+
+  rating_avg        Decimal?      @db.Decimal(2,1)
+  rating_count      Int           @default(0)
+
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
 
@@ -223,8 +227,27 @@ model Product {
   categories    ProductCategory[]
   skus          Sku[]
   media         ProductMedia[]
+  reviews       ProductReview[]
 
   @@index([slug])
+}
+
+model ProductReview {
+  id           String   @id @default(uuid())
+  product_id   String
+  customer_id  String?
+  rating       Int
+  title        String?
+  comment      String?
+  is_approved  Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  product   Product   @relation(fields: [product_id], references: [id])
+  customer  Customer? @relation(fields: [customer_id], references: [id])
+
+  @@index([product_id])
+  @@unique([product_id, customer_id])
 }
 
 model ProductCategory {
@@ -450,6 +473,8 @@ model Customer {
   carts     Cart[]
   orders    Order[]
   rmas      Rma[]
+
+  reviews   ProductReview[] 
 }
 
 model CustomerAddress {

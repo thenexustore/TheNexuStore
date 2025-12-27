@@ -62,15 +62,13 @@ export class AuthController {
   @Get('me')
   @UseGuards(AuthGuard)
   me(@Req() req) {
-    return {
-      id: req.user.id,
-      email: req.user.email,
-      firstName: req.user.first_name,
-      lastName: req.user.last_name,
-      role: req.user.role,
-      profile_image: req.user.profile_image,
-      createdAt: req.user.created_at,
-    };
+    return this.auth.getMe(req.user.id);
+  }
+
+  @Post('profile')
+  @UseGuards(AuthGuard)
+  updateProfile(@Req() req, @Body() body: any) {
+    return this.auth.updateProfile(req.user.id, body);
   }
 
   @Get('google')
@@ -87,6 +85,6 @@ export class AuthController {
       sameSite: 'lax',
     });
 
-    res.redirect('http://localhost:3000/account');
+    res.redirect('http://localhost:3000/store');
   }
 }

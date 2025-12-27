@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: nexu_pg
+    environment:
+      POSTGRES_DB: nexustore
+      POSTGRES_USER: nexu
+      POSTGRES_PASSWORD: nexu_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: nexu_redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: nexu_rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  pg_data:

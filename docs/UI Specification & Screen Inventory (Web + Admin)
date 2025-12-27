@@ -1,0 +1,182 @@
+Appendix B — UX/UI Specification & Screen Inventory (Web + Admin)
+Version: v1.0   Date: 2025-12-20
+This appendix enumerates all required screens and defines UI/UX checklists for TheNexuStore storefront and admin console.
+B1) UX/UI Objectives
+PCComponentes-level clarity: fast discovery, strong filters, trust elements, frictionless checkout.
+Mobile-first responsiveness (≥60% traffic assumption) with excellent Core Web Vitals.
+Consistency: design system components reused across web and admin.
+Internationalization-ready (ES first, EN optional).
+API-first UX: every screen powered by Commerce Core API (no supplier runtime dependency).
+
+B2) Information Architecture (Site Map)
+Home
+Categories (Mega-menu) → Category Listing (PLP)
+Search Results
+Product Detail (PDP)
+Cart
+Checkout (multi-step)
+Order Confirmation
+Customer Account: Profile, Addresses, Orders, Order Detail, Invoices, Returns (RMA), Wishlist (optional), GDPR/Consents
+Content Pages (CMS): About, Contact, FAQ, Shipping, Returns, Warranty, Privacy, Terms
+Admin Console: Dashboard, Orders, Catalog, Imports, Pricing, Promotions, Customers, Returns, Shipping/Tracking, Settings, Logs/Audit
+
+B3) Global Design System (Reusable Components)
+Header: logo, mega-menu, search bar, account, cart (count), support link.
+Footer: legal links, contact, social, payment badges, shipping partners, newsletter.
+Product Card: image, title, brand, key specs (2–3), price, availability badge, add-to-cart.
+Price Block: sale price, compare-at (optional), VAT/tax note, financing/badge (phase 2).
+Availability Widget: in stock / low stock / out of stock; shipping ETA; warehouse vs supplier indicator (internal only).
+Filter Facets: brand, price slider, attributes; mobile drawer version.
+Sort Control: relevance, price asc/desc, newest, best sellers.
+Pagination / Infinite scroll (choose one; pagination preferred for SEO).
+Breadcrumbs and canonical SEO URL handling.
+Toasts/Notifications: add-to-cart success, error states.
+Empty states: no results, empty cart, no orders.
+Skeleton loaders (avoid layout shift).
+Forms: inputs, validation, error summary (checkout-critical).
+Trust Blocks: warranties, secure payment, delivery/returns policy microcopy.
+
+B4) Screen Specifications — Storefront
+B4.1 Home Page
+Hero: primary value proposition + main CTA (Shop categories / Best deals).
+Top categories tiles (6–10).
+Featured deals (based on promotions/coupons).
+Best sellers and New arrivals (configurable).
+Brand strip (top brands).
+Trust section: shipping, returns, warranty, secure payment.
+Newsletter / lead capture (optional).
+SEO: unique H1, meta, internal links to category pages.
+B4.2 Category Listing Page (PLP)
+H1 category title + short intro (SEO text, CMS-editable).
+Left sidebar filters (desktop) and filter drawer (mobile).
+Sort dropdown and results count.
+Product grid with consistent cards and quick add-to-cart.
+Badges: 'In Stock', 'Fast Shipping', 'On Sale'.
+Pagination (SEO-friendly).
+No-results handling: show suggestions and clear filters CTA.
+Performance: SSR/ISR for first load; cache category results.
+B4.3 Search Results
+Autosuggest dropdown: products + categories + brands.
+Search results page with same filters as PLP, plus 'Did you mean'.
+Track search queries for merchandising optimization.
+SEO: noindex for some search pages if needed to avoid index bloat.
+B4.4 Product Detail Page (PDP)
+Above the fold: title, brand, rating (phase 2), image gallery + zoom, price block, availability, shipping ETA, add-to-cart.
+Variant selection (if any) and compatibility/notes when applicable.
+Key specs highlights (4–6) plus full specs table (normalized attributes).
+Downloads: manuals/datasheets (if present).
+Related: alternatives, accessories, 'customers also bought'.
+Trust microcopy: returns window, warranty, payment safety.
+SEO: JSON-LD (Product/Offer), canonical, open graph.
+B4.5 Cart
+Line items with qty controls and remove.
+Price summary: subtotal, shipping estimate (optional), discounts, total.
+Coupon field (if enabled).
+Cross-sell module (accessories / recommended).
+Primary CTA: Proceed to checkout.
+Persist cart for guest via session; for logged-in via customer_id.
+B4.6 Checkout (Multi-step)
+Step 1: Email / login (guest allowed).
+Step 2: Shipping address + delivery method selection (ETA/cost).
+Step 3: Billing address + invoice data (company, VAT ID).
+Step 4: Payment (Redsys/Stripe) + anti-fraud basics.
+Step 5: Review and confirm (order summary, terms acceptance).
+Error handling: clear field errors + global summary; retry payment safely (idempotent).
+Compliance: explicit acceptance of Terms/Privacy; capture consent versions.
+B4.7 Order Confirmation
+Order number + summary + next steps.
+Email confirmation message + invoice availability status.
+Tracking placeholder (if not yet shipped).
+Account creation prompt for guest (optional).
+B4.8 Customer Account
+Login/Register + password reset flow.
+Profile: name, phone, preferences.
+Addresses: add/edit defaults (billing/shipping).
+Orders list: status, total, date; filter by status.
+Order detail: timeline, items, invoice download, shipment tracking.
+Returns (RMA): request flow, status updates.
+GDPR: consents and data export/delete request mechanism (phase 2 UI if needed).
+B4.9 Content Pages (CMS)
+About NEXUS / Store info
+Contact (form + phone + email + address)
+FAQ / Help Center
+Shipping Policy
+Returns & Warranty
+Privacy Policy
+Terms & Conditions
+These pages must be editable in WordPress headless, but rendered within the storefront layout.
+
+B5) Screen Specifications — Admin Console (Operations Platform)
+B5.1 Admin Dashboard
+KPIs: orders today, revenue, conversion (if available), AOV, payment failure rate.
+Alerts: import failures, low stock (internal), high refund rate, supplier submission errors.
+Quick actions: run import, create coupon, search orders.
+B5.2 Orders
+Orders list: filters (date, status, payment status), search by order number/email.
+Order detail: timeline, payment details, items, fulfillment split (internal vs supplier).
+Actions: cancel (before shipment), refund/partial refund, resend emails, add internal notes.
+Shipment management: create shipment, set carrier, tracking number, update status.
+B5.3 Catalog
+Product search and editing: title, descriptions, images ordering.
+Category assignment (primary + secondary).
+Attribute management: create/edit attributes, define filterable attributes.
+Media management (image/datasheet).
+Merchandising: featured products, category banners (optional).
+B5.4 Imports (Supplier Manager)
+Run imports: catalog/stock/prices/images.
+Import history: status, duration, counts, errors.
+Diff view: new products, delisted products, major price changes.
+Retries: re-run failed jobs; view raw snapshot reference.
+B5.5 Pricing Rules
+CRUD pricing rules by scope: global/category/brand/sku.
+Priority resolution and preview calculation (show computed sale price for a SKU).
+Floor price alerts (selling below cost protection).
+B5.6 Promotions & Coupons
+Create coupons (percent/fixed), usage limits, validity dates.
+Assign promotions to category/brand (phase 2).
+Track coupon usage and revenue impact.
+B5.7 Customers
+Search customers by email/phone.
+View order history, addresses, consent logs.
+Support actions: disable account (if fraud), reset password link (safe flow).
+B5.8 Returns (RMA)
+RMA list: requested/approved/received/refunded.
+RMA detail: items, reason, notes, decision.
+Refund workflow integration with payment provider; generate customer notifications.
+B5.9 Settings & Security
+Users & roles (RBAC): admin, ops, marketing, read-only.
+Audit log viewer (key actions).
+Email templates management (optional if not via provider).
+System settings: currency, tax mode, shipping rules, legal versions.
+B5.10 Logs & Observability
+View recent errors (Sentry deep link).
+Webhook events viewer: payment callbacks, processing status.
+Job queue viewer: running/failed jobs with retry.
+
+B6) UX States and Edge Cases (Must Be Designed)
+Out of stock: disable add-to-cart, show alternatives and notify-me (phase 2).
+Price changed between browse and checkout: show clear message; require reconfirmation.
+Supplier item disappears: mark SKU inactive; keep order history intact.
+Payment failures: allow retry without duplicating orders (idempotency key).
+Partial shipments: show multiple shipments and tracking numbers.
+Returns window expiry: inform user clearly and provide contact path.
+Fraud/abuse prevention: rate limit login/checkout; captcha optional on sensitive endpoints.
+
+B7) Analytics & SEO Requirements
+Analytics events (GA4 recommended): view_item, add_to_cart, begin_checkout, add_payment_info, purchase; include SKU and value.
+Search analytics: capture query, result count, clicks (for merchandising).
+SEO: clean slugs, canonical URLs, XML sitemap (products/categories), robots.txt rules.
+Structured data: Product, Offer, BreadcrumbList; OpenGraph/Twitter cards for sharing.
+Performance: image optimization, lazy loading, SSR/ISR; avoid CLS with fixed media ratios.
+
+B8) Accessibility & Quality
+Keyboard navigation for menus, filters, modals.
+ARIA labels for buttons and form fields.
+Color contrast compliance; error messages readable.
+Form validation that is both field-level and summary-level in checkout.
+
+B9) Mobile App Readiness (No Extra Backend Needed)
+All storefront actions must exist as API endpoints; no logic only in UI.
+Use consistent DTOs and versioned endpoints for mobile stability.
+Webhooks for order/shipment updates if mobile push is added later.
+

@@ -1,0 +1,184 @@
+# TheNexuStore — Project Structure Guide
+
+This document explains the folder structure, responsibilities, and rules
+for adding new features to TheNexuStore platform.
+
+---
+
+## 1. Root Folder: `thenexustore/`
+
+This is a monorepo containing all applications, services, and infrastructure.
+
+thenexustore/
+├── apps/
+├── services/
+├── packages/
+├── infra/
+├── docs/
+└── docker-compose.yml
+
+
+---
+
+## 2. `apps/` — Frontend Applications
+
+Frontend projects that consume APIs from backend services.
+
+### 2.1 `apps/storefront`
+Customer-facing e-commerce website (Next.js).
+
+Responsibilities:
+- Home, Category (PLP), Product (PDP)
+- Cart & Checkout
+- Customer account
+- SEO & performance
+
+Rules:
+- No direct DB access
+- No supplier integration
+- Uses only commerce-core APIs
+
+---
+
+### 2.2 `apps/admin`
+Internal admin panel for operations.
+
+Responsibilities:
+- Orders management
+- Imports trigger
+- Pricing rules
+- Catalog moderation
+- RMA & refunds
+
+---
+
+## 3. `services/` — Backend Services
+
+Backend business logic, APIs, and workers.
+
+### 3.1 `services/commerce-core` (Main Backend)
+
+This is the core API of the platform.
+
+Responsibilities:
+- Cart
+- Checkout
+- Orders
+- Payments
+- Pricing rules
+- Customers
+- Invoices
+- Shipments
+- Admin APIs
+
+Structure:
+
+commerce-core/
+├── src/
+│ ├── cart/
+│ ├── pricing/
+│ ├── common/
+│ └── main.ts
+├── prisma/
+│ └── schema.prisma
+
+
+Rules:
+- Owns business logic
+- Owns database schema
+- Exposes REST APIs
+- Does NOT run supplier imports
+
+---
+
+### 3.2 `services/import-workers` (Async Jobs)
+
+Background workers for async and heavy tasks.
+
+Responsibilities:
+- Supplier catalog import
+- Stock sync
+- Price sync
+- Invoice generation
+- Email sending
+
+Structure:
+
+import-workers/
+├── src/
+│ ├── jobs/
+│ ├── common/
+│ └── main.ts
+
+Rules:
+- No public APIs
+- Triggered via queues or admin actions
+- Uses same database as commerce-core
+- Does not serve frontend traffic
+
+---
+
+## 4. `packages/shared`
+
+Shared code used across services and apps.
+
+Examples:
+- Enums
+- DTOs
+- Types
+- Utility functions
+
+Rule:
+- No framework-specific code
+- Must be reusable
+
+---
+
+## 5. `infra/` — Infrastructure
+
+Infrastructure and deployment related files.
+
+Includes:
+- Docker
+- Database setup
+- Nginx
+- Reverse proxy
+- SSL
+
+Rule:
+- No business logic
+- No application code
+
+---
+
+## 6. `docs/` — Documentation
+
+Project documentation:
+- Architecture
+- API contracts
+- Decisions
+- Onboarding guides
+
+---
+
+## 7. Database & Prisma
+
+- `schema.prisma` is the single source of truth
+- Database is owned by commerce-core
+- import-workers uses the same schema
+- No legacy Odoo schema dependency
+
+---
+
+## 8. Golden Rules
+
+- Frontend → talks only to APIs
+- commerce-core → business logic owner
+- import-workers → async processing only
+- No supplier runtime dependency
+- No direct DB access from frontend
+- Everything goes via PR → staging → production
+
+---
+
+End of document.

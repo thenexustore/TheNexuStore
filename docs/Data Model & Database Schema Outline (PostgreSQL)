@@ -1,0 +1,383 @@
+Appendix A — Data Model & Database Schema Outline (PostgreSQL)
+Version: v1.0   Date: 2025-12-20
+This appendix defines an MVP-ready schema that scales to multi-supplier, mixed fulfillment, invoicing, and returns.
+A1) Design Principles (Non-Negotiable)
+Canonical product model in our DB. Supplier feeds never become the runtime “source of truth.”
+Keep supplier data separate (raw snapshots + mappings) to allow audit, rollback, and multi-supplier scaling.
+Order data immutable once paid (except status transitions). Never recalculate totals after payment.
+Use strong IDs and timestamps everywhere; use UUID for public entities to avoid enumeration.
+Events & jobs are first-class: async imports, invoices, emails, tracking updates.
+Tax/price snapshots must be stored per order item at purchase time.
+
+A2) Entity Groups and Tables
+A2.1 Catalog (Canonical)
+brands
+id (uuid, pk)
+name (text, unique)
+slug (text, unique)
+logo_url (text, nullable)
+is_active (bool)
+created_at, updated_at
+categories
+id (uuid, pk)
+parent_id (uuid, fk -> categories.id, nullable)
+name (text)
+slug (text, unique)
+sort_order (int)
+is_active (bool)
+created_at, updated_at
+Indexes: (parent_id, sort_order), slug unique
+products (product family / listing)
+id (uuid, pk)
+title (text)
+slug (text, unique)
+brand_id (uuid, fk -> brands.id)
+description_html (text, nullable)
+short_description (text, nullable)
+status (enum: draft, active, archived)
+main_category_id (uuid, fk -> categories.id, nullable)
+created_at, updated_at
+product_categories (many-to-many)
+product_id (uuid, fk -> products.id)
+category_id (uuid, fk -> categories.id)
+is_primary (bool)
+sort_order (int)
+pk (product_id, category_id)
+skus (sellable units / variants)
+id (uuid, pk)
+product_id (uuid, fk -> products.id)
+sku_code (text, unique)  [internal canonical SKU]
+gtin (text, nullable)  [EAN/UPC]
+mpn (text, nullable)   [manufacturer part number]
+name (text, nullable)  [variant name]
+status (enum: active, inactive)
+weight_grams (int, nullable)
+dimensions_mm (jsonb, nullable)  [L/W/H]
+created_at, updated_at
+product_media
+id (uuid, pk)
+product_id (uuid, fk -> products.id)
+sku_id (uuid, fk -> skus.id, nullable)
+type (enum: image, manual, datasheet)
+url (text)
+alt_text (text, nullable)
+sort_order (int)
+created_at
+attributes (for filters)
+id (uuid, pk)
+code (text, unique)  [e.g., ram_gb, storage_gb, cpu_model]
+name (text)
+data_type (enum: text, number, boolean, enum)
+unit (text, nullable)
+is_filterable (bool)
+created_at
+attribute_values (optional lookup for enums)
+id (uuid, pk)
+attribute_id (uuid, fk -> attributes.id)
+value_text (text)
+sort_order (int)
+unique(attribute_id, value_text)
+sku_attributes
+sku_id (uuid, fk -> skus.id)
+attribute_id (uuid, fk -> attributes.id)
+value_text (text, nullable)
+value_number (numeric, nullable)
+value_bool (bool, nullable)
+attribute_value_id (uuid, fk -> attribute_values.id, nullable)
+pk (sku_id, attribute_id)
+Indexing: (attribute_id, value_number), (attribute_id, attribute_value_id), (attribute_id, value_text)
+A2.2 Suppliers (INFORTISA + Future)
+suppliers
+id (uuid, pk)
+name (text, unique)
+code (text, unique)  [e.g., INFORTISA]
+status (enum: active, inactive)
+config (jsonb)  [endpoints/auth references — no secrets]
+created_at, updated_at
+supplier_products (mapping)
+id (uuid, pk)
+supplier_id (uuid, fk -> suppliers.id)
+supplier_sku (text)  [their identifier]
+sku_id (uuid, fk -> skus.id, nullable)  [mapped to our SKU]
+supplier_payload_hash (text)  [change detection]
+last_seen_at (timestamp)
+is_active (bool)
+unique(supplier_id, supplier_sku)
+supplier_stock
+supplier_product_id (uuid, fk -> supplier_products.id)
+qty_available (int)
+qty_inbound (int, nullable)
+availability_code (text, nullable)
+updated_at (timestamp)
+pk (supplier_product_id)
+supplier_prices
+supplier_product_id (uuid, fk -> supplier_products.id)
+cost_price (numeric(12,2))
+currency (text, default EUR)
+updated_at (timestamp)
+pk (supplier_product_id)
+supplier_raw_snapshots (audit/rollback)
+id (uuid, pk)
+supplier_id (uuid)
+type (enum: catalog, stock, prices, images)
+fetched_at (timestamp)
+source_ref (text, nullable)
+payload (jsonb or text)  [or pointer to object storage]
+checksum (text)
+status (enum: ok, failed)
+error (text, nullable)
+A2.3 Pricing (Sell Price)
+pricing_rules
+id (uuid, pk)
+scope (enum: global, category, brand, sku)
+category_id (uuid, nullable)
+brand_id (uuid, nullable)
+sku_id (uuid, nullable)
+margin_pct (numeric(5,2))
+min_margin_amount (numeric(12,2), nullable)
+rounding_mode (enum: none, x.99, x.95)
+is_active (bool)
+priority (int)  [higher wins]
+created_at, updated_at
+sku_prices (computed cache)
+sku_id (uuid, fk -> skus.id, pk)
+sale_price (numeric(12,2))
+compare_at_price (numeric(12,2), nullable)
+currency (text, default EUR)
+price_source (text)
+updated_at
+A2.4 Inventory (Internal Stock) + Availability
+warehouses
+id (uuid, pk)
+name (text)
+code (text, unique)
+created_at
+inventory_levels
+warehouse_id (uuid)
+sku_id (uuid)
+qty_on_hand (int)
+qty_reserved (int)
+updated_at
+pk (warehouse_id, sku_id)
+Availability: available = qty_on_hand - qty_reserved
+A2.5 Customers & Auth
+customers
+id (uuid, pk)
+email (citext, unique)
+password_hash (text, nullable)
+first_name, last_name (text)
+phone (text, nullable)
+is_active (bool)
+created_at, updated_at
+customer_addresses
+id (uuid, pk)
+customer_id (uuid, fk -> customers.id)
+type (enum: shipping, billing)
+full_name (text)
+company (text, nullable)
+vat_id (text, nullable)
+address_line1, address_line2 (text)
+city, postal_code, region, country (text)
+phone (text, nullable)
+is_default (bool)
+created_at, updated_at
+customer_consents
+id (uuid, pk)
+customer_id (uuid)
+type (enum: marketing_email, terms_accepted, privacy_accepted)
+version (text)
+accepted_at (timestamp)
+source (text)  [web, mobile]
+ip_address (text, nullable)
+A2.6 Cart
+carts
+id (uuid, pk)
+customer_id (uuid, nullable)
+session_id (text, nullable)
+status (enum: active, converted, abandoned)
+currency (text, default EUR)
+created_at, updated_at
+cart_items
+id (uuid, pk)
+cart_id (uuid, fk -> carts.id)
+sku_id (uuid, fk -> skus.id)
+qty (int)
+unit_price_snapshot (numeric(12,2), optional)
+created_at, updated_at
+unique(cart_id, sku_id)
+A2.7 Orders, Payments, Invoices
+orders
+id (uuid, pk)
+order_number (text, unique)
+customer_id (uuid, nullable)
+email (citext)  [guest checkout]
+status (enum: pending_payment, paid, processing, shipped, delivered, cancelled, refunded, failed)
+currency (text, default EUR)
+subtotal_amount (numeric(12,2))
+shipping_amount (numeric(12,2))
+discount_amount (numeric(12,2))
+tax_amount (numeric(12,2))
+total_amount (numeric(12,2))
+billing_address_json (jsonb)
+shipping_address_json (jsonb)
+created_at, updated_at, paid_at (timestamp, nullable)
+order_items
+id (uuid, pk)
+order_id (uuid, fk -> orders.id)
+sku_id (uuid, fk -> skus.id)
+title_snapshot (text)
+unit_price (numeric(12,2))
+qty (int)
+line_subtotal (numeric(12,2))
+tax_amount (numeric(12,2))
+line_total (numeric(12,2))
+fulfillment_type (enum: internal, supplier)
+supplier_id (uuid, nullable)
+supplier_product_id (uuid, nullable)
+created_at
+Note: store snapshots so catalog changes do not affect past orders.
+payments
+id (uuid, pk)
+order_id (uuid, fk -> orders.id)
+provider (enum: redsys, stripe, paypal)
+status (enum: initiated, authorized, captured, failed, refunded, partial_refund)
+amount (numeric(12,2))
+currency (text)
+provider_payment_id (text, nullable)
+raw_response (jsonb, nullable)
+created_at, updated_at
+invoices
+id (uuid, pk)
+order_id (uuid, unique)
+invoice_number (text, unique)
+issued_at (timestamp)
+pdf_url (text)
+billing_company (text, nullable)
+billing_vat_id (text, nullable)
+totals_json (jsonb)
+created_at
+A2.8 Shipments & Tracking
+shipments
+id (uuid, pk)
+order_id (uuid, fk -> orders.id)
+carrier (text)
+service_level (text, nullable)
+tracking_number (text, nullable)
+tracking_url (text, nullable)
+status (enum: pending, shipped, in_transit, delivered, exception)
+shipped_at (timestamp, nullable)
+delivered_at (timestamp, nullable)
+created_at, updated_at
+shipment_items
+shipment_id (uuid, fk -> shipments.id)
+order_item_id (uuid, fk -> order_items.id)
+qty (int)
+pk (shipment_id, order_item_id)
+tracking_events
+id (uuid, pk)
+shipment_id (uuid, fk -> shipments.id)
+event_time (timestamp)
+status (text)
+location (text, nullable)
+details (text, nullable)
+A2.9 Returns (RMA) & Refunds
+rmas
+id (uuid, pk)
+rma_number (text, unique)
+order_id (uuid)
+customer_id (uuid, nullable)
+status (enum: requested, approved, rejected, received, refunded, closed)
+reason_code (text)
+notes (text, nullable)
+created_at, updated_at
+rma_items
+id (uuid, pk)
+rma_id (uuid)
+order_item_id (uuid)
+qty (int)
+resolution (enum: refund, replace)
+created_at
+refunds
+id (uuid, pk)
+payment_id (uuid)
+rma_id (uuid, nullable)
+amount (numeric(12,2))
+status (enum: initiated, succeeded, failed)
+provider_refund_id (text, nullable)
+raw_response (jsonb, nullable)
+created_at, updated_at
+A2.10 Promotions & Coupons (MVP Minimal)
+coupons
+id (uuid, pk)
+code (text, unique)
+type (enum: percent, fixed)
+value (numeric(12,2))
+min_order_amount (numeric(12,2), nullable)
+starts_at, ends_at (timestamp, nullable)
+usage_limit (int, nullable)
+is_active (bool)
+order_discounts
+order_id (uuid)
+coupon_id (uuid)
+amount (numeric(12,2))
+pk (order_id, coupon_id)
+A2.11 Async Jobs, Webhooks, and Audit
+jobs
+id (uuid, pk)
+type (enum: import_catalog, import_stock, import_prices, generate_invoice, send_email, sync_tracking)
+status (enum: queued, running, succeeded, failed, retrying)
+payload (jsonb)
+attempts (int)
+run_at (timestamp)
+last_error (text, nullable)
+created_at, updated_at
+webhook_events
+id (uuid, pk)
+source (text)
+event_type (text)
+received_at (timestamp)
+payload (jsonb)
+processed_at (timestamp, nullable)
+status (enum: received, processed, failed)
+error (text, nullable)
+audit_log
+id (uuid, pk)
+actor_type (enum: admin, system, customer)
+actor_id (uuid, nullable)
+action (text)
+entity_type (text)
+entity_id (uuid, nullable)
+metadata (jsonb)
+created_at
+
+A3) Critical Indexes (Performance)
+products(slug) unique
+skus(sku_code) unique
+categories(slug) unique
+brands(slug) unique
+orders(order_number) unique
+orders(customer_id, created_at desc)
+order_items(order_id)
+supplier_products(supplier_id, supplier_sku) unique
+supplier_stock(updated_at)
+sku_attributes(attribute_id, value_number) and sku_attributes(attribute_id, attribute_value_id)
+Consider full-text index on products.title + products.description_html (or use OpenSearch)
+
+A4) Notes on Search and Filters
+For PCComponentes-like filtering: keep attributes normalized for fast filtering.
+Use a search index (OpenSearch/Algolia) with: product title, brand, categories, key specs flattened, price and availability.
+DB remains the source of truth; search index is derived.
+
+A5) Multi-Supplier Roadmap (Built Into Schema)
+Schema supports supplier mapping via supplier_products and linking to skus.
+For multi-supplier per SKU, add: sku_supplier_links(sku_id, supplier_product_id, priority, is_preferred).
+Supplier selection can be: lowest landed cost + availability + SLA policy.
+
+A6) MVP “Minimum Set” (If Time Is Tight)
+Keep: products, skus, categories, brands.
+Keep: supplier_products, supplier_stock, supplier_prices.
+Keep: orders, order_items, payments, invoices.
+Keep: shipments.
+Keep: jobs (mandatory).
+Everything else can be Phase 2.
+

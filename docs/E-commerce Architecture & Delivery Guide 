@@ -1,0 +1,276 @@
+TheNexuStore by NEXUS SP Solutions— E-commerce Architecture & Delivery Guide
+Version: v1.1   Date: 2025-12-20
+TheNexuStore — E-commerce Architecture & Delivery Guide (v1.1)
+Client/Owner: NEXUS SP Solutions
+Project: New e-commerce platform “TheNexuStore” (replacement of current Odoo-based store)
+Audience: Suraj, Chaitayna (Full-Stack Developers)
+Supervisor: Antonio (NEXUS IT/Cyber)
+Priorities: Clean architecture, stability, speed, conversion, scalability, maintainability
+
+1) Context and Purpose
+
+We are rebuilding our e-commerce because the current implementation (Odoo + custom API) has accumulated technical debt, is difficult to evolve, and has reliability issues. The new store must be designed as a modern, scalable e-commerce platform, with robust supplier integration starting with INFORTISA, and extendable to future suppliers.
+We want the result to be:
+Modular (clear boundaries; replaceable components)
+API-First (same backend for web, future mobile app, and internal admin platform)
+Scalable (more suppliers, more traffic, more categories)
+Understandable (clean codebase, documentation, testing, monitoring)
+Operationally complete (checkout → payment → invoice → shipping/tracking → emails → returns/RMA)
+
+2) Goals and Non-Goals
+2.1 Goals
+Launch a stable, high-converting e-commerce similar in UX to PCComponentes/Design by Sai.
+API-first architecture that supports: Web storefront, future mobile app (iOS/Android), and an internal operations/admin console (“simple multi-platform”).
+Integrate INFORTISA first, using a scalable “supplier adapter” approach.
+Automate the full order lifecycle: Cart → Checkout → Payment → Invoice generation → Shipment/tracking → Customer notifications.
+Strong SEO foundation and high performance (mobile-first, Core Web Vitals oriented).
+Proper DevOps: staging, CI/CD, backups, monitoring, and security controls.
+2.2 Non-Goals for MVP (Phase 1)
+Full marketplace / multi-vendor system.
+Replacing full accounting/ERP processes (we will export data cleanly).
+Building an overly complex custom CMS from scratch.
+
+3) Recommended Target Architecture (High-Level)
+3.1 Strong Recommendation: Headless/Composable Commerce
+We want to decouple the storefront from the commerce core. WordPress can be used for marketing content, but catalog + checkout + orders must be controlled by the commerce backend to keep integration and operations stable.
+3.2 Components Overview
+Storefront Web (Front): Next.js (React) for performance + SEO + scalability.
+CMS (optional): WordPress Headless (only for pages/blog/landing content).
+Commerce Core (Back): Node.js NestJS (preferred) or equivalent. Must expose OpenAPI/Swagger.
+Database: PostgreSQL (primary).
+Cache: Redis (sessions, caching, rate limiting).
+Search: OpenSearch/Elasticsearch (self-host) or Algolia (SaaS).
+Async/Queue: RabbitMQ (self-host) or AWS SQS for imports, invoices, emails.
+Object storage: S3/MinIO for images and documents; CDN recommended.
+Observability: centralized logs + metrics dashboards + Sentry.
+3.3 Environments (Mandatory)
+DEV: local docker compose.
+STAGING: mirrors PROD, used for validation.
+PROD: hardened, backups, least-privilege access.
+Important
+No direct development on PROD. Fixes go through PR → staging → production.
+
+4) Domain Model (Core Data)
+4.1 Core Entities
+Catalog: Product, Variant/SKU, Brand, Category, Attribute/Feature (normalized), Media (images), Documents (datasheets).
+Suppliers: Supplier (INFORTISA, etc.), SupplierProduct mapping, SupplierStock, SupplierCostPrice.
+Customers: Customer, Address, Company/VAT info, GDPR consent flags.
+Commerce: Cart, Order, PaymentAttempt, Invoice (PDF reference), Shipment, TrackingEvent.
+After-sales: Return/RMA, Refund (Support tickets optional Phase 2).
+4.2 Source of Truth
+Commerce Core DB is the source of truth for catalog (normalized), orders, customers.
+Supplier feeds are imported and transformed into canonical model; do not depend live on supplier at request time.
+
+5) Supplier Integration (INFORTISA First) — Adapter Pattern
+5.1 Non-Negotiable: Supplier Adapters
+Each supplier is a pluggable module implementing a common interface:
+fetchCatalog(), fetchStock(), fetchPrices(), fetchImages(), submitOrder(), fetchTracking().
+All adapters output a canonical internal schema.
+5.2 Import Pipeline (Async)
+Pull feed from INFORTISA (API/FTP/CSV/JSON depending on their spec).
+Store raw snapshot (audit + rollback).
+Transform → canonical schema (category mapping, brand normalization).
+Upsert into core tables (products, attributes, media).
+Compute final sale price (pricing rules).
+Update search index.
+Generate import report (new/changed items, missing images, failures, retries).
+5.3 Stock Policy
+Refresh stock frequently (example every 15–30 minutes).
+Use conservative availability to prevent overselling.
+Support reserved stock for carts/orders.
+5.4 Pricing Rules (Configurable)
+Base margin per category/brand.
+Floor price protection (cost + fees + minimum profit).
+Rounding rules (.99, etc.).
+Promotions: coupons, time-boxed offers.
+Regional tax logic configurable if needed (Ceuta vs Peninsula).
+
+6) UX/UI Requirements (Benchmark: PCComponentes)
+6.1 Navigation and Discovery
+Mega-menu categories + featured brands.
+Search with autosuggest (products/brands/categories).
+Filters on PLP: price, brand, key specs, availability/shipping time.
+Breadcrumbs and SEO-friendly slugs.
+6.2 Product Detail Page (PDP)
+Above the fold: name, image gallery (zoom), price, availability, shipping estimate, add-to-cart.
+Trust elements: warranty/returns, secure payment badges.
+Normalized specs table.
+Related products: alternatives + accessories.
+Documents: datasheet/manual.
+SEO structured data (JSON-LD).
+6.3 Checkout (Conversion Critical)
+Guest checkout + account checkout.
+Clear shipping costs + ETA.
+Invoice details (company name, VAT ID).
+Card payments (Redsys or Stripe) — decide quickly.
+Confirmation page + immediate email confirmation.
+6.4 Customer Account
+Order history.
+Invoice downloads.
+Tracking status.
+Returns/RMA request (simple MVP).
+
+7) End-to-End E-commerce Flows
+7.1 Standard Order Flow (Happy Path)
+Customer adds items → cart.
+Checkout (address + shipping + payment).
+Payment success → create Order = “Paid”.
+Trigger invoice generation job (PDF + store) + notification email.
+Fulfillment: internal stock pick OR supplier dropship.
+Shipment created + tracking recorded.
+Emails: order confirmation, invoice available, shipped + tracking, delivered (optional).
+7.2 Mixed Fulfillment
+One order may split: items from INFORTISA and items from internal stock.
+Phase 2: multiple suppliers.
+7.3 Returns/RMA (MVP)
+Customer selects order item → reason → request type (refund/replace).
+Generate RMA number + instructions email.
+Admin approves/rejects and triggers refund workflow.
+
+8) API Design (Public + Internal)
+8.1 Principles
+Versioned API: /api/v1/…
+OpenAPI/Swagger always up to date.
+Idempotency for checkout/payment endpoints.
+Webhooks for async updates (shipment updates, refunds).
+Rate limiting and proper authentication scopes.
+8.2 Minimum Endpoints (MVP)
+Catalog: GET /products, GET /products/{id}, GET /categories, GET /brands, GET /search?q=
+Cart & Checkout: POST /cart, PATCH /cart, POST /checkout, POST /payments, POST /webhooks/payment
+Orders: GET /orders, GET /orders/{id}, GET /orders/{id}/invoice
+Returns: POST /returns
+Admin: POST /admin/imports/run, GET /admin/imports/report, GET/PUT /admin/pricing-rules, POST /admin/shipment
+8.3 Authentication
+Customers: JWT or session cookies (httpOnly cookies preferred).
+Admin: MFA recommended; RBAC roles (admin, ops, marketing).
+Service-to-service: signed tokens or mTLS.
+
+9) Emails, Invoices, and Documents
+9.1 Transactional Emails (MVP)
+Order confirmation.
+Payment confirmation.
+Invoice available.
+Shipment + tracking.
+RMA updates.
+Email Requirements
+Template-driven (EN/ES ready), deliverability controls (SPF/DKIM/DMARC), and reliable provider recommended.
+9.2 Invoice Generation
+Auto-generate PDF invoice after payment confirmation.
+Store PDF securely and allow download in customer account.
+Export accounting data (CSV/JSON) for external accountant/gestoría.
+
+10) Internal Admin / Operations Console (Simple Multi-Platform)
+Purpose
+We need a lightweight internal console so operations do not depend on developers.
+MVP Admin Features
+Dashboard: orders today, revenue, conversion, stock alerts.
+Catalog management: category mapping, override descriptions, manage featured products.
+Pricing rules: margins per category/brand, promotions, coupons.
+Imports: run imports, view status/report, retry failed jobs.
+Orders: change status, attach tracking, handle cancellations/refunds.
+Returns: approve/reject RMA.
+
+11) Engineering Standards (Non-Negotiable)
+11.1 Repo Structure
+Monorepo recommended: /apps/storefront, /apps/admin, /services/commerce-core, /services/import-workers, /packages/shared.
+Keep shared types/utilities in /packages/shared.
+11.2 Branching & Releases
+main = production, develop = staging, feature/* = PR only.
+No direct commits to main.
+Code review required.
+11.3 Quality Gates
+Unit tests: pricing rules, import transforms.
+Integration tests: checkout/payment endpoints.
+Lint + format (ESLint/Prettier).
+Dependency security scanning.
+Performance budget for storefront pages.
+11.4 Observability
+Structured logging (JSON).
+Sentry (frontend + backend).
+Metrics dashboards.
+Alerts: import failures, payment failure spikes, supplier order submission failures, API latency.
+
+12) Security and Compliance
+Requirements
+GDPR: consent records + data export/delete workflow.
+Least privilege access per environment.
+Secrets management (never in git).
+Backups: daily DB + object storage backups; tested restore procedure.
+WAF/CDN recommended on production; rate limits on auth/checkout endpoints.
+
+13) MVP Scope (Phase 1) vs Phase 2
+13.1 Phase 1 (MVP Launch)
+Storefront: home, PLP, PDP, search, cart, checkout, account.
+INFORTISA: import catalog/stock/price/images + reporting.
+Payment: card (Redsys or Stripe).
+Invoices: PDF generation + download.
+Shipping: manual tracking entry in admin (MVP).
+Admin: orders, imports, pricing rules.
+13.2 Phase 2
+Add more wholesalers via adapters.
+Advanced promotions, bundles, accessories automation.
+Carrier APIs (MRW/SEUR/Correos) end-to-end.
+More robust returns automation.
+Mobile app (reuse the same API).
+
+14) Inputs Needed From NEXUS
+We will provide:
+INFORTISA documentation + credentials (feed format, endpoints, auth).
+Target categories + priority brands.
+Legal texts: terms, privacy, returns, warranty (EN + ES).
+Payment provider decision + merchant credentials.
+Email domain DNS access; sender identities (noreply@, support@).
+Shipping policy, carriers, and delivery estimate logic.
+Brand assets (logo, colors, typography) + UI references.
+
+15) Definition of Done (Acceptance Criteria)
+Rules
+Runs on staging via deploy from develop.
+Tested (unit/integration where relevant).
+Observability confirmed (logs + Sentry).
+Security checks: no secrets leaked; endpoints protected.
+Meets UX requirements on mobile + desktop.
+Docs updated (README + OpenAPI if API change).
+MVP Acceptance Checklist
+Catalog import works and produces a clear report.
+PLP/PDP/search/filtering work reliably and fast.
+Checkout + payment reliably creates orders.
+Invoice PDF generated and downloadable.
+Customer emails sent correctly.
+Admin can manage orders and import status without developer help.
+
+16) Delivery Plan (Recommended Sprints)
+Sprint 0 (Setup)
+Repo setup (monorepo).
+CI/CD pipeline.
+Staging + prod environment skeleton.
+DB schema baseline.
+Basic storefront shell.
+Observability base (Sentry + logs).
+Sprint 1 (Catalog & UX Core)
+INFORTISA import pipeline (raw snapshot + transform + upsert).
+Category/brand mapping tooling.
+PLP + PDP + search + filters.
+Image handling.
+Sprint 2 (Checkout & Payments)
+Cart + checkout.
+Payment integration (Redsys/Stripe).
+Order creation + order status machine.
+Confirmation emails.
+Sprint 3 (Invoices, Admin, Shipping)
+Invoice PDF generation.
+Admin console: orders/imports/pricing rules.
+Shipment/tracking (manual entry MVP).
+Customer account: orders + invoice download + tracking view.
+Sprint 4 (Stabilization)
+Performance optimization (Core Web Vitals).
+Security hardening.
+Monitoring + alerts.
+Bug fixing + launch readiness checklist.
+
+Final Notes (Rules of Engagement)
+	•	No patches on PROD. All changes go via PR → staging → production.
+	•	Keep integration logic in backend services, never in the frontend.
+	•	Everything must be documented: installation, env vars, API, deployment.
+	•	Modular design is mandatory: suppliers will increase after INFORTISA.
+

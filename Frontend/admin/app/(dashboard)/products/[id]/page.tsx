@@ -12,13 +12,26 @@ import {
   Calendar,
   Hash,
   Warehouse,
+  Star,
+  Box,
+  Image as ImageIcon,
+  Grid,
+  Check,
+  AlertCircle,
+  TrendingDown,
+  Settings,
+  Copy,
 } from "lucide-react";
-import { fetchProductById } from "@/lib/api";
+import {
+  fetchProductById,
+  toggleFeatured,
+  type Product,
+} from "@/lib/api/products";
 
 export default function ProductViewPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,64 +49,103 @@ export default function ProductViewPage() {
     }
   };
 
+  const handleToggleFeatured = async () => {
+    if (!product) return;
+    try {
+      await toggleFeatured(product.id);
+      loadProduct();
+    } catch (error) {
+      console.error("Failed to toggle featured:", error);
+    }
+  };
+
   if (loading) return <LoadingState />;
   if (!product) return <NotFoundState router={router} />;
 
-  const sku = product.skus?.[0];
-  const price = sku?.price;
-  const inventory = sku?.inventory;
-
   return (
     <div className="max-w-7xl mx-auto">
-      <Header product={product} id={id} sku={sku} router={router} />
+      <Header
+        product={product}
+        id={id as string}
+        router={router}
+        onToggleFeatured={handleToggleFeatured}
+      />
 
       <div className="grid lg:grid-cols-3 gap-6 mt-6">
         <MainContent product={product} />
-        <Sidebar price={price} inventory={inventory} product={product} />
+        <Sidebar product={product} />
       </div>
     </div>
   );
 }
 
-function Header({ product, id, sku, router }: any) {
+function Header({ product, id, router, onToggleFeatured }: any) {
+  const brandName =
+    typeof product.brand === "object" ? product.brand.name : product.brand;
+
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/products")}
-            className="p-2 hover:bg-slate-100 rounded-lg"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold">
-              {product.title}{" "}
-              <span className="ml-3">
-                <StatusBadge status={product.status} />
-              </span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-slate-900">
+                {product.title}
+              </h1>
+              {product.featured_product && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 rounded-full text-sm font-semibold border border-amber-200">
+                  <Star className="w-3 h-3 fill-amber-700" />
+                  Featured
+                </span>
+              )}
+              <StatusBadge status={product.product_status} />
+            </div>
             <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
               <div className="flex items-center gap-1">
                 <Hash className="w-4 h-4" />
-                <span>ID: {id}</span>
+                <span className="font-mono">{product.sku_code}</span>
               </div>
-              {sku && (
-                <div className="flex items-center gap-1">
-                  <Package className="w-4 h-4" />
-                  <span>SKU: {sku.sku_code}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <Package className="w-4 h-4" />
+                <span>{brandName || "No Brand"}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Box className="w-4 h-4" />
+                <span>{product.stock_quantity} in stock</span>
+              </div>
             </div>
           </div>
         </div>
-        <button
-          onClick={() => router.push(`/products/${id}/edit`)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2"
-        >
-          <Edit className="w-4 h-4" />
-          Edit Product
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={onToggleFeatured}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors ${
+              product.featured_product
+                ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Star
+              className={`w-4 h-4 ${
+                product.featured_product ? "fill-amber-700" : ""
+              }`}
+            />
+            {product.featured_product ? "Remove Featured" : "Mark Featured"}
+          </button>
+          <button
+            onClick={() => router.push(`/products/${product.id}/edit`)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-blue-700 transition-colors"
+          >
+            <Edit className="w-4 h-4" />
+            Edit Product
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -101,14 +153,14 @@ function Header({ product, id, sku, router }: any) {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: any = {
-    ACTIVE: "bg-emerald-100 text-emerald-800",
-    DRAFT: "bg-amber-100 text-amber-800",
-    ARCHIVED: "bg-slate-100 text-slate-800",
+    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    DRAFT: "bg-amber-50 text-amber-700 border-amber-100",
+    ARCHIVED: "bg-slate-100 text-slate-600 border-slate-200",
   };
 
   return (
     <span
-      className={`px-3 py-1 rounded-full text-sm font-medium ${
+      className={`px-3 py-1 rounded-full text-sm font-medium border ${
         colors[status] || colors.DRAFT
       }`}
     >
@@ -117,19 +169,208 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function MainContent({ product }: any) {
+function StockStatusBadge({ status }: { status: string }) {
+  const colors: any = {
+    IN_STOCK: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    OUT_OF_STOCK: "bg-red-50 text-red-700 border-red-100",
+    LOW_STOCK: "bg-amber-50 text-amber-700 border-amber-100",
+    PREORDER: "bg-blue-50 text-blue-700 border-blue-100",
+  };
+
+  const icons: any = {
+    IN_STOCK: <Check className="w-3 h-3" />,
+    OUT_OF_STOCK: <AlertCircle className="w-3 h-3" />,
+    LOW_STOCK: <TrendingDown className="w-3 h-3" />,
+    PREORDER: <Calendar className="w-3 h-3" />,
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${
+        colors[status] || colors.IN_STOCK
+      }`}
+    >
+      {icons[status]}
+      {status.replace("_", " ")}
+    </span>
+  );
+}
+
+function MainContent({ product }: { product: Product }) {
+  function MainContent({ product }: { product: Product }) {
+    return (
+      <div className="lg:col-span-2 space-y-6">
+        <Card title="Product Images" icon={ImageIcon}>
+          {product.product_images && product.product_images.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {product.product_images.map((img, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={img.url}
+                    alt={img.alt_text || product.title}
+                    className="aspect-square object-cover rounded-lg w-full border border-slate-200"
+                  />
+                  {img.alt_text && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                      {img.alt_text}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-500 text-center py-8">
+              No images available
+            </p>
+          )}
+        </Card>
+
+        <Card title="Description" icon={Package}>
+          {product.product_description ? (
+            <div className="prose max-w-none">
+              {product.product_description}
+            </div>
+          ) : (
+            <p className="text-slate-500 italic">No description provided</p>
+          )}
+          {product.short_description && (
+            <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <p className="text-sm font-medium text-slate-700 mb-1">
+                Short Description:
+              </p>
+              <p className="text-slate-600">{product.short_description}</p>
+            </div>
+          )}
+        </Card>
+
+        {product.attributes && product.attributes.length > 0 && (
+          <Card title="Product Attributes" icon={Settings}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {product.attributes.map((attr, index) => (
+                <div
+                  key={index}
+                  className="p-3 bg-slate-50 rounded-lg border border-slate-200"
+                >
+                  <p className="text-sm font-medium text-slate-700 mb-1 capitalize">
+                    {attr.key}:
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="px-2 py-1 bg-white text-slate-600 rounded text-sm border border-slate-200">
+                      {attr.value}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {product.variants && product.variants.length > 0 && (
+          <Card title="Product Variants" icon={Layers}>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                      SKU
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                      Attributes
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                      Price
+                    </th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                      Stock
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {product.variants.map((variant) => (
+                    <tr
+                      key={variant.id}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Hash className="w-3 h-3 text-slate-400" />
+                          <span className="font-mono text-sm">
+                            {variant.sku_code}
+                          </span>
+                          <button
+                            onClick={() =>
+                              navigator.clipboard.writeText(variant.sku_code)
+                            }
+                            className="p-1 hover:bg-slate-200 rounded"
+                            title="Copy SKU"
+                          >
+                            <Copy className="w-3 h-3 text-slate-400" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {variant.attributes && variant.attributes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {variant.attributes.map((attr, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium"
+                              >
+                                {attr.key}: {attr.value}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm">
+                            No attributes
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-900">
+                            ₹{variant.price.toLocaleString()}
+                          </span>
+                          {variant.compare_at_price && (
+                            <span className="text-xs text-slate-400 line-through">
+                              ₹{variant.compare_at_price.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-sm text-slate-700">
+                          {variant.stock_quantity} units
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="lg:col-span-2 space-y-6">
-      <Card title="Product Images" icon={Package}>
-        {product.media?.length > 0 ? (
+      <Card title="Product Images" icon={ImageIcon}>
+        {product.product_images && product.product_images.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {product.media.map((img: any) => (
-              <img
-                key={img.id}
-                src={img.url}
-                alt={img.alt_text || product.title}
-                className="aspect-square object-cover rounded-lg w-full"
-              />
+            {product.product_images.map((img, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={img.url}
+                  alt={img.alt_text || product.title}
+                  className="aspect-square object-cover rounded-lg w-full border border-slate-200"
+                />
+                {img.alt_text && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                    {img.alt_text}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         ) : (
@@ -137,101 +378,243 @@ function MainContent({ product }: any) {
         )}
       </Card>
 
-      {product.description_html && (
-        <Card title="Description">
-          <div
-            className="prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: product.description_html }}
-          />
+      <Card title="Description" icon={Package}>
+        {product.product_description ? (
+          <div className="prose max-w-none">{product.product_description}</div>
+        ) : (
+          <p className="text-slate-500 italic">No description provided</p>
+        )}
+        {product.short_description && (
+          <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <p className="text-sm font-medium text-slate-700 mb-1">
+              Short Description:
+            </p>
+            <p className="text-slate-600">{product.short_description}</p>
+          </div>
+        )}
+      </Card>
+
+      {product.attributes && product.attributes.length > 0 && (
+        <Card title="Product Attributes" icon={Settings}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {product.attributes.map((attr, index) => (
+              <div
+                key={index}
+                className="p-3 bg-slate-50 rounded-lg border border-slate-200"
+              >
+                <p className="text-sm font-medium text-slate-700 mb-1 capitalize">
+                  {attr.key}:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  <span className="px-2 py-1 bg-white text-slate-600 rounded text-sm border border-slate-200">
+                    {attr.value}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {product.variants && product.variants.length > 0 && (
+        <Card title="Product Variants" icon={Layers}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                    SKU
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                    Attributes
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                    Price
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                    Stock
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {product.variants.map((variant) => (
+                  <tr
+                    key={variant.id}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                  >
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-3 h-3 text-slate-400" />
+                        <span className="font-mono text-sm">
+                          {variant.sku_code}
+                        </span>
+                        <button
+                          onClick={() =>
+                            navigator.clipboard.writeText(variant.sku_code)
+                          }
+                          className="p-1 hover:bg-slate-200 rounded"
+                          title="Copy SKU"
+                        >
+                          <Copy className="w-3 h-3 text-slate-400" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      {variant.attributes && variant.attributes.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {variant.attributes.map((attr, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium"
+                            >
+                              {attr.key}: {attr.value}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-sm">
+                          No attributes
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-slate-900">
+                          ₹{variant.price.toLocaleString()}
+                        </span>
+                        {variant.compare_at_price && (
+                          <span className="text-xs text-slate-400 line-through">
+                            ₹{variant.compare_at_price.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-slate-700">
+                        {variant.stock_quantity} units
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
     </div>
   );
 }
 
-function Sidebar({ price, inventory, product }: any) {
+function Sidebar({ product }: { product: Product }) {
+  const brandName =
+    typeof product.brand === "object" ? product.brand.name : product.brand;
+  const categoryName =
+    typeof product.category === "object"
+      ? product.category.name
+      : product.category;
+
   const discount =
-    price?.compare_at_price && price?.sale_price
-      ? Math.round((1 - price.sale_price / price.compare_at_price) * 100)
+    product.discount_price && product.price
+      ? Math.round((1 - product.price / product.discount_price) * 100)
       : 0;
 
   return (
     <div className="space-y-6">
-      <Card title="Pricing" icon={Tag}>
-        <InfoRow
-          label="Sale Price"
-          value={`₹${price?.sale_price?.toLocaleString() || 0}`}
-          bold
-        />
-        <InfoRow
-          label="Compare at Price"
-          value={
-            price?.compare_at_price
-              ? `₹${price.compare_at_price.toLocaleString()}`
-              : "—"
-          }
-          strikethrough
-        />
-        {discount > 0 && (
-          <InfoRow
-            label="Discount"
-            value={`${discount}% OFF`}
-            className="text-emerald-600"
-          />
-        )}
-      </Card>
-
-      <Card title="Inventory" icon={Database}>
-        <InfoRow
-          label="Available Stock"
-          value={`${inventory?.qty_on_hand || 0} units`}
-          className={getStockColor(inventory?.qty_on_hand)}
-          bold
-        />
-        <InfoRow
-          label="Reserved Stock"
-          value={`${inventory?.qty_reserved || 0} units`}
-        />
-        {inventory?.warehouse && (
-          <InfoRow
-            label="Warehouse"
-            value={
-              <div className="text-right">
-                <div>{inventory.warehouse.name}</div>
-                <div className="text-sm text-slate-500">
-                  ({inventory.warehouse.code})
-                </div>
+      <Card title="Pricing & Inventory" icon={Tag}>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-600">Sale Price</span>
+            <span className="text-xl font-bold text-slate-900">
+              ₹{product.price.toLocaleString()}
+            </span>
+          </div>
+          {product.discount_price && (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600">Compare at Price</span>
+                <span className="text-lg text-slate-400 line-through">
+                  ₹{product.discount_price.toLocaleString()}
+                </span>
               </div>
-            }
-          />
-        )}
-      </Card>
-
-      <Card title="Product Details" icon={Layers}>
-        <InfoRow label="Brand" value={product.brand?.name || "—"} />
-        <div className="mt-3">
-          <p className="text-sm text-slate-500 mb-2">Categories</p>
-          <div className="flex flex-wrap gap-2">
-            {product.categories?.map((cat: any) => (
+              {discount > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">Discount</span>
+                  <span className="text-lg font-semibold text-emerald-600">
+                    {discount}% OFF
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+          <div className="pt-3 border-t border-slate-200">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-slate-600">Stock Status</span>
+              <StockStatusBadge status={product.stock_status} />
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Available Quantity</span>
               <span
-                key={cat.id}
-                className="bg-slate-100 px-3 py-1 rounded text-sm"
+                className={`text-lg font-bold ${
+                  product.stock_quantity > 10
+                    ? "text-emerald-600"
+                    : product.stock_quantity > 0
+                    ? "text-amber-600"
+                    : "text-red-600"
+                }`}
               >
-                {cat.name}
+                {product.stock_quantity} units
               </span>
-            ))}
+            </div>
           </div>
         </div>
-        <InfoRow
-          label="SKU Variants"
-          value={`${product.skusCount || 1} variant(s)`}
-        />
+      </Card>
+
+      <Card title="Categories" icon={Grid}>
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm text-slate-500 mb-2">Primary Category</p>
+            <span className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium">
+              {categoryName || "Uncategorized"}
+            </span>
+          </div>
+          {product.categories && product.categories.length > 0 && (
+            <div>
+              <p className="text-sm text-slate-500 mb-2">Other Categories</p>
+              <div className="flex flex-wrap gap-2">
+                {product.categories.map((cat, idx) => {
+                  const catName = typeof cat === "object" ? cat.name : cat;
+                  return (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-sm"
+                    >
+                      {catName}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card title="Product Information" icon={Database}>
+        <InfoRow label="Brand" value={brandName || "No Brand"} />
         <InfoRow
           label="Created"
-          value={new Date(product.createdAt).toLocaleDateString("en-IN", {
+          value={new Date(product.created_at).toLocaleString("en-IN", {
             dateStyle: "medium",
+            timeStyle: "short",
           })}
           icon={Calendar}
+        />
+        <InfoRow
+          label="Product Status"
+          value={<StatusBadge status={product.product_status} />}
+        />
+        <InfoRow
+          label="Featured Product"
+          value={product.featured_product ? "Yes" : "No"}
         />
       </Card>
     </div>
@@ -240,8 +623,8 @@ function Sidebar({ price, inventory, product }: any) {
 
 function Card({ title, children, icon: Icon }: any) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-6">
-      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-900">
         {Icon && <Icon className="w-5 h-5 text-slate-500" />}
         {title}
       </h3>
@@ -250,36 +633,22 @@ function Card({ title, children, icon: Icon }: any) {
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  bold,
-  strikethrough,
-  className = "",
-  icon: Icon,
-}: any) {
+function InfoRow({ label, value, icon: Icon }: any) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
       <div className="flex items-center gap-2 text-slate-600">
         {Icon && <Icon className="w-4 h-4" />}
         <span>{label}</span>
       </div>
-      <span
-        className={`${bold ? "font-bold" : ""} ${
-          strikethrough ? "line-through text-slate-500" : ""
-        } ${className}`}
-      >
-        {value}
-      </span>
+      <div className="text-right">
+        {typeof value === "string" || typeof value === "number" ? (
+          <span className="font-medium text-slate-900">{value}</span>
+        ) : (
+          value
+        )}
+      </div>
     </div>
   );
-}
-
-function getStockColor(qty: number) {
-  if (!qty) return "text-red-600";
-  if (qty > 10) return "text-emerald-600";
-  if (qty > 0) return "text-amber-600";
-  return "text-red-600";
 }
 
 function LoadingState() {
@@ -303,14 +672,19 @@ function LoadingState() {
 
 function NotFoundState({ router }: any) {
   return (
-    <div className="p-6 text-center">
-      <h2 className="text-xl font-bold mb-4">Product not found</h2>
-      <p className="text-slate-600 mb-6">
-        The requested product does not exist.
+    <div className="max-w-7xl mx-auto py-12 text-center">
+      <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 text-slate-400 rounded-full mb-6">
+        <Package className="w-8 h-8" />
+      </div>
+      <h2 className="text-2xl font-bold text-slate-900 mb-3">
+        Product not found
+      </h2>
+      <p className="text-slate-600 mb-8 max-w-md mx-auto">
+        The requested product does not exist or has been removed.
       </p>
       <button
         onClick={() => router.push("/products")}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+        className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
       >
         Back to Products
       </button>

@@ -11,6 +11,20 @@ import {
   createProduct,
 } from "@/lib/api";
 
+interface ProductAttribute {
+  key: string;
+  value: string;
+}
+
+interface ProductVariant {
+  variant_name?: string;
+  attributes: ProductAttribute[];
+  sale_price: number;
+  compare_at_price?: number;
+  qty_on_hand: number;
+  images?: string[];
+}
+
 export default function NewProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -20,17 +34,33 @@ export default function NewProductPage() {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newBrandName, setNewBrandName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [attributes, setAttributes] = useState<ProductAttribute[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [showVariantForm, setShowVariantForm] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
-    description: "",
+    description_html: "",
+    short_description: "",
     brandId: "",
-    price: 0,
-    comparePrice: 0,
-    stock: 0,
+    sale_price: 0,
+    compare_at_price: 0,
+    qty_on_hand: 0,
+    stock_status: "IN_STOCK",
     status: "DRAFT",
+    category: "",
     categories: [] as string[],
-    images: [] as string[],
+    images_base64: [] as string[],
+    featured: false,
+  });
+
+  const [variantForm, setVariantForm] = useState<ProductVariant>({
+    variant_name: "",
+    attributes: [],
+    sale_price: 0,
+    compare_at_price: 0,
+    qty_on_hand: 0,
+    images: [],
   });
 
   useEffect(() => {
@@ -63,7 +93,40 @@ export default function NewProductPage() {
       });
       newImages.push(result);
     }
-    setForm((prev) => ({ ...prev, images: [...prev.images, ...newImages] }));
+    setForm((prev) => ({
+      ...prev,
+      images_base64: [...prev.images_base64, ...newImages],
+    }));
+  };
+
+  const handleAddAttribute = () => {
+    const key = prompt("Enter attribute key:");
+    if (!key) return;
+    const value = prompt("Enter attribute value:");
+    if (!value) return;
+    setAttributes([...attributes, { key, value }]);
+  };
+
+  const handleAddVariant = () => {
+    if (variantForm.sale_price <= 0) {
+      alert("Variant price must be greater than 0");
+      return;
+    }
+    if (variantForm.qty_on_hand < 0) {
+      alert("Variant stock cannot be negative");
+      return;
+    }
+
+    setVariants([...variants, { ...variantForm }]);
+    setVariantForm({
+      variant_name: "",
+      attributes: [],
+      sale_price: 0,
+      compare_at_price: 0,
+      qty_on_hand: 0,
+      images: [],
+    });
+    setShowVariantForm(false);
   };
 
   const handleAddBrand = async () => {
@@ -112,8 +175,12 @@ export default function NewProductPage() {
       alert("Please select a brand");
       return;
     }
-    if (form.price <= 0) {
+    if (form.sale_price <= 0) {
       alert("Price must be greater than 0");
+      return;
+    }
+    if (form.qty_on_hand < 0) {
+      alert("Stock cannot be negative");
       return;
     }
 
@@ -122,14 +189,19 @@ export default function NewProductPage() {
       await createProduct({
         title: form.title,
         brandId: form.brandId,
-        description_html: form.description,
-        short_description: form.description.slice(0, 200),
-        sale_price: form.price,
-        compare_at_price: form.comparePrice || undefined,
-        qty_on_hand: form.stock,
+        description_html: form.description_html,
+        short_description:
+          form.short_description || form.description_html.slice(0, 200),
+        sale_price: form.sale_price,
+        compare_at_price: form.compare_at_price || undefined,
+        qty_on_hand: form.qty_on_hand,
         status: form.status,
+        category: form.category,
         categories: form.categories,
-        images_base64: form.images,
+        images_base64: form.images_base64,
+        attributes: attributes,
+        variants: variants,
+        featured: form.featured,
       });
       router.push("/products");
     } catch (error: any) {
@@ -140,7 +212,7 @@ export default function NewProductPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <button
           onClick={() => router.push("/products")}
@@ -156,6 +228,7 @@ export default function NewProductPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Product Title */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Product Title *
@@ -172,6 +245,7 @@ export default function NewProductPage() {
           />
         </div>
 
+        {/* Brand Selection */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium text-slate-700">
@@ -231,6 +305,7 @@ export default function NewProductPage() {
           </select>
         </div>
 
+        {/* Pricing & Stock */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -238,9 +313,12 @@ export default function NewProductPage() {
             </label>
             <input
               type="number"
-              value={form.price}
+              value={form.sale_price}
               onChange={(e) =>
-                setForm((prev) => ({ ...prev, price: Number(e.target.value) }))
+                setForm((prev) => ({
+                  ...prev,
+                  sale_price: Number(e.target.value),
+                }))
               }
               placeholder="0.00"
               className="w-full px-4 py-3 border border-slate-300 rounded-lg"
@@ -255,11 +333,11 @@ export default function NewProductPage() {
             </label>
             <input
               type="number"
-              value={form.comparePrice || ""}
+              value={form.compare_at_price || ""}
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  comparePrice: Number(e.target.value) || 0,
+                  compare_at_price: Number(e.target.value) || 0,
                 }))
               }
               placeholder="Optional"
@@ -274,9 +352,12 @@ export default function NewProductPage() {
             </label>
             <input
               type="number"
-              value={form.stock}
+              value={form.qty_on_hand}
               onChange={(e) =>
-                setForm((prev) => ({ ...prev, stock: Number(e.target.value) }))
+                setForm((prev) => ({
+                  ...prev,
+                  qty_on_hand: Number(e.target.value),
+                }))
               }
               placeholder="0"
               className="w-full px-4 py-3 border border-slate-300 rounded-lg"
@@ -286,6 +367,7 @@ export default function NewProductPage() {
           </div>
         </div>
 
+        {/* Categories */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <label className="block text-sm font-medium text-slate-700">
@@ -351,6 +433,253 @@ export default function NewProductPage() {
           </div>
         </div>
 
+        {/* Attributes Section */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-slate-700">
+              Product Attributes
+            </label>
+            <button
+              type="button"
+              onClick={handleAddAttribute}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              Add Attribute
+            </button>
+          </div>
+
+          {attributes.length > 0 ? (
+            <div className="space-y-2">
+              {attributes.map((attr, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg"
+                >
+                  <span className="font-medium text-slate-700">
+                    {attr.key}:
+                  </span>
+                  <span className="text-slate-600 flex-1">{attr.value}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAttributes(attributes.filter((_, i) => i !== index))
+                    }
+                    className="p-1 hover:bg-slate-200 rounded"
+                  >
+                    <X className="w-4 h-4 text-slate-500" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 italic">No attributes added</p>
+          )}
+        </div>
+
+        {/* Variants Section */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-slate-700">
+              Product Variants
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowVariantForm(true)}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              Add Variant
+            </button>
+          </div>
+
+          {variants.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                        Variant Name
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                        Attributes
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                        Price
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                        Stock
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map((variant, index) => (
+                      <tr
+                        key={index}
+                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                      >
+                        <td className="py-3 px-4 text-slate-700">
+                          {variant.variant_name}
+                        </td>
+                        <td className="py-3 px-4">
+                          {variant.attributes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {variant.attributes.map((attr, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs"
+                                >
+                                  {attr.key}: {attr.value}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-sm">
+                              No attributes
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-medium">
+                            ₹{variant.sale_price.toLocaleString()}
+                          </span>
+                          {variant.compare_at_price > 0 && (
+                            <div className="text-xs text-slate-400 line-through">
+                              ₹{variant.compare_at_price.toLocaleString()}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-slate-700">
+                            {variant.qty_on_hand} units
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVariants(
+                                variants.filter((_, i) => i !== index)
+                              )
+                            }
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {showVariantForm && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Variant Name
+                  </label>
+                  <input
+                    type="text"
+                    value={variantForm.variant_name}
+                    onChange={(e) =>
+                      setVariantForm((prev) => ({
+                        ...prev,
+                        variant_name: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g., Blue, Large"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Variant Price (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    value={variantForm.sale_price}
+                    onChange={(e) =>
+                      setVariantForm((prev) => ({
+                        ...prev,
+                        sale_price: Number(e.target.value),
+                      }))
+                    }
+                    placeholder="0.00"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    min="0.01"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Compare Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={variantForm.compare_at_price || ""}
+                    onChange={(e) =>
+                      setVariantForm((prev) => ({
+                        ...prev,
+                        compare_at_price: Number(e.target.value) || 0,
+                      }))
+                    }
+                    placeholder="Optional"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Stock Quantity *
+                  </label>
+                  <input
+                    type="number"
+                    value={variantForm.qty_on_hand}
+                    onChange={(e) =>
+                      setVariantForm((prev) => ({
+                        ...prev,
+                        qty_on_hand: Number(e.target.value),
+                      }))
+                    }
+                    placeholder="0"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    min="0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-4 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleAddVariant}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Add Variant
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowVariantForm(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Images */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Product Images
@@ -372,9 +701,9 @@ export default function NewProductPage() {
             </div>
           </label>
 
-          {form.images.length > 0 && (
+          {form.images_base64.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              {form.images.map((img, index) => (
+              {form.images_base64.map((img, index) => (
                 <div key={index} className="relative group">
                   <img
                     src={img}
@@ -386,7 +715,9 @@ export default function NewProductPage() {
                     onClick={() =>
                       setForm((prev) => ({
                         ...prev,
-                        images: prev.images.filter((_, i) => i !== index),
+                        images_base64: prev.images_base64.filter(
+                          (_, i) => i !== index
+                        ),
                       }))
                     }
                     className="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -399,38 +730,78 @@ export default function NewProductPage() {
           )}
         </div>
 
+        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            Description
+            Detailed Description
           </label>
           <textarea
-            value={form.description}
+            value={form.description_html}
             onChange={(e) =>
-              setForm((prev) => ({ ...prev, description: e.target.value }))
+              setForm((prev) => ({ ...prev, description_html: e.target.value }))
             }
-            placeholder="Enter product description..."
+            placeholder="Enter detailed product description..."
             className="w-full px-4 py-3 border border-slate-300 rounded-lg h-40"
             rows={6}
           />
         </div>
 
+        {/* Short Description */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            Status
+            Short Description
           </label>
-          <select
-            value={form.status}
+          <textarea
+            value={form.short_description}
             onChange={(e) =>
-              setForm((prev) => ({ ...prev, status: e.target.value as any }))
+              setForm((prev) => ({
+                ...prev,
+                short_description: e.target.value,
+              }))
             }
-            className="w-full px-4 py-3 border border-slate-300 rounded-lg"
-          >
-            <option value="DRAFT">Draft</option>
-            <option value="ACTIVE">Active</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
+            placeholder="Brief product description for listings..."
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg h-24"
+            rows={3}
+          />
         </div>
 
+        {/* Status & Featured */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Status
+            </label>
+            <select
+              value={form.status}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, status: e.target.value as any }))
+              }
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+            >
+              <option value="DRAFT">Draft</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Featured Product
+            </label>
+            <label className="flex items-center gap-2 p-3 border border-slate-300 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.featured}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, featured: e.target.checked }))
+                }
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-slate-700">Mark as featured product</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
         <div className="flex gap-3 pt-6 border-t">
           <button
             type="submit"

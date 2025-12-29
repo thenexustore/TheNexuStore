@@ -4,7 +4,48 @@ import {
   IsArray,
   IsNumber,
   IsEnum,
+  IsBoolean,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class ProductAttributeDto {
+  @IsString()
+  key!: string;
+
+  @IsString()
+  value!: string;
+}
+
+class ProductVariantDto {
+  @IsOptional()
+  @IsString()
+  sku_code?: string;
+
+  @IsOptional()
+  @IsString()
+  variant_name?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductAttributeDto)
+  attributes!: ProductAttributeDto[];
+
+  @IsNumber()
+  sale_price!: number;
+
+  @IsOptional()
+  @IsNumber()
+  compare_at_price?: number;
+
+  @IsNumber()
+  qty_on_hand!: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+}
 
 export class CreateProductDto {
   @IsString()
@@ -15,15 +56,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  description_html?: string;
-
-  @IsOptional()
-  @IsString()
-  short_description?: string;
-
-  @IsOptional()
-  @IsEnum(['DRAFT', 'ACTIVE', 'ARCHIVED'])
-  status?: string;
+  category?: string;
 
   @IsOptional()
   @IsArray()
@@ -31,12 +64,12 @@ export class CreateProductDto {
   categories?: string[];
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  images_base64?: string[];
+  @IsString()
+  sku_code?: string;
 
+  @IsOptional()
   @IsNumber()
-  sale_price!: number;
+  sale_price?: number;
 
   @IsOptional()
   @IsNumber()
@@ -45,4 +78,41 @@ export class CreateProductDto {
   @IsOptional()
   @IsNumber()
   qty_on_hand?: number;
+
+  @IsOptional()
+  @IsEnum(['IN_STOCK', 'OUT_OF_STOCK', 'LOW_STOCK', 'PREORDER'])
+  stock_status?: string;
+
+  @IsOptional()
+  @IsString()
+  description_html?: string;
+
+  @IsOptional()
+  @IsString()
+  short_description?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images_base64?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductAttributeDto)
+  attributes?: ProductAttributeDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantDto)
+  variants?: ProductVariantDto[];
+
+  @IsOptional()
+  @IsEnum(['DRAFT', 'ACTIVE', 'ARCHIVED'])
+  status?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  featured?: boolean;
 }

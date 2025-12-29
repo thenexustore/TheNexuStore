@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Edit, Trash2, Eye, Package } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Package,
+  Tag,
+  Star,
+  Layers,
+  Hash,
+} from "lucide-react";
 import {
   fetchProducts,
   deleteProduct,
@@ -16,13 +27,20 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await fetchProducts(page, 20, search, statusFilter);
+      const data = await fetchProducts(
+        page,
+        20,
+        search,
+        statusFilter,
+        categoryFilter
+      );
 
       setProducts(data.products);
       setTotalPages(data.totalPages);
@@ -35,7 +53,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     loadProducts();
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, categoryFilter]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -62,6 +80,13 @@ export default function ProductsPage() {
     ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-100",
     DRAFT: "bg-amber-50 text-amber-700 border-amber-100",
     ARCHIVED: "bg-slate-100 text-slate-600 border-slate-200",
+  };
+
+  const stockStatusStyles: Record<string, string> = {
+    IN_STOCK: "bg-emerald-50 text-emerald-700",
+    OUT_OF_STOCK: "bg-red-50 text-red-700",
+    LOW_STOCK: "bg-amber-50 text-amber-700",
+    PREORDER: "bg-blue-50 text-blue-700",
   };
 
   return (
@@ -95,6 +120,13 @@ export default function ProductsPage() {
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all text-sm"
           />
         </div>
+        <input
+          type="text"
+          placeholder="Category filter..."
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-600"
+        />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -116,7 +148,7 @@ export default function ProductsPage() {
                   Product
                 </th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Inventory
+                  SKU & Inventory
                 </th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                   Category
@@ -148,53 +180,78 @@ export default function ProductsPage() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                            {product.title}
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono mt-0.5">
-                            {product.id}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-slate-900">
-                            {product.stock} in stock
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            {product.skusCount} variants
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
+                              {product.title}
+                            </span>
+                            {product.featured_product && (
+                              <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                            <Hash className="w-3 h-3" />
+                            <span className="font-mono">
+                              {product.sku_code}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex gap-1.5">
-                          {product.categories.length > 0 ? (
-                            <>
-                              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase">
-                                {product.categories[0]}
-                              </span>
-
-                              {product.categories.length > 1 && (
-                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[11px] font-bold uppercase">
-                                  +{product.categories.length - 1}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                                stockStatusStyles[product.stock_status]
+                              }`}
+                            >
+                              {product.stock_status}
+                            </span>
+                            <span className="text-sm font-medium text-slate-900">
+                              {product.stock_quantity} units
+                            </span>
+                          </div>
+                          {product.variants.length > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-slate-400">
+                              <Layers className="w-3 h-3" />
+                              <span>{product.variants.length} variants</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase">
+                            {product.category || "Uncategorized"}
+                          </span>
+                          {product.categories.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {product.categories
+                                .slice(0, 2)
+                                .map((cat, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium"
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
+                              {product.categories.length > 2 && (
+                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[10px] font-medium">
+                                  +{product.categories.length - 2}
                                 </span>
                               )}
-                            </>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded-md text-[11px] font-bold uppercase">
-                              Uncategorized
-                            </span>
+                            </div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <select
-                          value={product.status}
+                          value={product.product_status}
                           onChange={(e) =>
                             handleStatusChange(product.id, e.target.value)
                           }
                           className={`text-[11px] font-bold px-2.5 py-1 rounded-full border outline-none transition-all cursor-pointer ${
-                            statusStyles[product.status]
+                            statusStyles[product.product_status]
                           }`}
                         >
                           <option value="ACTIVE">ACTIVE</option>
@@ -203,9 +260,16 @@ export default function ProductsPage() {
                         </select>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm font-bold text-slate-900">
-                          ₹{product.price.toLocaleString()}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-900">
+                            ₹{product.price.toLocaleString()}
+                          </span>
+                          {product.discount_price && (
+                            <span className="text-xs text-slate-400 line-through">
+                              ₹{product.discount_price.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-1">

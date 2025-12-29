@@ -8,6 +8,7 @@ import {
   Put,
   Delete,
   Param,
+  Patch,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { AdminGuard } from '../admin.guard';
@@ -26,6 +27,7 @@ export class ProductsController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('status') status?: string,
+    @Query('category') category?: string,
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 20;
@@ -35,6 +37,7 @@ export class ProductsController {
       limitNum,
       search,
       status,
+      category,
     );
 
     return {
@@ -95,6 +98,16 @@ export class ProductsController {
       success: true,
       data: product,
       message: 'Product status updated',
+    };
+  }
+
+  @Patch(':id/toggle-featured')
+  async toggleFeatured(@Param('id') id: string) {
+    const product = await this.productsService.toggleFeatured(id);
+    return {
+      success: true,
+      data: product,
+      message: 'Product featured status toggled',
     };
   }
 }

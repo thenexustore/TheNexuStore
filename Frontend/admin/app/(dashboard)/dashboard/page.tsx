@@ -142,57 +142,31 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">
-            Recent Orders
-          </h3>
-          <div className="space-y-4">
-            {stats?.recentOrders?.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    {order.orderNumber}
-                  </p>
-                  <p className="text-sm text-slate-500">{order.customer}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-slate-900">₹{order.amount}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-500">
-                      {new Date(order.date).toLocaleDateString()}
-                    </span>
-                  </div>
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Recent Orders</h3>
+        <div className="space-y-4">
+          {stats?.recentOrders?.map((order) => (
+            <div
+              key={order.id}
+              className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
+            >
+              <div>
+                <p className="font-semibold text-slate-900">
+                  {order.orderNumber}
+                </p>
+                <p className="text-sm text-slate-500">{order.customer}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-slate-900">₹{order.amount}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm text-slate-500">
+                    {new Date(order.date).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">
-            Quick Actions
-          </h3>
-          <div className="space-y-3">
-            <button className="w-full text-left p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors">
-              <p className="font-semibold text-blue-900">Add New Product</p>
-              <p className="text-sm text-blue-600">
-                Create a new product listing
-              </p>
-            </button>
-            <button className="w-full text-left p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors">
-              <p className="font-semibold text-green-900">View Orders</p>
-              <p className="text-sm text-green-600">Manage customer orders</p>
-            </button>
-            <button className="w-full text-left p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors">
-              <p className="font-semibold text-purple-900">Manage Inventory</p>
-              <p className="text-sm text-purple-600">Update stock levels</p>
-            </button>
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -2,28 +2,21 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link"; // Use Link instead of <a> for SPA speed
+import Link from "next/link";
 import {
   LayoutDashboard,
   ShoppingCart,
   Package,
-  RefreshCw,
-  DollarSign,
-  RotateCcw,
   LogOut,
   Menu,
   X,
-  Store,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Products", href: "/products", icon: Package },
-  { name: "Imports", href: "/imports", icon: RefreshCw },
-  { name: "Pricing", href: "/pricing", icon: DollarSign },
-  { name: "Returns", href: "/returns", icon: RotateCcw },
+  { name: "Orders", href: "/orders", icon: ShoppingCart },
 ];
 
 export default function DashboardLayout({

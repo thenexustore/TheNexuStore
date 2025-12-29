@@ -2,342 +2,447 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { fetchAdminData, postAdminData } from "@/lib/api";
-
-const Select = dynamic(() => import("react-select"), { ssr: false });
+import { ArrowLeft, Upload, X, Plus } from "lucide-react";
+import {
+  fetchBrands,
+  fetchCategories,
+  createBrand,
+  createCategory,
+  createProduct,
+} from "@/lib/api";
 
 export default function NewProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-
   const [brands, setBrands] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-
   const [showNewBrand, setShowNewBrand] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
-
   const [newBrandName, setNewBrandName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
 
-  const [imageError, setImageError] = useState("");
-
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     title: "",
     description: "",
     brandId: "",
-    sale_price: 0,
-    compare_at_price: 0,
-    qty_on_hand: 0,
+    price: 0,
+    comparePrice: 0,
+    stock: 0,
     status: "DRAFT",
     categories: [] as string[],
     images: [] as string[],
   });
 
   useEffect(() => {
-    fetchAdminData("brands").then(setBrands);
-    fetchAdminData("categories").then(setCategories);
+    loadData();
   }, []);
 
-  const handleChange = (e: any) => {
-    const { name, value } = e.target;
-    setFormData((p) => ({
-      ...p,
-      [name]:
-        name === "sale_price" ||
-        name === "compare_at_price" ||
-        name === "qty_on_hand"
-          ? Number(value) || 0
-          : value,
-    }));
+  const loadData = async () => {
+    const [brandsData, categoriesData] = await Promise.all([
+      fetchBrands(),
+      fetchCategories(),
+    ]);
+    setBrands(brandsData);
+    setCategories(categoriesData);
   };
 
-  const handleCategoryChange = (selected: any) => {
-    setFormData((p) => ({
-      ...p,
-      categories: selected ? selected.map((s: any) => s.value) : [],
-    }));
-  };
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
 
-  const convertToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
+    const newImages: string[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > 1024 * 1024) {
+        alert("Image must be less than 1MB");
+        continue;
+      }
       const reader = new FileReader();
-      const img = new Image();
-      reader.onload = () => (img.src = reader.result as string);
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const scale = Math.min(1, 800 / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        canvas
-          .getContext("2d")
-          ?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const base64 = canvas.toDataURL("image/jpeg", 0.7);
-        const size = Math.ceil((base64.length * 3) / 4);
-        size > 1024 * 1024 ? reject("Image must be < 1MB") : resolve(base64);
-      };
       reader.readAsDataURL(file);
-    });
+      const result = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+      });
+      newImages.push(result);
+    }
+    setForm((prev) => ({ ...prev, images: [...prev.images, ...newImages] }));
+  };
 
-  const handleImagesSelect = async (e: any) => {
-    const files = Array.from(e.target.files || []);
+  const handleAddBrand = async () => {
+    if (!newBrandName.trim()) {
+      alert("Brand name is required");
+      return;
+    }
     try {
-      const imgs = await Promise.all(files.map(convertToBase64));
-      setFormData((p) => ({ ...p, images: [...p.images, ...imgs] }));
-    } catch (err: any) {
-      setImageError(err);
-    }
-  };
-
-  const removeImage = (i: number) => {
-    setFormData((p) => ({
-      ...p,
-      images: p.images.filter((_, idx) => idx !== i),
-    }));
-  };
-
-  const createBrand = async () => {
-    if (!newBrandName.trim()) return;
-    setLoading(true);
-    const res = await postAdminData("brands", { name: newBrandName.trim() });
-    if (res.success) {
-      setBrands(await fetchAdminData("brands"));
-      setFormData((p) => ({ ...p, brandId: res.data.id }));
-      setShowNewBrand(false);
+      const newBrand = await createBrand({ name: newBrandName });
+      setBrands((prev) => [...prev, newBrand]);
+      setForm((prev) => ({ ...prev, brandId: newBrand.id }));
       setNewBrandName("");
+      setShowNewBrand(false);
+    } catch (error: any) {
+      alert(error.message || "Failed to add brand");
     }
-    setLoading(false);
   };
 
-  const createCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    setLoading(true);
-    const res = await postAdminData("categories", {
-      name: newCategoryName.trim(),
-    });
-    if (res.success) {
-      setCategories(await fetchAdminData("categories"));
-      setFormData((p) => ({
-        ...p,
-        categories: [...p.categories, res.data.id],
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      alert("Category name is required");
+      return;
+    }
+    try {
+      const newCategory = await createCategory({ name: newCategoryName });
+      setCategories((prev) => [...prev, newCategory]);
+      setForm((prev) => ({
+        ...prev,
+        categories: [...prev.categories, newCategory.id],
       }));
-      setShowNewCategory(false);
       setNewCategoryName("");
+      setShowNewCategory(false);
+    } catch (error: any) {
+      alert(error.message || "Failed to add category");
     }
-    setLoading(false);
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!form.title.trim()) {
+      alert("Product title is required");
+      return;
+    }
+    if (!form.brandId) {
+      alert("Please select a brand");
+      return;
+    }
+    if (form.price <= 0) {
+      alert("Price must be greater than 0");
+      return;
+    }
+
     setLoading(true);
-
-    const payload = {
-      title: formData.title,
-      brandId: formData.brandId,
-      description_html: formData.description,
-      short_description: formData.description.slice(0, 200),
-      status: formData.status,
-      sale_price: formData.sale_price,
-      compare_at_price: formData.compare_at_price,
-      qty_on_hand: formData.qty_on_hand,
-      categories: formData.categories,
-      images_base64: formData.images,
-    };
-
-    const res = await postAdminData("products", payload);
-    if (res.success) router.push("/products");
-    setLoading(false);
+    try {
+      await createProduct({
+        title: form.title,
+        brandId: form.brandId,
+        description_html: form.description,
+        short_description: form.description.slice(0, 200),
+        sale_price: form.price,
+        compare_at_price: form.comparePrice || undefined,
+        qty_on_hand: form.stock,
+        status: form.status,
+        categories: form.categories,
+        images_base64: form.images,
+      });
+      router.push("/products");
+    } catch (error: any) {
+      alert(error.message || "Failed to create product");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Create Product</h1>
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="mb-8">
+        <button
+          onClick={() => router.push("/products")}
+          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-4"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to Products
+        </button>
+        <h1 className="text-2xl font-bold text-slate-900">
+          Create New Product
+        </h1>
+        <p className="text-slate-600 mt-1">Add a new product to your catalog</p>
+      </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white border rounded p-6 grid gap-5"
-      >
-        <input
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          placeholder="Product Title"
-          className="px-3 py-2 border rounded"
-          required
-        />
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Product Title *
+          </label>
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, title: e.target.value }))
+            }
+            placeholder="Enter product title"
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
 
-        <textarea
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          placeholder="Product Description"
-          className="px-3 py-2 border rounded h-32"
-        />
-
-        {!showNewBrand ? (
-          <div>
-            <select
-              name="brandId"
-              value={formData.brandId}
-              onChange={handleChange}
-              className="px-3 py-2 border rounded w-full"
-              required
-            >
-              <option value="">Select Brand</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Brand *
+            </label>
             <button
               type="button"
               onClick={() => setShowNewBrand(true)}
-              className="text-sm text-blue-600 mt-1"
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
-              + Create new brand
+              <Plus className="w-4 h-4" />
+              Add New Brand
             </button>
           </div>
-        ) : (
-          <div className="flex gap-2">
-            <input
-              value={newBrandName}
-              onChange={(e) => setNewBrandName(e.target.value)}
-              className="px-3 py-2 border rounded flex-1"
-            />
-            <button
-              type="button"
-              onClick={createBrand}
-              className="px-4 py-2 bg-black text-white rounded"
-            >
-              Create
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowNewBrand(false)}
-              className="px-4 py-2 border rounded"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
 
-        {!showNewCategory ? (
-          <div>
-            <Select
-              isMulti
-              options={categories.map((c) => ({ value: c.id, label: c.name }))}
-              onChange={handleCategoryChange}
-              placeholder="Select Categories"
-            />
-            <button
-              type="button"
-              onClick={() => setShowNewCategory(true)}
-              className="text-sm text-blue-600 mt-1"
-            >
-              + Create new category
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <input
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              className="px-3 py-2 border rounded flex-1"
-            />
-            <button
-              type="button"
-              onClick={createCategory}
-              className="px-4 py-2 bg-black text-white rounded"
-            >
-              Create
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowNewCategory(false)}
-              className="px-4 py-2 border rounded"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-4">
-          <input
-            type="number"
-            name="sale_price"
-            value={formData.sale_price}
-            onChange={handleChange}
-            placeholder="Sale Price"
-            className="px-3 py-2 border rounded"
-          />
-          <input
-            type="number"
-            name="compare_at_price"
-            value={formData.compare_at_price}
-            onChange={handleChange}
-            placeholder="MRP"
-            className="px-3 py-2 border rounded"
-          />
-          <input
-            type="number"
-            name="qty_on_hand"
-            value={formData.qty_on_hand}
-            onChange={handleChange}
-            placeholder="Stock Quantity"
-            className="px-3 py-2 border rounded"
-          />
-        </div>
-
-        <select
-          name="status"
-          value={formData.status}
-          onChange={handleChange}
-          className="px-3 py-2 border rounded"
-        >
-          <option value="DRAFT">Draft</option>
-          <option value="ACTIVE">Active</option>
-          <option value="ARCHIVED">Archived</option>
-        </select>
-
-        <input
-          type="file"
-          multiple
-          accept="image/*"
-          onChange={handleImagesSelect}
-        />
-        {imageError && <p className="text-red-600 text-sm">{imageError}</p>}
-
-        <div className="grid grid-cols-4 gap-3">
-          {formData.images.map((img, i) => (
-            <div key={i} className="relative">
-              <img
-                src={img}
-                className="h-28 w-full object-cover rounded border"
+          {showNewBrand ? (
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                placeholder="Enter brand name"
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg"
+                autoFocus
               />
               <button
                 type="button"
-                onClick={() => removeImage(i)}
-                className="absolute top-1 right-1 bg-black text-white text-xs px-2 py-1 rounded"
+                onClick={handleAddBrand}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                ✕
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNewBrand(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
               </button>
             </div>
-          ))}
+          ) : null}
+
+          <select
+            value={form.brandId}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, brandId: e.target.value }))
+            }
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            <option value="">Select a brand</option>
+            {brands.map((brand) => (
+              <option key={brand.id} value={brand.id}>
+                {brand.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Sale Price (₹) *
+            </label>
+            <input
+              type="number"
+              value={form.price}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, price: Number(e.target.value) }))
+              }
+              placeholder="0.00"
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              min="0.01"
+              step="0.01"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Compare Price (₹)
+            </label>
+            <input
+              type="number"
+              value={form.comparePrice || ""}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  comparePrice: Number(e.target.value) || 0,
+                }))
+              }
+              placeholder="Optional"
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Stock Quantity *
+            </label>
+            <input
+              type="number"
+              value={form.stock}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, stock: Number(e.target.value) }))
+              }
+              placeholder="0"
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              min="0"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-medium text-slate-700">
+              Categories
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowNewCategory(true)}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              Add New Category
+            </button>
+          </div>
+
+          {showNewCategory && (
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Enter category name"
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNewCategory(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <label
+                key={cat.id}
+                className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={form.categories.includes(cat.id)}
+                  onChange={(e) => {
+                    const newCats = e.target.checked
+                      ? [...form.categories, cat.id]
+                      : form.categories.filter((id) => id !== cat.id);
+                    setForm((prev) => ({ ...prev, categories: newCats }));
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+                <span className="text-slate-700">{cat.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Product Images
+          </label>
+          <label className="block border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors">
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+            <div className="text-slate-600 font-medium">
+              Click to upload images
+            </div>
+            <div className="text-sm text-slate-500 mt-1">
+              PNG, JPG, GIF up to 1MB
+            </div>
+          </label>
+
+          {form.images.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              {form.images.map((img, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={img}
+                    alt={`Product image ${index + 1}`}
+                    className="h-32 w-full object-cover rounded-lg border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        images: prev.images.filter((_, i) => i !== index),
+                      }))
+                    }
+                    className="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Description
+          </label>
+          <textarea
+            value={form.description}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, description: e.target.value }))
+            }
+            placeholder="Enter product description..."
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg h-40"
+            rows={6}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Status
+          </label>
+          <select
+            value={form.status}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, status: e.target.value as any }))
+            }
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+          >
+            <option value="DRAFT">Draft</option>
+            <option value="ACTIVE">Active</option>
+            <option value="ARCHIVED">Archived</option>
+          </select>
+        </div>
+
+        <div className="flex gap-3 pt-6 border-t">
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-black text-white rounded"
+            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {loading ? "Creating..." : "Create Product"}
           </button>
           <button
             type="button"
-            onClick={() => router.back()}
-            className="px-4 py-2 border rounded"
+            onClick={() => router.push("/products")}
+            className="px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
           >
             Cancel
           </button>

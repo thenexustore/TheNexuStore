@@ -1,140 +1,200 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ShoppingCart, Package, Users, DollarSign } from 'lucide-react'
-import { fetchAdminData } from '@/lib/api'
+import { useEffect, useState } from "react";
+import { fetchDashboardStats } from "@/lib/api";
+import {
+  ShoppingCart,
+  DollarSign,
+  Package,
+  Users,
+  AlertCircle,
+  TrendingUp,
+  Clock,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+interface DashboardStats {
+  todayOrders: number;
+  todayRevenue: number;
+  totalProducts: number;
+  totalCustomers: number;
+  pendingOrders: number;
+  activeProducts: number;
+  recentOrders: Array<{
+    id: string;
+    orderNumber: string;
+    customer: string;
+    amount: number;
+    status: string;
+    date: string;
+  }>;
+}
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<any>(null)
-  const [error, setError] = useState('')
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('admin_token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
+    loadStats();
+  }, []);
 
-    loadDashboardData()
-  }, [router])
-
-  const loadDashboardData = async () => {
+  const loadStats = async () => {
     try {
-      const data = await fetchAdminData('dashboard/stats')
-      setStats(data)
-    } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard')
+      const data = await fetchDashboardStats();
+      setStats(data);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load dashboard");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-black"></div>
-          <p className="mt-4">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-700">{error}</p>
-          <button
-            onClick={loadDashboardData}
-            className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const statCards = [
+    {
+      title: "Today's Orders",
+      value: stats?.todayOrders || 0,
+      icon: ShoppingCart,
+      color: "bg-blue-500",
+      change: "+12%",
+    },
+    {
+      title: "Today's Revenue",
+      value: `₹${stats?.todayRevenue?.toLocaleString() || 0}`,
+      icon: DollarSign,
+      color: "bg-green-500",
+      change: "+8%",
+    },
+    {
+      title: "Total Products",
+      value: stats?.totalProducts || 0,
+      icon: Package,
+      color: "bg-purple-500",
+      change: "+5%",
+    },
+    {
+      title: "Total Customers",
+      value: stats?.totalCustomers || 0,
+      icon: Users,
+      color: "bg-orange-500",
+      change: "+15%",
+    },
+    {
+      title: "Pending Orders",
+      value: stats?.pendingOrders || 0,
+      icon: AlertCircle,
+      color: "bg-yellow-500",
+      change: "-3%",
+    },
+    {
+      title: "Active Products",
+      value: stats?.activeProducts || 0,
+      icon: TrendingUp,
+      color: "bg-indigo-500",
+      change: "+7%",
+    },
+  ];
 
   return (
-    <div className="p-6">
+    <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-gray-600">Welcome to TheNexuStore Admin</p>
+        <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+        <p className="text-slate-500 mt-2">
+          Welcome to your store management dashboard
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Today's Orders</p>
-              <h3 className="text-2xl font-bold mt-1">{stats?.todayOrders || 0}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {statCards.map((stat, index) => (
+          <motion.div
+            key={stat.title}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+                  {stat.title}
+                </p>
+                <p className="text-3xl font-bold text-slate-900 mt-2">
+                  {stat.value}
+                </p>
+                <p className="text-sm text-green-600 mt-1 flex items-center">
+                  <TrendingUp className="w-4 h-4 mr-1" />
+                  {stat.change} from yesterday
+                </p>
+              </div>
+              <div className={`${stat.color} p-3 rounded-xl`}>
+                <stat.icon className="w-6 h-6 text-white" />
+              </div>
             </div>
-            <ShoppingCart className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Today's Revenue</p>
-              <h3 className="text-2xl font-bold mt-1">${(stats?.todayRevenue || 0).toFixed(2)}</h3>
-            </div>
-            <DollarSign className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Products</p>
-              <h3 className="text-2xl font-bold mt-1">{stats?.totalProducts || 0}</h3>
-            </div>
-            <Package className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Customers</p>
-              <h3 className="text-2xl font-bold mt-1">{stats?.totalCustomers || 0}</h3>
-            </div>
-            <Users className="w-6 h-6" />
-          </div>
-        </div>
+          </motion.div>
+        ))}
       </div>
 
-      <div className="border rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Recent Orders</h2>
-        {stats?.recentOrders && stats.recentOrders.length > 0 ? (
-          <div className="space-y-3">
-            {stats.recentOrders.map((order: any) => (
-              <div key={order.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+          <h3 className="text-lg font-bold text-slate-900 mb-4">
+            Recent Orders
+          </h3>
+          <div className="space-y-4">
+            {stats?.recentOrders?.map((order) => (
+              <div
+                key={order.id}
+                className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
+              >
                 <div>
-                  <p className="font-medium">{order.orderNumber}</p>
-                  <p className="text-sm text-gray-500">{order.customer}</p>
+                  <p className="font-semibold text-slate-900">
+                    {order.orderNumber}
+                  </p>
+                  <p className="text-sm text-slate-500">{order.customer}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">${order.amount}</p>
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    order.status === 'paid' ? 'bg-green-100 text-green-800' :
-                    order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-gray-100'
-                  }`}>
-                    {order.status}
-                  </span>
+                  <p className="font-bold text-slate-900">₹{order.amount}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-500">
+                      {new Date(order.date).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-gray-500">No recent orders</p>
-        )}
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+          <h3 className="text-lg font-bold text-slate-900 mb-4">
+            Quick Actions
+          </h3>
+          <div className="space-y-3">
+            <button className="w-full text-left p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors">
+              <p className="font-semibold text-blue-900">Add New Product</p>
+              <p className="text-sm text-blue-600">
+                Create a new product listing
+              </p>
+            </button>
+            <button className="w-full text-left p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors">
+              <p className="font-semibold text-green-900">View Orders</p>
+              <p className="text-sm text-green-600">Manage customer orders</p>
+            </button>
+            <button className="w-full text-left p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors">
+              <p className="font-semibold text-purple-900">Manage Inventory</p>
+              <p className="text-sm text-purple-600">Update stock levels</p>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  )
+  );
 }

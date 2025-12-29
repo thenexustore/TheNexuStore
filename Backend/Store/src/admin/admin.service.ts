@@ -1,9 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private jwtService: JwtService,
+    private prisma: PrismaService,
+  ) {}
+
+  validateAdmin(email: string, password: string): boolean {
+    return email === 'admin@thenexusstore.com' && password === 'Suraj@123';
+  }
+
+  // ✅ CHANGE 2: Simple login (no database check)
+  login(email: string) {
+    const payload = {
+      email: email,
+      role: 'admin',
+      permissions: ['full_access'],
+      sub: 'admin_user',
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        email: email,
+        role: 'admin',
+        name: 'Admin User',
+        permissions: ['full_access'],
+      },
+    };
+  }
 
   async getOrders(
     page: number,

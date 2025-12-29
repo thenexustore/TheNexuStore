@@ -4,10 +4,41 @@ import { AdminGuard } from './admin.guard';
 import { CreateBrandDto, CreateCategoryDto } from './admin.dto';
 
 @Controller('admin')
-@UseGuards(AdminGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
+  @Post('login')
+  async adminLogin(@Body() body: { email: string; password: string }) {
+    const isValid = await this.adminService.validateAdmin(
+      body.email,
+      body.password,
+    );
+
+    if (!isValid) {
+      return {
+        success: false,
+        message: 'Invalid credentials',
+      };
+    }
+
+    const loginData = await this.adminService.login(body.email);
+
+    return {
+      success: true,
+      data: loginData,
+    };
+  }
+
+  @Get('health')
+  healthCheck() {
+    return {
+      status: 'ok',
+      service: 'admin-api',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @UseGuards(AdminGuard)
   @Get('orders')
   async getOrders(
     @Query('page') page?: string,
@@ -31,6 +62,7 @@ export class AdminController {
     };
   }
 
+  @UseGuards(AdminGuard)
   @Get('brands')
   async getBrands() {
     const brands = await this.adminService.getBrands();
@@ -40,6 +72,7 @@ export class AdminController {
     };
   }
 
+  @UseGuards(AdminGuard)
   @Post('brands')
   async createBrand(@Body() body: CreateBrandDto) {
     const brand = await this.adminService.createBrand(body);
@@ -50,6 +83,7 @@ export class AdminController {
     };
   }
 
+  @UseGuards(AdminGuard)
   @Get('categories')
   async getCategories() {
     const categories = await this.adminService.getCategories();
@@ -59,6 +93,7 @@ export class AdminController {
     };
   }
 
+  @UseGuards(AdminGuard)
   @Post('categories')
   async createCategory(@Body() body: CreateCategoryDto) {
     const category = await this.adminService.createCategory(body);
@@ -66,15 +101,6 @@ export class AdminController {
       success: true,
       data: category,
       message: 'Category created successfully',
-    };
-  }
-
-  @Get('health')
-  healthCheck() {
-    return {
-      status: 'ok',
-      service: 'admin-api',
-      timestamp: new Date().toISOString(),
     };
   }
 }

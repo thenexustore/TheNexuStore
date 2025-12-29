@@ -2,27 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Search, Plus, Edit, Trash2, Eye, Package } from "lucide-react";
 import {
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  Package,
-} from "lucide-react";
-import { fetchAdminData, deleteAdminData, putAdminData } from "@/lib/api";
-
-interface Product {
-  id: string;
-  title: string;
-  brand: string;
-  categories: string[];
-  skusCount: number;
-  status: string;
-  createdAt: string;
-  price: number;
-  stock: number;
-}
+  fetchProducts,
+  deleteProduct,
+  updateProductStatus,
+  type Product,
+} from "@/lib/api";
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -36,18 +22,12 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const params: Record<string, string> = {
-        page: page.toString(),
-        limit: "20",
-      };
-      if (search) params.search = search;
-      if (statusFilter !== "all") params.status = statusFilter;
+      const data = await fetchProducts(page, 20, search, statusFilter);
 
-      const data = await fetchAdminData("products", params);
       setProducts(data.products);
       setTotalPages(data.totalPages);
     } catch (error) {
-      console.error(error);
+      console.error("Failed to load products:", error);
     } finally {
       setLoading(false);
     }
@@ -60,18 +40,20 @@ export default function ProductsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
     try {
-      await deleteAdminData(`products/${id}`);
+      await deleteProduct(id);
       loadProducts();
     } catch (error) {
-      console.error(error);
+      console.error("Failed to delete product:", error);
+      alert("Failed to delete product");
     }
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      await putAdminData(`products/${id}/status`, { status: newStatus });
+      await updateProductStatus(id, newStatus);
       loadProducts();
     } catch (error) {
+      console.error("Failed to update status:", error);
       alert("Failed: " + (error as Error).message);
     }
   };
@@ -186,14 +168,23 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-1.5">
-                          {product.categories.slice(0, 1).map((cat, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase"
-                            >
-                              {cat}
+                          {product.categories.length > 0 ? (
+                            <>
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase">
+                                {product.categories[0]}
+                              </span>
+
+                              {product.categories.length > 1 && (
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[11px] font-bold uppercase">
+                                  +{product.categories.length - 1}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 rounded-md text-[11px] font-bold uppercase">
+                              Uncategorized
                             </span>
-                          ))}
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">

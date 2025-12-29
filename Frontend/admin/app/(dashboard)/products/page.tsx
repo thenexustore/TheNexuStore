@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Edit, Trash2, Eye } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Package,
+} from "lucide-react";
 import { fetchAdminData, deleteAdminData, putAdminData } from "@/lib/api";
 
 interface Product {
@@ -33,7 +40,6 @@ export default function ProductsPage() {
         page: page.toString(),
         limit: "20",
       };
-
       if (search) params.search = search;
       if (statusFilter !== "all") params.status = statusFilter;
 
@@ -41,7 +47,7 @@ export default function ProductsPage() {
       setProducts(data.products);
       setTotalPages(data.totalPages);
     } catch (error) {
-      console.error("Failed to load products:", error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -52,13 +58,12 @@ export default function ProductsPage() {
   }, [page, search, statusFilter]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
-
+    if (!confirm("Are you sure?")) return;
     try {
       await deleteAdminData(`products/${id}`);
       loadProducts();
     } catch (error) {
-      console.error("Failed to delete product:", error);
+      console.error(error);
     }
   };
 
@@ -67,202 +72,213 @@ export default function ProductsPage() {
       await putAdminData(`products/${id}/status`, { status: newStatus });
       loadProducts();
     } catch (error) {
-      console.error("Failed to update status:", error);
-      alert("Failed to update status: " + (error as Error).message);
+      alert("Failed: " + (error as Error).message);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      </div>
-    );
-  }
+  const statusStyles: Record<string, string> = {
+    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    DRAFT: "bg-amber-50 text-amber-700 border-amber-100",
+    ARCHIVED: "bg-slate-100 text-slate-600 border-slate-200",
+  };
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <p className="text-gray-600">Manage your store products</p>
-      </div>
-
-      <div className="bg-white border rounded-lg p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border rounded"
-            >
-              <option value="all">All Status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="DRAFT">Draft</option>
-              <option value="ARCHIVED">Archived</option>
-            </select>
-
-            <button
-              onClick={() => router.push("/products/new")}
-              className="flex items-center px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
-            </button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Products
+          </h1>
+          <p className="text-slate-500 text-sm">
+            Manage inventory, pricing, and visibility.
+          </p>
         </div>
+        <button
+          onClick={() => router.push("/products/new")}
+          className="inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Product
+        </button>
       </div>
 
-      <div className="bg-white border rounded-lg overflow-hidden">
+      <div className="grid grid-cols-1 md:flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all text-sm"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-600 cursor-pointer"
+        >
+          <option value="all">All Status</option>
+          <option value="ACTIVE">Active</option>
+          <option value="DRAFT">Draft</option>
+          <option value="ARCHIVED">Archived</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-200">
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                   Product
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                  Brand
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Inventory
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                  Categories
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Category
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                  SKUs
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                   Price
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                  Stock
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                  Created
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {products.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{product.title}</div>
-                    <div className="text-xs text-gray-500">{product.id}</div>
-                  </td>
-                  <td className="px-4 py-3">{product.brand}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {product.categories.slice(0, 2).map((cat, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs"
-                        >
-                          {cat}
-                        </span>
-                      ))}
-                      {product.categories.length > 2 && (
-                        <span className="px-2 py-1 text-gray-500 text-xs">
-                          +{product.categories.length - 2}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">{product.skusCount}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={product.status}
-                      onChange={(e) =>
-                        handleStatusChange(product.id, e.target.value)
-                      }
-                      className={`px-2 py-1 rounded text-sm ${
-                        product.status === "ACTIVE"
-                          ? "bg-green-100 text-green-800"
-                          : product.status === "DRAFT"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
+            <tbody className="divide-y divide-slate-100">
+              {loading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan={6} className="px-6 py-4">
+                        <div className="h-10 bg-slate-100 rounded-lg w-full" />
+                      </td>
+                    </tr>
+                  ))
+                : products.map((product) => (
+                    <tr
+                      key={product.id}
+                      className="group hover:bg-slate-50/50 transition-colors"
                     >
-                      <option value="ACTIVE">Active</option>
-                      <option value="DRAFT">Draft</option>
-                      <option value="ARCHIVED">Archived</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">₹{product.price}</td>
-                  <td className="px-4 py-3">{product.stock}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {new Date(product.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => router.push(`/products/${product.id}`)}
-                        className="p-1 text-blue-600 hover:text-blue-800"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          router.push(`/products/${product.id}/edit`)
-                        }
-                        className="p-1 text-blue-600 hover:text-blue-800"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="p-1 text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
+                            {product.title}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono mt-0.5">
+                            {product.id}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-900">
+                            {product.stock} in stock
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {product.skusCount} variants
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-1.5">
+                          {product.categories.slice(0, 1).map((cat, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={product.status}
+                          onChange={(e) =>
+                            handleStatusChange(product.id, e.target.value)
+                          }
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border outline-none transition-all cursor-pointer ${
+                            statusStyles[product.status]
+                          }`}
+                        >
+                          <option value="ACTIVE">ACTIVE</option>
+                          <option value="DRAFT">DRAFT</option>
+                          <option value="ARCHIVED">ARCHIVED</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-bold text-slate-900">
+                          ₹{product.price.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() =>
+                              router.push(`/products/${product.id}`)
+                            }
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              router.push(`/products/${product.id}/edit`)
+                            }
+                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
 
-        {products.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No products found
+        {!loading && products.length === 0 && (
+          <div className="py-20 text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-50 text-slate-400 rounded-full mb-4">
+              <Package className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-900">
+              No products found
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Try adjusting your filters or search terms.
+            </p>
           </div>
         )}
 
-        <div className="px-4 py-3 border-t flex items-center justify-between">
-          <div className="text-sm text-gray-500">
+        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">
             Page {page} of {totalPages}
-          </div>
+          </span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1 border rounded disabled:opacity-50"
+              className="px-4 py-2 text-xs font-bold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-all"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1 border rounded disabled:opacity-50"
+              className="px-4 py-2 text-xs font-bold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-all"
             >
               Next
             </button>

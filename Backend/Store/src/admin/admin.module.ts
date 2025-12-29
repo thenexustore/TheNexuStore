@@ -1,8 +1,11 @@
-// src/admin/admin.module.ts
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AdminController } from './admin.controller';
+import { DashboardController } from './dashboard/dashboard.controller';
+import { ProductsController } from './products/products.controller';
 import { AdminService } from './admin.service';
+import { DashboardService } from './dashboard/dashboard.service';
+import { ProductsService } from './products/products.service';
 import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
 
@@ -13,8 +16,14 @@ import { PrismaService } from '../common/prisma.service';
       signOptions: { expiresIn: '8h' },
     }),
   ],
-  controllers: [AdminController],
-  providers: [AdminService, AdminGuard, PrismaService],
+  controllers: [AdminController, DashboardController, ProductsController],
+  providers: [
+    AdminService,
+    DashboardService,
+    ProductsService,
+    AdminGuard,
+    PrismaService,
+  ],
   exports: [AdminGuard],
 })
 export class AdminModule {}

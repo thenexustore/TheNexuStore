@@ -8,16 +8,27 @@ export default function ProductViewPage() {
   const { id } = useParams();
   const router = useRouter();
   const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAdminData(`products/${id}`).then(setProduct);
+    setLoading(true);
+    fetchAdminData(`products/${id}`)
+      .then(setProduct)
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [id]);
 
-  if (!product) return <div className="p-6">Loading...</div>;
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  if (!product) {
+    return <div className="p-6">Product not found</div>;
+  }
 
   const sku = product.skus?.[0];
-  const price = sku?.prices?.[0];
-  const inventory = sku?.inventory?.[0];
+  const price = sku?.price;
+  const inventory = sku?.inventory;
 
   return (
     <div className="p-6">
@@ -40,19 +51,19 @@ export default function ProductViewPage() {
             <b>Status:</b> {product.status}
           </p>
           <p>
-            <b>Price:</b> ₹{price?.sale_price}
+            <b>Price:</b> ₹{price?.sale_price || 0}
           </p>
           <p>
-            <b>MRP:</b> ₹{price?.compare_at_price}
+            <b>MRP:</b> ₹{price?.compare_at_price || 0}
           </p>
           <p>
-            <b>Stock:</b> {inventory?.qty_on_hand}
+            <b>Stock:</b> {inventory?.qty_on_hand || 0}
           </p>
 
           <div className="mt-4">
             <b>Categories:</b>
             <div className="flex gap-2 mt-1 flex-wrap">
-              {product.categories.map((c: any) => (
+              {product.categories?.map((c: any) => (
                 <span
                   key={c.id}
                   className="bg-gray-100 px-2 py-1 rounded text-sm"
@@ -70,7 +81,7 @@ export default function ProductViewPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {product.media.map((m: any) => (
+          {product.media?.map((m: any) => (
             <img
               key={m.id}
               src={m.url}

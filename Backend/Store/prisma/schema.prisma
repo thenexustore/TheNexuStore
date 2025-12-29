@@ -469,6 +469,7 @@ model InventoryLevel {
   sku          Sku       @relation(fields: [sku_id], references: [id])
 
   @@id([warehouse_id, sku_id])
+  @@unique([warehouse_id, sku_id], name: "warehouse_sku_unique")  // ADD THIS
 }
 
 model Customer {

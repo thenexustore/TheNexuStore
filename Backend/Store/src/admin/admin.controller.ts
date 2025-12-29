@@ -13,6 +13,13 @@ import { AdminService } from './admin.service';
 import { StaffGuard } from '../auth/staff-auth/staff.guard';
 import { StaffRoleGuard } from '../auth/staff-auth/staff-role.guard';
 import { Roles } from '../auth/staff-auth/roles.decorator';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  CreateBrandDto,
+  CreateCategoryDto,
+  UpdateProductStatusDto,
+} from './admin.dto';
 
 @Controller('admin')
 @UseGuards(StaffGuard, StaffRoleGuard)
@@ -85,7 +92,7 @@ export class AdminController {
   }
 
   @Post('products')
-  async createProduct(@Body() body: any) {
+  async createProduct(@Body() body: CreateProductDto) {
     const product = await this.adminService.createProduct(body);
     return {
       success: true,
@@ -95,7 +102,7 @@ export class AdminController {
   }
 
   @Put('products/:id')
-  async updateProduct(@Param('id') id: string, @Body() body: any) {
+  async updateProduct(@Param('id') id: string, @Body() body: UpdateProductDto) {
     const product = await this.adminService.updateProduct(id, body);
     return {
       success: true,
@@ -116,7 +123,7 @@ export class AdminController {
   @Put('products/:id/status')
   async updateProductStatus(
     @Param('id') id: string,
-    @Body() body: { status: string },
+    @Body() body: UpdateProductStatusDto,
   ) {
     const product = await this.adminService.updateProductStatus(
       id,
@@ -140,7 +147,7 @@ export class AdminController {
   }
 
   @Post('brands')
-  async createBrand(@Body() body: { name: string; logo_url?: string }) {
+  async createBrand(@Body() body: CreateBrandDto) {
     const brand = await this.adminService.createBrand(body);
     return {
       success: true,
@@ -159,9 +166,7 @@ export class AdminController {
   }
 
   @Post('categories')
-  async createCategory(
-    @Body() body: { name: string; parent_id?: string; sort_order?: number },
-  ) {
+  async createCategory(@Body() body: CreateCategoryDto) {
     const category = await this.adminService.createCategory(body);
     return {
       success: true,

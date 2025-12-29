@@ -218,6 +218,9 @@ export class AdminService {
           skip,
           take: limit,
           orderBy: { created_at: 'desc' },
+          include: {
+            brand: true,
+          },
         }),
         this.prisma.product.count({ where }),
       ]);
@@ -230,13 +233,13 @@ export class AdminService {
         skusCount: number;
         status: string;
         createdAt: Date;
+        price: number;
+        compareAtPrice: number | null;
+        stock: number;
       }> = [];
 
       for (const product of products) {
-        const [brand, categories, skus] = await Promise.all([
-          this.prisma.brand.findUnique({
-            where: { id: product.brand_id },
-          }),
+        const [categories, skus, firstSku] = await Promise.all([
           this.prisma.productCategory.findMany({
             where: { product_id: product.id },
             include: { category: true },
@@ -244,16 +247,36 @@ export class AdminService {
           this.prisma.sku.findMany({
             where: { product_id: product.id },
           }),
+          this.prisma.sku.findFirst({
+            where: { product_id: product.id },
+            include: {
+              prices: {
+                take: 1,
+                orderBy: { updated_at: 'desc' },
+              },
+              inventory: {
+                take: 1,
+              },
+            },
+          }),
         ]);
+
+        const priceData = firstSku?.prices[0];
+        const inventoryData = firstSku?.inventory[0];
 
         productsWithDetails.push({
           id: product.id,
           title: product.title,
-          brand: brand?.name || 'No Brand',
+          brand: product.brand?.name || 'No Brand',
           categories: categories.map((pc) => pc.category.name),
           skusCount: skus.length,
           status: product.status,
           createdAt: product.created_at,
+          price: priceData?.sale_price ? Number(priceData.sale_price) : 0,
+          compareAtPrice: priceData?.compare_at_price
+            ? Number(priceData.compare_at_price)
+            : null,
+          stock: inventoryData?.qty_on_hand || 0,
         });
       }
 
@@ -327,7 +350,13 @@ export class AdminService {
       include: {
         brand: true,
         skus: {
-          include: { media: true },
+          include: {
+            media: true,
+            prices: true,
+            inventory: {
+              include: { warehouse: true },
+            },
+          },
         },
         media: {
           orderBy: { sort_order: 'asc' },
@@ -342,9 +371,37 @@ export class AdminService {
       throw new Error('Product not found');
     }
 
+    const transformedSkus = await Promise.all(
+      product.skus.map(async (sku) => {
+        const price = sku.prices[0] || null;
+        const inventory = sku.inventory[0] || null;
+
+        return {
+          ...sku,
+          price: price
+            ? {
+                sale_price: Number(price.sale_price),
+                compare_at_price: price.compare_at_price
+                  ? Number(price.compare_at_price)
+                  : null,
+                currency: price.currency,
+              }
+            : null,
+          inventory: inventory
+            ? {
+                qty_on_hand: inventory.qty_on_hand,
+                qty_reserved: inventory.qty_reserved,
+                warehouse: inventory.warehouse,
+              }
+            : null,
+        };
+      }),
+    );
+
     return {
       ...product,
       categories: product.categories.map((pc) => pc.category),
+      skus: transformedSkus,
     };
   }
 
@@ -387,27 +444,39 @@ export class AdminService {
         },
       });
 
+      const salePriceValue = Number(sale_price) || 0;
+      const compareAtPriceValue = compare_at_price
+        ? Number(compare_at_price)
+        : null;
+
       await this.prisma.skuPrice.create({
         data: {
           sku_id: sku.id,
-          sale_price,
-          compare_at_price,
+          sale_price: salePriceValue,
+          compare_at_price: compareAtPriceValue,
           currency: 'INR',
           price_source: 'ADMIN',
         },
       });
 
-      const warehouse = await this.prisma.warehouse.findFirst();
+      let warehouse = await this.prisma.warehouse.findFirst({
+        where: { code: 'DEFAULT' },
+      });
 
       if (!warehouse) {
-        throw new Error('No warehouse found. Please create a warehouse first.');
+        warehouse = await this.prisma.warehouse.create({
+          data: {
+            name: 'Default Warehouse',
+            code: 'DEFAULT',
+          },
+        });
       }
 
       await this.prisma.inventoryLevel.create({
         data: {
           sku_id: sku.id,
           warehouse_id: warehouse.id,
-          qty_on_hand: qty_on_hand ?? 0,
+          qty_on_hand: qty_on_hand ? Number(qty_on_hand) : 0,
           qty_reserved: 0,
         },
       });
@@ -434,9 +503,9 @@ export class AdminService {
         });
       }
 
-      return product;
+      return await this.getProductById(product.id);
     } catch (error) {
-      console.error('Create product error 👉', error);
+      console.error('Create product error:', error);
       throw error;
     }
   }
@@ -478,32 +547,57 @@ export class AdminService {
       where: { product_id: id },
     });
 
-    if (!sku) return true;
-
-    await this.prisma.skuPrice.updateMany({
-      where: { sku_id: sku.id },
-      data: {
-        sale_price,
-        compare_at_price,
-      },
-    });
-
-    const warehouse = await this.prisma.warehouse.findFirst({
-      where: { code: 'DEFAULT' },
-    });
-
-    if (!warehouse) {
-      throw new Error('Default warehouse not found');
+    if (!sku) {
+      throw new Error('SKU not found for product');
     }
 
-    if (typeof qty_on_hand === 'number') {
-      await this.prisma.inventoryLevel.updateMany({
+    if (sale_price !== undefined || compare_at_price !== undefined) {
+      const salePriceValue =
+        sale_price !== undefined ? Number(sale_price) : undefined;
+      const compareAtPriceValue =
+        compare_at_price !== undefined
+          ? compare_at_price
+            ? Number(compare_at_price)
+            : null
+          : undefined;
+
+      await this.prisma.skuPrice.updateMany({
+        where: { sku_id: sku.id },
+        data: {
+          ...(salePriceValue !== undefined && { sale_price: salePriceValue }),
+          ...(compareAtPriceValue !== undefined && {
+            compare_at_price: compareAtPriceValue,
+          }),
+        },
+      });
+    }
+
+    if (qty_on_hand !== undefined) {
+      const warehouse = await this.prisma.warehouse.findFirst({
+        where: { code: 'DEFAULT' },
+      });
+
+      if (!warehouse) {
+        throw new Error('Default warehouse not found');
+      }
+
+      const qtyValue = Number(qty_on_hand);
+
+      await this.prisma.inventoryLevel.upsert({
         where: {
+          warehouse_id_sku_id: {
+            sku_id: sku.id,
+            warehouse_id: warehouse.id,
+          },
+        },
+        update: {
+          qty_on_hand: qtyValue,
+        },
+        create: {
           sku_id: sku.id,
           warehouse_id: warehouse.id,
-        },
-        data: {
-          qty_on_hand,
+          qty_on_hand: qtyValue,
+          qty_reserved: 0,
         },
       });
     }
@@ -513,14 +607,16 @@ export class AdminService {
         where: { product_id: id },
       });
 
-      await this.prisma.productCategory.createMany({
-        data: categories.map((cid: string, i: number) => ({
-          product_id: id,
-          category_id: cid,
-          is_primary: i === 0,
-          sort_order: i,
-        })),
-      });
+      if (categories.length > 0) {
+        await this.prisma.productCategory.createMany({
+          data: categories.map((cid: string, i: number) => ({
+            product_id: id,
+            category_id: cid,
+            is_primary: i === 0,
+            sort_order: i,
+          })),
+        });
+      }
     }
 
     if (images_base64) {
@@ -528,17 +624,19 @@ export class AdminService {
         where: { product_id: id },
       });
 
-      await this.prisma.productMedia.createMany({
-        data: images_base64.map((img: string, i: number) => ({
-          product_id: id,
-          type: 'IMAGE',
-          url: img,
-          sort_order: i,
-        })),
-      });
+      if (images_base64.length > 0) {
+        await this.prisma.productMedia.createMany({
+          data: images_base64.map((img: string, i: number) => ({
+            product_id: id,
+            type: 'IMAGE',
+            url: img,
+            sort_order: i,
+          })),
+        });
+      }
     }
 
-    return true;
+    return await this.getProductById(id);
   }
 
   async deleteProduct(id: string) {

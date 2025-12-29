@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Filter, Plus, Edit, Trash2, Eye } from "lucide-react";
-import { fetchAdminData, deleteAdminData, putAdminData } from "@/lib/api"; // Add putAdminData
+import { fetchAdminData, deleteAdminData, putAdminData } from "@/lib/api";
 
 interface Product {
   id: string;
@@ -13,6 +13,8 @@ interface Product {
   skusCount: number;
   status: string;
   createdAt: string;
+  price: number;
+  stock: number;
 }
 
 export default function ProductsPage() {
@@ -62,7 +64,6 @@ export default function ProductsPage() {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      // Use putAdminData instead of direct fetch
       await putAdminData(`products/${id}/status`, { status: newStatus });
       loadProducts();
     } catch (error) {
@@ -147,6 +148,12 @@ export default function ProductsPage() {
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  Price
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  Stock
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                   Created
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
@@ -199,6 +206,8 @@ export default function ProductsPage() {
                       <option value="ARCHIVED">Archived</option>
                     </select>
                   </td>
+                  <td className="px-4 py-3">₹{product.price}</td>
+                  <td className="px-4 py-3">{product.stock}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {new Date(product.createdAt).toLocaleDateString()}
                   </td>

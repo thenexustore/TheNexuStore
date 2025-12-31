@@ -506,15 +506,10 @@ function MainContent({ product }: { product: Product }) {
 }
 
 function Sidebar({ product }: { product: Product }) {
-  const brandName =
-    typeof product.brand === "object" ? product.brand.name : product.brand;
-  const categoryName =
-    typeof product.category === "object"
-      ? product.category.name
-      : product.category;
-
+  const brandName = product.brand?.name || "No Brand";
+  const categoryName = product.category?.name || "Uncategorized";
   const discount =
-    product.discount_price && product.price
+    product.discount_price && product.price && product.discount_price > 0
       ? Math.round((1 - product.price / product.discount_price) * 100)
       : 0;
 

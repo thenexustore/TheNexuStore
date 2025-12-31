@@ -173,7 +173,7 @@ export default function ProductsPage() {
                       </td>
                     </tr>
                   ))
-                : products.map((product) => (
+                : products.map((product:any) => (
                     <tr
                       key={product.id}
                       className="group hover:bg-slate-50/50 transition-colors"
@@ -220,21 +220,23 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1.5">
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase">
-                            {product.category || "Uncategorized"}
-                          </span>
+                          {product.category && (
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase">
+                              {product.category}
+                            </span>
+                          )}
+
                           {product.categories.length > 0 && (
                             <div className="flex flex-wrap gap-1">
-                              {product.categories
-                                .slice(0, 2)
-                                .map((cat, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium"
-                                  >
-                                    {cat}
-                                  </span>
-                                ))}
+                              {product.categories.slice(0, 2).map((cat:any) => (
+                                <span
+                                  key={`${product.id}-${cat}`}
+                                  className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium"
+                                >
+                                  {cat}
+                                </span>
+                              ))}
+
                               {product.categories.length > 2 && (
                                 <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[10px] font-medium">
                                   +{product.categories.length - 2}
@@ -244,6 +246,7 @@ export default function ProductsPage() {
                           )}
                         </div>
                       </td>
+
                       <td className="px-6 py-4">
                         <select
                           value={product.product_status}

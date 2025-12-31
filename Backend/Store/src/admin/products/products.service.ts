@@ -95,7 +95,7 @@ export class ProductsService {
       const productsWithDetails: any[] = [];
 
       for (const product of products) {
-        const defaultSku = product.skus[0];
+        const defaultSku = product.skus.find((s) => !s.name) || product.skus[0];
         const price = defaultSku?.prices?.[0];
         const inventory = defaultSku?.inventory?.[0];
 
@@ -242,7 +242,7 @@ export class ProductsService {
       throw new Error('Product not found');
     }
 
-    const defaultSku = product.skus[0];
+    const defaultSku = product.skus.find((s) => !s.name) || product.skus[0];
     const price = defaultSku?.prices?.[0];
     const inventory = defaultSku?.inventory?.[0];
 
@@ -301,6 +301,19 @@ export class ProductsService {
       };
     });
 
+    const productAttributes =
+      product.skus[0]?.attributes.map((attr) => ({
+        key: attr.attribute.code,
+        value:
+          attr.attribute_value?.value_text ||
+          attr.value_text ||
+          (attr.value_number !== null
+            ? attr.value_number.toString()
+            : attr.value_bool !== null
+              ? attr.value_bool.toString()
+              : ''),
+      })) || [];
+
     return {
       id: product.id,
       title: product.title,
@@ -323,19 +336,8 @@ export class ProductsService {
         type: m.type,
         sort_order: m.sort_order,
       })),
-      attributes: product.skus.flatMap((sku) =>
-        sku.attributes.map((attr) => ({
-          key: attr.attribute.code,
-          value:
-            attr.attribute_value?.value_text ||
-            attr.value_text ||
-            (attr.value_number !== null
-              ? attr.value_number.toString()
-              : attr.value_bool !== null
-                ? attr.value_bool.toString()
-                : ''),
-        })),
-      ),
+
+      attributes: productAttributes,
       variants: variants,
       product_status: product.status,
       featured_product: product.main_category?.slug === 'featured',

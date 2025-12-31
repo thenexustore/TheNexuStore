@@ -20,19 +20,19 @@ import {
   type Product,
 } from "@/lib/api";
 
-interface ProductVariant {
+type FormAttribute = {
+  key: string;
+  value: string;
+};
+
+type FormVariant = {
   variant_name?: string;
-  attributes: Array<{ key: string; value: string }>;
+  attributes: FormAttribute[];
   sale_price: number;
   compare_at_price?: number;
   qty_on_hand: number;
   images?: string[];
-}
-
-interface ProductAttribute {
-  key: string;
-  value: string;
-}
+};
 
 export default function ProductEditPage() {
   const { id } = useParams();
@@ -52,8 +52,8 @@ export default function ProductEditPage() {
     description_html: "",
     short_description: "",
     images_base64: [] as string[],
-    attributes: [] as ProductAttribute[],
-    variants: [] as ProductVariant[],
+    attributes: [] as FormAttribute[],
+    variants: [] as FormVariant[],
     status: "DRAFT",
     featured: false,
   });
@@ -66,7 +66,7 @@ export default function ProductEditPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
 
   // Variant state
-  const [variantForm, setVariantForm] = useState<ProductVariant>({
+  const [variantForm, setVariantForm] = useState<FormVariant>({
     variant_name: "",
     attributes: [],
     sale_price: 0,
@@ -94,7 +94,6 @@ export default function ProductEditPage() {
       setCategories(categoriesData);
       const product = productData as Product;
 
-      // Transform data to form
       setForm({
         title: product.title || "",
         brandId: product.brand?.id || "",
@@ -107,38 +106,21 @@ export default function ProductEditPage() {
         description_html: product.product_description || "",
         short_description: product.short_description || "",
         images_base64: product.product_images?.map((img) => img.url) || [],
-        attributes: product.attributes
-          ? Object.entries(product.attributes).flatMap(([key, values]) => {
-              if (Array.isArray(values)) {
-                return values.map((value) => ({
-                  key,
-                  value:
-                    typeof value === "object"
-                      ? JSON.stringify(value)
-                      : String(value),
-                }));
-              } else {
-                return [
-                  {
-                    key,
-                    value:
-                      typeof values === "object"
-                        ? JSON.stringify(values)
-                        : String(values),
-                  },
-                ];
-              }
-            })
-          : [],
+        attributes: product.attributes || [],
+
         variants:
           product.variants?.map((v) => ({
-            variant_name: v.variant_name || "",
-            attributes: v.attributes || [],
-            sale_price: v.price || 0,
-            compare_at_price: v.compare_at_price || 0,
-            qty_on_hand: v.stock_quantity || 0,
+            variant_name: "",
+            attributes: v.attributes.map((a) => ({
+              key: a.key,
+              value: a.value,
+            })),
+            sale_price: v.price,
+            compare_at_price: v.compare_at_price ?? 0,
+            qty_on_hand: v.stock_quantity,
             images: [],
           })) || [],
+
         status: product.product_status || "DRAFT",
         featured: product.featured_product || false,
       });
@@ -274,7 +256,7 @@ export default function ProductEditPage() {
       variantImages = [base64];
     }
 
-    const newVariant: ProductVariant = {
+    const newVariant: FormVariant = {
       ...variantForm,
       images: variantImages,
     };
@@ -342,7 +324,17 @@ export default function ProductEditPage() {
         short_description: form.short_description,
         images_base64: form.images_base64,
         attributes: form.attributes,
-        variants: form.variants,
+        variants: form.variants.map((v, index) => ({
+          sku_code: `${form.title.replace(/\s+/g, "-").toUpperCase()}-V${
+            index + 1
+          }`,
+          variant_name: v.variant_name,
+          attributes: v.attributes,
+          sale_price: v.sale_price,
+          compare_at_price: v.compare_at_price || undefined,
+          qty_on_hand: v.qty_on_hand,
+          images: v.images,
+        })),
         status: form.status,
         featured: form.featured,
       });
@@ -894,12 +886,15 @@ export default function ProductEditPage() {
                           <span className="font-medium">
                             ₹{variant.sale_price.toLocaleString()}
                           </span>
-                          {variant.compare_at_price > 0 && (
-                            <div className="text-xs text-slate-400 line-through">
-                              ₹{variant.compare_at_price.toLocaleString()}
-                            </div>
-                          )}
+
+                          {variant.compare_at_price &&
+                            variant.compare_at_price > 0 && (
+                              <div className="text-xs text-slate-400 line-through">
+                                ₹{variant.compare_at_price.toLocaleString()}
+                              </div>
+                            )}
                         </td>
+
                         <td className="py-3 px-4">
                           <span className="text-slate-700">
                             {variant.qty_on_hand} units

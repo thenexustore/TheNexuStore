@@ -17,6 +17,7 @@ interface ProductAttribute {
 }
 
 interface ProductVariant {
+  sku_code: string;
   variant_name?: string;
   attributes: ProductAttribute[];
   sale_price: number;
@@ -55,6 +56,7 @@ export default function NewProductPage() {
   });
 
   const [variantForm, setVariantForm] = useState<ProductVariant>({
+    sku_code: "",
     variant_name: "",
     attributes: [],
     sale_price: 0,
@@ -119,6 +121,7 @@ export default function NewProductPage() {
 
     setVariants([...variants, { ...variantForm }]);
     setVariantForm({
+      sku_code: "",
       variant_name: "",
       attributes: [],
       sale_price: 0,
@@ -188,6 +191,7 @@ export default function NewProductPage() {
     try {
       await createProduct({
         title: form.title,
+        sku_code: "",
         brandId: form.brandId,
         description_html: form.description_html,
         short_description:
@@ -547,11 +551,12 @@ export default function NewProductPage() {
                           <span className="font-medium">
                             ₹{variant.sale_price.toLocaleString()}
                           </span>
-                          {variant.compare_at_price > 0 && (
-                            <div className="text-xs text-slate-400 line-through">
-                              ₹{variant.compare_at_price.toLocaleString()}
-                            </div>
-                          )}
+                          {variant.compare_at_price &&
+                            variant.compare_at_price > 0 && (
+                              <div className="text-xs text-slate-400 line-through">
+                                ₹{variant.compare_at_price.toLocaleString()}
+                              </div>
+                            )}
                         </td>
                         <td className="py-3 px-4">
                           <span className="text-slate-700">

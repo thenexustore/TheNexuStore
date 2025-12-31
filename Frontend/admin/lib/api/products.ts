@@ -1,11 +1,43 @@
 import { fetchWithAuth } from "../utils";
 
+export interface ProductAttribute {
+  key: string;
+  value: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  sku_code: string;
+  attributes: ProductAttribute[];
+  price: number;
+  compare_at_price: number | null;
+  stock_quantity: number;
+}
+
+export interface ProductImage {
+  url: string;
+  alt_text: string | null;
+}
+
 export interface Product {
   id: string;
   title: string;
-  category: string;
-  categories: string[];
-  brand: string;
+
+  brand: {
+    id: string;
+    name: string;
+  } | null;
+
+  category: {
+    id: string;
+    name: string;
+  } | null;
+
+  categories: Array<{
+    id: string;
+    name: string;
+  }>;
+
   sku_code: string;
   price: number;
   discount_price: number | null;
@@ -13,16 +45,9 @@ export interface Product {
   stock_status: string;
   product_description: string;
   short_description?: string;
-  product_images: Array<{ url: string; alt_text: string | null }>;
-  attributes: Record<string, string[]>;
-  variants: Array<{
-    id: string;
-    sku_code: string;
-    attributes: Array<{ key: string; value: string }>;
-    price: number;
-    compare_at_price: number | null;
-    stock_quantity: number;
-  }>;
+  product_images: ProductImage[];
+  attributes: ProductAttribute[];
+  variants: ProductVariant[];
   product_status: string;
   featured_product: boolean;
   created_at: string;

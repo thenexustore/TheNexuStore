@@ -15,6 +15,7 @@ import { GoogleStrategy } from './google-verfication/google.strategy';
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard, PrismaService,GoogleStrategy],
+  providers: [AuthService, AuthGuard, PrismaService, GoogleStrategy],
+  exports: [AuthGuard, JwtModule, AuthService],
 })
 export class AuthModule {}

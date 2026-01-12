@@ -308,6 +308,40 @@ model Sku {
   @@index([sku_code])
 }
 
+model Banner {
+  id              String   @id @default(uuid())
+
+  image           String?
+
+  overlay         String
+  align           String
+
+  title_text      String
+  title_color     String
+  title_size      String
+  title_weight    String
+  title_font      String
+
+  subtitle_text   String
+  subtitle_color  String
+  subtitle_size   String
+
+  button_text     String
+  button_link     String?
+  button_bg       String
+  button_color    String
+  button_radius   String
+  button_padding  String
+
+  is_active       Boolean  @default(true)
+  sort_order      Int
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([is_active, sort_order])
+}
+
 model ProductMedia {
   id         String    @id @default(uuid())
   product_id String
@@ -469,7 +503,6 @@ model InventoryLevel {
   sku          Sku       @relation(fields: [sku_id], references: [id])
 
   @@id([warehouse_id, sku_id])
-  @@unique([warehouse_id, sku_id], name: "warehouse_sku_unique")  // ADD THIS
 }
 
 model Customer {

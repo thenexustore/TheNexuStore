@@ -9,12 +9,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "developers.google.com",
-        pathname: "/identity/images/**",
-      },
-      {
-        protocol: "https",
-        hostname: "picsum.photos",
+        hostname: "**",
         pathname: "/**",
       },
     ],

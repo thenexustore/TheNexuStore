@@ -14,7 +14,6 @@ export class AdminService {
     return email === 'admin@thenexusstore.com' && password === 'Suraj@123';
   }
 
-  // ✅ CHANGE 2: Simple login (no database check)
   login(email: string) {
     const payload = {
       email: email,

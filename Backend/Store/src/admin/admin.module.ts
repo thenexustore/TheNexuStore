@@ -8,6 +8,7 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { ProductsService } from './products/products.service';
 import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
+import { BannersModule } from './banners/banners.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PrismaService } from '../common/prisma.service';
       secret: process.env.JWT_SECRET || 'your_jwt_secret_key_here',
       signOptions: { expiresIn: '8h' },
     }),
+    BannersModule,
   ],
   controllers: [AdminController, DashboardController, ProductsController],
   providers: [

@@ -10,6 +10,8 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronDown,
+  LayoutTemplate,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -17,6 +19,14 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Products", href: "/products", icon: Package },
   { name: "Orders", href: "/orders", icon: ShoppingCart },
+  {
+    name: "Home Content",
+    icon: LayoutTemplate,
+    children: [
+      { name: "Banners", href: "/banners" },
+      { name: "Featured Products", href: "/featured-products" },
+    ],
+  },
 ];
 
 export default function DashboardLayout({
@@ -27,6 +37,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
@@ -34,26 +45,84 @@ export default function DashboardLayout({
   };
 
   const NavItems = () => (
-    <div className="space-y-1 px-3">
+    <div className="space-y-1.5 px-4">
       {navigation.map((item) => {
+        const isParentActive = item.children?.some(
+          (sub) => pathname === sub.href
+        );
+        const isOpen = openMenu === item.name || isParentActive;
         const isActive = pathname === item.href;
+
+        if (item.children) {
+          return (
+            <div key={item.name}>
+              <button
+                onClick={() =>
+                  setOpenMenu(isOpen && !isParentActive ? null : item.name)
+                }
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium rounded-xl transition ${
+                  isParentActive
+                    ? "bg-black text-white"
+                    : "text-zinc-600 hover:bg-zinc-100 hover:text-black"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon
+                    className={`w-5 h-5 ${
+                      isParentActive ? "text-white" : "text-zinc-400"
+                    }`}
+                  />
+                  {item.name}
+                </div>
+                <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+                  <ChevronDown className="w-4 h-4 text-zinc-400" />
+                </motion.div>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-1 ml-6 pl-4 border-l border-zinc-200 space-y-1">
+                      {item.children.map((sub) => (
+                        <Link
+                          key={sub.name}
+                          href={sub.href}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`block px-4 py-2 text-sm rounded-lg transition ${
+                            pathname === sub.href
+                              ? "bg-zinc-900 text-white"
+                              : "text-zinc-500 hover:bg-zinc-100 hover:text-black"
+                          }`}
+                        >
+                          {sub.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        }
+
         return (
           <Link
             key={item.name}
             href={item.href}
             onClick={() => setSidebarOpen(false)}
-            className={`group flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${
+            className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-xl transition ${
               isActive
-                ? "bg-white text-blue-600 shadow-sm border border-slate-200"
-                : "text-slate-500 hover:bg-slate-200/50 hover:text-slate-900"
+                ? "bg-black text-white"
+                : "text-zinc-600 hover:bg-zinc-100 hover:text-black"
             }`}
           >
             <item.icon
-              className={`w-5 h-5 mr-3 transition-colors ${
-                isActive
-                  ? "text-blue-600"
-                  : "text-slate-400 group-hover:text-slate-900"
-              }`}
+              className={`w-5 h-5 ${isActive ? "text-white" : "text-zinc-400"}`}
             />
             {item.name}
           </Link>
@@ -63,97 +132,76 @@ export default function DashboardLayout({
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Mobile Top Bar */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="flex items-center gap-2">
-          <img src="./logo.png" alt="logo" />
-        </div>
+    <div className="h-screen bg-white flex overflow-hidden">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-white border-b z-30">
+        <img src="/logo.png" className="h-7" />
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-zinc-100 rounded-full"
         >
-          <Menu className="w-6 h-6 text-slate-600" />
+          <Menu className="w-6 h-6 text-zinc-700" />
         </button>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
-            />
-            <motion.div
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 bg-slate-50 z-50 lg:hidden shadow-2xl flex flex-col"
-            >
-              <div className="p-6 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <img src="./logo.png" alt="logo" />
-                </div>
-                <button onClick={() => setSidebarOpen(false)}>
-                  <X className="w-6 h-6 text-slate-400" />
-                </button>
-              </div>
-              <nav className="flex-1 overflow-y-auto">
-                <NavItems />
-              </nav>
-              <div className="p-4 border-t border-slate-200">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center w-full px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-                >
-                  <LogOut className="w-5 h-5 mr-3" />
-                  Logout
-                </button>
-              </div>
-            </motion.div>
-          </>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/20 z-40 lg:hidden"
+          />
         )}
       </AnimatePresence>
 
-      {/* Desktop Layout */}
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 bg-slate-50 border-r border-slate-200">
-          <div className="p-8 mb-4">
-            <div className="flex items-center gap-3">
-              <img src="./logo.png" alt="logo" />
-            </div>
-          </div>
+      <aside className="hidden lg:flex w-72 bg-white border-r border-zinc-200 flex-col">
+        <div className="h-20 flex items-center px-8">
+          <img src="/logo.png" className="h-8" />
+        </div>
+        <nav className="flex-1 overflow-y-auto py-4">
+          <NavItems />
+        </nav>
+        <div className="p-4 border-t border-zinc-200">
+          <button
+            onClick={handleLogout}
+            className="group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+          >
+            <LogOut className="w-5 h-5 text-zinc-400 group-hover:text-red-600" />
+            Logout
+          </button>
+        </div>
+      </aside>
 
-          <nav className="flex-1">
-            <NavItems />
-          </nav>
+      <motion.aside
+        initial={{ x: "-100%" }}
+        animate={{ x: sidebarOpen ? 0 : "-100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed inset-y-0 left-0 w-72 bg-white border-r border-zinc-200 z-50 flex flex-col lg:hidden"
+      >
+        <div className="h-20 flex items-center px-8">
+          <img src="/logo.png" className="h-8" />
+          <button className="ml-auto" onClick={() => setSidebarOpen(false)}>
+            <X className="w-5 h-5 text-zinc-500" />
+          </button>
+        </div>
+        <nav className="flex-1 overflow-y-auto py-4">
+          <NavItems />
+        </nav>
+        <div className="p-4 border-t border-zinc-200">
+          <button
+            onClick={handleLogout}
+            className="group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+          >
+            <LogOut className="w-5 h-5 text-zinc-400 group-hover:text-red-600" />
+            Logout
+          </button>
+        </div>
+      </motion.aside>
 
-          <div className="p-4 mt-auto">
-            <div className="bg-white p-1 rounded-2xl border border-slate-200 mb-4">
-              <button
-                onClick={handleLogout}
-                className="flex items-center justify-center w-full py-2 px-3 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-all"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <main className="flex-1 min-w-0">
-          <div className="p-4 sm:p-8 lg:p-12 max-w-[1600px] mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden pt-16 lg:pt-0">
+        <div className="flex-1 overflow-y-auto p-8 bg-zinc-50">{children}</div>
+      </main>
     </div>
   );
 }

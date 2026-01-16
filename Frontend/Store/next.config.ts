@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
         hostname: "**",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "recursos.infortisa.com",
+        pathname: "/**",
+      },
     ],
   },
 

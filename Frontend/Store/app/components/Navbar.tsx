@@ -24,6 +24,11 @@ export default function Navbar() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const [categories, setCategories] = useState<
+    { id: string; name: string; slug: string }[]
+  >([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
   const router = useRouter();
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -32,6 +37,8 @@ export default function Navbar() {
     getMe().then((res: User | null) => {
       if (res) setUser(res);
     });
+
+    loadCategories();
 
     const loadCartCount = () => {
       const stored = localStorage.getItem("cart");
@@ -58,6 +65,18 @@ export default function Navbar() {
     window.addEventListener("cart-update", handleCartUpdate);
     return () => window.removeEventListener("cart-update", handleCartUpdate);
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const fetchedCategories = await productAPI.getCategories();
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -136,6 +155,15 @@ export default function Navbar() {
     }
   };
 
+  const handleCategoryClick = (categorySlug: string) => {
+    router.push(`/products?categories=${categorySlug}`);
+    setSidebarOpen(false);
+  };
+
+  const filteredCategories = categories.filter((category) =>
+    category.name.toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
   return (
     <>
       <header className="sticky top-0 z-50 h-20 w-full bg-white text-black border-b border-gray-200">
@@ -149,7 +177,7 @@ export default function Navbar() {
 
           <Link href="/" className="flex-shrink-0">
             <div className="h-10 w-32 rounded-lg flex items-center justify-center">
-              <img src="./logo.png" alt="logo" />
+              <img src="/logo.png" alt="logo" />
             </div>
           </Link>
 
@@ -182,74 +210,104 @@ export default function Navbar() {
               </button>
 
               {showSearchResults && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto z-50">
-                  {searchLoading ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0B123A] mx-auto"></div>
-                      <p className="mt-2 text-sm">Searching...</p>
-                    </div>
-                  ) : searchResults.length > 0 ? (
-                    <>
-                      <div className="p-3 border-b border-gray-100 bg-gray-50">
-                        <p className="text-sm font-medium text-gray-700">
-                          {searchResults.length} product
-                          {searchResults.length !== 1 ? "s" : ""} found
-                        </p>
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-300 z-[9999]">
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    {searchLoading ? (
+                      <div className="p-4 text-center text-gray-500">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0B123A] mx-auto"></div>
+                        <p className="mt-2 text-sm">Searching...</p>
                       </div>
-                      <div className="divide-y divide-gray-100">
-                        {searchResults.map((product) => (
-                          <button
-                            key={product.id}
-                            onClick={() => handleProductClick(product)}
-                            className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
-                          >
-                            <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
-                              {product.thumbnail && (
+                    ) : searchResults.length > 0 ? (
+                      <>
+                        <div className="p-3 border-b border-gray-100 bg-gray-50 sticky top-0">
+                          <p className="text-sm font-medium text-gray-700">
+                            {searchResults.length} product
+                            {searchResults.length !== 1 ? "s" : ""} found
+                          </p>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {searchResults.map((product) => (
+                            <button
+                              key={product.id}
+                              onClick={() => handleProductClick(product)}
+                              className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            >
+                              <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
                                 <img
-                                  src={product.thumbnail}
+                                  src={
+                                    product.thumbnail &&
+                                    product.thumbnail.trim() !== ""
+                                      ? product.thumbnail
+                                      : "/No_Image_Available.png"
+                                  }
                                   alt={product.title}
                                   className="h-full w-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src =
+                                      "/No_Image_Available.png";
+                                  }}
                                 />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {product.title}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate">
-                                {product.brand_name}
-                              </p>
-                              <div className="flex items-center justify-between mt-1">
-                                <p className="text-sm font-bold text-[#0B123A]">
-                                  €{product.price.toFixed(2)}
-                                </p>
-                                {product.rating_avg && (
-                                  <div className="flex items-center text-xs text-gray-600">
-                                    <span className="text-yellow-400">★</span>
-                                    <span className="ml-1">
-                                      {product.rating_avg.toFixed(1)}
-                                    </span>
-                                  </div>
-                                )}
                               </div>
-                            </div>
+
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {product.title}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {product.brand_name}
+                                </p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-sm font-bold text-[#0B123A]">
+                                    €{product.price.toFixed(2)}
+                                  </p>
+                                  {product.rating_avg && (
+                                    <div className="flex items-center text-xs text-gray-600">
+                                      <span className="text-yellow-400">★</span>
+                                      <span className="ml-1">
+                                        {product.rating_avg.toFixed(1)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="p-3 border-t border-gray-100 bg-gray-50 sticky bottom-0">
+                          <button
+                            onClick={() => {
+                              router.push(
+                                `/products?search=${encodeURIComponent(search)}`
+                              );
+                              setShowSearchResults(false);
+                              setSearch("");
+                            }}
+                            className="w-full text-center text-sm font-medium text-[#0B123A] hover:text-[#1a245a] py-2 flex items-center justify-center gap-2"
+                          >
+                            View all search results
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5l7 7-7 7"
+                              />
+                            </svg>
                           </button>
-                        ))}
-                      </div>
-                      <div className="p-3 border-t border-gray-100 bg-gray-50">
-                        <button
-                          onClick={() => {
-                            router.push(
-                              `/products?search=${encodeURIComponent(search)}`
-                            );
-                            setShowSearchResults(false);
-                            setSearch("");
-                          }}
-                          className="w-full text-center text-sm font-medium text-[#0B123A] hover:text-[#1a245a] py-2 flex items-center justify-center gap-2"
-                        >
-                          View all search results
+                        </div>
+                      </>
+                    ) : search.length >= 2 ? (
+                      <div className="p-6 text-center">
+                        <div className="text-gray-400 mb-2">
                           <svg
-                            className="w-4 h-4"
+                            className="w-12 h-12 mx-auto"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -257,38 +315,20 @@ export default function Navbar() {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5l7 7-7 7"
+                              strokeWidth={1}
+                              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                             />
                           </svg>
-                        </button>
+                        </div>
+                        <p className="text-gray-700 font-medium">
+                          No results found
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Try different keywords
+                        </p>
                       </div>
-                    </>
-                  ) : search.length >= 2 ? (
-                    <div className="p-6 text-center">
-                      <div className="text-gray-400 mb-2">
-                        <svg
-                          className="w-12 h-12 mx-auto"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1}
-                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-gray-700 font-medium">
-                        No results found
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Try different keywords
-                      </p>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
               )}
             </form>
@@ -369,40 +409,53 @@ export default function Navbar() {
         }`}
       >
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold">Categories</h2>
+          <h2 className="text-xl font-bold text-black">Categories</h2>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
           >
             <X size={24} />
           </button>
         </div>
 
-        <div className="p-6">
-          <div className="space-y-2">
-            {[
-              "Electronics",
-              "Clothing",
-              "Home & Garden",
-              "Sports",
-              "Books",
-              "Beauty",
-              "Toys",
-              "Automotive",
-              "Health",
-              "Office",
-            ].map((category) => (
-              <button
-                key={category}
-                onClick={() => {
-                  router.push(`/products?category=${category.toLowerCase()}`);
-                  setSidebarOpen(false);
-                }}
-                className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium"
-              >
-                {category}
-              </button>
-            ))}
+        <div className="p-4 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              placeholder="Search categories..."
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
+            />
+          </div>
+        </div>
+
+        <div className="h-[calc(100vh-144px)] overflow-y-auto">
+          <div className="p-4">
+            {categoriesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
+              </div>
+            ) : filteredCategories.length > 0 ? (
+              <div className="space-y-1">
+                {filteredCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategoryClick(category.slug)}
+                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
+                  >
+                    <span>{category.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                {categorySearch
+                  ? "No categories found"
+                  : "No categories available"}
+              </div>
+            )}
           </div>
         </div>
       </aside>

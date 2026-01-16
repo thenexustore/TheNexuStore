@@ -19,6 +19,7 @@ export default function ProductPage() {
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -117,39 +118,57 @@ export default function ProductPage() {
         <div>
           <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
             {images.length > 0 ? (
-              <Image
-                src={images[selectedImage].url}
-                alt={product.title}
-                width={600}
-                height={600}
-                className="h-full w-full object-cover object-center"
-              />
+              <div className="relative h-full w-full bg-gray-100">
+                <Image
+                  src={
+                    imageError
+                      ? "/No_Image_Available.png"
+                      : images[selectedImage]?.url || "/No_Image_Available.png"
+                  }
+                  alt={product.title}
+                  width={600}
+                  height={600}
+                  priority={selectedImage === 0}
+                  className="h-full w-full object-cover object-center"
+                  onError={() => {
+                    if (!imageError) setImageError(true);
+                  }}
+                />
+              </div>
             ) : (
-              <div className="flex h-full items-center justify-center">
+              <div className="flex h-full items-center justify-center bg-gray-100">
                 <span className="text-gray-400">No Image</span>
               </div>
             )}
           </div>
 
           {images.length > 1 && (
-            <div className="mt-4 flex gap-2 overflow-x-auto">
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
               {images.map((image, index) => (
                 <button
                   key={index}
+                  type="button"
                   onClick={() => setSelectedImage(index)}
-                  className={`h-20 w-20 flex-shrink-0 overflow-hidden rounded border-2 ${
+                  aria-label={`View image ${index + 1}`}
+                  className={`h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                     selectedImage === index
-                      ? "border-blue-500"
-                      : "border-transparent"
+                      ? "border-blue-500 ring-2 ring-blue-200"
+                      : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
-                  <Image
-                    src={image.url}
-                    alt={`${product.title} - ${index + 1}`}
-                    width={80}
-                    height={80}
-                    className="h-full w-full object-cover"
-                  />
+                  <div className="relative h-full w-full bg-gray-100">
+                    <Image
+                      src={image?.url || "/No_Image_Available.png"}
+                      alt={`${product.title} - ${index + 1}`}
+                      width={80}
+                      height={80}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        // @ts-ignore
+                        e.currentTarget.src = "/No_Image_Available.png";
+                      }}
+                    />
+                  </div>
                 </button>
               ))}
             </div>
@@ -303,58 +322,6 @@ export default function ProductPage() {
               />
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="mb-12">
-        <h2 className="mb-6 text-2xl font-bold">Customer Reviews</h2>
-
-        {product.reviews && product.reviews.length > 0 ? (
-          <div className="space-y-6">
-            {product.reviews.map((review) => (
-              <div
-                key={review.id}
-                className="border-b border-gray-200 pb-6 last:border-0"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{review.customer_name}</span>
-                    <span className="ml-2 text-gray-500 text-sm">
-                      {new Date(review.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <span
-                        key={i}
-                        className={
-                          i < review.rating
-                            ? "text-yellow-400"
-                            : "text-gray-300"
-                        }
-                      >
-                        ★
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {review.title && (
-                  <h4 className="mb-2 font-semibold">{review.title}</h4>
-                )}
-                {review.comment && (
-                  <p className="text-gray-700">{review.comment}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-600">
-            No reviews yet. Be the first to review this product!
-          </p>
-        )}
-
-        <div className="mt-8">
-          <ReviewForm onSubmit={handleReviewSubmit} />
         </div>
       </div>
 

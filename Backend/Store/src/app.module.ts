@@ -6,16 +6,18 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { StaffAuthModule } from './auth/staff-auth/staff-auth.module';
 import { UserModule } from './user/user.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { InfortisaModule } from './infortisa/infortisa.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     AuthModule,
     AdminModule,
     StaffAuthModule,
-    UserModule
+    InfortisaModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

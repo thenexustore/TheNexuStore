@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "Banner" ALTER COLUMN "image" DROP NOT NULL,
-ALTER COLUMN "button_link" DROP NOT NULL;

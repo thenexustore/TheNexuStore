@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FilterOptions, ProductFilters } from "../lib/products";
 
 interface SidebarFiltersProps {
@@ -9,134 +9,134 @@ interface SidebarFiltersProps {
   onFilterChange: (filters: ProductFilters) => void;
 }
 
+function SearchableCheckboxList({
+  title,
+  items,
+  selected,
+  onToggle,
+  initialVisible = 6,
+}: {
+  title: string;
+  items: { id: string; name: string; slug: string; count: number }[];
+  selected: string[];
+  onToggle: (slug: string) => void;
+  initialVisible?: number;
+}) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  const filtered = useMemo(
+    () =>
+      items.filter((item) =>
+        item.name.toLowerCase().includes(query.toLowerCase())
+      ),
+    [items, query]
+  );
+
+  const visibleItems = expanded ? filtered : filtered.slice(0, initialVisible);
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-medium">{title}</h4>
+
+      {items.length > initialVisible && (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Search ${title.toLowerCase()}...`}
+          className="w-full rounded border px-2 py-1 text-sm"
+        />
+      )}
+
+      <div className="space-y-2 max-h-64 overflow-auto">
+        {visibleItems.map((item) => (
+          <label key={item.id} className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected.includes(item.slug)}
+              onChange={() => onToggle(item.slug)}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="ml-2 text-sm">
+              {item.name} ({item.count})
+            </span>
+          </label>
+        ))}
+      </div>
+
+      {filtered.length > initialVisible && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-blue-600"
+        >
+          {expanded
+            ? "Show less"
+            : `Show ${filtered.length - initialVisible} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SidebarFilters({
   filterOptions,
   filters,
   onFilterChange,
 }: SidebarFiltersProps) {
-  const [priceRange, setPriceRange] = useState<[number, number]>([
-    filterOptions.price_range.min,
-    filterOptions.price_range.max,
+  const minPrice = filterOptions.price_range.min;
+  const maxPrice = filterOptions.price_range.max;
+
+  const [price, setPrice] = useState<[number, number]>([
+    filters.min_price ?? minPrice,
+    filters.max_price ?? maxPrice,
   ]);
-  const [selectedPriceRange, setSelectedPriceRange] = useState<
-    [number, number]
-  >([
-    filters.min_price || filterOptions.price_range.min,
-    filters.max_price || filterOptions.price_range.max,
-  ]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    filters.categories || []
+
+  const [categories, setCategories] = useState<string[]>(
+    filters.categories ?? []
   );
-  const [selectedBrands, setSelectedBrands] = useState<string[]>(
+  const [brands, setBrands] = useState<string[]>(
     filters.brand ? [filters.brand] : []
   );
-  const [selectedAttributes, setSelectedAttributes] = useState<string[]>(
-    filters.attributes || []
+  const [attributes, setAttributes] = useState<string[]>(
+    filters.attributes ?? []
   );
-  const [inStockOnly, setInStockOnly] = useState(
-    filters.in_stock_only || false
-  );
-  const [featuredOnly, setFeaturedOnly] = useState(
-    filters.featured_only || false
-  );
+  const [inStock, setInStock] = useState(!!filters.in_stock_only);
+  const [featured, setFeatured] = useState(!!filters.featured_only);
 
   useEffect(() => {
-    setPriceRange([
-      filterOptions.price_range.min,
-      filterOptions.price_range.max,
-    ]);
-    setSelectedPriceRange([
-      filters.min_price || filterOptions.price_range.min,
-      filters.max_price || filterOptions.price_range.max,
-    ]);
-  }, [filterOptions, filters]);
+    const t = setTimeout(() => {
+      onFilterChange({
+        ...filters,
+        min_price: price[0] !== minPrice ? price[0] : undefined,
+        max_price: price[1] !== maxPrice ? price[1] : undefined,
+        categories: categories.length ? categories : undefined,
+        brand: brands.length ? brands[0] : undefined,
+        attributes: attributes.length ? attributes : undefined,
+        in_stock_only: inStock || undefined,
+        featured_only: featured || undefined,
+        page: 1,
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [price, categories, brands, attributes, inStock, featured]);
 
-  const handlePriceChange = (type: "min" | "max", value: number) => {
-    const newRange = [...selectedPriceRange] as [number, number];
-    if (type === "min") {
-      newRange[0] = Math.min(value, selectedPriceRange[1] - 1);
-    } else {
-      newRange[1] = Math.max(value, selectedPriceRange[0] + 1);
-    }
-    setSelectedPriceRange(newRange);
-
-    onFilterChange({
-      ...filters,
-      min_price: newRange[0] === priceRange[0] ? undefined : newRange[0],
-      max_price: newRange[1] === priceRange[1] ? undefined : newRange[1],
-      page: 1,
-    });
+  const toggleArrayValue = (
+    value: string,
+    list: string[],
+    setList: (v: string[]) => void
+  ) => {
+    setList(
+      list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
+    );
   };
 
-  const handleCategoryToggle = (categorySlug: string) => {
-    const newCategories = selectedCategories.includes(categorySlug)
-      ? selectedCategories.filter((cat) => cat !== categorySlug)
-      : [...selectedCategories, categorySlug];
-
-    setSelectedCategories(newCategories);
-    onFilterChange({
-      ...filters,
-      categories: newCategories.length > 0 ? newCategories : undefined,
-      category: undefined,
-      page: 1,
-    });
-  };
-
-  const handleBrandToggle = (brandSlug: string) => {
-    const newBrands = selectedBrands.includes(brandSlug)
-      ? selectedBrands.filter((brand) => brand !== brandSlug)
-      : [...selectedBrands, brandSlug];
-
-    setSelectedBrands(newBrands);
-    onFilterChange({
-      ...filters,
-      brand: newBrands.length > 0 ? newBrands[0] : undefined,
-      page: 1,
-    });
-  };
-
-  const handleAttributeToggle = (key: string, value: string) => {
-    const attributeString = `${key}:${value}`;
-    const newAttributes = selectedAttributes.includes(attributeString)
-      ? selectedAttributes.filter((attr) => attr !== attributeString)
-      : [...selectedAttributes, attributeString];
-
-    setSelectedAttributes(newAttributes);
-    onFilterChange({
-      ...filters,
-      attributes: newAttributes.length > 0 ? newAttributes : undefined,
-      page: 1,
-    });
-  };
-
-  const handleInStockToggle = () => {
-    const newValue = !inStockOnly;
-    setInStockOnly(newValue);
-    onFilterChange({
-      ...filters,
-      in_stock_only: newValue || undefined,
-      page: 1,
-    });
-  };
-
-  const handleFeaturedToggle = () => {
-    const newValue = !featuredOnly;
-    setFeaturedOnly(newValue);
-    onFilterChange({
-      ...filters,
-      featured_only: newValue || undefined,
-      page: 1,
-    });
-  };
-
-  const clearAllFilters = () => {
-    setSelectedCategories([]);
-    setSelectedBrands([]);
-    setSelectedPriceRange(priceRange);
-    setSelectedAttributes([]);
-    setInStockOnly(false);
-    setFeaturedOnly(false);
-
+  const clearAll = () => {
+    setPrice([minPrice, maxPrice]);
+    setCategories([]);
+    setBrands([]);
+    setAttributes([]);
+    setInStock(false);
+    setFeatured(false);
     onFilterChange({
       page: 1,
       limit: filters.limit,
@@ -144,163 +144,58 @@ export function SidebarFilters({
     });
   };
 
-  const hasActiveFilters =
-    selectedCategories.length > 0 ||
-    selectedBrands.length > 0 ||
-    selectedPriceRange[0] !== priceRange[0] ||
-    selectedPriceRange[1] !== priceRange[1] ||
-    selectedAttributes.length > 0 ||
-    inStockOnly ||
-    featuredOnly;
+  const active =
+    categories.length ||
+    brands.length ||
+    attributes.length ||
+    inStock ||
+    featured ||
+    price[0] !== minPrice ||
+    price[1] !== maxPrice;
 
   return (
     <div className="w-64 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Filters</h3>
-        {hasActiveFilters && (
-          <button
-            onClick={clearAllFilters}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
+        {active && (
+          <button onClick={clearAll} className="text-sm text-blue-600">
             Clear all
           </button>
         )}
       </div>
 
-      <div className="space-y-4">
-        <h4 className="font-medium">Price Range</h4>
-        <div className="space-y-2">
-          <div className="relative pt-1">
-            <input
-              type="range"
-              min={priceRange[0]}
-              max={priceRange[1]}
-              value={selectedPriceRange[0]}
-              onChange={(e) =>
-                handlePriceChange("min", parseInt(e.target.value))
-              }
-              className="w-full"
-            />
-            <input
-              type="range"
-              min={priceRange[0]}
-              max={priceRange[1]}
-              value={selectedPriceRange[1]}
-              onChange={(e) =>
-                handlePriceChange("max", parseInt(e.target.value))
-              }
-              className="w-full"
-            />
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span>€{selectedPriceRange[0]}</span>
-            <span>€{selectedPriceRange[1]}</span>
-          </div>
-        </div>
-      </div>
-
       {filterOptions.categories.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-medium">Categories</h4>
-          <div className="space-y-2">
-            {filterOptions.categories.map((category) => (
-              <label
-                key={category.id}
-                className="flex items-center cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(category.slug)}
-                  onChange={() => handleCategoryToggle(category.slug)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm">
-                  {category.name} ({category.count})
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+        <SearchableCheckboxList
+          title="Categories"
+          items={filterOptions.categories}
+          selected={categories}
+          onToggle={(v) => toggleArrayValue(v, categories, setCategories)}
+        />
       )}
 
       {filterOptions.brands.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-medium">Brands</h4>
-          <div className="space-y-2">
-            {filterOptions.brands.map((brand) => (
-              <label
-                key={brand.id}
-                className="flex items-center cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedBrands.includes(brand.slug)}
-                  onChange={() => handleBrandToggle(brand.slug)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm">
-                  {brand.name} ({brand.count})
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+        <SearchableCheckboxList
+          title="Brands"
+          items={filterOptions.brands}
+          selected={brands}
+          onToggle={(v) => toggleArrayValue(v, brands, setBrands)}
+        />
       )}
 
-      <div className="space-y-4">
-        <h4 className="font-medium">Stock Status</h4>
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={inStockOnly}
-            onChange={handleInStockToggle}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm">In Stock Only</span>
-        </label>
-      </div>
-
-      <div className="space-y-4">
-        <h4 className="font-medium">Featured</h4>
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={featuredOnly}
-            onChange={handleFeaturedToggle}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm">Featured Products Only</span>
-        </label>
-      </div>
-
-      {filterOptions.attributes.length > 0 &&
-        filterOptions.attributes.map((attribute) => (
-          <div key={attribute.key} className="space-y-4">
-            <h4 className="font-medium">{attribute.name}</h4>
-            <div className="space-y-2">
-              {attribute.values.map((value) => (
-                <label
-                  key={value.value}
-                  className="flex items-center cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedAttributes.includes(
-                      `${attribute.key}:${value.value}`
-                    )}
-                    onChange={() =>
-                      handleAttributeToggle(attribute.key, value.value)
-                    }
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm">
-                    {value.value} ({value.count})
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
+      {filterOptions.attributes.map((attr) => (
+        <SearchableCheckboxList
+          key={attr.key}
+          title={attr.name}
+          items={attr.values.map((v) => ({
+            id: `${attr.key}-${v.value}`,
+            name: v.value,
+            slug: `${attr.key}:${v.value}`,
+            count: v.count,
+          }))}
+          selected={attributes}
+          onToggle={(v) => toggleArrayValue(v, attributes, setAttributes)}
+        />
+      ))}
     </div>
   );
 }

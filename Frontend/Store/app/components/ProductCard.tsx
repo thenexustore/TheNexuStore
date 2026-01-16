@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { Heart, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { Product } from "../lib/products";
+import { useRouter } from "next/navigation";
 
 type CartItem = {
   id: string;
@@ -32,6 +32,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [quantity, setQuantity] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   // Use actual rating data from product
   const rating = product.rating_avg || 0;
@@ -83,12 +84,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
-    if (isOutOfStock) return;
+    if (isOutOfStock || isLoading) return;
 
     setIsLoading(true);
 
-    // Add to cart first
-    let cart: CartItem[] = JSON.parse(localStorage.getItem("cart") || "[]");
+    // 1️⃣ Add to cart
+    const cart: CartItem[] = JSON.parse(localStorage.getItem("cart") || "[]");
+
     const index = cart.findIndex((i) => i.id === product.id);
 
     if (index >= 0) {
@@ -107,13 +109,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     }
 
     localStorage.setItem("cart", JSON.stringify(cart));
-
-    // Simulate API call delay
-    setTimeout(() => {
-      setIsLoading(false);
-      // Redirect to checkout or cart page
-      window.location.href = "/checkout";
-    }, 500);
+    router.push("/checkout");
   };
 
   const toggleFavorite = (e: React.MouseEvent) => {
@@ -135,19 +131,66 @@ const ProductCard: React.FC<ProductCardProps> = ({
     window.dispatchEvent(new CustomEvent("favorites-update"));
   };
 
+  const imageSrc =
+    product.thumbnail && product.thumbnail.trim() !== ""
+      ? product.thumbnail
+      : "/No_Image_Available.png";
+
   return (
     <div
-      className={`group relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 ${className}`}
+      className={`group relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 ${
+        isLoading ? "pointer-events-none" : ""
+      } ${className}`}
     >
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl">
+          <div className="flex flex-col items-center gap-3">
+            <svg
+              className="animate-spin h-8 w-8 text-[#0B123A]"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            <span className="text-sm font-semibold text-gray-700">
+              Redirecting to checkout...
+            </span>
+          </div>
+        </div>
+      )}
+
       <Link href={`/products/${product.slug}`} className="block p-4">
         {/* Product Image */}
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-50 mb-4">
-          <Image
-            src={product.thumbnail}
+          <img
+            src={imageSrc}
             alt={product.title}
-            width={300}
-            height={300}
-            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105 p-4"
+            loading="lazy"
+            decoding="async"
+            style={{
+              height: "100%",
+              width: "100%",
+              objectFit: "contain",
+              padding: "2px",
+            }}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/No_Image_Available.png";
+            }}
           />
 
           {/* Stock status badges */}
@@ -180,20 +223,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <span className="text-xs font-semibold uppercase text-gray-500 tracking-wide">
             {product.brand_name}
           </span>
-          <button
-            onClick={toggleFavorite}
-            className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
-            aria-label={
-              isFavorite ? "Remove from favorites" : "Add to favorites"
-            }
-          >
-            <Heart
-              size={20}
-              className={
-                isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"
-              }
-            />
-          </button>
         </div>
 
         {/* Product Details */}
@@ -222,18 +251,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <span className="text-xs text-gray-400">
                 ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
               </span>
-            </div>
-          )}
-
-          {/* Show message if no reviews yet */}
-          {rating === 0 && reviewCount === 0 && (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center">
-                <Star size={16} className="text-gray-300" />
-                <span className="ml-1 text-sm font-semibold text-gray-400">
-                  No reviews yet
-                </span>
-              </div>
             </div>
           )}
 

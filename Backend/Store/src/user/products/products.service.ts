@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import {
@@ -42,9 +41,8 @@ export class ProductsService {
         page = 1,
         limit = 20,
         search,
-        category,
         brand,
-        categories: categoryList,
+        categories,
         sort_by = ProductSortBy.NEWEST,
         min_price,
         max_price,
@@ -55,13 +53,12 @@ export class ProductsService {
       } = dto;
 
       const skip = (page - 1) * limit;
+      const where: any = {};
 
-      // Build where clause
-      const where: any = {
-        status: status === ProductStatus.ACTIVE ? 'ACTIVE' : undefined,
-      };
+      if (status === ProductStatus.ACTIVE) {
+        where.status = 'ACTIVE';
+      }
 
-      // Search filter
       if (search) {
         where.OR = [
           { title: { contains: search, mode: 'insensitive' } },
@@ -75,65 +72,57 @@ export class ProductsService {
         ];
       }
 
-      // Category filter
-      if (category || categoryList) {
-        const categoryIds: string[] = [];
-        if (category) categoryIds.push(category);
-        if (categoryList && Array.isArray(categoryList))
-          categoryIds.push(...categoryList);
-
-        where.categories = {
-          some: {
-            category_id: { in: categoryIds },
-          },
-        };
-      }
-
-      // Brand filter
       if (brand) {
         where.brand = {
-          OR: [{ id: brand }, { slug: brand }],
+          slug: brand,
         };
       }
 
-      // Featured filter
+      if (categories && categories.length > 0) {
+        const categoryRecords = await this.prisma.category.findMany({
+          where: { slug: { in: categories } },
+          select: { id: true },
+        });
+
+        if (categoryRecords.length > 0) {
+          const categoryIds = categoryRecords.map((c) => c.id);
+          where.categories = {
+            some: {
+              category_id: { in: categoryIds },
+            },
+          };
+        }
+      }
+
       if (featured_only) {
         where.main_category = {
           slug: 'featured',
         };
       }
 
-      // Price range filter
+      const skusConditions: any = {
+        inventory: {
+          some: {
+            qty_on_hand: { gt: 0 },
+          },
+        },
+      };
+
       if (min_price !== undefined || max_price !== undefined) {
-        where.skus = {
+        skusConditions.prices = {
           some: {
-            prices: {
-              some: {
-                sale_price: {
-                  ...(min_price !== undefined && { gte: min_price }),
-                  ...(max_price !== undefined && { lte: max_price }),
-                },
-              },
+            sale_price: {
+              ...(min_price !== undefined && { gte: min_price }),
+              ...(max_price !== undefined && { lte: max_price }),
             },
           },
         };
       }
 
-      // Stock filter
-      if (in_stock_only) {
-        where.skus = {
-          ...where.skus,
-          some: {
-            inventory: {
-              some: {
-                qty_on_hand: { gt: 0 },
-              },
-            },
-          },
-        };
-      }
+      where.skus = {
+        some: skusConditions,
+      };
 
-      // Attribute filters
       if (attributes.length > 0) {
         const attributeConditions = attributes.map((attr) => {
           const [key, value] = attr.split(':');
@@ -149,6 +138,11 @@ export class ProductsService {
                     ],
                   },
                 },
+                inventory: {
+                  some: {
+                    qty_on_hand: { gt: 0 },
+                  },
+                },
               },
             },
           };
@@ -157,52 +151,32 @@ export class ProductsService {
         where.AND = [...(where.AND || []), ...attributeConditions];
       }
 
-      // Build orderBy based on sort option
-      let orderBy: any = { created_at: 'desc' };
-      switch (sort_by) {
-        case ProductSortBy.PRICE_LOW_TO_HIGH:
-          orderBy = {
-            skus: {
-              prices: {
-                sale_price: 'asc',
-              },
-            },
-          };
-          break;
-        case ProductSortBy.PRICE_HIGH_TO_LOW:
-          orderBy = {
-            skus: {
-              prices: {
-                sale_price: 'desc',
-              },
-            },
-          };
-          break;
-        case ProductSortBy.BEST_SELLING:
-          // This would require order item tracking - for now use newest
-          orderBy = { created_at: 'desc' };
-          break;
-        case ProductSortBy.HIGHEST_RATED:
-          orderBy = { rating_avg: 'desc' };
-          break;
-        case ProductSortBy.MOST_REVIEWED:
-          orderBy = { rating_count: 'desc' };
-          break;
-        case ProductSortBy.NAME_A_TO_Z:
-          orderBy = { title: 'asc' };
-          break;
-        case ProductSortBy.NAME_Z_TO_A:
-          orderBy = { title: 'desc' };
-          break;
-      }
+      let products: any[] = [];
+      let total: number;
 
-      // Fetch products
-      const [products, total] = await Promise.all([
-        this.prisma.product.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy,
+      if (sort_by === ProductSortBy.PRICE_LOW_TO_HIGH || sort_by === ProductSortBy.PRICE_HIGH_TO_LOW) {
+        const orderDirection = sort_by === ProductSortBy.PRICE_LOW_TO_HIGH ? 'asc' : 'desc';
+        
+        const productIdsWithPrice = await this.prisma.$queryRaw<any[]>`
+          SELECT p.id, MIN(sp.sale_price) as min_price
+          FROM products p
+          LEFT JOIN skus s ON s.product_id = p.id
+          LEFT JOIN sku_prices sp ON sp.sku_id = s.id
+          WHERE p.status = 'ACTIVE'
+          AND s.name IS NULL
+          AND sp.sale_price IS NOT NULL
+          GROUP BY p.id
+          ORDER BY min_price ${orderDirection}
+          LIMIT ${limit} OFFSET ${skip}
+        `;
+
+        const productIds = productIdsWithPrice.map(row => row.id);
+
+        products = await this.prisma.product.findMany({
+          where: {
+            ...where,
+            id: { in: productIds },
+          },
           include: {
             brand: true,
             main_category: true,
@@ -215,18 +189,69 @@ export class ProductsService {
               take: 1,
             },
             skus: {
-              where: { name: null }, // Default SKU
+              where: { name: null },
               include: {
                 prices: true,
                 inventory: true,
               },
             },
           },
-        }),
-        this.prisma.product.count({ where }),
-      ]);
+        });
 
-      // Transform to DTO
+        products.sort((a, b) => {
+          const indexA = productIds.indexOf(a.id);
+          const indexB = productIds.indexOf(b.id);
+          return indexA - indexB;
+        });
+
+        total = await this.prisma.product.count({ where });
+      } else {
+        let orderBy: any = { created_at: 'desc' };
+        switch (sort_by) {
+          case ProductSortBy.HIGHEST_RATED:
+            orderBy = { rating_avg: 'desc' };
+            break;
+          case ProductSortBy.MOST_REVIEWED:
+            orderBy = { rating_count: 'desc' };
+            break;
+          case ProductSortBy.NAME_A_TO_Z:
+            orderBy = { title: 'asc' };
+            break;
+          case ProductSortBy.NAME_Z_TO_A:
+            orderBy = { title: 'desc' };
+            break;
+        }
+
+        [products, total] = await Promise.all([
+          this.prisma.product.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy,
+            include: {
+              brand: true,
+              main_category: true,
+              categories: {
+                include: { category: true },
+              },
+              media: {
+                where: { sku_id: null },
+                orderBy: { sort_order: 'asc' },
+                take: 1,
+              },
+              skus: {
+                where: { name: null },
+                include: {
+                  prices: true,
+                  inventory: true,
+                },
+              },
+            },
+          }),
+          this.prisma.product.count({ where }),
+        ]);
+      }
+
       const productList: ProductListItemDto[] = products.map((product) => {
         const defaultSku = product.skus[0];
         const price = defaultSku?.prices?.[0];
@@ -266,10 +291,8 @@ export class ProductsService {
         };
       });
 
-      // Get filter options for the current result set
       const [categoriesResult, brandsResult, priceRangeResult] =
         await Promise.all([
-          // Get categories with counts
           this.prisma.category.findMany({
             where: {
               products: {
@@ -284,7 +307,6 @@ export class ProductsService {
             },
             orderBy: { sort_order: 'asc' },
           }),
-          // Get brands with counts
           this.prisma.brand.findMany({
             where: {
               products: { some: where },
@@ -297,7 +319,6 @@ export class ProductsService {
             },
             orderBy: { name: 'asc' },
           }),
-          // Get price range
           this.prisma.skuPrice.aggregate({
             where: {
               sku: {
@@ -309,7 +330,6 @@ export class ProductsService {
           }),
         ]);
 
-      // Get attribute filters
       const attributeFilters = await this.getAttributeFilters(where);
 
       const response: ProductsListResponseDto = {
@@ -319,22 +339,18 @@ export class ProductsService {
         limit,
         total_pages: Math.ceil(total / limit),
         filters: {
-          categories: Array.isArray(categoriesResult)
-            ? categoriesResult.map((cat) => ({
-                id: cat.id,
-                name: cat.name,
-                slug: cat.slug,
-                count: cat._count.products,
-              }))
-            : [],
-          brands: Array.isArray(brandsResult)
-            ? brandsResult.map((brand) => ({
-                id: brand.id,
-                name: brand.name,
-                slug: brand.slug,
-                count: brand._count.products,
-              }))
-            : [],
+          categories: categoriesResult.map((cat) => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+            count: cat._count.products,
+          })),
+          brands: brandsResult.map((brand) => ({
+            id: brand.id,
+            name: brand.name,
+            slug: brand.slug,
+            count: brand._count.products,
+          })),
           price_range: {
             min: priceRangeResult._min?.sale_price
               ? Number(priceRangeResult._min.sale_price)
@@ -389,7 +405,7 @@ export class ProductsService {
           .filter((sa) => sa.value_text || sa.attribute_value)
           .map((sa) => ({
             value: sa.attribute_value?.value_text || sa.value_text || '',
-            count: 1, // This should be aggregated count in a real scenario
+            count: 1,
           })),
       }));
     } catch (error) {
@@ -516,7 +532,6 @@ export class ProductsService {
     const price = defaultSku?.prices?.[0];
     const inventory = defaultSku?.inventory?.[0];
 
-    // Group attributes by key
     const attributeMap = new Map();
     for (const sku of product.skus) {
       for (const attr of sku.attributes) {
@@ -685,6 +700,15 @@ export class ProductsService {
               category_id: { in: categoryIds },
             },
           },
+          skus: {
+            some: {
+              inventory: {
+                some: {
+                  qty_on_hand: { gt: 0 },
+                },
+              },
+            },
+          },
         },
         take: limit,
         include: {
@@ -757,6 +781,15 @@ export class ProductsService {
           main_category: {
             slug: 'featured',
           },
+          skus: {
+            some: {
+              inventory: {
+                some: {
+                  qty_on_hand: { gt: 0 },
+                },
+              },
+            },
+          },
         },
         take: limit,
         orderBy: { created_at: 'desc' },
@@ -828,7 +861,6 @@ export class ProductsService {
     dto: CreateReviewDto,
   ) {
     try {
-      // Check if product exists and is active
       const product = await this.prisma.product.findUnique({
         where: {
           id: productId,
@@ -840,7 +872,6 @@ export class ProductsService {
         throw new NotFoundException('Product not found');
       }
 
-      // Check if customer already reviewed this product
       const existingReview = await this.prisma.productReview.findUnique({
         where: {
           product_id_customer_id: {
@@ -854,7 +885,6 @@ export class ProductsService {
         throw new BadRequestException('You have already reviewed this product');
       }
 
-      // Create review
       const review = await this.prisma.productReview.create({
         data: {
           product_id: productId,
@@ -862,7 +892,7 @@ export class ProductsService {
           rating: dto.rating,
           title: dto.title,
           comment: dto.comment,
-          is_approved: false, // Requires admin approval
+          is_approved: false,
         },
       });
 
@@ -891,6 +921,15 @@ export class ProductsService {
       const products = await this.prisma.product.findMany({
         where: {
           status: 'ACTIVE',
+          skus: {
+            some: {
+              inventory: {
+                some: {
+                  qty_on_hand: { gt: 0 },
+                },
+              },
+            },
+          },
           OR: [
             { title: { contains: query, mode: 'insensitive' } },
             { short_description: { contains: query, mode: 'insensitive' } },
@@ -962,6 +1001,213 @@ export class ProductsService {
     } catch (error) {
       console.error('Search products error:', error);
       return [];
+    }
+  }
+
+  async upsertFromInfortisa(
+    p: any,
+  ): Promise<'created' | 'updated' | 'skipped'> {
+    const skuCode = String(p.SKU);
+    const title = String(p.Name || 'Unknown Product');
+    const price = Number(p.Price || 0);
+    const stock = Number(p.Stock || 0);
+    const stockPalma = Number(p.StockPalma || 0);
+    const totalStock = stock + stockPalma;
+
+    const image = p.PictureUrl || null;
+    const brandName = String(p.ManufacturerName || 'Infortisa');
+    const shortDesc = p.ShortDescription || null;
+    const fullDesc = p.FullDescription || null;
+
+    if (!skuCode || !title) {
+      return 'skipped';
+    }
+
+    const categoryName = p.CategoryName ? String(p.CategoryName) : 'Infortisa';
+    const categorySlug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    let category = await this.prisma.category.findFirst({
+      where: { slug: categorySlug },
+    });
+
+    if (!category) {
+      category = await this.prisma.category.create({
+        data: {
+          name: categoryName,
+          slug: categorySlug,
+          is_active: true,
+          sort_order: 0,
+        },
+      });
+    }
+
+    const brandSlug = brandName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    let brand = await this.prisma.brand.findFirst({
+      where: { slug: brandSlug },
+    });
+
+    if (!brand) {
+      brand = await this.prisma.brand.create({
+        data: {
+          name: brandName,
+          slug: brandSlug,
+        },
+      });
+    }
+
+    let warehouse = await this.prisma.warehouse.findFirst({
+      where: { code: 'INFORTISA' },
+    });
+
+    if (!warehouse) {
+      warehouse = await this.prisma.warehouse.create({
+        data: {
+          name: 'Infortisa Warehouse',
+          code: 'INFORTISA',
+        },
+      });
+    }
+
+    const existingSku = await this.prisma.sku.findUnique({
+      where: { sku_code: skuCode },
+      include: { product: true },
+    });
+
+    if (!existingSku) {
+      const productSlug = p.slug || skuCode.toLowerCase();
+
+      const product = await this.prisma.product.create({
+        data: {
+          title,
+          slug: productSlug,
+          short_description: shortDesc,
+          description_html: fullDesc,
+          status: 'ACTIVE',
+          brand_id: brand.id,
+          main_category_id: category.id,
+        },
+      });
+
+      await this.prisma.productCategory.create({
+        data: {
+          product_id: product.id,
+          category_id: category.id,
+          sort_order: 0,
+        },
+      });
+
+      const newSku = await this.prisma.sku.create({
+        data: {
+          sku_code: skuCode,
+          product_id: product.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      await this.prisma.skuPrice.create({
+        data: {
+          sku_id: newSku.id,
+          sale_price: price,
+          currency: 'EUR',
+          price_source: 'INFORTISA',
+        },
+      });
+
+      await this.prisma.inventoryLevel.create({
+        data: {
+          sku_id: newSku.id,
+          warehouse_id: warehouse.id,
+          qty_on_hand: totalStock,
+          qty_reserved: 0,
+        },
+      });
+
+      if (image) {
+        await this.prisma.productMedia.create({
+          data: {
+            product_id: product.id,
+            url: image,
+            type: 'IMAGE',
+            sort_order: 0,
+          },
+        });
+      }
+
+      return 'created';
+    } else {
+      await this.prisma.product.update({
+        where: { id: existingSku.product_id },
+        data: {
+          title,
+          short_description: shortDesc,
+          description_html: fullDesc,
+          brand_id: brand.id,
+          main_category_id: category.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      await this.prisma.productCategory.upsert({
+        where: {
+          product_id_category_id: {
+            product_id: existingSku.product_id,
+            category_id: category.id,
+          },
+        },
+        update: {},
+        create: {
+          product_id: existingSku.product_id,
+          category_id: category.id,
+          sort_order: 0,
+        },
+      });
+
+      await this.prisma.skuPrice.upsert({
+        where: { sku_id: existingSku.id },
+        update: { sale_price: price },
+        create: {
+          sku_id: existingSku.id,
+          sale_price: price,
+          currency: 'EUR',
+          price_source: 'INFORTISA',
+        },
+      });
+
+      await this.prisma.inventoryLevel.upsert({
+        where: {
+          warehouse_id_sku_id: {
+            warehouse_id: warehouse.id,
+            sku_id: existingSku.id,
+          },
+        },
+        update: { qty_on_hand: totalStock },
+        create: {
+          warehouse_id: warehouse.id,
+          sku_id: existingSku.id,
+          qty_on_hand: totalStock,
+          qty_reserved: 0,
+        },
+      });
+
+      const existingImage = await this.prisma.productMedia.findFirst({
+        where: {
+          product_id: existingSku.product_id,
+          sku_id: null,
+        },
+      });
+
+      if (image && !existingImage) {
+        await this.prisma.productMedia.create({
+          data: {
+            product_id: existingSku.product_id,
+            url: image,
+            type: 'IMAGE',
+            sort_order: 0,
+          },
+        });
+      }
+
+      return 'updated';
     }
   }
 }

@@ -30,6 +30,41 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStats, setSyncStats] = useState({
+    calls: 0,
+    lastSync: "",
+  });
+
+  const runSync = async () => {
+    try {
+      setSyncing(true);
+
+      const res = await fetch("http://localhost:4000/admin/infortisa/sync", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Sync failed");
+      }
+
+      const data = await res.json();
+
+      setSyncStats((s) => ({
+        calls: s.calls + 1,
+        lastSync: new Date().toLocaleTimeString(),
+      }));
+
+      alert(`Synced ${data.count} products`);
+
+      loadProducts();
+    } catch (err) {
+      alert("Infortisa sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -100,13 +135,64 @@ export default function ProductsPage() {
             Manage inventory, pricing, and visibility.
           </p>
         </div>
-        <button
-          onClick={() => router.push("/products/new")}
-          className="inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Product
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* API Calls Counter */}
+          <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold shadow-sm">
+            Infortisa Calls:
+            <span className="ml-1 text-blue-600">{syncStats.calls}</span>
+          </div>
+
+          {/* Last Sync Time */}
+          <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold shadow-sm">
+            Last Sync:
+            <span className="ml-1 text-emerald-600">
+              {syncStats.lastSync || "Never"}
+            </span>
+          </div>
+
+          {/* Sync Button */}
+          <button
+            onClick={runSync}
+            disabled={syncing}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all active:scale-95 ${
+              syncing
+                ? "bg-slate-300 text-slate-600 cursor-not-allowed"
+                : "bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white"
+            }`}
+          >
+            {syncing ? (
+              <>
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    strokeWidth="4"
+                    opacity="0.25"
+                  />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeWidth="4" />
+                </svg>
+                Syncing...
+              </>
+            ) : (
+              "Sync Infortisa"
+            )}
+          </button>
+
+          {/* Add Product */}
+          <button
+            onClick={() => router.push("/products/new")}
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Product
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:flex gap-3">
@@ -173,7 +259,7 @@ export default function ProductsPage() {
                       </td>
                     </tr>
                   ))
-                : products.map((product:any) => (
+                : products.map((product: any) => (
                     <tr
                       key={product.id}
                       className="group hover:bg-slate-50/50 transition-colors"
@@ -228,14 +314,16 @@ export default function ProductsPage() {
 
                           {product.categories.length > 0 && (
                             <div className="flex flex-wrap gap-1">
-                              {product.categories.slice(0, 2).map((cat:any) => (
-                                <span
-                                  key={`${product.id}-${cat}`}
-                                  className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium"
-                                >
-                                  {cat}
-                                </span>
-                              ))}
+                              {product.categories
+                                .slice(0, 2)
+                                .map((cat: any) => (
+                                  <span
+                                    key={`${product.id}-${cat}`}
+                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium"
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
 
                               {product.categories.length > 2 && (
                                 <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[10px] font-medium">

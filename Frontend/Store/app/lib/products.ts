@@ -39,6 +39,17 @@ export interface FilterOptions {
   }>;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  parent_id?: string | null;
+  order?: number;
+  product_count?: number;
+  children?: Category[];
+}
+
 export interface Product {
   id: string;
   title: string;
@@ -138,6 +149,7 @@ class ProductAPI {
     const url = `${API_BASE}${endpoint}`;
     const response = await fetch(url, {
       ...options,
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
         ...options.headers,
@@ -256,6 +268,24 @@ class ProductAPI {
       method: "POST",
       body: JSON.stringify(reviewData),
     });
+  }
+
+  async getCategories(): Promise<Category[]> {
+    try {
+      const response = await this.fetchAPI("/user/products?limit=1");
+      if (response.filters && response.filters.categories) {
+        return response.filters.categories.map((cat:any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          product_count: cat.count,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return [];
+    }
   }
 }
 

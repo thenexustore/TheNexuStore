@@ -158,13 +158,18 @@ export default function CartPage() {
                     <div className="flex gap-4">
                       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100">
                         <img
-                          src={
-                            item.image ||
-                            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=400"
-                          }
+                          src={item.image?.trim() || "/No_Image_Available.png"}
                           alt={item.name}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
                           className="h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/No_Image_Available.png";
+                          }}
                         />
+
                         {item.stock_status === "OUT_OF_STOCK" && (
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                             <span className="text-white text-xs font-bold bg-red-500 px-2 py-1 rounded">

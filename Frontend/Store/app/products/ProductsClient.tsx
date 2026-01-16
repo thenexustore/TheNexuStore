@@ -102,10 +102,6 @@ export default function ProductsPage() {
                 className="rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm outline-none text-black"
               >
                 <option value="newest">Newest</option>
-                <option value="price_low_to_high">Price: Low to High</option>
-                <option value="price_high_to_low">Price: High to Low</option>
-                <option value="highest_rated">Highest Rated</option>
-                <option value="most_reviewed">Most Reviewed</option>
                 <option value="name_a_to_z">Name: A to Z</option>
                 <option value="name_z_to_a">Name: Z to A</option>
               </select>

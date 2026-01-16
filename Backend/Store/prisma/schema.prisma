@@ -575,6 +575,13 @@ model Cart {
   items       CartItem[]
 }
 
+model SyncLog {
+  id        Int      @id @default(autoincrement())
+  type      String   @unique
+  last_sync DateTime
+  details   String?
+}
+
 model CartItem {
   id                  String   @id @default(uuid())
   cart_id             String

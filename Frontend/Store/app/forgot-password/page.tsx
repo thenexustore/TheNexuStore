@@ -11,6 +11,7 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { forgotPassword } from "../lib/auth";
+import Image from "next/image";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -72,6 +73,14 @@ export default function ForgotPasswordPage() {
           </div>
 
           <form onSubmit={submit} className="space-y-8">
+            <Image
+              src="/logo.png"
+              alt="Secure Gate"
+              width={160}
+              height={40}
+              priority
+              className="mx-auto"
+            />
             {error && (
               <div className="bg-red-50 border-2 border-red-500 p-4 flex items-center gap-3 text-red-600 font-black text-[10px] uppercase tracking-widest">
                 <AlertCircle size={16} />
@@ -106,7 +115,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full bg-black py-5 text-sm font-black uppercase tracking-widest text-white transition-all hover:bg-indigo-600 active:scale-95 disabled:opacity-50"
+              className="group relative w-full bg-black py-5 text-sm font-black uppercase tracking-widest text-white transition-all duration-200 hover:bg-neutral-800 cursor-pointer active:scale-95 disabled:opacity-50"
             >
               {loading ? (
                 <div className="flex items-center justify-center gap-3">
@@ -115,10 +124,10 @@ export default function ForgotPasswordPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2">
-                  <span>Send_OTP_Signal</span>
+                  <span>Send OTP</span>
                   <ArrowRight
                     size={18}
-                    className="transition-transform group-hover:translate-x-1"
+                    className="transition-transform duration-200 group-hover:translate-x-1"
                   />
                 </div>
               )}

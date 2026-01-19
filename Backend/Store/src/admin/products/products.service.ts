@@ -7,14 +7,12 @@ import { CreateProductDto } from './dto/create-product.dto';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  // Helper function to generate unique SKU
   private generateSKU(prefix: string = 'PROD'): string {
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substr(2, 6).toUpperCase();
     return `${prefix}-${timestamp}-${random}`;
   }
 
-  // Helper function to generate variant SKU
   private generateVariantSKU(productSku: string, index: number): string {
     return `${productSku}-VAR-${(index + 1).toString().padStart(3, '0')}`;
   }
@@ -396,7 +394,6 @@ export class ProductsService {
         },
       });
 
-      // Auto-generate main SKU
       const mainSkuCode = this.generateSKU();
       const defaultSku = await this.prisma.sku.create({
         data: {
@@ -512,7 +509,6 @@ export class ProductsService {
         for (let i = 0; i < variants.length; i++) {
           const variant = variants[i];
 
-          // Auto-generate variant SKU
           const variantSkuCode = this.generateVariantSKU(mainSkuCode, i);
 
           const variantSku = await this.prisma.sku.create({
@@ -674,9 +670,6 @@ export class ProductsService {
     });
 
     const defaultSku = existing.skus[0];
-
-    // REMOVED: SKU code update logic (line 514-525)
-    // SKU codes are now auto-generated and cannot be edited
 
     if (
       (sale_price !== undefined || compare_at_price !== undefined) &&
@@ -851,7 +844,6 @@ export class ProductsService {
           throw new Error('Default warehouse not found');
         }
 
-        // Get main SKU code for reference
         const mainSku = await this.prisma.sku.findFirst({
           where: { product_id: id },
           orderBy: { created_at: 'asc' },
@@ -862,7 +854,6 @@ export class ProductsService {
         for (let i = 0; i < variants.length; i++) {
           const variant = variants[i];
 
-          // Auto-generate new variant SKU
           const variantSkuCode = this.generateVariantSKU(mainSkuCode, i);
 
           const variantSku = await this.prisma.sku.create({
@@ -1039,7 +1030,6 @@ export class ProductsService {
             name: 'Featured',
             slug: 'featured',
             sort_order: 999,
-            is_active: true,
           },
         });
       }
@@ -1058,6 +1048,445 @@ export class ProductsService {
     } catch (error: any) {
       console.error('Toggle featured error:', error);
       throw new Error('Failed to toggle featured status: ' + error.message);
+    }
+  }
+
+  async upsertFromInfortisa(
+    infortisaProduct: any,
+  ): Promise<'created' | 'updated'> {
+    try {
+      const {
+        SKU,
+        Title,
+        Description,
+        StockCentral,
+        Price,
+        ImageUrl,
+        Brand,
+        Category,
+        Attributes,
+        Variants,
+      } = infortisaProduct;
+
+      const existingSku = await this.prisma.sku.findUnique({
+        where: { sku_code: SKU },
+        include: {
+          product: {
+            include: {
+              skus: {
+                orderBy: { created_at: 'asc' },
+              },
+            },
+          },
+        },
+      });
+
+      if (existingSku) {
+        const product = existingSku.product;
+        const defaultSku = product.skus[0];
+
+        if (Title) {
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { title: Title },
+          });
+        }
+
+        if (Description) {
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { description_html: Description },
+          });
+        }
+
+        if (Brand) {
+          let brand = await this.prisma.brand.findFirst({
+            where: { name: { equals: Brand, mode: 'insensitive' } },
+          });
+
+          if (!brand) {
+            brand = await this.prisma.brand.create({
+              data: {
+                name: Brand,
+                slug: Brand.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              },
+            });
+          }
+
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { brand_id: brand.id },
+          });
+        }
+
+        if (Category) {
+          let category = await this.prisma.category.findFirst({
+            where: { name: { equals: Category, mode: 'insensitive' } },
+          });
+
+          if (!category) {
+            category = await this.prisma.category.create({
+              data: {
+                name: Category,
+                slug: Category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                sort_order: 0,
+              },
+            });
+          }
+
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { main_category_id: category.id },
+          });
+
+          await this.prisma.productCategory.upsert({
+            where: {
+              product_id_category_id: {
+                product_id: product.id,
+                category_id: category.id,
+              },
+            },
+            update: { is_primary: true },
+            create: {
+              product_id: product.id,
+              category_id: category.id,
+              is_primary: true,
+              sort_order: 0,
+            },
+          });
+        }
+
+        if (Price !== undefined && defaultSku) {
+          const priceValue = Number(Price) || 0;
+
+          const existingPrice = await this.prisma.skuPrice.findFirst({
+            where: {
+              sku_id: defaultSku.id,
+              price_source: 'INFORTISA',
+            },
+          });
+
+          if (existingPrice) {
+            await this.prisma.skuPrice.updateMany({
+              where: {
+                sku_id: defaultSku.id,
+                price_source: 'INFORTISA',
+              },
+              data: {
+                sale_price: priceValue,
+                compare_at_price: null,
+                updated_at: new Date(),
+              },
+            });
+          } else {
+            await this.prisma.skuPrice.create({
+              data: {
+                sku_id: defaultSku.id,
+                sale_price: priceValue,
+                compare_at_price: null,
+                currency: 'EUR',
+                price_source: 'INFORTISA',
+              },
+            });
+          }
+        }
+
+        if (StockCentral !== undefined && defaultSku) {
+          let warehouse = await this.prisma.warehouse.findFirst({
+            where: { code: 'INFORTISA' },
+          });
+
+          if (!warehouse) {
+            warehouse = await this.prisma.warehouse.create({
+              data: {
+                name: 'Infortisa Warehouse',
+                code: 'INFORTISA',
+              },
+            });
+          }
+
+          const stockValue = Number(StockCentral) || 0;
+
+          await this.prisma.inventoryLevel.upsert({
+            where: {
+              warehouse_id_sku_id: {
+                sku_id: defaultSku.id,
+                warehouse_id: warehouse.id,
+              },
+            },
+            update: {
+              qty_on_hand: stockValue,
+              updated_at: new Date(),
+            },
+            create: {
+              sku_id: defaultSku.id,
+              warehouse_id: warehouse.id,
+              qty_on_hand: stockValue,
+              qty_reserved: 0,
+            },
+          });
+        }
+
+        if (ImageUrl && ImageUrl.trim() !== '') {
+          const existingImage = await this.prisma.productMedia.findFirst({
+            where: {
+              product_id: product.id,
+              url: ImageUrl,
+            },
+          });
+
+          if (!existingImage) {
+            await this.prisma.productMedia.deleteMany({
+              where: { product_id: product.id, sku_id: null },
+            });
+
+            await this.prisma.productMedia.create({
+              data: {
+                product_id: product.id,
+                url: ImageUrl,
+                type: 'IMAGE',
+                sort_order: 0,
+              },
+            });
+          }
+        }
+
+        if (Attributes && Array.isArray(Attributes)) {
+          await this.prisma.skuAttribute.deleteMany({
+            where: { sku_id: defaultSku.id },
+          });
+
+          for (const attr of Attributes) {
+            if (attr.Key && attr.Value) {
+              let attribute = await this.prisma.attribute.findUnique({
+                where: { code: attr.Key },
+              });
+
+              if (!attribute) {
+                attribute = await this.prisma.attribute.create({
+                  data: {
+                    code: attr.Key,
+                    name: attr.Key,
+                    data_type: 'TEXT',
+                  },
+                });
+              }
+
+              let attributeValue = await this.prisma.attributeValue.findFirst({
+                where: {
+                  attribute_id: attribute.id,
+                  value_text: attr.Value,
+                },
+              });
+
+              if (!attributeValue) {
+                attributeValue = await this.prisma.attributeValue.create({
+                  data: {
+                    attribute_id: attribute.id,
+                    value_text: attr.Value,
+                    sort_order: 0,
+                  },
+                });
+              }
+
+              await this.prisma.skuAttribute.create({
+                data: {
+                  sku_id: defaultSku.id,
+                  attribute_id: attribute.id,
+                  attribute_value_id: attributeValue.id,
+                  value_text: attr.Value,
+                },
+              });
+            }
+          }
+        }
+
+        if (Variants && Array.isArray(Variants) && Variants.length > 0) {
+          const existingVariants = await this.prisma.sku.findMany({
+            where: {
+              product_id: product.id,
+              id: { not: defaultSku.id },
+            },
+          });
+
+          const variantIds = existingVariants.map((v) => v.id);
+          await Promise.all([
+            this.prisma.skuPrice.deleteMany({
+              where: { sku_id: { in: variantIds } },
+            }),
+            this.prisma.inventoryLevel.deleteMany({
+              where: { sku_id: { in: variantIds } },
+            }),
+            this.prisma.skuAttribute.deleteMany({
+              where: { sku_id: { in: variantIds } },
+            }),
+            this.prisma.productMedia.deleteMany({
+              where: { sku_id: { in: variantIds } },
+            }),
+            this.prisma.sku.deleteMany({
+              where: { id: { in: variantIds } },
+            }),
+          ]);
+
+          const warehouse = await this.prisma.warehouse.findFirst({
+            where: { code: 'INFORTISA' },
+          });
+
+          for (let i = 0; i < Variants.length; i++) {
+            const variant = Variants[i];
+
+            const variantSkuCode = this.generateVariantSKU(SKU, i);
+
+            const variantSku = await this.prisma.sku.create({
+              data: {
+                product_id: product.id,
+                sku_code: variantSkuCode,
+                name: variant.Name || `Variant ${i + 1}`,
+              },
+            });
+
+            await this.prisma.skuPrice.create({
+              data: {
+                sku_id: variantSku.id,
+                sale_price: Number(variant.Price) || 0,
+                compare_at_price: null,
+                currency: 'EUR',
+                price_source: 'INFORTISA',
+              },
+            });
+
+            if (warehouse) {
+              await this.prisma.inventoryLevel.create({
+                data: {
+                  sku_id: variantSku.id,
+                  warehouse_id: warehouse.id,
+                  qty_on_hand: Number(variant.Stock) || 0,
+                  qty_reserved: 0,
+                },
+              });
+            }
+
+            if (variant.Attributes && Array.isArray(variant.Attributes)) {
+              for (const attr of variant.Attributes) {
+                if (attr.Key && attr.Value) {
+                  let attribute = await this.prisma.attribute.findUnique({
+                    where: { code: attr.Key },
+                  });
+
+                  if (!attribute) {
+                    attribute = await this.prisma.attribute.create({
+                      data: {
+                        code: attr.Key,
+                        name: attr.Key,
+                        data_type: 'TEXT',
+                      },
+                    });
+                  }
+
+                  let attributeValue =
+                    await this.prisma.attributeValue.findFirst({
+                      where: {
+                        attribute_id: attribute.id,
+                        value_text: attr.Value,
+                      },
+                    });
+
+                  if (!attributeValue) {
+                    attributeValue = await this.prisma.attributeValue.create({
+                      data: {
+                        attribute_id: attribute.id,
+                        value_text: attr.Value,
+                        sort_order: 0,
+                      },
+                    });
+                  }
+
+                  await this.prisma.skuAttribute.create({
+                    data: {
+                      sku_id: variantSku.id,
+                      attribute_id: attribute.id,
+                      attribute_value_id: attributeValue.id,
+                      value_text: attr.Value,
+                    },
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        await this.prisma.product.update({
+          where: { id: product.id },
+          data: { status: 'ACTIVE' },
+        });
+
+        return 'updated';
+      } else {
+        const productSlug = `${Title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
+
+        if (!Brand) {
+          throw new Error('Brand is required for product creation');
+        }
+
+        let brand = await this.prisma.brand.findFirst({
+          where: { name: { equals: Brand, mode: 'insensitive' } },
+        });
+
+        if (!brand) {
+          brand = await this.prisma.brand.create({
+            data: {
+              name: Brand,
+              slug: Brand.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            },
+          });
+        }
+
+        const brandId = brand.id;
+
+        let mainCategoryId: string | null = null;
+        if (Category) {
+          let category = await this.prisma.category.findFirst({
+            where: { name: { equals: Category, mode: 'insensitive' } },
+          });
+
+          if (!category) {
+            category = await this.prisma.category.create({
+              data: {
+                name: Category,
+                slug: Category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                sort_order: 0,
+              },
+            });
+          }
+          mainCategoryId = category.id;
+        }
+
+        const product = await this.prisma.product.create({
+          data: {
+            title: Title || 'Untitled Product',
+            slug: productSlug,
+            brand_id: brandId,
+            main_category_id: mainCategoryId,
+            description_html: Description || '',
+            short_description: Description ? Description.substring(0, 200) : '',
+            status: 'ACTIVE',
+          },
+        });
+
+        const sku = await this.prisma.sku.create({
+          data: {
+            product_id: product.id,
+            sku_code: SKU,
+          },
+        });
+
+        return 'created';
+      }
+    } catch (error: any) {
+      console.error('Upsert from Infortisa error:', error);
+      throw new Error(
+        `Failed to upsert product from Infortisa: ${error.message}`,
+      );
     }
   }
 }

@@ -9,10 +9,10 @@ import {
   Trash2,
   Eye,
   Package,
-  Tag,
   Star,
   Layers,
   Hash,
+  RefreshCw,
 } from "lucide-react";
 import {
   fetchProducts,
@@ -24,43 +24,94 @@ import {
 export default function ProductsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [syncing, setSyncing] = useState(false);
-  const [syncStats, setSyncStats] = useState({
-    calls: 0,
-    lastSync: "",
-  });
 
   const runSync = async () => {
     try {
       setSyncing(true);
-
       const res = await fetch("http://localhost:4000/admin/infortisa/sync", {
         method: "POST",
         credentials: "include",
       });
-
       if (!res.ok) {
         throw new Error("Sync failed");
       }
-
       const data = await res.json();
-
-      setSyncStats((s) => ({
-        calls: s.calls + 1,
-        lastSync: new Date().toLocaleTimeString(),
-      }));
-
-      alert(`Synced ${data.count} products`);
-
+      alert(`Synced products`);
       loadProducts();
     } catch (err) {
       alert("Infortisa sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const runFullSync = async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch(
+        "http://localhost:4000/admin/infortisa/sync/full",
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!res.ok) throw new Error("Full sync failed");
+      const data = await res.json();
+      alert(`Full sync initiated: ${data.message}`);
+      loadProducts();
+    } catch (err) {
+      alert("Full sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const runStockSync = async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch(
+        "http://localhost:4000/admin/infortisa/sync/stock",
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!res.ok) throw new Error("Stock sync failed");
+      const data = await res.json();
+      alert(`Stock sync initiated: ${data.message}`);
+      loadProducts();
+    } catch (err) {
+      alert("Stock sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const runImageSync = async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch(
+        "http://localhost:4000/admin/infortisa/sync/images",
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!res.ok) throw new Error("Image sync failed");
+      const data = await res.json();
+      alert(`Image sync initiated: ${data.message}`);
+      loadProducts();
+    } catch (err) {
+      alert("Image sync failed");
     } finally {
       setSyncing(false);
     }
@@ -71,14 +122,14 @@ export default function ProductsPage() {
       setLoading(true);
       const data = await fetchProducts(
         page,
-        20,
+        50,
         search,
         statusFilter,
-        categoryFilter
+        categoryFilter,
       );
 
-      setProducts(data.products);
-      setTotalPages(data.totalPages);
+      setAllProducts(data.products);
+      filterProducts();
     } catch (error) {
       console.error("Failed to load products:", error);
     } finally {
@@ -86,9 +137,39 @@ export default function ProductsPage() {
     }
   };
 
+  const filterProducts = () => {
+    let filtered = [...allProducts];
+
+    if (stockFilter !== "all") {
+      filtered = filtered.filter((product: any) => {
+        if (stockFilter === "IN_STOCK") {
+          return product.stock_status === "IN_STOCK";
+        } else if (stockFilter === "LOW_STOCK") {
+          return product.stock_status === "LOW_STOCK";
+        } else if (stockFilter === "OUT_OF_STOCK") {
+          return product.stock_status === "OUT_OF_STOCK";
+        }
+        return true;
+      });
+    }
+
+    setFilteredProducts(filtered);
+    setTotalPages(Math.ceil(filtered.length / 20));
+  };
+
+  useEffect(() => {
+    filterProducts();
+  }, [stockFilter, allProducts]);
+
   useEffect(() => {
     loadProducts();
   }, [page, search, statusFilter, categoryFilter]);
+
+  const getPaginatedProducts = () => {
+    const startIndex = (page - 1) * 20;
+    const endIndex = startIndex + 20;
+    return filteredProducts.slice(startIndex, endIndex);
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -128,153 +209,149 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Products
-          </h1>
-          <p className="text-slate-500 text-sm">
+          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+          <p className="text-gray-500 text-sm">
             Manage inventory, pricing, and visibility.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* API Calls Counter */}
-          <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold shadow-sm">
-            Infortisa Calls:
-            <span className="ml-1 text-blue-600">{syncStats.calls}</span>
+        <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={runFullSync}
+              disabled={syncing}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+            >
+              Full Sync
+            </button>
+            <button
+              onClick={runStockSync}
+              disabled={syncing}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+            >
+              Stock Sync
+            </button>
+            <button
+              onClick={runImageSync}
+              disabled={syncing}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+            >
+              Image Sync
+            </button>
           </div>
 
-          {/* Last Sync Time */}
-          <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold shadow-sm">
-            Last Sync:
-            <span className="ml-1 text-emerald-600">
-              {syncStats.lastSync || "Never"}
-            </span>
-          </div>
-
-          {/* Sync Button */}
           <button
             onClick={runSync}
             disabled={syncing}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all active:scale-95 ${
-              syncing
-                ? "bg-slate-300 text-slate-600 cursor-not-allowed"
-                : "bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white"
-            }`}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
           >
-            {syncing ? (
-              <>
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    strokeWidth="4"
-                    opacity="0.25"
-                  />
-                  <path d="M12 2a10 10 0 0 1 10 10" strokeWidth="4" />
-                </svg>
-                Syncing...
-              </>
-            ) : (
-              "Sync Infortisa"
-            )}
+            <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+            Sync All
           </button>
 
-          {/* Add Product */}
           <button
             onClick={() => router.push("/products/new")}
-            className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Product
+            <Plus className="w-3 h-3" />
+            Add
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:flex gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+        <div className="md:col-span-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 bg-white border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+          </div>
+        </div>
+        <div>
           <input
             type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all text-sm"
+            placeholder="Category..."
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm focus:border-blue-500 outline-none"
           />
         </div>
-        <input
-          type="text"
-          placeholder="Category filter..."
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-600"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-600 cursor-pointer"
-        >
-          <option value="all">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="DRAFT">Draft</option>
-          <option value="ARCHIVED">Archived</option>
-        </select>
+        <div className="flex gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-xs focus:border-blue-500 outline-none"
+          >
+            <option value="all">Status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="DRAFT">Draft</option>
+            <option value="ARCHIVED">Archived</option>
+          </select>
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-xs focus:border-blue-500 outline-none"
+          >
+            <option value="all">Stock</option>
+            <option value="IN_STOCK">In Stock</option>
+            <option value="LOW_STOCK">Low Stock</option>
+            <option value="OUT_OF_STOCK">Out of Stock</option>
+          </select>
+        </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Product
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   SKU & Inventory
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Category
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Price
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-gray-100">
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td colSpan={6} className="px-6 py-4">
-                        <div className="h-10 bg-slate-100 rounded-lg w-full" />
+                      <td colSpan={6} className="px-4 py-4">
+                        <div className="h-8 bg-gray-100 rounded w-full" />
                       </td>
                     </tr>
                   ))
-                : products.map((product: any) => (
-                    <tr
-                      key={product.id}
-                      className="group hover:bg-slate-50/50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
+                : getPaginatedProducts().map((product: any) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
                         <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-gray-900">
                               {product.title}
                             </span>
                             {product.featured_product && (
-                              <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                          <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
                             <Hash className="w-3 h-3" />
                             <span className="font-mono">
                               {product.sku_code}
@@ -282,36 +359,35 @@ export default function ProductsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                              className={`text-xs px-2 py-0.5 rounded ${
                                 stockStatusStyles[product.stock_status]
                               }`}
                             >
                               {product.stock_status}
                             </span>
-                            <span className="text-sm font-medium text-slate-900">
-                              {product.stock_quantity} units
+                            <span className="text-gray-900">
+                              {product.stock_quantity}
                             </span>
                           </div>
                           {product.variants.length > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
                               <Layers className="w-3 h-3" />
                               <span>{product.variants.length} variants</span>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1.5">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
                           {product.category && (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold uppercase">
+                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[11px]">
                               {product.category}
                             </span>
                           )}
-
                           {product.categories.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {product.categories
@@ -319,14 +395,13 @@ export default function ProductsPage() {
                                 .map((cat: any) => (
                                   <span
                                     key={`${product.id}-${cat}`}
-                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium"
+                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]"
                                   >
                                     {cat}
                                   </span>
                                 ))}
-
                               {product.categories.length > 2 && (
-                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[10px] font-medium">
+                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-400 rounded text-[10px]">
                                   +{product.categories.length - 2}
                                 </span>
                               )}
@@ -334,14 +409,13 @@ export default function ProductsPage() {
                           )}
                         </div>
                       </td>
-
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <select
                           value={product.product_status}
                           onChange={(e) =>
                             handleStatusChange(product.id, e.target.value)
                           }
-                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border outline-none transition-all cursor-pointer ${
+                          className={`text-[11px] px-2 py-1 rounded border outline-none cursor-pointer ${
                             statusStyles[product.product_status]
                           }`}
                         >
@@ -350,26 +424,26 @@ export default function ProductsPage() {
                           <option value="ARCHIVED">ARCHIVED</option>
                         </select>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-900">
+                          <span className="font-medium text-gray-900">
                             ₹{product.price.toLocaleString()}
                           </span>
                           {product.discount_price && (
-                            <span className="text-xs text-slate-400 line-through">
+                            <span className="text-xs text-gray-400 line-through">
                               ₹{product.discount_price.toLocaleString()}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           <button
                             onClick={() =>
                               router.push(`/products/${product.id}`)
                             }
-                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                            title="View Details"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="View"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -377,13 +451,15 @@ export default function ProductsPage() {
                             onClick={() =>
                               router.push(`/products/${product.id}/edit`)
                             }
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(product.id)}
-                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -394,37 +470,35 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
-
-        {!loading && products.length === 0 && (
-          <div className="py-20 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-50 text-slate-400 rounded-full mb-4">
-              <Package className="w-6 h-6" />
+        {!loading && getPaginatedProducts().length === 0 && (
+          <div className="py-12 text-center">
+            <div className="inline-flex items-center justify-center w-10 h-10 bg-gray-100 text-gray-400 rounded-full mb-3">
+              <Package className="w-5 h-5" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">
+            <h3 className="text-sm font-medium text-gray-900">
               No products found
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               Try adjusting your filters or search terms.
             </p>
           </div>
         )}
-
-        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">
-            Page {page} of {totalPages}
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+          <span className="text-xs text-gray-500">
+            Page {page} of {totalPages} ({filteredProducts.length} products)
           </span>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-4 py-2 text-xs font-bold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-all"
+              className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-4 py-2 text-xs font-bold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-all"
+              className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >
               Next
             </button>

@@ -103,12 +103,14 @@ export default function RegisterPage() {
             <>
               <form onSubmit={onRegister} className="space-y-5">
                 <div className="text-center mb-8">
-                  <h1 className="text-4xl font-[1000] tracking-tighter uppercase italic">
-                    Create_Node
-                  </h1>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-2">
-                    Initialize Infrastructure
-                  </p>
+                  <Image
+                    src="/logo.png"
+                    alt="Secure Gate"
+                    width={160}
+                    height={40}
+                    priority
+                    className="mx-auto"
+                  />
                 </div>
 
                 <div className="flex justify-center mb-6">
@@ -196,13 +198,21 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-black text-white py-5 font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-50"
+                  className="
+w-full bg-black py-4 text-xs font-black uppercase tracking-widest text-white
+hover:bg-neutral-800
+cursor-pointer
+transition-all duration-200
+active:scale-[0.98]
+disabled:opacity-50
+flex items-center justify-center gap-2
+"
                 >
                   {loading ? (
                     "INITIALIZING..."
                   ) : (
                     <>
-                      Register_Node <ArrowRight size={20} />
+                      Register <ArrowRight size={20} />
                     </>
                   )}
                 </button>
@@ -275,9 +285,9 @@ export default function RegisterPage() {
               href="/login"
               className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-black"
             >
-              Already have a node?{" "}
+              Already have an account?{" "}
               <span className="underline underline-offset-4">
-                Back_to_Login
+                Back to Login
               </span>
             </Link>
           </div>

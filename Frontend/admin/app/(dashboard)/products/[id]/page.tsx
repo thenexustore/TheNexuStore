@@ -11,7 +11,6 @@ import {
   Layers,
   Calendar,
   Hash,
-  Warehouse,
   Star,
   Box,
   Image as ImageIcon,
@@ -197,166 +196,11 @@ function StockStatusBadge({ status }: { status: string }) {
 }
 
 function MainContent({ product }: { product: Product }) {
-  function MainContent({ product }: { product: Product }) {
-    return (
-      <div className="lg:col-span-2 space-y-6">
-        <Card title="Product Images" icon={ImageIcon}>
-          {product.product_images && product.product_images.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {product.product_images.map((img, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={img.url}
-                    alt={img.alt_text || product.title}
-                    className="aspect-square object-cover rounded-lg w-full border border-slate-200"
-                  />
-                  {img.alt_text && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                      {img.alt_text}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-500 text-center py-8">
-              No images available
-            </p>
-          )}
-        </Card>
-
-        <Card title="Description" icon={Package}>
-          {product.product_description ? (
-            <div className="prose max-w-none">
-              {product.product_description}
-            </div>
-          ) : (
-            <p className="text-slate-500 italic">No description provided</p>
-          )}
-          {product.short_description && (
-            <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-sm font-medium text-slate-700 mb-1">
-                Short Description:
-              </p>
-              <p className="text-slate-600">{product.short_description}</p>
-            </div>
-          )}
-        </Card>
-
-        {product.attributes && product.attributes.length > 0 && (
-          <Card title="Product Attributes" icon={Settings}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {product.attributes.map((attr, index) => (
-                <div
-                  key={index}
-                  className="p-3 bg-slate-50 rounded-lg border border-slate-200"
-                >
-                  <p className="text-sm font-medium text-slate-700 mb-1 capitalize">
-                    {attr.key}:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    <span className="px-2 py-1 bg-white text-slate-600 rounded text-sm border border-slate-200">
-                      {attr.value}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {product.variants && product.variants.length > 0 && (
-          <Card title="Product Variants" icon={Layers}>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
-                      SKU
-                    </th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
-                      Attributes
-                    </th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
-                      Price
-                    </th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
-                      Stock
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {product.variants.map((variant) => (
-                    <tr
-                      key={variant.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                    >
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <Hash className="w-3 h-3 text-slate-400" />
-                          <span className="font-mono text-sm">
-                            {variant.sku_code}
-                          </span>
-                          <button
-                            onClick={() =>
-                              navigator.clipboard.writeText(variant.sku_code)
-                            }
-                            className="p-1 hover:bg-slate-200 rounded"
-                            title="Copy SKU"
-                          >
-                            <Copy className="w-3 h-3 text-slate-400" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {variant.attributes && variant.attributes.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {variant.attributes.map((attr, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium"
-                              >
-                                {attr.key}: {attr.value}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-sm">
-                            No attributes
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-slate-900">
-                            ₹{variant.price.toLocaleString()}
-                          </span>
-                          {variant.compare_at_price && (
-                            <span className="text-xs text-slate-400 line-through">
-                              ₹{variant.compare_at_price.toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm text-slate-700">
-                          {variant.stock_quantity} units
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
-      </div>
-    );
-  }
   return (
     <div className="lg:col-span-2 space-y-6">
+      {/* Product Images */}
       <Card title="Product Images" icon={ImageIcon}>
-        {product.product_images && product.product_images.length > 0 ? (
+        {product.product_images?.length ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {product.product_images.map((img, index) => (
               <div key={index} className="relative group">
@@ -365,11 +209,6 @@ function MainContent({ product }: { product: Product }) {
                   alt={img.alt_text || product.title}
                   className="aspect-square object-cover rounded-lg w-full border border-slate-200"
                 />
-                {img.alt_text && (
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                    {img.alt_text}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -378,12 +217,19 @@ function MainContent({ product }: { product: Product }) {
         )}
       </Card>
 
+      {/* Description */}
       <Card title="Description" icon={Package}>
         {product.product_description ? (
-          <div className="prose max-w-none">{product.product_description}</div>
+          <div
+            className="prose max-w-none"
+            dangerouslySetInnerHTML={{
+              __html: product.product_description,
+            }}
+          />
         ) : (
           <p className="text-slate-500 italic">No description provided</p>
         )}
+
         {product.short_description && (
           <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <p className="text-sm font-medium text-slate-700 mb-1">
@@ -394,105 +240,35 @@ function MainContent({ product }: { product: Product }) {
         )}
       </Card>
 
-      {product.attributes && product.attributes.length > 0 && (
-        <Card title="Product Attributes" icon={Settings}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {product.attributes.map((attr, index) => (
-              <div
-                key={index}
-                className="p-3 bg-slate-50 rounded-lg border border-slate-200"
-              >
-                <p className="text-sm font-medium text-slate-700 mb-1 capitalize">
-                  {attr.key}:
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-white text-slate-600 rounded text-sm border border-slate-200">
-                    {attr.value}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {product.variants && product.variants.length > 0 && (
+      {/* Variants */}
+      {product.variants?.length > 0 && (
         <Card title="Product Variants" icon={Layers}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                  <th className="py-3 px-4 text-left text-sm text-slate-600">
                     SKU
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
-                    Attributes
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                  <th className="py-3 px-4 text-left text-sm text-slate-600">
                     Price
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
+                  <th className="py-3 px-4 text-left text-sm text-slate-600">
                     Stock
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {product.variants.map((variant) => (
-                  <tr
-                    key={variant.id}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Hash className="w-3 h-3 text-slate-400" />
-                        <span className="font-mono text-sm">
-                          {variant.sku_code}
-                        </span>
-                        <button
-                          onClick={() =>
-                            navigator.clipboard.writeText(variant.sku_code)
-                          }
-                          className="p-1 hover:bg-slate-200 rounded"
-                          title="Copy SKU"
-                        >
-                          <Copy className="w-3 h-3 text-slate-400" />
-                        </button>
-                      </div>
+                  <tr key={variant.id} className="border-b">
+                    <td className="py-3 px-4 font-mono text-sm">
+                      {variant.sku_code}
                     </td>
                     <td className="py-3 px-4">
-                      {variant.attributes && variant.attributes.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {variant.attributes.map((attr, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium"
-                            >
-                              {attr.key}: {attr.value}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-sm">
-                          No attributes
-                        </span>
-                      )}
+                      ₹{variant.price.toLocaleString()}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-slate-900">
-                          ₹{variant.price.toLocaleString()}
-                        </span>
-                        {variant.compare_at_price && (
-                          <span className="text-xs text-slate-400 line-through">
-                            ₹{variant.compare_at_price.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-sm text-slate-700">
-                        {variant.stock_quantity} units
-                      </span>
+                      {variant.stock_quantity} units
                     </td>
                   </tr>
                 ))}
@@ -509,8 +285,11 @@ function Sidebar({ product }: { product: Product }) {
   const brandName = product.brand?.name || "No Brand";
   const categoryName = product.category?.name || "Uncategorized";
   const discount =
-    product.discount_price && product.price && product.discount_price > 0
-      ? Math.round((1 - product.price / product.discount_price) * 100)
+    product.discount_price && product.discount_price > product.price
+      ? Math.round(
+          ((product.discount_price - product.price) / product.discount_price) *
+            100,
+        )
       : 0;
 
   return (
@@ -553,8 +332,8 @@ function Sidebar({ product }: { product: Product }) {
                   product.stock_quantity > 10
                     ? "text-emerald-600"
                     : product.stock_quantity > 0
-                    ? "text-amber-600"
-                    : "text-red-600"
+                      ? "text-amber-600"
+                      : "text-red-600"
                 }`}
               >
                 {product.stock_quantity} units

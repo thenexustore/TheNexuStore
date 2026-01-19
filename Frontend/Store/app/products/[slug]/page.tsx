@@ -16,10 +16,10 @@ export default function ProductPage() {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [imagesError, setImagesError] = useState<Record<number, boolean>>({});
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -116,22 +116,26 @@ export default function ProductPage() {
 
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
+          {/* MAIN IMAGE */}
           <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
             {images.length > 0 ? (
               <div className="relative h-full w-full bg-gray-100">
                 <Image
                   src={
-                    imageError
+                    imagesError[selectedImage]
                       ? "/No_Image_Available.png"
                       : images[selectedImage]?.url || "/No_Image_Available.png"
                   }
                   alt={product.title}
-                  width={600}
-                  height={600}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
                   priority={selectedImage === 0}
-                  className="h-full w-full object-cover object-center"
+                  className="object-contain"
                   onError={() => {
-                    if (!imageError) setImageError(true);
+                    setImagesError((prev) => ({
+                      ...prev,
+                      [selectedImage]: true,
+                    }));
                   }}
                 />
               </div>
@@ -142,6 +146,7 @@ export default function ProductPage() {
             )}
           </div>
 
+          {/* THUMBNAILS */}
           {images.length > 1 && (
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
               {images.map((image, index) => (
@@ -158,14 +163,20 @@ export default function ProductPage() {
                 >
                   <div className="relative h-full w-full bg-gray-100">
                     <Image
-                      src={image?.url || "/No_Image_Available.png"}
+                      src={
+                        imagesError[index]
+                          ? "/No_Image_Available.png"
+                          : image?.url || "/No_Image_Available.png"
+                      }
                       alt={`${product.title} - ${index + 1}`}
-                      width={80}
-                      height={80}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        // @ts-ignore
-                        e.currentTarget.src = "/No_Image_Available.png";
+                      fill
+                      sizes="80px"
+                      className="object-contain"
+                      onError={() => {
+                        setImagesError((prev) => ({
+                          ...prev,
+                          [index]: true,
+                        }));
                       }}
                     />
                   </div>
@@ -210,15 +221,15 @@ export default function ProductPage() {
                 currentVariant.stock_status === "IN_STOCK"
                   ? "bg-green-100 text-green-800"
                   : currentVariant.stock_status === "LOW_STOCK"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-red-100 text-red-800"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-red-100 text-red-800"
               }`}
             >
               {currentVariant.stock_status === "IN_STOCK"
                 ? `In Stock (${currentVariant.stock_quantity} available)`
                 : currentVariant.stock_status === "LOW_STOCK"
-                ? `Low Stock (${currentVariant.stock_quantity} left)`
-                : "Out of Stock"}
+                  ? `Low Stock (${currentVariant.stock_quantity} left)`
+                  : "Out of Stock"}
             </span>
           </div>
 
@@ -275,19 +286,26 @@ export default function ProductPage() {
                 </button>
                 <input
                   type="number"
-                  min="1"
+                  min={1}
                   max={currentVariant.stock_quantity}
                   value={quantity}
+                  readOnly
                   onChange={(e) =>
-                    setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                    setQuantity(
+                      Math.min(
+                        currentVariant.stock_quantity,
+                        Math.max(1, Number(e.target.value)),
+                      ),
+                    )
                   }
                   className="w-16 text-center"
                   disabled={isOutOfStock}
                 />
+
                 <button
                   onClick={() =>
                     setQuantity(
-                      Math.min(currentVariant.stock_quantity, quantity + 1)
+                      Math.min(currentVariant.stock_quantity, quantity + 1),
                     )
                   }
                   className="px-3 py-2 hover:bg-gray-100"

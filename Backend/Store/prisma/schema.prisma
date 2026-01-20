@@ -221,7 +221,8 @@ model Category {
   products      ProductCategory[]
   products_main Product[]         @relation("ProductMainCategory")
 
-  pricing_rules PricingRule[]
+  pricing_rules     PricingRule[]
+  featured_products FeaturedProduct[]
 
   @@index([parent_id, sort_order])
 }
@@ -242,12 +243,13 @@ model Product {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  brand         Brand             @relation(fields: [brand_id], references: [id])
-  main_category Category?         @relation("ProductMainCategory", fields: [main_category_id], references: [id])
-  categories    ProductCategory[]
-  skus          Sku[]
-  media         ProductMedia[]
-  reviews       ProductReview[]
+  brand            Brand             @relation(fields: [brand_id], references: [id])
+  main_category    Category?         @relation("ProductMainCategory", fields: [main_category_id], references: [id])
+  categories       ProductCategory[]
+  skus             Sku[]
+  media            ProductMedia[]
+  reviews          ProductReview[]
+  featured_product FeaturedProduct?
 
   @@index([slug])
 }
@@ -309,35 +311,35 @@ model Sku {
 }
 
 model Banner {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  image           String?
+  image String?
 
-  overlay         String
-  align           String
+  overlay String
+  align   String
 
-  title_text      String
-  title_color     String
-  title_size      String
-  title_weight    String
-  title_font      String
+  title_text   String
+  title_color  String
+  title_size   String
+  title_weight String
+  title_font   String
 
-  subtitle_text   String
-  subtitle_color  String
-  subtitle_size   String
+  subtitle_text  String
+  subtitle_color String
+  subtitle_size  String
 
-  button_text     String
-  button_link     String?
-  button_bg       String
-  button_color    String
-  button_radius   String
-  button_padding  String
+  button_text    String
+  button_link    String?
+  button_bg      String
+  button_color   String
+  button_radius  String
+  button_padding String
 
-  is_active       Boolean  @default(true)
-  sort_order      Int
+  is_active  Boolean @default(true)
+  sort_order Int
 
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@index([is_active, sort_order])
 }
@@ -622,6 +624,38 @@ model Order {
   rmas                  Rma[]
 
   @@index([customer_id, created_at(sort: Desc)])
+}
+
+model FeaturedProduct {
+  id         String  @id @default(uuid())
+  product_id String  @unique
+  product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  title       String?
+  subtitle    String?
+  description String?
+
+  image_url   String?
+  badge_text  String?
+  badge_color String? @default("bg-blue-500")
+
+  button_text String? @default("Shop Now")
+  button_link String?
+
+  layout_type String  @default("default")
+  sort_order  Int     @default(0)
+  is_active   Boolean @default(true)
+
+  category_id String?
+  category    Category? @relation(fields: [category_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([sort_order])
+  @@index([is_active])
+  @@index([category_id])
+  @@index([created_at(sort: Desc)])
 }
 
 model OrderItem {

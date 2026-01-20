@@ -427,11 +427,11 @@ export default function ProductsPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-medium text-gray-900">
-                            ₹{product.price.toLocaleString()}
+                            €{product.price.toLocaleString()}
                           </span>
                           {product.discount_price && (
                             <span className="text-xs text-gray-400 line-through">
-                              ₹{product.discount_price.toLocaleString()}
+                              €{product.discount_price.toLocaleString()}
                             </span>
                           )}
                         </div>

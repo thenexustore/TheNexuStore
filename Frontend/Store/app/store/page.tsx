@@ -2,7 +2,7 @@
 
 import StoreCarousel from "./StoreCarousel";
 import StoreExplore from "./StoreExplore";
-import FeaturedProducts from "./FeaturedProcucts";
+import FeaturedProducts from "./FeaturedProducts";
 
 export default function StorePage() {
   return (

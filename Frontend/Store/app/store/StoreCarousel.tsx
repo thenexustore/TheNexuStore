@@ -35,7 +35,7 @@ const carouselConfig = {
 
 const FALLBACK_SLIDE: Slide = {
   id: "fallback",
-  image: "https://picsum.photos/1600/600?blur=2",
+  image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1999&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   overlay: "linear-gradient(to top, rgba(0,0,0,.7), transparent)",
   content: {
     align: "center",
@@ -65,9 +65,9 @@ const FALLBACK_SLIDE: Slide = {
       show: true,
       text: "Shop Now",
       link: "/shop",
-      bg: "#ef4444",
-      hoverBg: "#dc2626",
-      color: "#ffffff",
+      bg: "#ffffff",
+      hoverBg: "#beb5b5",
+      color: "#000000",
       radius: "9999px",
       padding: "14px 36px",
       fontSize: "16px",

@@ -205,28 +205,6 @@ model Brand {
   pricing_rules PricingRule[]
 }
 
-model Category {
-  id         String   @id @default(uuid())
-  parent_id  String?  @map("parent_id")
-  name       String
-  slug       String   @unique
-  sort_order Int
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  parent   Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
-  children Category[] @relation("CategoryToCategory")
-
-  products      ProductCategory[]
-  products_main Product[]         @relation("ProductMainCategory")
-
-  pricing_rules     PricingRule[]
-  featured_products FeaturedProduct[]
-
-  @@index([parent_id, sort_order])
-}
-
 model Product {
   id                String        @id @default(uuid())
   title             String
@@ -626,35 +604,52 @@ model Order {
   @@index([customer_id, created_at(sort: Desc)])
 }
 
-model FeaturedProduct {
-  id         String  @id @default(uuid())
-  product_id String  @unique
-  product    Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
-
-  title       String?
-  subtitle    String?
-  description String?
-
-  image_url   String?
-  badge_text  String?
-  badge_color String? @default("bg-blue-500")
-
-  button_text String? @default("Shop Now")
-  button_link String?
-
-  layout_type String  @default("default")
-  sort_order  Int     @default(0)
-  is_active   Boolean @default(true)
-
-  category_id String?
-  category    Category? @relation(fields: [category_id], references: [id])
-
+model Category {
+  id         String   @id @default(uuid())
+  parent_id  String?  @map("parent_id")
+  name       String
+  slug       String   @unique
+  sort_order Int
+  is_active  Boolean  @default(true)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  parent   Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
+  children Category[] @relation("CategoryToCategory")
+
+  products      ProductCategory[]
+  products_main Product[]         @relation("ProductMainCategory")
+
+  pricing_rules PricingRule[]
+
+  @@index([parent_id, sort_order])
+}
+
+model FeaturedProduct {
+  id         String   @id @default(uuid())
+  product_id String   @unique
+  product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  
+  title       String?
+  subtitle    String?
+  description String?
+  
+  image_url   String?
+  badge_text  String?
+  badge_color String? @default("bg-blue-500")
+  
+  button_text String? @default("Shop Now")
+  button_link String?
+  
+  layout_type String  @default("default")
+  sort_order  Int     @default(0)
+  is_active   Boolean @default(true)
+  
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
   @@index([sort_order])
   @@index([is_active])
-  @@index([category_id])
   @@index([created_at(sort: Desc)])
 }
 

@@ -9,6 +9,7 @@ import { ProductsService } from './products/products.service';
 import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
 import { BannersModule } from './banners/banners.module';
+import { FeaturedProductsModule } from './featured-products/featured-products.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { BannersModule } from './banners/banners.module';
       signOptions: { expiresIn: '8h' },
     }),
     BannersModule,
+    FeaturedProductsModule,
   ],
   controllers: [AdminController, DashboardController, ProductsController],
   providers: [

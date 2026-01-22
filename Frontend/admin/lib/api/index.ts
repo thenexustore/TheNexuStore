@@ -11,9 +11,7 @@ export {
   type ProductsResponse,
 } from "./products";
 
-// Brands exports
 export { fetchBrands, createBrand, type Brand } from "./brands";
-
 
 export { fetchCategories, createCategory, type Category } from "./categories";
 
@@ -22,3 +20,21 @@ export { fetchOrders, type Order, type OrdersResponse } from "./orders";
 export { fetchDashboardStats, type DashboardStats } from "./dashboard";
 
 export { adminLogout } from "../utils";
+
+export {
+  fetchFeaturedProducts,
+  fetchFeaturedProductById,
+  createFeaturedProduct,
+  updateFeaturedProduct,
+  deleteFeaturedProduct,
+  toggleFeaturedProductStatus,
+  updateFeaturedProductOrder,
+  fetchProductOptions,
+  fetchCategoryOptions,
+  type FeaturedProduct,
+  type FeaturedProductsResponse,
+  type CreateFeaturedProductDto,
+  type UpdateFeaturedProductDto,
+  type ProductOption,
+  type CategoryOption,
+} from "./featured-products";

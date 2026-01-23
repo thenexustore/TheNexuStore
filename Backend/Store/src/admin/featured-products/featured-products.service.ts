@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateFeaturedProductDto } from './dto/create-featured-product.dto';
@@ -10,6 +11,8 @@ import { UpdateFeaturedProductOrderDto } from './dto/update-featured-product-ord
 
 @Injectable()
 export class FeaturedProductsService {
+  private readonly logger = new Logger(FeaturedProductsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   private async checkProductInventory(productId: string): Promise<boolean> {
@@ -31,7 +34,54 @@ export class FeaturedProductsService {
     );
   }
 
+  private async deleteOutOfStockFeaturedProducts(): Promise<void> {
+    try {
+      const featuredProducts = await this.prisma.featuredProduct.findMany({
+        include: {
+          product: {
+            include: {
+              skus: {
+                include: {
+                  inventory: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const outOfStockIds: string[] = [];
+
+      for (const featured of featuredProducts) {
+        const hasInventory = featured.product.skus.some((sku) =>
+          sku.inventory.some((inv) => inv.qty_on_hand > 0),
+        );
+
+        if (!hasInventory) {
+          outOfStockIds.push(featured.id);
+        }
+      }
+
+      if (outOfStockIds.length > 0) {
+        await this.prisma.featuredProduct.deleteMany({
+          where: { id: { in: outOfStockIds } },
+        });
+
+        this.logger.log(
+          `Automatically deleted ${outOfStockIds.length} out-of-stock featured products`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        'Error deleting out-of-stock featured products:',
+        error,
+      );
+    }
+  }
+
   async create(createFeaturedProductDto: CreateFeaturedProductDto) {
+    await this.deleteOutOfStockFeaturedProducts();
+
     const product = await this.prisma.product.findUnique({
       where: { id: createFeaturedProductDto.product_id },
       include: {
@@ -124,6 +174,8 @@ export class FeaturedProductsService {
     category_id?: string;
     search?: string;
   }) {
+    await this.deleteOutOfStockFeaturedProducts();
+
     const { skip, take, is_active, category_id, search } = params;
 
     const where: any = {};
@@ -165,30 +217,23 @@ export class FeaturedProductsService {
       orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
     });
 
-    const filteredFeaturedProducts = featuredProducts.filter((featured) => {
-      const product = featured.product;
-      const hasInventory = product.skus.some(
-        (sku) =>
-          sku.inventory && sku.inventory.some((inv) => inv.qty_on_hand > 0),
-      );
-      return hasInventory;
-    });
-
     const total = await this.prisma.featuredProduct.count({ where });
 
     return {
       success: true,
-      data: filteredFeaturedProducts,
+      data: featuredProducts,
       meta: {
-        total: filteredFeaturedProducts.length,
+        total: featuredProducts.length,
         skip: skip || 0,
-        take: take || filteredFeaturedProducts.length,
+        take: take || featuredProducts.length,
         originalTotal: total,
       },
     };
   }
 
   async findOne(id: string) {
+    await this.deleteOutOfStockFeaturedProducts();
+
     const featuredProduct = await this.prisma.featuredProduct.findUnique({
       where: { id },
       include: {
@@ -226,6 +271,8 @@ export class FeaturedProductsService {
   }
 
   async update(id: string, updateFeaturedProductDto: UpdateFeaturedProductDto) {
+    await this.deleteOutOfStockFeaturedProducts();
+
     const existing = await this.prisma.featuredProduct.findUnique({
       where: { id },
     });
@@ -341,6 +388,8 @@ export class FeaturedProductsService {
   }
 
   async toggleStatus(id: string) {
+    await this.deleteOutOfStockFeaturedProducts();
+
     const featuredProduct = await this.prisma.featuredProduct.findUnique({
       where: { id },
       include: {
@@ -389,6 +438,8 @@ export class FeaturedProductsService {
   }
 
   async getProductOptions(search?: string) {
+    await this.deleteOutOfStockFeaturedProducts();
+
     const where: any = {
       status: 'ACTIVE',
       skus: {
@@ -434,15 +485,9 @@ export class FeaturedProductsService {
       orderBy: { title: 'asc' },
     });
 
-    const filteredProducts = products.filter((product) =>
-      product.skus.some((sku) =>
-        sku.inventory.some((inv) => inv.qty_on_hand > 0),
-      ),
-    );
-
     return {
       success: true,
-      data: filteredProducts.map((product) => ({
+      data: products.map((product) => ({
         id: product.id,
         title: product.title,
         sku: product.skus[0]?.sku_code,
@@ -457,7 +502,6 @@ export class FeaturedProductsService {
   async cleanupOutOfStockFeaturedProducts() {
     try {
       const featuredProducts = await this.prisma.featuredProduct.findMany({
-        where: { is_active: true },
         include: {
           product: {
             include: {
@@ -483,15 +527,14 @@ export class FeaturedProductsService {
       }
 
       if (outOfStockFeaturedIds.length > 0) {
-        await this.prisma.featuredProduct.updateMany({
+        await this.prisma.featuredProduct.deleteMany({
           where: { id: { in: outOfStockFeaturedIds } },
-          data: { is_active: false },
         });
       }
 
       return {
         success: true,
-        message: `Deactivated ${outOfStockFeaturedIds.length} out-of-stock featured products`,
+        message: `Deleted ${outOfStockFeaturedIds.length} out-of-stock featured products`,
         count: outOfStockFeaturedIds.length,
       };
     } catch (error) {

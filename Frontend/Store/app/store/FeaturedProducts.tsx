@@ -80,7 +80,7 @@ export default function CompactFeaturedRow() {
   if (loading)
     return (
       <div className="flex gap-6 p-6">
-        {Array.from({ length: 20}).map((_, i) => (
+        {Array.from({ length: 20 }).map((_, i) => (
           <div
             key={i}
             className="w-[280px] h-[460px] bg-neutral-100 rounded-2xl animate-pulse"
@@ -162,18 +162,6 @@ export default function CompactFeaturedRow() {
                         {item.badge_text}
                       </span>
                     )}
-
-                    <span
-                      className={`absolute top-2 right-2 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
-                        stockStatus === "In Stock"
-                          ? "bg-green-100 text-green-800"
-                          : stockStatus === "Low Stock"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {stockStatus}
-                    </span>
                   </div>
 
                   <p className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">

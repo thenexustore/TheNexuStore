@@ -96,27 +96,6 @@ export default function ProductsPage() {
     }
   };
 
-  const runImageSync = async () => {
-    try {
-      setSyncing(true);
-      const res = await fetch(
-        "http://localhost:4000/admin/infortisa/sync/images",
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Image sync failed");
-      const data = await res.json();
-      alert(`Image sync initiated: ${data.message}`);
-      loadProducts();
-    } catch (err) {
-      alert("Image sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -215,7 +194,6 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-
           <div className="flex items-center gap-1">
             <button
               onClick={runFullSync}
@@ -230,13 +208,6 @@ export default function ProductsPage() {
               className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
             >
               Stock Sync
-            </button>
-            <button
-              onClick={runImageSync}
-              disabled={syncing}
-              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
-            >
-              Image Sync
             </button>
           </div>
 

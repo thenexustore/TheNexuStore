@@ -19,7 +19,7 @@ export class InfortisaService implements OnModuleInit {
   private initializeClient() {
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 300000,
+      timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Infortisa-Sync-Service/2.0',
@@ -28,20 +28,148 @@ export class InfortisaService implements OnModuleInit {
 
     this.client.interceptors.request.use(
       (config) => {
-        config.headers['Authorization-Token'] = this.token;
+        if (this.token) {
+          config.headers['Authorization-Token'] = this.token;
+        }
         return config;
       },
       (error) => {
-        this.logger.error('Request error', error);
+        this.logger.error('Request error', error.message);
         return Promise.reject(error);
       },
     );
   }
 
+  private formatToInfortisaDate(date: string): string {
+    const d = new Date(date);
+    return (
+      `${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/` +
+      `${d.getUTCDate().toString().padStart(2, '0')}/` +
+      `${d.getUTCFullYear()} ` +
+      `${d.getUTCHours().toString().padStart(2, '0')}:` +
+      `${d.getUTCMinutes().toString().padStart(2, '0')}:` +
+      `${d.getUTCSeconds().toString().padStart(2, '0')}`
+    );
+  }
+
+  private transformInfortisaProduct(product: any): any {
+    if (!product) return null;
+
+    const sku =
+      typeof product.SKU === 'string' && product.SKU.trim()
+        ? product.SKU.trim()
+        : typeof product.CODIGOINTERNO === 'string' &&
+            product.CODIGOINTERNO.trim()
+          ? product.CODIGOINTERNO.trim()
+          : typeof product.sku === 'string' && product.sku.trim()
+            ? product.sku.trim()
+            : null;
+
+    const title =
+      product.ProductDescription || product.TITULO || product.Name || '';
+
+    return {
+      SKU: sku,
+      Name: title,
+
+      Price:
+        product.Price ||
+        product.PRECIO ||
+        product.PriceWithoutCanon ||
+        product.PRECIOSINCANON ||
+        0,
+
+      Stock: product.StockCentral || product.STOCKCENTRAL || 0,
+      StockPalma: product.StockPalma || product.STOCKPALMA || 0,
+      StockExterno: product.StockExterno || product.STOCKEXTERNO || 0,
+
+      PictureUrl: product.IMAGEN || product.PictureUrl || null,
+
+      ManufacturerName:
+        product.NOMFABRICANTE || product.ManufacturerName || 'Infortisa',
+
+      ShortDescription: title,
+      FullDescription: title,
+
+      CategoryName:
+        product.TITULOSUBFAMILIA ||
+        product.TITULO_FAMILIA ||
+        product.CategoryName ||
+        'Infortisa',
+
+      Cycle: product.Cycle || product.CICLOVIDA || 'P',
+
+      CanonLPI: product.CanonLPI || product.CANONLPI || 0,
+
+      PRECIOSINCANON:
+        product.PRECIOSINCANON ||
+        product.PriceWithoutCanon ||
+        product.Price ||
+        0,
+
+      REFFABRICANTE: product.Partnumber || product.REFFABRICANTE || '',
+      Partnumber: product.Partnumber || product.REFFABRICANTE || '',
+
+      TITULOSUBFAMILIA:
+        product.TITULOSUBFAMILIA || product.CategoryName || 'Infortisa',
+
+      TITULO_FAMILIA:
+        product.TITULO_FAMILIA || product.CategoryName || 'Infortisa',
+
+      NOMFABRICANTE:
+        product.NOMFABRICANTE || product.ManufacturerName || 'Infortisa',
+
+      IMAGEN: product.IMAGEN || product.PictureUrl || null,
+
+      STOCKCENTRAL: product.StockCentral || product.STOCKCENTRAL || 0,
+      STOCKPALMA: product.StockPalma || product.STOCKPALMA || 0,
+      STOCKEXTERNO: product.StockExterno || product.STOCKEXTERNO || 0,
+
+      PRECIO:
+        product.Price ||
+        product.PRECIO ||
+        product.PriceWithoutCanon ||
+        product.PRECIOSINCANON ||
+        0,
+
+      CANONLPI: product.CanonLPI || product.CANONLPI || 0,
+      CICLOVIDA: product.Cycle || product.CICLOVIDA || 'P',
+
+      ProductDescription: title,
+      TITULO: title,
+
+      CODIGOINTERNO: sku,
+
+      slug: this.generateSlugFromTitle(title || 'unknown-product', sku || ''),
+
+      _original: product,
+    };
+  }
+
+  private generateSlugFromTitle(title: string, sku: string): string {
+    const baseSlug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    if (baseSlug.length < 3) {
+      return sku.toLowerCase();
+    }
+
+    return baseSlug.substring(0, 200);
+  }
+
   async getAllProducts(): Promise<any[]> {
     try {
       const response = await this.client.get('/api/Product/Get');
-      return response.data.items || response.data || [];
+      const data = response.data.items || response.data || [];
+
+      if (!Array.isArray(data)) {
+        this.logger.warn('Unexpected response format from getAllProducts');
+        return [];
+      }
+
+      return data.map((product) => this.transformInfortisaProduct(product));
     } catch (error: any) {
       this.logger.error('Get all products failed', error.message);
       throw error;
@@ -49,14 +177,26 @@ export class InfortisaService implements OnModuleInit {
   }
 
   async getModifiedProducts(date: string): Promise<any[]> {
+    const formatted = this.formatToInfortisaDate(date);
+
     try {
       const response = await this.client.get(
         '/api/Product/GetModifiedProductsByDateTime',
         {
-          params: { dateTime: date },
+          params: {
+            UtcDate: formatted,
+          },
         },
       );
-      return response.data.items || response.data || [];
+
+      const data = response.data.items || response.data || [];
+
+      if (!Array.isArray(data)) {
+        this.logger.warn('Unexpected response format from getModifiedProducts');
+        return [];
+      }
+
+      return data.map((product) => this.transformInfortisaProduct(product));
     } catch (error: any) {
       this.logger.error('Get modified products failed', error.message);
       throw error;
@@ -64,14 +204,26 @@ export class InfortisaService implements OnModuleInit {
   }
 
   async getModifiedStock(date: string): Promise<any[]> {
+    const formatted = this.formatToInfortisaDate(date);
+
     try {
       const response = await this.client.get(
         '/api/Stock/GetModifiedStocksByDateTime',
         {
-          params: { dateTime: date },
+          params: {
+            UtcDate: formatted,
+          },
         },
       );
-      return response.data.items || response.data || [];
+
+      const data = response.data.items || response.data || [];
+
+      if (!Array.isArray(data)) {
+        this.logger.warn('Unexpected response format from getModifiedStock');
+        return [];
+      }
+
+      return data.map((product) => this.transformInfortisaProduct(product));
     } catch (error: any) {
       this.logger.error('Get modified stock failed', error.message);
       throw error;
@@ -83,7 +235,9 @@ export class InfortisaService implements OnModuleInit {
       const response = await this.client.get('/api/Product/GetProductBySku', {
         params: { sku },
       });
-      return response.data;
+
+      const product = response.data;
+      return this.transformInfortisaProduct(product);
     } catch (error: any) {
       this.logger.error(`Get product by SKU failed: ${sku}`, error.message);
       throw error;
@@ -93,7 +247,14 @@ export class InfortisaService implements OnModuleInit {
   async getStockAndPrice(): Promise<any[]> {
     try {
       const response = await this.client.get('/api/Product/GetStockPrice');
-      return response.data.items || response.data || [];
+      const data = response.data.items || response.data || [];
+
+      if (!Array.isArray(data)) {
+        this.logger.warn('Unexpected response format from getStockAndPrice');
+        return [];
+      }
+
+      return data.map((product) => this.transformInfortisaProduct(product));
     } catch (error: any) {
       this.logger.error('Get stock and price failed', error.message);
       throw error;
@@ -128,6 +289,40 @@ export class InfortisaService implements OnModuleInit {
       return response.data;
     } catch (error: any) {
       this.logger.error('Get tariff file failed', error.message);
+      throw error;
+    }
+  }
+
+  async createOrder(orderData: any): Promise<any> {
+    try {
+      const response = await this.client.post('/api/order/create', orderData);
+      return response.data;
+    } catch (error: any) {
+      this.logger.error('Create order failed', error.message);
+      throw error;
+    }
+  }
+
+  async getOrderStatus(customerReference: string): Promise<any> {
+    try {
+      const response = await this.client.get('/api/order/status', {
+        params: { CustomerReference: customerReference },
+      });
+      return response.data;
+    } catch (error: any) {
+      this.logger.error('Get order status failed', error.message);
+      throw error;
+    }
+  }
+
+  async getInvoicesByDate(date: string): Promise<any> {
+    try {
+      const response = await this.client.get('/api/invoice/GetByDate', {
+        params: { Date: date },
+      });
+      return response.data;
+    } catch (error: any) {
+      this.logger.error('Get invoices by date failed', error.message);
       throw error;
     }
   }

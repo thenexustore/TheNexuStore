@@ -5,17 +5,7 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import { Product } from "../lib/products";
 import { useRouter } from "next/navigation";
-
-type CartItem = {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image?: string;
-  slug: string;
-  brand: string;
-  stock_status: string;
-};
+import { useCart } from "../../context/CartContext";
 
 interface ProductCardProps {
   product: Product;
@@ -26,90 +16,267 @@ const ProductCard: React.FC<ProductCardProps> = ({
   product,
   className = "",
 }) => {
+  if (!product) {
+    return (
+      <div className={`bg-white rounded-xl shadow-sm p-4 ${className}`}>
+        <div className="text-center text-gray-500 py-8">
+          Product not available
+        </div>
+      </div>
+    );
+  }
+
   const isOutOfStock =
-    product.stock_status === "OUT_OF_STOCK" || product.stock_quantity <= 0;
+    product.stock_status === "OUT_OF_STOCK" ||
+    (product.stock_quantity ?? 0) <= 0;
   const isLowStock = product.stock_status === "LOW_STOCK";
-  const [quantity, setQuantity] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [buyNowLoading, setBuyNowLoading] = useState(false);
   const router = useRouter();
 
-  // Use actual rating data from product
+  const {
+    addItem,
+    updateItem,
+    removeItem,
+    cart,
+    isLoading: cartLoading,
+  } = useCart();
+
   const rating = product.rating_avg || 0;
   const reviewCount = product.rating_count || 0;
 
-  useEffect(() => {
-    // Load cart quantity
-    const cart: CartItem[] = JSON.parse(localStorage.getItem("cart") || "[]");
-    const item = cart.find((i) => i.id === product.id);
-    setQuantity(item ? item.quantity : 0);
+  const cartItem = cart?.items.find((item) => {
+    return item.sku_code === product.sku_code || item.sku_id === product.sku_id;
+  });
 
-    // Load favorite status from localStorage
+  const quantity = cartItem?.quantity || 0;
+
+  useEffect(() => {
     const favorites: string[] = JSON.parse(
-      localStorage.getItem("favorites") || "[]"
+      localStorage.getItem("favorites") || "[]",
     );
     setIsFavorite(favorites.includes(product.id));
   }, [product.id]);
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (isOutOfStock) return;
 
-    let cart: CartItem[] = JSON.parse(localStorage.getItem("cart") || "[]");
-    const index = cart.findIndex((i) => i.id === product.id);
+    setIsLoading(true);
+    try {
+      // Use sku_id instead of sku_code
+      await addItem(product.sku_code, 1);
 
-    if (index >= 0) {
-      cart[index].quantity += 1;
-    } else {
-      cart.push({
-        id: product.id,
-        name: product.title,
-        price: product.price,
-        quantity: 1,
-        image: product.thumbnail,
-        slug: product.slug,
-        brand: product.brand_name,
-        stock_status: product.stock_status,
-      });
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
+
+      if (index >= 0) {
+        legacyCart[index].quantity += 1;
+      } else {
+        legacyCart.push({
+          id: product.id,
+          sku_id: product.sku_id,
+          sku_code: product.sku_code,
+          name: product.title,
+          price: product.price,
+          quantity: 1,
+          image: product.thumbnail,
+          slug: product.slug,
+          brand: product.brand_name,
+          stock_status: product.stock_status,
+        });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(legacyCart));
+      window.dispatchEvent(new CustomEvent("cart-update"));
+    } catch (error) {
+      console.error("Failed to add to cart:", error);
+
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
+
+      if (index >= 0) {
+        legacyCart[index].quantity += 1;
+      } else {
+        legacyCart.push({
+          id: product.id,
+          sku_id: product.sku_id,
+          sku_code: product.sku_code,
+          name: product.title,
+          price: product.price,
+          quantity: 1,
+          image: product.thumbnail,
+          slug: product.slug,
+          brand: product.brand_name,
+          stock_status: product.stock_status,
+        });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(legacyCart));
+      window.dispatchEvent(new CustomEvent("cart-update"));
+    } finally {
+      setIsLoading(false);
     }
-
-    setQuantity((prev) => prev + 1);
-    localStorage.setItem("cart", JSON.stringify(cart));
-    window.dispatchEvent(new CustomEvent("cart-update"));
   };
 
-  const handleBuyNow = (e: React.MouseEvent) => {
+  const handleIncreaseQuantity = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (isOutOfStock || isLoading) return;
+    if (isOutOfStock) return;
 
     setIsLoading(true);
+    try {
+      // Use sku_id
+      await addItem(product.sku_id, 1);
 
-    // 1️⃣ Add to cart
-    const cart: CartItem[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
 
-    const index = cart.findIndex((i) => i.id === product.id);
+      if (index >= 0) {
+        legacyCart[index].quantity += 1;
+      } else {
+        legacyCart.push({
+          id: product.id,
+          sku_id: product.sku_id,
+          sku_code: product.sku_code,
+          name: product.title,
+          price: product.price,
+          quantity: 1,
+          image: product.thumbnail,
+          slug: product.slug,
+          brand: product.brand_name,
+          stock_status: product.stock_status,
+        });
+      }
 
-    if (index >= 0) {
-      cart[index].quantity += 1;
-    } else {
-      cart.push({
-        id: product.id,
-        name: product.title,
-        price: product.price,
-        quantity: 1,
-        image: product.thumbnail,
-        slug: product.slug,
-        brand: product.brand_name,
-        stock_status: product.stock_status,
-      });
+      localStorage.setItem("cart", JSON.stringify(legacyCart));
+      window.dispatchEvent(new CustomEvent("cart-update"));
+    } catch (error) {
+      console.error("Failed to increase quantity:", error);
+
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
+
+      if (index >= 0) {
+        legacyCart[index].quantity += 1;
+        localStorage.setItem("cart", JSON.stringify(legacyCart));
+        window.dispatchEvent(new CustomEvent("cart-update"));
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    localStorage.setItem("cart", JSON.stringify(cart));
-    router.push("/checkout");
+  const handleDecreaseQuantity = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (quantity <= 0) return;
+
+    setIsLoading(true);
+    try {
+      if (cartItem) {
+        if (quantity === 1) {
+          await removeItem(cartItem.id);
+        } else {
+          await updateItem(cartItem.id, quantity - 1);
+        }
+      }
+
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
+
+      if (index >= 0) {
+        if (legacyCart[index].quantity > 1) {
+          legacyCart[index].quantity -= 1;
+        } else {
+          legacyCart = legacyCart.filter((i: any) => i.id !== product.id);
+        }
+        localStorage.setItem("cart", JSON.stringify(legacyCart));
+        window.dispatchEvent(new CustomEvent("cart-update"));
+      }
+    } catch (error) {
+      console.error("Failed to decrease quantity:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBuyNow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isOutOfStock || buyNowLoading) return;
+
+    setBuyNowLoading(true);
+    setIsLoading(true);
+
+    try {
+      // Use sku_id
+      await addItem(product.sku_id, 1);
+
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
+
+      if (index >= 0) {
+        legacyCart[index].quantity += 1;
+      } else {
+        legacyCart.push({
+          id: product.id,
+          sku_id: product.sku_id,
+          sku_code: product.sku_code,
+          name: product.title,
+          price: product.price,
+          quantity: 1,
+          image: product.thumbnail,
+          slug: product.slug,
+          brand: product.brand_name,
+          stock_status: product.stock_status,
+        });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(legacyCart));
+      window.dispatchEvent(new CustomEvent("cart-update"));
+
+      setTimeout(() => {
+        router.push("/cart");
+      }, 500);
+    } catch (error) {
+      console.error("Failed to buy now:", error);
+      setBuyNowLoading(false);
+      setIsLoading(false);
+
+      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
+      const index = legacyCart.findIndex((i: any) => i.id === product.id);
+
+      if (index >= 0) {
+        legacyCart[index].quantity += 1;
+      } else {
+        legacyCart.push({
+          id: product.id,
+          sku_id: product.sku_id,
+          sku_code: product.sku_code,
+          name: product.title,
+          price: product.price,
+          quantity: 1,
+          image: product.thumbnail,
+          slug: product.slug,
+          brand: product.brand_name,
+          stock_status: product.stock_status,
+        });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(legacyCart));
+      window.dispatchEvent(new CustomEvent("cart-update"));
+
+      setTimeout(() => {
+        router.push("/cart");
+      }, 500);
+    }
   };
 
   const toggleFavorite = (e: React.MouseEvent) => {
@@ -117,7 +284,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     e.stopPropagation();
 
     let favorites: string[] = JSON.parse(
-      localStorage.getItem("favorites") || "[]"
+      localStorage.getItem("favorites") || "[]",
     );
 
     if (isFavorite) {
@@ -142,7 +309,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
         isLoading ? "pointer-events-none" : ""
       } ${className}`}
     >
-      {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl">
           <div className="flex flex-col items-center gap-3">
@@ -167,14 +333,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
               />
             </svg>
             <span className="text-sm font-semibold text-gray-700">
-              Redirecting to checkout...
+              {buyNowLoading ? "Adding to cart..." : "Loading..."}
             </span>
           </div>
         </div>
       )}
 
       <Link href={`/products/${product.slug}`} className="block p-4">
-        {/* Product Image */}
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-50 mb-4">
           <img
             src={imageSrc}
@@ -193,7 +358,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             }}
           />
 
-          {/* Stock status badges */}
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
               <span className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-bold text-white">
@@ -209,7 +373,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          {/* Discount badge */}
           {product.discount_percentage && product.discount_percentage > 0 && (
             <div className="absolute top-2 right-2">
               <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
@@ -217,28 +380,49 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </span>
             </div>
           )}
+
+          <button
+            onClick={toggleFavorite}
+            className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
+            style={{ right: product.discount_percentage ? "3.5rem" : "0.5rem" }}
+          >
+            <svg
+              className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
+              fill={isFavorite ? "currentColor" : "none"}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={isFavorite ? "0" : "2"}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
         </div>
 
         <div className="flex justify-between items-center mb-3">
           <span className="text-xs font-semibold uppercase text-gray-500 tracking-wide">
             {product.brand_name}
           </span>
+          {cartItem && (
+            <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
+              {quantity} in cart
+            </span>
+          )}
         </div>
 
-        {/* Product Details */}
         <div className="space-y-3">
-          {/* Product Title */}
           <h3 className="text-lg font-bold text-gray-900 line-clamp-2 leading-tight">
             {product.title}
           </h3>
 
-          {/* Short Description */}
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
             {product.short_description ||
               "Premium quality product with excellent features and performance."}
           </p>
 
-          {/* Rating - Only show if there are reviews */}
           {rating > 0 && reviewCount > 0 && (
             <div className="flex items-center gap-2">
               <div className="flex items-center">
@@ -254,7 +438,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          {/* Price */}
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold text-gray-900">
               €{product.price.toFixed(2)}
@@ -276,20 +459,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      {/* Action Buttons */}
       <div className="px-4 pb-4 mt-2">
         <div className="grid grid-cols-2 gap-3">
-          {/* Buy Now Button */}
           <button
             onClick={handleBuyNow}
-            disabled={isOutOfStock || isLoading}
+            disabled={isOutOfStock || buyNowLoading || cartLoading}
             className={`flex-1 py-3 text-sm font-bold text-white rounded-lg transition-all duration-200 ${
-              isOutOfStock || isLoading
+              isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
             }`}
           >
-            {isLoading ? (
+            {buyNowLoading ? (
               <span className="flex items-center justify-center">
                 <svg
                   className="animate-spin h-5 w-5 mr-2 text-white"
@@ -311,14 +492,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Processing...
+                Adding...
               </span>
             ) : (
               "Buy Now"
             )}
           </button>
 
-          {/* Add to Cart / Quantity Selector */}
           {isOutOfStock ? (
             <button
               disabled
@@ -329,41 +509,29 @@ const ProductCard: React.FC<ProductCardProps> = ({
           ) : quantity === 0 ? (
             <button
               onClick={handleAddToCart}
-              className="w-full py-3 text-sm font-semibold text-white bg-[#0B123A] hover:bg-[#1a245a] rounded-lg transition-colors duration-200 active:scale-95"
+              disabled={cartLoading}
+              className={`w-full py-3 text-sm font-semibold text-white rounded-lg transition-colors duration-200 active:scale-95 ${
+                cartLoading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#0B123A] hover:bg-[#1a245a]"
+              }`}
             >
-              Add to Cart
+              {cartLoading ? "Adding..." : "Add to Cart"}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  let cart: CartItem[] = JSON.parse(
-                    localStorage.getItem("cart") || "[]"
-                  );
-                  const index = cart.findIndex((i) => i.id === product.id);
-
-                  if (index >= 0) {
-                    if (cart[index].quantity > 1) {
-                      cart[index].quantity -= 1;
-                      setQuantity((prev) => prev - 1);
-                    } else {
-                      cart = cart.filter((i) => i.id !== product.id);
-                      setQuantity(0);
-                    }
-                    localStorage.setItem("cart", JSON.stringify(cart));
-                    window.dispatchEvent(new CustomEvent("cart-update"));
-                  }
-                }}
-                className="px-2 py-1 text-lg font-bold text-gray-700 hover:text-[#0B123A] transition-colors"
+                onClick={handleDecreaseQuantity}
+                disabled={cartLoading}
+                className="px-2 py-1 text-lg font-bold text-gray-700 hover:text-[#0B123A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 −
               </button>
               <span className="font-semibold text-gray-900">{quantity}</span>
               <button
-                onClick={handleAddToCart}
-                className="px-2 py-1 text-lg font-bold text-gray-700 hover:text-[#0B123A] transition-colors"
+                onClick={handleIncreaseQuantity}
+                disabled={cartLoading || isOutOfStock}
+                className="px-2 py-1 text-lg font-bold text-gray-700 hover:text-[#0B123A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 +
               </button>

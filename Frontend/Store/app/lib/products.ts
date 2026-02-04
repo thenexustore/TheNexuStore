@@ -1,3 +1,5 @@
+import { apiRequest } from "./api";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export interface ProductFilters {
@@ -59,6 +61,7 @@ export interface Product {
   category_name: string;
   category_slug: string;
   sku_code: string;
+  sku_id: string;
   price: number;
   compare_at_price?: number;
   discount_percentage?: number;
@@ -145,25 +148,6 @@ export interface ReviewData {
 }
 
 class ProductAPI {
-  private async fetchAPI(endpoint: string, options: RequestInit = {}) {
-    const url = `${API_BASE}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
   async getProducts(filters: ProductFilters = {}): Promise<ProductResponse> {
     const params = new URLSearchParams();
 
@@ -182,42 +166,42 @@ class ProductAPI {
     const endpoint = `/user/products${
       params.toString() ? `?${params.toString()}` : ""
     }`;
-    return this.fetchAPI(endpoint);
+    return apiRequest(endpoint); // Use apiRequest from single source
   }
 
   async getProductById(id: string): Promise<ProductDetail> {
-    return this.fetchAPI(`/user/products/${id}`);
+    return apiRequest(`/user/products/${id}`);
   }
 
   async getProductBySlug(slug: string): Promise<ProductDetail> {
-    return this.fetchAPI(`/user/products/slug/${slug}`);
+    return apiRequest(`/user/products/slug/${slug}`);
   }
 
   async getFeaturedProducts(limit: number = 8): Promise<Product[]> {
-    const data = await this.fetchAPI(`/user/products/featured?limit=${limit}`);
+    const data = await apiRequest(`/user/products/featured?limit=${limit}`);
     return data;
   }
 
   async searchProducts(query: string, limit: number = 10): Promise<Product[]> {
-    const data = await this.fetchAPI(
-      `/user/products/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    const data = await apiRequest(
+      `/user/products/search?q=${encodeURIComponent(query)}&limit=${limit}`,
     );
     return data;
   }
 
   async getRelatedProducts(
     productId: string,
-    limit: number = 4
+    limit: number = 4,
   ): Promise<Product[]> {
-    const data = await this.fetchAPI(
-      `/user/products/${productId}/related?limit=${limit}`
+    const data = await apiRequest(
+      `/user/products/${productId}/related?limit=${limit}`,
     );
     return data;
   }
 
   async getProductsByCategory(
     slug: string,
-    filters: ProductFilters = {}
+    filters: ProductFilters = {},
   ): Promise<ProductResponse> {
     const params = new URLSearchParams();
 
@@ -236,12 +220,12 @@ class ProductAPI {
     const endpoint = `/user/products/categories/${slug}/products${
       params.toString() ? `?${params.toString()}` : ""
     }`;
-    return this.fetchAPI(endpoint);
+    return apiRequest(endpoint);
   }
 
   async getProductsByBrand(
     slug: string,
-    filters: ProductFilters = {}
+    filters: ProductFilters = {},
   ): Promise<ProductResponse> {
     const params = new URLSearchParams();
 
@@ -260,11 +244,11 @@ class ProductAPI {
     const endpoint = `/user/products/brands/${slug}/products${
       params.toString() ? `?${params.toString()}` : ""
     }`;
-    return this.fetchAPI(endpoint);
+    return apiRequest(endpoint);
   }
 
   async createReview(productId: string, reviewData: ReviewData): Promise<any> {
-    return this.fetchAPI(`/user/products/${productId}/reviews`, {
+    return apiRequest(`/user/products/${productId}/reviews`, {
       method: "POST",
       body: JSON.stringify(reviewData),
     });
@@ -272,9 +256,9 @@ class ProductAPI {
 
   async getCategories(): Promise<Category[]> {
     try {
-      const response = await this.fetchAPI("/user/products?limit=1");
+      const response = await apiRequest("/user/products?limit=1");
       if (response.filters && response.filters.categories) {
-        return response.filters.categories.map((cat:any) => ({
+        return response.filters.categories.map((cat: any) => ({
           id: cat.id,
           name: cat.name,
           slug: cat.slug,

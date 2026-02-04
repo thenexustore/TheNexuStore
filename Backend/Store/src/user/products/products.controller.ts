@@ -1,10 +1,10 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Param, 
-  Query, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
   UseGuards,
   Req,
   HttpCode,
@@ -19,11 +19,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
-  user: {
-    userId: string;
-    email: string;
-    role: string;
-  };
+  user?: any;
 }
 
 @Controller('user/products')
@@ -96,5 +92,10 @@ export class ProductsController {
   ) {
     const modifiedQuery = { ...query, brand: slug };
     return this.productsService.getProducts(modifiedQuery);
+  }
+
+  @Get('sku/:skuCode')
+  async getProductBySku(@Param('skuCode') skuCode: string) {
+    return this.productsService.getBySku(skuCode);
   }
 }

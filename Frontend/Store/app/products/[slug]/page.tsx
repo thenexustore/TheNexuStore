@@ -8,6 +8,7 @@ import ProductCard from "../../components/ProductCard";
 import ReviewForm from "../../components/ReviewForm";
 import { productAPI, ProductDetail, Product } from "../../lib/products";
 import { ProductDetailSkeleton } from "../../components/ProductDetailSkeleton";
+import { useCart } from "@/context/CartContext";
 
 export default function ProductPage() {
   const params = useParams();
@@ -21,6 +22,10 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [addToCartMessage, setAddToCartMessage] = useState<string | null>(null);
+
+  const { addItem } = useCart();
 
   useEffect(() => {
     const fetchProductData = async () => {
@@ -48,12 +53,29 @@ export default function ProductPage() {
     }
   }, [slug]);
 
-  const handleAddToCart = () => {
-    console.log("Add to cart:", {
-      productId: product?.id,
-      variantId: selectedVariant,
-      quantity,
-    });
+  const handleAddToCart = async () => {
+    if (!product || !selectedVariant) return;
+
+    const variant = product.variants.find((v) => v.id === selectedVariant);
+    if (!variant) return;
+
+    try {
+      setAddingToCart(true);
+      setAddToCartMessage(null);
+
+      await addItem(variant.sku_code, quantity);
+
+      setAddToCartMessage(`Added ${quantity} × ${product.title} to cart!`);
+
+      setTimeout(() => {
+        setAddToCartMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to add to cart:", err);
+      setAddToCartMessage("Failed to add item to cart. Please try again.");
+    } finally {
+      setAddingToCart(false);
+    }
   };
 
   const handleReviewSubmit = async (reviewData: {
@@ -301,7 +323,6 @@ export default function ProductPage() {
                   className="w-16 text-center"
                   disabled={isOutOfStock}
                 />
-
                 <button
                   onClick={() =>
                     setQuantity(
@@ -319,16 +340,56 @@ export default function ProductPage() {
 
               <button
                 onClick={handleAddToCart}
-                disabled={isOutOfStock}
-                className={`flex-1 rounded px-6 py-3 font-medium ${
-                  isOutOfStock
+                disabled={isOutOfStock || addingToCart}
+                className={`flex-1 rounded px-6 py-3 font-medium transition-all ${
+                  isOutOfStock || addingToCart
                     ? "cursor-not-allowed bg-gray-300 text-gray-500"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
                 }`}
               >
-                {isOutOfStock ? "Out of Stock" : "Add to Cart"}
+                {addingToCart ? (
+                  <span className="flex items-center justify-center">
+                    <svg
+                      className="animate-spin h-5 w-5 mr-2 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Adding...
+                  </span>
+                ) : isOutOfStock ? (
+                  "Out of Stock"
+                ) : (
+                  "Add to Cart"
+                )}
               </button>
             </div>
+
+            {addToCartMessage && (
+              <div
+                className={`p-3 rounded-lg text-sm font-medium ${
+                  addToCartMessage.includes("Failed")
+                    ? "bg-red-100 text-red-700"
+                    : "bg-green-100 text-green-700"
+                }`}
+              >
+                {addToCartMessage}
+              </div>
+            )}
           </div>
 
           {product.description_html && (

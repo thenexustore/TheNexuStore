@@ -4,6 +4,8 @@ import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
 import "./globals.css";
 import { usePathname } from "next/navigation";
+import { CartProvider } from "../context/CartContext";
+import { AuthProvider } from "./providers/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -21,13 +23,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {!hideLayout && <Navbar />}
+        <AuthProvider>
+          <CartProvider>
+            {!hideLayout && <Navbar />}
 
-        <main className={!hideLayout ? "" : undefined}>
-          {children}
-        </main>
+            <main className={!hideLayout ? "" : undefined}>{children}</main>
 
-        {!hideLayout && <Footer />}
+            {!hideLayout && <Footer />}
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

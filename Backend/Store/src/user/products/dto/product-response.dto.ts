@@ -57,6 +57,7 @@ export class ProductResponseDto {
   categories!: CategoryDto[];
   main_category?: CategoryDto;
   sku_code!: string;
+  sku_id!: string;
   price!: number;
   compare_at_price?: number;
   discount_percentage?: number;
@@ -84,6 +85,7 @@ export class ProductListItemDto {
   category_name!: string;
   category_slug!: string;
   sku_code!: string;
+  sku_id!: string;
   price!: number;
   compare_at_price?: number;
   discount_percentage?: number;

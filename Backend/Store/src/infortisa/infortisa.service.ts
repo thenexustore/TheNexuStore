@@ -19,7 +19,7 @@ export class InfortisaService implements OnModuleInit {
   private initializeClient() {
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 30000,
+      timeout: 300000,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Infortisa-Sync-Service/2.0',

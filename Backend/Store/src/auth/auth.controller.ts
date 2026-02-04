@@ -7,7 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { AuthGuard as PassportGuard } from '@nestjs/passport';
@@ -61,14 +61,16 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard)
-  me(@Req() req) {
-    return this.auth.getMe(req.user.id);
+  me(@Req() req: Request) {
+    const user = (req as any).user;
+    return this.auth.getMe(user?.id);
   }
 
   @Post('profile')
   @UseGuards(AuthGuard)
-  updateProfile(@Req() req, @Body() body: any) {
-    return this.auth.updateProfile(req.user.id, body);
+  updateProfile(@Req() req: Request, @Body() body: any) {
+    const user = (req as any).user;
+    return this.auth.updateProfile(user?.id, body);
   }
 
   @Get('google')
@@ -77,14 +79,13 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(PassportGuard('google'))
-  async googleCallback(@Req() req, @Res() res) {
-    const token = await this.auth.googleLogin(req.user);
-
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
+    const user = (req as any).user;
+    const token = await this.auth.googleLogin(user);
     res.cookie('access_token', token.accessToken, {
       httpOnly: true,
       sameSite: 'lax',
     });
-
     res.redirect('http://localhost:3000/store');
   }
 }

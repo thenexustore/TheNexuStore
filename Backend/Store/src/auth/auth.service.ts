@@ -83,9 +83,7 @@ export class AuthService {
     if (!match || !user.is_active) throw new UnauthorizedException();
 
     return {
-      accessToken: this.jwt.sign(
-        { sub: user.id, role: user.role },
-      ),
+      accessToken: this.jwt.sign({ sub: user.id, role: user.role }),
     };
   }
 
@@ -134,6 +132,10 @@ export class AuthService {
   }
 
   async googleLogin(googleUser: any) {
+    if (!googleUser || !googleUser.email) {
+      throw new UnauthorizedException('Google authentication failed');
+    }
+
     let user = await this.prisma.customer.findUnique({
       where: { email: googleUser.email },
     });
@@ -142,18 +144,16 @@ export class AuthService {
       user = await this.prisma.customer.create({
         data: {
           email: googleUser.email,
-          first_name: googleUser.firstName,
-          last_name: googleUser.lastName,
-          profile_image: googleUser.picture,
+          first_name: googleUser.firstName || 'User',
+          last_name: googleUser.lastName || '',
+          profile_image: googleUser.picture || null,
           is_active: true,
         },
       });
     }
 
     return {
-      accessToken: this.jwt.sign(
-        { sub: user.id, role: user.role },
-      ),
+      accessToken: this.jwt.sign({ sub: user.id, role: user.role }),
     };
   }
 
@@ -176,6 +176,10 @@ export class AuthService {
       customer = await this.prisma.customer.findUnique({
         where: { id: customerId },
       });
+    }
+
+    if (!customer) {
+      throw new BadRequestException('Customer not found');
     }
 
     if (address) {

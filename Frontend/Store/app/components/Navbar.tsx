@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Menu, Search, ShoppingCart, X } from "lucide-react";
+import { useAuth } from "../providers/AuthProvider";
+import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
 import { productAPI, Product } from "../lib/products";
 
@@ -23,7 +25,6 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
   const [categories, setCategories] = useState<
     { id: string; name: string; slug: string }[]
   >([]);
@@ -33,38 +34,62 @@ export default function Navbar() {
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Use context providers
+  const { user: authUser, logout } = useAuth();
+  const { cartCount, isLoading: cartLoading } = useCart();
+
+  // Legacy cart count for backward compatibility
+  const [legacyCartCount, setLegacyCartCount] = useState(0);
+
   useEffect(() => {
+    // Load user from API
     getMe().then((res: User | null) => {
       if (res) setUser(res);
     });
 
     loadCategories();
 
-    const loadCartCount = () => {
+    // Legacy cart count loading (for backward compatibility)
+    const loadLegacyCartCount = () => {
       const stored = localStorage.getItem("cart");
       if (stored) {
         try {
           const cart = JSON.parse(stored);
           const totalItems = cart.reduce(
             (sum: number, item: any) => sum + item.quantity,
-            0
+            0,
           );
-          setCartCount(totalItems);
+          setLegacyCartCount(totalItems);
         } catch (e) {
           console.error(e);
         }
       }
     };
 
-    loadCartCount();
+    loadLegacyCartCount();
 
     const handleCartUpdate = () => {
-      loadCartCount();
+      loadLegacyCartCount();
     };
 
     window.addEventListener("cart-update", handleCartUpdate);
     return () => window.removeEventListener("cart-update", handleCartUpdate);
   }, []);
+
+  // Sync auth user with local state
+  useEffect(() => {
+    if (authUser) {
+      setUser({
+        id: authUser.id,
+        firstName: authUser.first_name,
+        lastName: authUser.last_name,
+        email: authUser.email,
+        profile_image: authUser.profile_image,
+      });
+    } else {
+      setUser(null);
+    }
+  }, [authUser]);
 
   const loadCategories = async () => {
     try {
@@ -160,9 +185,17 @@ export default function Navbar() {
     setSidebarOpen(false);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+  };
+
   const filteredCategories = categories.filter((category) =>
-    category.name.toLowerCase().includes(categorySearch.toLowerCase())
+    category.name.toLowerCase().includes(categorySearch.toLowerCase()),
   );
+
+  // Use cart count from context, fallback to legacy count
+  const displayCartCount = cartCount || legacyCartCount;
 
   return (
     <>
@@ -279,7 +312,7 @@ export default function Navbar() {
                           <button
                             onClick={() => {
                               router.push(
-                                `/products?search=${encodeURIComponent(search)}`
+                                `/products?search=${encodeURIComponent(search)}`,
                               );
                               setShowSearchResults(false);
                               setSearch("");
@@ -351,20 +384,28 @@ export default function Navbar() {
                 </Link>
               </div>
             ) : (
-              <Link href="/account">
-                {user.profile_image ? (
-                  <img
-                    src={user.profile_image}
-                    className="h-9 w-9 rounded-full object-cover border-2 border-gray-200 hover:border-[#0B123A] transition-colors"
-                    referrerPolicy="no-referrer"
-                    alt="Profile"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B123A] text-sm font-bold text-white hover:bg-[#1a245a] transition-colors">
-                    {user.firstName?.[0] ?? "U"}
-                  </div>
-                )}
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link href="/account">
+                  {user.profile_image ? (
+                    <img
+                      src={user.profile_image}
+                      className="h-9 w-9 rounded-full object-cover border-2 border-gray-200 hover:border-[#0B123A] transition-colors"
+                      referrerPolicy="no-referrer"
+                      alt="Profile"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B123A] text-sm font-bold text-white hover:bg-[#1a245a] transition-colors">
+                      {user.firstName?.[0] ?? "U"}
+                    </div>
+                  )}
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm font-medium text-gray-700 hover:text-[#0B123A] transition-colors hidden md:block"
+                >
+                  Logout
+                </button>
+              </div>
             )}
 
             <button
@@ -386,9 +427,14 @@ export default function Navbar() {
               className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ShoppingCart className="w-6 h-6 text-gray-700" />
-              {cartCount > 0 && (
+              {displayCartCount > 0 && (
                 <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
-                  {cartCount > 9 ? "9+" : cartCount}
+                  {displayCartCount > 9 ? "9+" : displayCartCount}
+                </div>
+              )}
+              {cartLoading && displayCartCount === 0 && (
+                <div className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#0B123A]"></div>
                 </div>
               )}
             </Link>

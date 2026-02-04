@@ -154,9 +154,13 @@ export class ProductsService {
       let products: any[] = [];
       let total: number;
 
-      if (sort_by === ProductSortBy.PRICE_LOW_TO_HIGH || sort_by === ProductSortBy.PRICE_HIGH_TO_LOW) {
-        const orderDirection = sort_by === ProductSortBy.PRICE_LOW_TO_HIGH ? 'asc' : 'desc';
-        
+      if (
+        sort_by === ProductSortBy.PRICE_LOW_TO_HIGH ||
+        sort_by === ProductSortBy.PRICE_HIGH_TO_LOW
+      ) {
+        const orderDirection =
+          sort_by === ProductSortBy.PRICE_LOW_TO_HIGH ? 'asc' : 'desc';
+
         const productIdsWithPrice = await this.prisma.$queryRaw<any[]>`
           SELECT p.id, MIN(sp.sale_price) as min_price
           FROM products p
@@ -170,7 +174,7 @@ export class ProductsService {
           LIMIT ${limit} OFFSET ${skip}
         `;
 
-        const productIds = productIdsWithPrice.map(row => row.id);
+        const productIds = productIdsWithPrice.map((row) => row.id);
 
         products = await this.prisma.product.findMany({
           where: {
@@ -273,6 +277,7 @@ export class ProductsService {
           category_name: product.main_category?.name || 'Uncategorized',
           category_slug: product.main_category?.slug || 'uncategorized',
           sku_code: defaultSku?.sku_code || 'N/A',
+          sku_id: defaultSku?.id || '',
           price: priceValue,
           compare_at_price: compareAtPrice,
           discount_percentage: this.calculateDiscountPercentage(
@@ -644,6 +649,7 @@ export class ProductsService {
           }
         : undefined,
       sku_code: defaultSku?.sku_code || '',
+      sku_id: defaultSku?.id || '',
       price: priceValue,
       compare_at_price: compareAtPrice,
       discount_percentage: this.calculateDiscountPercentage(
@@ -750,6 +756,7 @@ export class ProductsService {
           category_name: product.main_category?.name || 'Uncategorized',
           category_slug: product.main_category?.slug || 'uncategorized',
           sku_code: defaultSku?.sku_code || 'N/A',
+          sku_id: defaultSku?.id || '',
           price: priceValue,
           compare_at_price: compareAtPrice,
           discount_percentage: this.calculateDiscountPercentage(
@@ -832,6 +839,7 @@ export class ProductsService {
           category_name: product.main_category?.name || 'Uncategorized',
           category_slug: product.main_category?.slug || 'uncategorized',
           sku_code: defaultSku?.sku_code || 'N/A',
+          sku_id: defaultSku?.id || '',
           price: priceValue,
           compare_at_price: compareAtPrice,
           discount_percentage: this.calculateDiscountPercentage(
@@ -981,6 +989,7 @@ export class ProductsService {
           category_name: product.main_category?.name || 'Uncategorized',
           category_slug: product.main_category?.slug || 'uncategorized',
           sku_code: defaultSku?.sku_code || 'N/A',
+          sku_id: defaultSku?.id || '',
           price: priceValue,
           compare_at_price: compareAtPrice,
           discount_percentage: this.calculateDiscountPercentage(
@@ -1208,6 +1217,77 @@ export class ProductsService {
       }
 
       return 'updated';
+    }
+  }
+
+  async getBySku(skuCode: string): Promise<any> {
+    try {
+      const sku = await this.prisma.sku.findFirst({
+        where: {
+          OR: [
+            { sku_code: skuCode },
+            { sku_code: skuCode.toUpperCase() },
+            { sku_code: skuCode.toLowerCase() },
+          ],
+          status: 'ACTIVE',
+        },
+        include: {
+          product: true,
+        },
+      });
+
+      if (!sku) {
+        throw new NotFoundException(`SKU '${skuCode}' not found`);
+      }
+
+      const product = await this.prisma.product.findFirst({
+        where: {
+          id: sku.product_id,
+          status: 'ACTIVE',
+        },
+        include: {
+          brand: true,
+        },
+      });
+
+      if (!product) {
+        throw new NotFoundException(
+          `Product for SKU '${skuCode}' is not active`,
+        );
+      }
+
+      const price = await this.prisma.skuPrice.findFirst({
+        where: { sku_id: sku.id },
+        orderBy: { updated_at: 'desc' },
+      });
+
+      const inventory = await this.prisma.inventoryLevel.aggregate({
+        where: { sku_id: sku.id },
+        _sum: {
+          qty_on_hand: true,
+          qty_reserved: true,
+        },
+      });
+
+      const availableStock =
+        (inventory._sum.qty_on_hand || 0) - (inventory._sum.qty_reserved || 0);
+
+      return {
+        id: sku.id,
+        sku_code: sku.sku_code,
+        product_id: sku.product_id,
+        product_title: product.title,
+        brand_name: product.brand?.name || 'Unknown',
+        price: price?.sale_price || 0,
+        stock_quantity: availableStock,
+        in_stock: availableStock > 0,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error in getBySku:', error);
+      throw new BadRequestException('Failed to fetch product by SKU');
     }
   }
 }

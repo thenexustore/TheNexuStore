@@ -62,9 +62,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const useCart = () => {
   const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within CartProvider");
-  }
+  if (!context) throw new Error("useCart must be used within CartProvider");
   return context;
 };
 
@@ -86,7 +84,6 @@ const convertLegacyToBackendFormat = (legacyItems: any[]): Cart => {
   const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
   const shipping = subtotal > 100 ? 0 : 9.99;
   const tax = subtotal * 0.21;
-  const total = subtotal + shipping + tax;
 
   return {
     id: "legacy-cart",
@@ -95,15 +92,15 @@ const convertLegacyToBackendFormat = (legacyItems: any[]): Cart => {
       subtotal,
       shipping,
       tax,
-      total,
+      total: subtotal + shipping + tax,
       item_count: items.reduce((sum, item) => sum + item.quantity, 0),
       currency: "EUR",
     },
   };
 };
 
-const convertBackendToLegacyFormat = (backendCart: Cart): any[] => {
-  return backendCart.items.map((item) => ({
+const convertBackendToLegacyFormat = (backendCart: Cart): any[] =>
+  backendCart.items.map((item) => ({
     id: item.product_id || item.sku_id,
     name: item.product_title,
     price: item.price,
@@ -114,20 +111,19 @@ const convertBackendToLegacyFormat = (backendCart: Cart): any[] => {
     brand: "Unknown",
     stock_status: item.in_stock ? "IN_STOCK" : "OUT_OF_STOCK",
   }));
-};
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const { user, getSessionId } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasSynced, setHasSynced] = useState(false);
 
   const fetchBackendCart = async (): Promise<Cart | null> => {
     try {
       const sessionId = getSessionId();
-      const cartData = await getCart(sessionId);
-      return cartData;
-    } catch (error) {
-      console.error("Failed to fetch backend cart:", error);
+      if (!sessionId) return null;
+      return await getCart(sessionId);
+    } catch {
       return null;
     }
   };
@@ -135,37 +131,30 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const loadLegacyCart = (): Cart | null => {
     try {
       const stored = localStorage.getItem("cart");
-      if (stored) {
-        const legacyItems = JSON.parse(stored);
-        if (Array.isArray(legacyItems) && legacyItems.length > 0) {
-          return convertLegacyToBackendFormat(legacyItems);
-        }
-      }
-    } catch (e) {
-      console.error("Error loading legacy cart:", e);
+      if (!stored) return null;
+      const legacyItems = JSON.parse(stored);
+      if (!Array.isArray(legacyItems) || legacyItems.length === 0) return null;
+      return convertLegacyToBackendFormat(legacyItems);
+    } catch {
+      return null;
     }
-    return null;
   };
 
   const fetchCart = async () => {
     try {
       setIsLoading(true);
 
-      let backendCart = await fetchBackendCart();
+      const backendCart = await fetchBackendCart();
 
       if (backendCart) {
         setCart(backendCart);
-        const legacyItems = convertBackendToLegacyFormat(backendCart);
-        localStorage.setItem("cart", JSON.stringify(legacyItems));
+        localStorage.setItem(
+          "cart",
+          JSON.stringify(convertBackendToLegacyFormat(backendCart)),
+        );
       } else {
-        const legacyCart = loadLegacyCart();
-        setCart(legacyCart);
+        setCart(loadLegacyCart());
       }
-
-      const event = new CustomEvent("cart-update");
-      window.dispatchEvent(event);
-    } catch (error) {
-      console.error("Failed to fetch cart:", error);
     } finally {
       setIsLoading(false);
     }
@@ -173,188 +162,91 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     fetchCart();
+    setHasSynced(false);
   }, [user]);
 
   const addItem = async (skuCode: string, quantity: number) => {
     try {
       const sessionId = getSessionId();
+      if (!sessionId) return;
+
       await addToCart(skuCode, quantity, sessionId);
       await fetchCart();
-
-      const event = new CustomEvent("cart-update");
-      window.dispatchEvent(event);
-    } catch (error) {
-      console.error("Failed to add item:", error);
-
-      const legacyCart = loadLegacyCart();
-      const currentItems = legacyCart?.items || [];
-
-      const updatedItems = [...currentItems];
-      const existingItemIndex = updatedItems.findIndex(
-        (item) => item.sku_code === skuCode,
-      );
-
-      if (existingItemIndex >= 0) {
-        updatedItems[existingItemIndex].quantity += quantity;
-      } else {
-        updatedItems.push({
-          id: `legacy-${Date.now()}`,
-          sku_id: `sku-${skuCode}`,
-          product_title: `Product ${skuCode}`,
-          sku_code: skuCode,
-          price: 0,
-          quantity,
-          line_total: 0,
-          thumbnail: "",
-          max_quantity: 99,
-          in_stock: true,
-        });
-      }
-
-      const newCart = {
-        id: "legacy-cart",
-        items: updatedItems,
-        summary: {
-          subtotal: updatedItems.reduce(
-            (sum, item) => sum + item.line_total,
-            0,
-          ),
-          shipping: 9.99,
-          tax:
-            updatedItems.reduce((sum, item) => sum + item.line_total, 0) * 0.21,
-          total:
-            updatedItems.reduce((sum, item) => sum + item.line_total, 0) +
-            9.99 +
-            updatedItems.reduce((sum, item) => sum + item.line_total, 0) * 0.21,
-          item_count: updatedItems.reduce(
-            (sum, item) => sum + item.quantity,
-            0,
-          ),
-          currency: "EUR",
-        },
-      };
-
-      setCart(newCart);
-      localStorage.setItem(
-        "cart",
-        JSON.stringify(convertBackendToLegacyFormat(newCart)),
-      );
-
-      const event = new CustomEvent("cart-update");
-      window.dispatchEvent(event);
-    }
+    } catch {}
   };
 
   const updateItem = async (itemId: string, quantity: number) => {
     try {
       const sessionId = getSessionId();
+      if (!sessionId) return;
+
       if (quantity < 1) {
         await removeItem(itemId);
-      } else {
-        await updateCartItem(itemId, { quantity }, sessionId);
-        await fetchCart();
+        return;
       }
 
-      const event = new CustomEvent("cart-update");
-      window.dispatchEvent(event);
-    } catch (error) {
-      console.error("Failed to update item:", error);
-      const legacyCart = loadLegacyCart();
-      if (legacyCart) {
-        const updatedItems = legacyCart.items.map((item) =>
-          item.id === itemId ? { ...item, quantity } : item,
-        );
-        localStorage.setItem(
-          "cart",
-          JSON.stringify(
-            convertBackendToLegacyFormat({
-              ...legacyCart,
-              items: updatedItems,
-            }),
-          ),
-        );
-        setCart({ ...legacyCart, items: updatedItems });
-
-        const event = new CustomEvent("cart-update");
-        window.dispatchEvent(event);
-      }
-    }
+      await updateCartItem(itemId, { quantity }, sessionId);
+      await fetchCart();
+    } catch {}
   };
 
   const removeItem = async (itemId: string) => {
     try {
       const sessionId = getSessionId();
+      if (!sessionId) return;
+
       await removeCartItem(itemId, sessionId);
       await fetchCart();
-
-      const event = new CustomEvent("cart-update");
-      window.dispatchEvent(event);
-    } catch (error) {
-      console.error("Failed to remove item:", error);
-      const legacyCart = loadLegacyCart();
-      if (legacyCart) {
-        const updatedItems = legacyCart.items.filter(
-          (item) => item.id !== itemId,
-        );
-        localStorage.setItem(
-          "cart",
-          JSON.stringify(
-            convertBackendToLegacyFormat({
-              ...legacyCart,
-              items: updatedItems,
-            }),
-          ),
-        );
-        setCart({ ...legacyCart, items: updatedItems });
-
-        const event = new CustomEvent("cart-update");
-        window.dispatchEvent(event);
-      }
-    }
+    } catch {}
   };
 
   const clearCart = async () => {
     try {
       const sessionId = getSessionId();
-      await clearBackendCart(sessionId);
-    } catch (error) {
-      console.error("Failed to clear backend cart:", error);
-    }
+      if (sessionId) await clearBackendCart(sessionId);
+    } catch {}
 
     localStorage.removeItem("cart");
     setCart(null);
-
-    const event = new CustomEvent("cart-update");
-    window.dispatchEvent(event);
-    const countEvent = new CustomEvent("cart-count-update", { detail: 0 });
-    window.dispatchEvent(countEvent);
   };
 
   const syncLegacyCart = async () => {
     const legacyCart = loadLegacyCart();
-    if (legacyCart && legacyCart.items.length > 0) {
+    if (!legacyCart) return;
+
+    const sessionId = getSessionId();
+    if (!sessionId) return;
+
+    const backendCart = await fetchBackendCart();
+
+    for (const item of legacyCart.items) {
       try {
-        const sessionId = getSessionId();
-        for (const item of legacyCart.items) {
-          try {
-            await addToCart(item.sku_code, item.quantity, sessionId);
-          } catch (e) {
-            console.error("Failed to sync item:", e);
-          }
-        }
-        localStorage.removeItem("cart");
-        await fetchCart();
-      } catch (error) {
-        console.error("Failed to sync legacy cart:", error);
+        const existing = backendCart?.items.find(
+          (i) => i.sku_code === item.sku_code,
+        );
+
+        const existingQty = existing?.quantity || 0;
+        const allowed = Math.max(0, item.max_quantity - existingQty);
+        if (allowed <= 0) continue;
+
+        const qtyToAdd = Math.min(item.quantity, allowed);
+
+        await addToCart(item.sku_code, qtyToAdd, sessionId);
+      } catch {
+        continue;
       }
     }
+
+    localStorage.removeItem("cart");
+    await fetchCart();
   };
 
   useEffect(() => {
-    if (user && cart?.id === "legacy-cart") {
+    if (user && cart?.id === "legacy-cart" && !hasSynced) {
+      setHasSynced(true);
       syncLegacyCart();
     }
-  }, [user, cart?.id]);
+  }, [user, cart?.id, hasSynced]);
 
   const cartCount = cart?.summary.item_count || 0;
 

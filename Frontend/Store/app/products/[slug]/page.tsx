@@ -21,11 +21,10 @@ export default function ProductPage() {
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
   const [addToCartMessage, setAddToCartMessage] = useState<string | null>(null);
-
-  const { addItem } = useCart();
+  const { addItem, updateItem, removeItem, cart } = useCart();
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     const fetchProductData = async () => {
@@ -40,38 +39,58 @@ export default function ProductPage() {
         if (productData.variants.length > 0) {
           setSelectedVariant(productData.variants[0].id);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load product");
-        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    if (slug) {
-      fetchProductData();
-    }
+    if (slug) fetchProductData();
   }, [slug]);
 
-  const handleAddToCart = async () => {
-    if (!product || !selectedVariant) return;
+  const currentVariant =
+    product?.variants.find((v) => v.id === selectedVariant) ||
+    product?.variants[0];
 
-    const variant = product.variants.find((v) => v.id === selectedVariant);
-    if (!variant) return;
+  const images =
+    currentVariant?.images?.length > 0
+      ? currentVariant.images
+      : product?.images || [];
+
+  const isOutOfStock = currentVariant?.stock_status === "OUT_OF_STOCK";
+
+  const cartItem = cart?.items.find(
+    (item) =>
+      item.sku_code === currentVariant?.sku_code ||
+      item.sku_id === currentVariant?.sku_id,
+  );
+
+  const cartQuantity = cartItem?.quantity || 0;
+
+  useEffect(() => {
+    if (cartQuantity > 0) {
+      setQuantity(cartQuantity);
+    } else {
+      setQuantity(1);
+    }
+  }, [cartQuantity]);
+
+  const handleAddToCart = async () => {
+    if (!product || !currentVariant) return;
 
     try {
       setAddingToCart(true);
       setAddToCartMessage(null);
 
-      await addItem(variant.sku_code, quantity);
+      await addItem(currentVariant.sku_code, quantity);
 
       setAddToCartMessage(`Added ${quantity} × ${product.title} to cart!`);
 
       setTimeout(() => {
         setAddToCartMessage(null);
       }, 3000);
-    } catch (err) {
-      console.error("Failed to add to cart:", err);
+    } catch {
       setAddToCartMessage("Failed to add item to cart. Please try again.");
     } finally {
       setAddingToCart(false);
@@ -83,19 +102,11 @@ export default function ProductPage() {
     title?: string;
     comment?: string;
   }) => {
-    try {
-      if (!product) return;
-
-      const response = await productAPI.createReview(product.id, reviewData);
-      console.log("Review submitted:", response);
-    } catch (err) {
-      console.error("Failed to submit review:", err);
-    }
+    if (!product) return;
+    await productAPI.createReview(product.id, reviewData);
   };
 
-  if (loading) {
-    return <ProductDetailSkeleton />;
-  }
+  if (loading) return <ProductDetailSkeleton />;
 
   if (error || !product) {
     return (
@@ -114,13 +125,6 @@ export default function ProductPage() {
       </div>
     );
   }
-
-  const currentVariant =
-    product.variants.find((v) => v.id === selectedVariant) ||
-    product.variants[0];
-  const images =
-    currentVariant?.images?.length > 0 ? currentVariant.images : product.images;
-  const isOutOfStock = currentVariant?.stock_status === "OUT_OF_STOCK";
 
   return (
     <div className="container mx-auto px-4 py-8 bg-white text-black">
@@ -300,7 +304,17 @@ export default function ProductPage() {
             <div className="mb-4 flex items-center gap-4">
               <div className="flex items-center border border-gray-300 rounded">
                 <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  onClick={async () => {
+                    if (!currentVariant) return;
+
+                    if (cartItem) {
+                      if (cartQuantity <= 1) {
+                        await removeItem(cartItem.id);
+                      } else {
+                        await updateItem(cartItem.id, cartQuantity - 1);
+                      }
+                    }
+                  }}
                   className="px-3 py-2 hover:bg-gray-100"
                   disabled={isOutOfStock}
                 >
@@ -324,11 +338,15 @@ export default function ProductPage() {
                   disabled={isOutOfStock}
                 />
                 <button
-                  onClick={() =>
-                    setQuantity(
-                      Math.min(currentVariant.stock_quantity, quantity + 1),
-                    )
-                  }
+                  onClick={async () => {
+                    if (!currentVariant) return;
+
+                    if (cartItem) {
+                      await updateItem(cartItem.id, cartQuantity + 1);
+                    } else {
+                      await addItem(currentVariant.sku_code, 1);
+                    }
+                  }}
                   className="px-3 py-2 hover:bg-gray-100"
                   disabled={
                     isOutOfStock || quantity >= currentVariant.stock_quantity

@@ -27,10 +27,9 @@ export default function CartPage() {
 
   const [isLegacyCart, setIsLegacyCart] = useState(false);
 
-  // Handle legacy cart updates
   useEffect(() => {
     const handleLegacyUpdate = () => {
-      window.location.reload(); // Simple reload for legacy compatibility
+      window.location.reload(); 
     };
 
     window.addEventListener("cart-update", handleLegacyUpdate);
@@ -77,6 +76,26 @@ export default function CartPage() {
     }
   };
 
+  useEffect(() => {
+    if (cart) {
+      console.log("Cart Data:", cart);
+      console.log("Cart Items:", cart.items);
+      console.log("Cart Summary:", cart.summary);
+
+      // Check for duplicate items
+      const skuMap = new Map();
+      cart.items.forEach((item, index) => {
+        if (skuMap.has(item.sku_code)) {
+          console.warn(
+            `Duplicate SKU found: ${item.sku_code} at positions ${skuMap.get(item.sku_code)} and ${index}`,
+          );
+        } else {
+          skuMap.set(item.sku_code, index);
+        }
+      });
+    }
+  }, [cart]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -112,26 +131,6 @@ export default function CartPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (cart) {
-      console.log("Cart Data:", cart);
-      console.log("Cart Items:", cart.items);
-      console.log("Cart Summary:", cart.summary);
-
-      // Check for duplicate items
-      const skuMap = new Map();
-      cart.items.forEach((item, index) => {
-        if (skuMap.has(item.sku_code)) {
-          console.warn(
-            `Duplicate SKU found: ${item.sku_code} at positions ${skuMap.get(item.sku_code)} and ${index}`,
-          );
-        } else {
-          skuMap.set(item.sku_code, index);
-        }
-      });
-    }
-  }, [cart]);
 
   return (
     <div className="min-h-screen bg-white text-black py-8">

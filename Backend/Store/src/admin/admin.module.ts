@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { AdminController } from './admin.controller';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { ProductsController } from './products/products.controller';
@@ -10,13 +9,11 @@ import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
 import { BannersModule } from './banners/banners.module';
 import { FeaturedProductsModule } from './featured-products/featured-products.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your_jwt_secret_key_here',
-      signOptions: { expiresIn: '8h' },
-    }),
+    AuthModule,
     BannersModule,
     FeaturedProductsModule,
   ],

@@ -54,9 +54,9 @@ export default function ProductPage() {
     product?.variants[0];
 
   const images =
-    currentVariant?.images?.length > 0
+    currentVariant?.images && currentVariant.images.length > 0
       ? currentVariant.images
-      : product?.images || [];
+      : (product?.images ?? []);
 
   const isOutOfStock = currentVariant?.stock_status === "OUT_OF_STOCK";
 
@@ -122,6 +122,14 @@ export default function ProductPage() {
             Back to Products
           </a>
         </div>
+      </div>
+    );
+  }
+
+  if (!currentVariant) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-red-500">Variant not available</div>
       </div>
     );
   }

@@ -6,7 +6,8 @@
     "dev": "NEXT_DISABLE_TURBOPACK=1 next dev -p 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export": "next export"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

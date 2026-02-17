@@ -24,7 +24,7 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState({
     email: user?.email || "",
     shipping_address: {
-      full_name: user?.name || "",
+      full_name: user ? `${user.first_name} ${user.last_name}` : "",
       address_line1: "",
       city: "",
       postal_code: "",
@@ -33,7 +33,7 @@ export default function CheckoutPage() {
       phone: "",
     },
     billing_address: {
-      full_name: user?.name || "",
+      full_name: user ? `${user.first_name} ${user.last_name}` : "",
       address_line1: "",
       city: "",
       postal_code: "",

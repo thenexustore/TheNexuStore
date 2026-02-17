@@ -61,7 +61,7 @@ export interface Product {
   category_name: string;
   category_slug: string;
   sku_code: string;
-  sku_id: string;
+  sku_id?: string;
   price: number;
   compare_at_price?: number;
   discount_percentage?: number;
@@ -99,6 +99,7 @@ export interface ProductDetail extends Product {
   }>;
   variants: Array<{
     id: string;
+    sku_id?: string;
     sku_code: string;
     variant_name?: string;
     attributes: Array<{ key: string; value: string }>;

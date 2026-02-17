@@ -4,7 +4,6 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: "bottom-right",
   },
-
   images: {
     remotePatterns: [
       {
@@ -19,7 +18,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-
   async rewrites() {
     return [
       {

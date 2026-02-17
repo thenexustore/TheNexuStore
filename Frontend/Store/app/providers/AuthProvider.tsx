@@ -14,6 +14,8 @@ interface User {
   email: string;
   first_name: string;
   last_name: string;
+  name?: string;
+  profile_image?: string;
   phone?: string;
   role: string;
 }
@@ -61,7 +63,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const userData = await getMe();
         if (userData) {
-          setUser(userData);
+          setUser({
+            ...userData,
+            name: `${userData.first_name} ${userData.last_name}`,
+          });
         }
       } catch (error) {
         console.error("Failed to load user:", error);

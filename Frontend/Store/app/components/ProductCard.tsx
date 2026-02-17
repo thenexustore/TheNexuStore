@@ -131,7 +131,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     setIsLoading(true);
     try {
       // Use sku_id
-      await addItem(product.sku_id, 1);
+      await addItem(product.sku_id || product.sku_code, 1);
 
       let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
       const index = legacyCart.findIndex((i: any) => i.id === product.id);
@@ -217,7 +217,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
     try {
       // Use sku_id
-      await addItem(product.sku_id, 1);
+      await addItem(product.sku_id || product.sku_code, 1);
 
       let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
       const index = legacyCart.findIndex((i: any) => i.id === product.id);

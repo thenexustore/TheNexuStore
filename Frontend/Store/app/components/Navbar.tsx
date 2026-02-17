@@ -194,8 +194,7 @@ export default function Navbar() {
     category.name.toLowerCase().includes(categorySearch.toLowerCase()),
   );
 
-  // Use cart count from context, fallback to legacy count
-  const displayCartCount = cartCount || legacyCartCount;
+  const displayCartCount = cartLoading ? legacyCartCount : cartCount;
 
   return (
     <>

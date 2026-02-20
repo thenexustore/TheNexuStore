@@ -30,11 +30,9 @@ export {
   toggleFeaturedProductStatus,
   updateFeaturedProductOrder,
   fetchProductOptions,
-  fetchCategoryOptions,
   type FeaturedProduct,
   type FeaturedProductsResponse,
   type CreateFeaturedProductDto,
   type UpdateFeaturedProductDto,
   type ProductOption,
-  type CategoryOption,
 } from "./featured-products";

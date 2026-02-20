@@ -28,7 +28,7 @@ export default function NewFeaturedProductPage() {
 
   const loadInitialProductOptions = async () => {
     try {
-      const result = await fetchProductOptions();
+      const result: any = await fetchProductOptions();
       setProductOptions(result.data || []);
     } catch (error) {
       console.error("Error loading product options:", error);
@@ -39,7 +39,7 @@ export default function NewFeaturedProductPage() {
   const loadProductOptions = async (search?: string) => {
     try {
       setSearchingProducts(true);
-      const result = await fetchProductOptions(search);
+      const result: any = await fetchProductOptions(search);
       setProductOptions(result.data || []);
     } catch (error) {
       console.error("Error loading product options:", error);

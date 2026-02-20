@@ -40,7 +40,7 @@ export default function EditFeaturedProductPage() {
   const loadFeaturedProduct = async () => {
     try {
       setLoading(true);
-      const result = await fetchFeaturedProductById(id);
+      const result: any = await fetchFeaturedProductById(id);
       const data = result.data;
 
       setFormData({
@@ -87,7 +87,7 @@ export default function EditFeaturedProductPage() {
 
   const loadInitialProductOptions = async () => {
     try {
-      const result = await fetchProductOptions();
+      const result : any  = await fetchProductOptions();
       setProductOptions(result.data || []);
     } catch (error) {
       console.error("Error loading product options:", error);
@@ -98,7 +98,7 @@ export default function EditFeaturedProductPage() {
   const loadProductOptions = async (search?: string) => {
     try {
       setSearchingProducts(true);
-      const result = await fetchProductOptions(search);
+      const result: any  = await fetchProductOptions(search);
       setProductOptions(result.data || []);
     } catch (error) {
       console.error("Error loading product options:", error);

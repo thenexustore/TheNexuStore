@@ -290,7 +290,7 @@ export default function FeaturedProductsPage() {
                             className="h-10 w-10 rounded-md object-cover"
                             src={
                               item.image_url ||
-                              item.product.skus?.[0]?.image_url ||
+                              (item.product.skus?.[0] as any)?.image_url ||
                               "/No_Image_Available.png"
                             }
                             alt={item.product.title}

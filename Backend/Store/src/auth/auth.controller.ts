@@ -29,9 +29,11 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: any, @Res({ passthrough: true }) res: Response) {
     const token = await this.auth.login(body);
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access_token', token.accessToken, {
       httpOnly: true,
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
     });
     return { success: true };
   }
@@ -82,9 +84,12 @@ export class AuthController {
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const user = (req as any).user;
     const token = await this.auth.googleLogin(user);
+    const isProd = process.env.NODE_ENV === 'production';
+
     res.cookie('access_token', token.accessToken, {
       httpOnly: true,
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
     });
     res.redirect(`${process.env.FRONTEND_URL}/store`);
   }

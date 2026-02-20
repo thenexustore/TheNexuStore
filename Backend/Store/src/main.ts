@@ -21,12 +21,16 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: ['https://dev.thenexustore.com', 'https://dev.thenexuadmin.com'],
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:4000',
+      'https://nexus-store-chi.vercel.app',
+      'https://nexus-store-vpq8.vercel.app',
+    ],
     credentials: true,
   });
 
-  const port = process.env.PORT || 3000;
-
-  await app.listen(port, '0.0.0.0');
+  await app.listen(process.env.PORT as any);
 }
 bootstrap();

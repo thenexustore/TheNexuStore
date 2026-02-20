@@ -21,10 +21,12 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001','http://localhost:4000'],
+    origin: ['https://dev.thenexustore.com', 'https://dev.thenexuadmin.com'],
     credentials: true,
   });
 
-  await app.listen(4000);
+  const port = process.env.PORT || 3000;
+
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap();

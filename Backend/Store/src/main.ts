@@ -25,7 +25,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:4000',
-      'https://nexus-store-chi.vercel.app',
+      'https://nexus-store-eight.vercel.app',
       'https://nexus-store-vpq8.vercel.app',
     ],
     credentials: true,

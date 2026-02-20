@@ -227,7 +227,7 @@ flex items-center justify-center gap-2
               </div>
 
               <a
-                href="http://localhost:4000/auth/google"
+                href={`${process.env.NEXT_PUBLIC_API_URL}/auth/google`}
                 className="w-full flex items-center justify-center gap-3 border-2 border-slate-200 py-4 font-black uppercase tracking-widest hover:bg-slate-50 transition text-xs"
               >
                 <Image

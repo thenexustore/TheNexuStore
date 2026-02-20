@@ -137,7 +137,11 @@ flex items-center justify-center gap-2
 
           <div className="mt-6 pt-6 border-t-2 border-slate-100 flex flex-col gap-4">
             <a
-              href="http://localhost:4000/auth/google"
+              href={`${
+                window.location.hostname === "localhost"
+                  ? "http://localhost:4000"
+                  : "https://nexus-store-production.up.railway.app"
+              }/auth/google`}
               className="flex items-center justify-center gap-3 border-2 border-slate-200 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50 hover:border-black transition-colors"
             >
               <img

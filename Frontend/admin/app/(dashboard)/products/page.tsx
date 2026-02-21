@@ -37,10 +37,13 @@ export default function ProductsPage() {
   const runSync = async () => {
     try {
       setSyncing(true);
-      const res = await fetch("http://localhost:4000/admin/infortisa/sync", {
-        method: "POST",
-        credentials: "include",
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
       if (!res.ok) {
         throw new Error("Sync failed");
       }
@@ -58,7 +61,7 @@ export default function ProductsPage() {
     try {
       setSyncing(true);
       const res = await fetch(
-        "http://localhost:4000/admin/infortisa/sync/full",
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync/full`,
         {
           method: "POST",
           credentials: "include",
@@ -79,7 +82,7 @@ export default function ProductsPage() {
     try {
       setSyncing(true);
       const res = await fetch(
-        "http://localhost:4000/admin/infortisa/sync/stock",
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync/stock`,
         {
           method: "POST",
           credentials: "include",

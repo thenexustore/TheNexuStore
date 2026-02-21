@@ -15,7 +15,7 @@ export class InfortisaSyncService {
     private products: ProductsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_YEAR)
+  @Cron('0 2 * * *')
   async fullSync() {
     try {
       this.logger.log('Starting full synchronization');
@@ -27,7 +27,7 @@ export class InfortisaSyncService {
     }
   }
 
-  @Cron(CronExpression.EVERY_YEAR)
+  @Cron('*/5 * * * *')
   async syncStockRealTime() {
     const startTime = Date.now();
 
@@ -59,7 +59,7 @@ export class InfortisaSyncService {
     }
   }
 
-  @Cron(CronExpression.EVERY_YEAR)
+  @Cron(CronExpression.EVERY_HOUR)
   async syncProductsIncremental() {
     const startTime = Date.now();
 

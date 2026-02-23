@@ -22,7 +22,12 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: true,
+    origin: [
+      'https://www.thenexustore.com',
+      'https://admin.thenexustore.com',
+      'https://nexus-store-vpq8.vercel.app',
+      'https://nexus-store-eight.vercel.app',
+    ],
     credentials: true,
   });
 

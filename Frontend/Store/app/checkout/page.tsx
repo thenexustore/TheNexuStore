@@ -22,9 +22,9 @@ export default function CheckoutPage() {
   const [hasRedirected, setHasRedirected] = useState(false);
 
   const [formData, setFormData] = useState({
-    email: user?.email || "",
+    email: "",
     shipping_address: {
-      full_name: user ? `${user.first_name} ${user.last_name}` : "",
+      full_name: "",
       address_line1: "",
       city: "",
       postal_code: "",
@@ -33,7 +33,7 @@ export default function CheckoutPage() {
       phone: "",
     },
     billing_address: {
-      full_name: user ? `${user.first_name} ${user.last_name}` : "",
+      full_name: "",
       address_line1: "",
       city: "",
       postal_code: "",
@@ -44,6 +44,41 @@ export default function CheckoutPage() {
     },
     notes: "",
   });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fullName =
+      user.address?.full_name ||
+      [user.firstName, user.lastName].filter(Boolean).join(" ");
+
+    setFormData((prev) => ({
+      ...prev,
+      email: user.email || "",
+
+      shipping_address: {
+        ...prev.shipping_address,
+        full_name: fullName || "",
+        address_line1: user.address?.address_line1 || "",
+        city: user.address?.city || "",
+        postal_code: user.address?.postal_code || "",
+        region: user.address?.region || "",
+        country: user.address?.country || "Spain",
+        phone: user.address?.phone || "",
+      },
+
+      billing_address: {
+        ...prev.billing_address,
+        full_name: fullName || "",
+        address_line1: user.address?.address_line1 || "",
+        city: user.address?.city || "",
+        postal_code: user.address?.postal_code || "",
+        region: user.address?.region || "",
+        country: user.address?.country || "Spain",
+        vat_id: user.address?.vat_id || "",
+      },
+    }));
+  }, [user]);
 
   useEffect(() => {
     if (cartLoading || hasRedirected) return;

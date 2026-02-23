@@ -9,15 +9,27 @@ import React, {
 } from "react";
 import { getMe, logoutUser } from "../lib/auth";
 
+interface Address {
+  full_name?: string;
+  address_line1?: string;
+  city?: string;
+  postal_code?: string;
+  region?: string;
+  country?: string;
+  phone?: string;
+  vat_id?: string | null;
+}
+
 interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   name?: string;
   profile_image?: string;
   phone?: string;
   role: string;
+  address?: Address;
 }
 
 interface AuthContextType {

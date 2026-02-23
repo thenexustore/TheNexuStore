@@ -76,13 +76,12 @@ export default function Navbar() {
     return () => window.removeEventListener("cart-update", handleCartUpdate);
   }, []);
 
-  // Sync auth user with local state
   useEffect(() => {
     if (authUser) {
       setUser({
         id: authUser.id,
-        firstName: authUser.first_name,
-        lastName: authUser.last_name,
+        firstName: authUser.firstName,
+        lastName: authUser.lastName,
         email: authUser.email,
         profile_image: authUser.profile_image,
       });

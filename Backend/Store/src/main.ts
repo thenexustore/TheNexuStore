@@ -22,12 +22,22 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: [
-      'https://www.thenexustore.com',
-      'https://admin.thenexustore.com',
-      'https://nexus-store-vpq8.vercel.app',
-      'https://nexus-store-eight.vercel.app',
-    ],
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:4000',
+        'https://www.thenexustore.com',
+        'https://admin.thenexustore.com',
+        'https://nexus-store-vpq8.vercel.app',
+        'https://nexus-store-eight.vercel.app',
+      ];
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 

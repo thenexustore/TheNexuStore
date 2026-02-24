@@ -503,13 +503,67 @@ model Customer {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  addresses CustomerAddress[]
-  consents  CustomerConsent[]
-  carts     Cart[]
-  orders    Order[]
-  rmas      Rma[]
+  addresses  CustomerAddress[]
+  consents   CustomerConsent[]
+  carts      Cart[]
+  orders     Order[]
+  rmas       Rma[]
+  reviews    ProductReview[]
+  chatConversations ChatConversation[]
+  guestChatSession  GuestChatSession?
+}
 
-  reviews ProductReview[]
+enum ChatStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ChatSenderType {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+model ChatConversation {
+  id          String     @id @default(uuid())
+  customer_id String
+  status      ChatStatus @default(OPEN)
+  subject     String?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+
+  customer Customer      @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([customer_id])
+  @@index([status])
+}
+
+model ChatMessage {
+  id             String         @id @default(uuid())
+  conversation_id String
+  sender_type    ChatSenderType
+  sender_id      String?        // customer_id or staff_id
+  content        String         @db.Text
+  image_base64   String?        @db.Text
+  is_read        Boolean        @default(false)
+  created_at     DateTime       @default(now())
+
+  conversation ChatConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id])
+}
+
+model GuestChatSession {
+  id           String   @id @default(uuid())
+  session_ref  String   @unique
+  customer_id  String   @unique
+  created_at   DateTime @default(now())
+  customer     Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([session_ref])
 }
 
 model CustomerAddress {

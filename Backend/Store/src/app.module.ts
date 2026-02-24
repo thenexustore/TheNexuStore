@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { StaffAuthModule } from './auth/staff-auth/staff-auth.module';
 import { UserModule } from './user/user.module';
+import { ChatModule } from './chat/chat.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { InfortisaModule } from './infortisa/infortisa.module';
 
@@ -18,6 +19,7 @@ import { InfortisaModule } from './infortisa/infortisa.module';
     StaffAuthModule,
     InfortisaModule,
     UserModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

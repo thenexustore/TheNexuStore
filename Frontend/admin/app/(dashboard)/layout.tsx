@@ -12,6 +12,7 @@ import {
   X,
   ChevronDown,
   LayoutTemplate,
+  MessageCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Products", href: "/products", icon: Package },
   { name: "Orders", href: "/orders", icon: ShoppingCart },
+  { name: "Chat", href: "/chat", icon: MessageCircle },
   {
     name: "Home Content",
     icon: LayoutTemplate,

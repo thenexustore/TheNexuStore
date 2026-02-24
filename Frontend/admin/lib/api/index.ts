@@ -36,3 +36,14 @@ export {
   type UpdateFeaturedProductDto,
   type ProductOption,
 } from "./featured-products";
+
+export {
+  fetchConversations,
+  fetchConversation,
+  sendAdminMessage,
+  updateConversationStatus,
+  type ChatConversation,
+  type ChatMessage,
+  type ChatStatus,
+  type ConversationsResponse,
+} from "./chat";

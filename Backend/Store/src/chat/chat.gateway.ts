@@ -21,7 +21,6 @@ interface AuthenticatedSocket {
 }
 
 @WebSocketGateway({
-  path: '/chat-ws',
   cors: {
     origin: [
       'http://localhost:3000',

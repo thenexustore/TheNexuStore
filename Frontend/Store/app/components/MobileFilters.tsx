@@ -21,7 +21,7 @@ export function MobileFilters({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg"
+        className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 lg:hidden"
       >
         <svg
           className="w-5 h-5"
@@ -45,7 +45,7 @@ export function MobileFilters({
             className="fixed inset-0 bg-black bg-opacity-50"
             onClick={() => setIsOpen(false)}
           />
-          <div className="fixed inset-y-0 right-0 w-full max-w-sm bg-white shadow-xl overflow-y-auto">
+          <div className="fixed inset-y-0 right-0 w-full max-w-sm overflow-y-auto bg-white shadow-xl">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold">Filters</h2>

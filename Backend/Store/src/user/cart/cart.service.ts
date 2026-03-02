@@ -222,6 +222,36 @@ export class CartService {
     };
   }
 
+
+  async validateCoupon(
+    couponCode: string,
+    customerId?: string,
+    sessionId?: string,
+  ): Promise<{ valid: boolean; discount_amount: number; message: string }> {
+    const cart = await this.getOrCreateCart(customerId, sessionId);
+
+    let subtotal = 0;
+    for (const item of cart.items) {
+      const price = await this.getCurrentPrice(item.sku.sku_code);
+      subtotal += price * item.qty;
+    }
+
+    const validation = await this.couponService.validateCoupon(couponCode, subtotal);
+    if (!validation.isValid || !validation.coupon) {
+      throw new BadRequestException(validation.error || 'Invalid coupon');
+    }
+
+    const discountAmount = this.couponService.calculateDiscount(
+      validation.coupon,
+      subtotal,
+    );
+
+    return {
+      valid: true,
+      discount_amount: discountAmount,
+      message: 'Coupon is valid',
+    };
+  }
   async applyCoupon(
     couponCode: string,
     customerId?: string,

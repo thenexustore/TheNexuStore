@@ -6,8 +6,10 @@ import * as bodyParser from 'body-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Logger } from '@nestjs/common';
+import { config as loadEnv } from 'dotenv';
 
 function validateEnvironment() {
+  loadEnv();
   const logger = new Logger('Bootstrap');
 
   if (!process.env.DATABASE_URL) {

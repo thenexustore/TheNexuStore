@@ -97,6 +97,9 @@ export class InfortisaService implements OnModuleInit {
         product.TITULO_FAMILIA ||
         product.CategoryName ||
         'Infortisa',
+      FamilyName: product.TITULO_FAMILIA || product.FamilyName || null,
+      SubfamilyName:
+        product.TITULOSUBFAMILIA || product.SubfamilyName || null,
 
       Cycle: product.Cycle || product.CICLOVIDA || 'P',
 
@@ -135,6 +138,8 @@ export class InfortisaService implements OnModuleInit {
 
       CANONLPI: product.CanonLPI || product.CANONLPI || 0,
       CICLOVIDA: product.Cycle || product.CICLOVIDA || 'P',
+      CodCicloVida:
+        product.CodCicloVida || product.CICLOVIDA || product.Cycle || 'P',
 
       ProductDescription: title,
       TITULO: title,

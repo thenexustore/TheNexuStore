@@ -1,4 +1,4 @@
-import { apiRequest, apiRequestWithSession } from "./api";
+import { apiRequestWithSession } from "./api";
 
 export interface CartItem {
   id: string;
@@ -17,6 +17,7 @@ export interface CartItem {
 
 export interface CartSummary {
   subtotal: number;
+  discount?: number;
   shipping: number;
   tax: number;
   total: number;
@@ -24,10 +25,18 @@ export interface CartSummary {
   currency: string;
 }
 
+export interface AppliedCoupon {
+  code: string;
+  type: "PERCENT" | "FIXED";
+  value: number;
+  discount_amount: number;
+}
+
 export interface CartResponse {
   id: string;
   items: CartItem[];
   summary: CartSummary;
+  applied_coupon?: AppliedCoupon;
 }
 
 export const getCart = async (sessionId?: string): Promise<CartResponse> => {
@@ -80,6 +89,32 @@ export const removeCartItem = async (
 export const clearCart = async (sessionId?: string): Promise<CartResponse> => {
   return apiRequestWithSession(
     "/cart/clear",
+    {
+      method: "DELETE",
+    },
+    sessionId,
+  );
+};
+
+export const applyCoupon = async (
+  couponCode: string,
+  sessionId?: string,
+): Promise<CartResponse> => {
+  return apiRequestWithSession(
+    "/cart/coupon/apply",
+    {
+      method: "POST",
+      body: JSON.stringify({ coupon_code: couponCode }),
+    },
+    sessionId,
+  );
+};
+
+export const removeCoupon = async (
+  sessionId?: string,
+): Promise<CartResponse> => {
+  return apiRequestWithSession(
+    "/cart/coupon",
     {
       method: "DELETE",
     },

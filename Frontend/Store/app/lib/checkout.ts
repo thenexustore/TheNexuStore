@@ -20,6 +20,7 @@ export interface CreateOrderData {
   shipping_address: ShippingAddress;
   billing_address: BillingAddress;
   notes?: string;
+  payment_method?: "REDSYS" | "COD" | "STRIPE" | "PAYPAL";
 }
 
 export interface OrderItem {
@@ -34,7 +35,12 @@ export interface OrderItem {
 export interface Order {
   id: string;
   order_number: string;
+  tracking_token?: string;
   status: string;
+  subtotal_amount: number;
+  shipping_amount: number;
+  discount_amount: number;
+  tax_amount: number;
   total_amount: number;
   currency: string;
   created_at: string;
@@ -58,11 +64,16 @@ export interface CreateOrderResponse {
 
 export const createOrder = async (
   orderData: CreateOrderData,
+  sessionId?: string,
 ): Promise<CreateOrderResponse> => {
-  return apiRequest("/checkout/create-order", {
-    method: "POST",
-    body: JSON.stringify(orderData),
-  });
+  return apiRequestWithSession(
+    "/checkout/create-order",
+    {
+      method: "POST",
+      body: JSON.stringify(orderData),
+    },
+    sessionId,
+  );
 };
 
 export const getOrder = async (orderId: string): Promise<Order> => {
@@ -71,6 +82,12 @@ export const getOrder = async (orderId: string): Promise<Order> => {
 
 export const getOrders = async (): Promise<Order[]> => {
   return apiRequest("/checkout/orders");
+};
+
+export const getOrderByTrackingToken = async (
+  token: string,
+): Promise<Order> => {
+  return apiRequest(`/checkout/track/${token}`);
 };
 
 export const createPaymentIntent = async (

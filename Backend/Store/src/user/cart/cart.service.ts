@@ -5,11 +5,15 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { UpdateCartItemDto, AddToCartDto } from './dto/cart.dto';
-import { CartItemDto, CartResponseDto } from './dto/cart-response.dto';
+import { CartItemDto, CartResponseDto, AppliedCouponDto } from './dto/cart-response.dto';
+import { CouponService, DiscountCalculation } from '../coupon/coupon.service';
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private couponService: CouponService,
+  ) {}
 
   private async getOrCreateCart(
     customerId?: string,
@@ -179,22 +183,69 @@ export class CartService {
       });
     }
 
+    let discount = 0;
+    let appliedCoupon: AppliedCouponDto | undefined;
+
+    const coupon = await this.couponService.getCartCoupon(cart.id);
+    if (coupon) {
+      const validation = await this.couponService.validateCoupon(coupon.code, subtotal);
+      if (validation.isValid && validation.coupon) {
+        discount = this.couponService.calculateDiscount(validation.coupon, subtotal);
+        appliedCoupon = {
+          code: coupon.code,
+          type: coupon.type,
+          value: Number(coupon.value),
+          discount_amount: discount,
+        };
+      } else {
+        await this.couponService.removeCouponFromCart(cart.id);
+      }
+    }
+
     const shipping = subtotal > 100 ? 0 : 9.99;
-    const tax = subtotal * 0.21;
-    const total = subtotal + shipping + tax;
+    const tax = (subtotal - discount) * 0.21;
+    const total = subtotal - discount + shipping + tax;
 
     return {
       id: cart.id,
       items,
       summary: {
         subtotal,
+        discount,
         shipping,
         tax,
         total,
         item_count: items.reduce((sum, item) => sum + item.quantity, 0),
         currency: cart.currency,
       },
+      applied_coupon: appliedCoupon,
     };
+  }
+
+  async applyCoupon(
+    couponCode: string,
+    customerId?: string,
+    sessionId?: string,
+  ): Promise<CartResponseDto> {
+    const cart = await this.getOrCreateCart(customerId, sessionId);
+    
+    let subtotal = 0;
+    for (const item of cart.items) {
+      const price = await this.getCurrentPrice(item.sku.sku_code);
+      subtotal += price * item.qty;
+    }
+
+    await this.couponService.applyCouponToCart(cart.id, couponCode, subtotal);
+    return this.getCart(customerId, sessionId);
+  }
+
+  async removeCoupon(
+    customerId?: string,
+    sessionId?: string,
+  ): Promise<CartResponseDto> {
+    const cart = await this.getOrCreateCart(customerId, sessionId);
+    await this.couponService.removeCouponFromCart(cart.id);
+    return this.getCart(customerId, sessionId);
   }
 
   async addToCart(dto: AddToCartDto, customerId?: string, sessionId?: string) {

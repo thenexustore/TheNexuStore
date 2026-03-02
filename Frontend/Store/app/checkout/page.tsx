@@ -15,7 +15,7 @@ const formatCurrency = (amount: number) => {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, getSessionId } = useAuth();
   const { cart, isLoading: cartLoading } = useCart();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -164,8 +164,10 @@ export default function CheckoutPage() {
         notes: formData.notes || undefined,
       };
 
-      const response = await createOrder(orderData);
-      router.push(`/order/${response.order.id}`);
+      const response = await createOrder(orderData, getSessionId());
+      const trackingToken =
+        response.order.tracking_token || response.order.id;
+      router.push(`/order/track/${trackingToken}`);
     } catch (error: any) {
       console.error("Checkout error:", error);
       setErrors({
@@ -464,6 +466,14 @@ export default function CheckoutPage() {
                     {formatCurrency(cart.summary.subtotal)}
                   </span>
                 </div>
+                {cart.summary.discount && cart.summary.discount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span className="text-gray-600">Discount</span>
+                    <span className="font-medium">
+                      -{formatCurrency(cart.summary.discount)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span className="font-medium">

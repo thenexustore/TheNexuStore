@@ -62,4 +62,8 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string = '';
+
+  @IsOptional()
+  @IsString()
+  payment_method?: 'REDSYS' | 'COD' | 'STRIPE' | 'PAYPAL' = 'REDSYS';
 }

@@ -12,7 +12,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
-import { AddToCartDto, UpdateCartItemDto, CartQueryDto } from './dto/cart.dto';
+import { AddToCartDto, UpdateCartItemDto, CartQueryDto, ApplyCouponDto } from './dto/cart.dto';
 import { AuthGuard } from '../../auth/auth.guard';
 import { PrismaService } from 'src/common/prisma.service';
 
@@ -94,6 +94,24 @@ export class CartController {
   @UseGuards(AuthGuard)
   async mergeCarts(@Request() req, @Body() body: { session_cart_id: string }) {
     return this.cartService.mergeCarts(body.session_cart_id, req.user.id);
+  }
+
+  @Post('coupon/apply')
+  async applyCoupon(
+    @Request() req,
+    @Body() dto: ApplyCouponDto,
+    @Query() query: CartQueryDto,
+  ) {
+    const customerId = req.user?.id;
+    const sessionId = query.session_id || req.headers['x-session-id'];
+    return this.cartService.applyCoupon(dto.coupon_code, customerId, sessionId);
+  }
+
+  @Delete('coupon')
+  async removeCoupon(@Request() req, @Query() query: CartQueryDto) {
+    const customerId = req.user?.id;
+    const sessionId = query.session_id || req.headers['x-session-id'];
+    return this.cartService.removeCoupon(customerId, sessionId);
   }
 
   @Get('debug/skus/:skuCode')

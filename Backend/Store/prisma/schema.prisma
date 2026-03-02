@@ -76,6 +76,7 @@ enum PaymentProvider {
   REDSYS
   STRIPE
   PAYPAL
+  COD
 }
 
 enum PaymentStatus {
@@ -603,9 +604,11 @@ model Cart {
   session_id  String?
   status      CartStatus @default(ACTIVE)
   currency    String     @default("EUR")
+  coupon_id   String?    @map("coupon_id")
   created_at  DateTime   @default(now())
   updated_at  DateTime   @updatedAt
   customer    Customer?  @relation(fields: [customer_id], references: [id])
+  coupon      Coupon?    @relation(fields: [coupon_id], references: [id])
   items       CartItem[]
 }
 
@@ -633,6 +636,7 @@ model CartItem {
 model Order {
   id                    String          @id @default(uuid())
   order_number          String          @unique
+  tracking_token        String          @unique
   customer_id           String?         @map("customer_id")
   email                 String          @db.Citext
   status                OrderStatus     @default(PENDING_PAYMENT)
@@ -844,8 +848,12 @@ model Coupon {
   starts_at        DateTime?
   ends_at          DateTime?
   usage_limit      Int?
+  usage_count      Int             @default(0)
   is_active        Boolean         @default(true)
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
   order_discounts  OrderDiscount[]
+  carts            Cart[]
 }
 
 model OrderDiscount {

@@ -12,8 +12,16 @@ export class CartItemDto {
   in_stock: boolean = false;
 }
 
+export class AppliedCouponDto {
+  code: string = '';
+  type: 'PERCENT' | 'FIXED' = 'PERCENT';
+  value: number = 0;
+  discount_amount: number = 0;
+}
+
 export class CartSummaryDto {
   subtotal: number = 0;
+  discount: number = 0;
   shipping: number = 0;
   tax: number = 0;
   total: number = 0;
@@ -25,4 +33,5 @@ export class CartResponseDto {
   id: string = '';
   items: CartItemDto[] = [];
   summary: CartSummaryDto = new CartSummaryDto();
+  applied_coupon?: AppliedCouponDto;
 }

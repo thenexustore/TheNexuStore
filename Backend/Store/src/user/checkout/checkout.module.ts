@@ -4,9 +4,11 @@ import { CheckoutService } from './checkout.service';
 import { CommonModule } from '../../common/common.module';
 import { CartModule } from '../cart/cart.module';
 import { AuthModule } from '../../auth/auth.module';
+import { CouponModule } from '../coupon/coupon.module';
+import { MailModule } from '../../auth/mail/mail.module';
 
 @Module({
-  imports: [CommonModule, CartModule, AuthModule],
+  imports: [CommonModule, CartModule, AuthModule, CouponModule, MailModule],
   controllers: [CheckoutController],
   providers: [CheckoutService],
   exports: [CheckoutService],

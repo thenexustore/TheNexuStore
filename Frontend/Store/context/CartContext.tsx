@@ -14,6 +14,8 @@ import {
   updateCartItem,
   removeCartItem,
   clearCart as clearBackendCart,
+  applyCoupon as applyCouponApi,
+  removeCoupon as removeCouponApi,
 } from "@/app/lib/cart";
 
 interface CartItem {
@@ -33,6 +35,7 @@ interface CartItem {
 
 interface CartSummary {
   subtotal: number;
+  discount?: number;
   shipping: number;
   tax: number;
   total: number;
@@ -40,10 +43,18 @@ interface CartSummary {
   currency: string;
 }
 
+interface AppliedCoupon {
+  code: string;
+  type: "PERCENT" | "FIXED";
+  value: number;
+  discount_amount: number;
+}
+
 interface Cart {
   id: string;
   items: CartItem[];
   summary: CartSummary;
+  applied_coupon?: AppliedCoupon | null;
 }
 
 interface CartContextType {
@@ -56,6 +67,8 @@ interface CartContextType {
   clearCart: () => Promise<void>;
   refreshCart: () => Promise<void>;
   syncLegacyCart: () => Promise<void>;
+  applyCoupon: (code: string) => Promise<void>;
+  removeCoupon: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -241,6 +254,28 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     await fetchCart();
   };
 
+  const applyCoupon = async (code: string) => {
+    try {
+      const sessionId = getSessionId();
+      if (!sessionId) return;
+      await applyCouponApi(code, sessionId);
+      await fetchCart();
+    } catch {
+      // swallow for now; UI will handle error via thrown message if needed
+    }
+  };
+
+  const removeCoupon = async () => {
+    try {
+      const sessionId = getSessionId();
+      if (!sessionId) return;
+      await removeCouponApi(sessionId);
+      await fetchCart();
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     if (user && cart?.id === "legacy-cart" && !hasSynced) {
       setHasSynced(true);
@@ -262,6 +297,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         clearCart,
         refreshCart: fetchCart,
         syncLegacyCart,
+        applyCoupon,
+        removeCoupon,
       }}
     >
       {children}

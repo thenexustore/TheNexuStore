@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../common/prisma.service';
 import { MailModule } from './mail/mail.module';
 import { GoogleStrategy } from './google-verfication/google.strategy';
+import { AuthGuard } from './auth.guard';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { GoogleStrategy } from './google-verfication/google.strategy';
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, GoogleStrategy],
-  exports: [JwtModule, AuthService],
+  providers: [AuthService, PrismaService, GoogleStrategy, AuthGuard],
+  exports: [JwtModule, AuthService, AuthGuard],
 })
 export class AuthModule {}

@@ -19,6 +19,13 @@ export { fetchOrders, type Order, type OrdersResponse } from "./orders";
 
 export { fetchDashboardStats, type DashboardStats } from "./dashboard";
 
+export {
+  fetchCoupons,
+  createCoupon,
+  type Coupon,
+  type CreateCouponInput,
+} from "./coupons";
+
 export { adminLogout } from "../utils";
 
 export {

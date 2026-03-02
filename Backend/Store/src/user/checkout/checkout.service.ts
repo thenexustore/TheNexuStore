@@ -6,15 +6,23 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CartService } from '../cart/cart.service';
+import { CouponService } from '../coupon/coupon.service';
 import { BillingAddressDto, CreateOrderDto, ShippingAddressDto } from './dto/checkout.dto';
 import { OrderResponseDto, PaymentIntentDto } from './dto/checkout-response.dto';
+import { PaymentProvider } from '@prisma/client';
+import { MailService } from '../../auth/mail/mail.service';
 
 @Injectable()
 export class CheckoutService {
   constructor(
     private prisma: PrismaService,
     private cartService: CartService,
+    private couponService: CouponService,
+    private mailService: MailService,
   ) {}
+
+  private readonly FRONTEND_URL =
+    process.env.FRONTEND_URL || 'http://localhost:3000';
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
@@ -87,10 +95,11 @@ export class CheckoutService {
   }
 
   async createOrder(
-    customerId: string,
+    customerId: string | undefined,
+    sessionId: string | undefined,
     dto: CreateOrderDto,
   ): Promise<OrderResponseDto> {
-    const cart = await this.cartService.getCart(customerId, undefined);
+    const cart = await this.cartService.getCart(customerId, sessionId);
 
     if (cart.items.length === 0) {
       throw new BadRequestException('Cart is empty');
@@ -104,31 +113,51 @@ export class CheckoutService {
     );
 
     const subtotal = cart.summary.subtotal;
-    const shippingAmount = 5.99;
-    const tax = (subtotal + shippingAmount) * 0.21;
-    const total = subtotal + shippingAmount + tax;
+    const discountAmount = cart.summary.discount || 0;
+    const shippingAmount = subtotal > 100 ? 0 : 5.99;
+    const taxableAmount = subtotal - discountAmount + shippingAmount;
+    const tax = taxableAmount * 0.21;
+    const total = taxableAmount + tax;
 
     const billingAddressJson = JSON.parse(JSON.stringify(dto.billing_address));
     const shippingAddressJson = JSON.parse(
       JSON.stringify(dto.shipping_address),
     );
 
+    const paymentMethod = dto.payment_method || 'REDSYS';
+
+    const trackingToken = await this.generateTrackingToken();
+
     const order = await this.prisma.order.create({
       data: {
         order_number: this.generateOrderNumber(),
+        tracking_token: trackingToken,
         customer_id: customerId,
         email: dto.email,
         status: 'PENDING_PAYMENT',
         currency: 'EUR',
         subtotal_amount: subtotal,
         shipping_amount: shippingAmount,
-        discount_amount: 0,
+        discount_amount: discountAmount,
         tax_amount: tax,
         total_amount: total,
         billing_address_json: billingAddressJson,
         shipping_address_json: shippingAddressJson,
       },
     });
+
+    if (cart.applied_coupon && discountAmount > 0) {
+      const coupon = await this.couponService.getCouponByCode(cart.applied_coupon.code);
+      if (coupon) {
+        await this.prisma.orderDiscount.create({
+          data: {
+            order_id: order.id,
+            coupon_id: coupon.id,
+            amount: discountAmount,
+          },
+        });
+      }
+    }
 
     const cartItems = await this.prisma.cartItem.findMany({
       where: { cart_id: cart.id },
@@ -164,10 +193,21 @@ export class CheckoutService {
 
     await this.prisma.cart.update({
       where: { id: cart.id },
-      data: { status: 'CONVERTED' },
+      data: { status: 'CONVERTED', coupon_id: null },
     });
 
-    const paymentIntent = await this.createPaymentIntent(order.id, total);
+    const paymentIntent = await this.createPaymentIntent(
+      order.id,
+      total,
+      paymentMethod as PaymentProvider,
+    );
+
+    const trackingUrl = `${this.FRONTEND_URL}/order/track/${order.tracking_token}`;
+    await this.mailService.sendOrderConfirmation(
+      dto.email,
+      order.order_number,
+      trackingUrl,
+    );
 
     return {
       order: {
@@ -185,27 +225,105 @@ export class CheckoutService {
   private async createPaymentIntent(
     orderId: string,
     amount: number,
+    provider: PaymentProvider = 'REDSYS',
   ): Promise<PaymentIntentDto> {
+    let status = 'requires_payment_method';
+    let paymentStatus: 'INITIATED' | 'AUTHORIZED' = 'INITIATED';
+
+    if (provider === 'COD') {
+      status = 'cod_pending';
+      paymentStatus = 'AUTHORIZED';
+    }
+
     const paymentIntent = {
-      id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      client_secret: `secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`,
+      id: `pi_${provider.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      client_secret: provider === 'COD' 
+        ? '' 
+        : `secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`,
       amount,
       currency: 'EUR',
-      status: 'requires_payment_method',
+      status,
+      provider,
     };
 
     await this.prisma.payment.create({
       data: {
         order_id: orderId,
-        provider: 'STRIPE',
-        status: 'INITIATED',
+        provider,
+        status: paymentStatus,
         amount,
         currency: 'EUR',
         provider_payment_id: paymentIntent.id,
       },
     });
 
+    if (provider === 'COD') {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'PROCESSING' },
+      });
+
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { discounts: true },
+      });
+
+      if (order && order.discounts.length > 0) {
+        for (const discount of order.discounts) {
+          await this.couponService.incrementUsage(discount.coupon_id);
+        }
+      }
+    }
+
     return paymentIntent;
+  }
+
+  private async generateTrackingToken(): Promise<string> {
+    // Simple random token; uniqueness enforced at DB level
+    return `trk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private serializeOrder(order: any) {
+    return {
+      id: order.id,
+      order_number: order.order_number,
+      tracking_token: order.tracking_token,
+      status: order.status,
+      subtotal_amount: Number(order.subtotal_amount),
+      shipping_amount: Number(order.shipping_amount),
+      discount_amount: Number(order.discount_amount),
+      tax_amount: Number(order.tax_amount),
+      total_amount: Number(order.total_amount),
+      currency: order.currency,
+      created_at: order.created_at,
+      shipping_address: order.shipping_address_json,
+      billing_address: order.billing_address_json,
+      items: order.items?.map((item: any) => ({
+        id: item.id,
+        title_snapshot: item.title_snapshot,
+        unit_price: Number(item.unit_price),
+        qty: item.qty,
+        line_total: Number(item.line_total),
+        sku_code: item.sku?.sku_code,
+      })),
+      payments: order.payments?.map((p: any) => ({
+        id: p.id,
+        provider: p.provider,
+        status: p.status,
+        amount: Number(p.amount),
+        currency: p.currency,
+        created_at: p.created_at,
+      })),
+      shipments: order.shipments?.map((s: any) => ({
+        id: s.id,
+        carrier: s.carrier,
+        tracking_number: s.tracking_number,
+        tracking_url: s.tracking_url,
+        status: s.status,
+        shipped_at: s.shipped_at,
+        delivered_at: s.delivered_at,
+      })),
+    };
   }
 
   async getOrder(orderId: string, customerId: string): Promise<any> {
@@ -234,7 +352,7 @@ export class CheckoutService {
       throw new ForbiddenException('You are not authorized to view this order');
     }
 
-    return order;
+    return this.serializeOrder(order);
   }
 
   async getCustomerOrders(customerId: string): Promise<any[]> {
@@ -256,6 +374,31 @@ export class CheckoutService {
       },
     });
 
-    return orders;
+    return orders.map((order) => this.serializeOrder(order));
+  }
+
+  async getOrderByTrackingToken(trackingToken: string): Promise<any> {
+    const order = await this.prisma.order.findUnique({
+      where: { tracking_token: trackingToken },
+      include: {
+        items: {
+          include: {
+            sku: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+        payments: true,
+        shipments: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return this.serializeOrder(order);
   }
 }

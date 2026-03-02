@@ -3,9 +3,18 @@ import { ProductsModule } from './products/products.module';
 import { UserFeaturedProductsModule } from './featured-products/featured-products.module';
 import { CartModule } from './cart/cart.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { PaymentModule } from './payment/payment.module';
+import { CouponModule } from './coupon/coupon.module';
 
 @Module({
-  imports: [ProductsModule, UserFeaturedProductsModule,CartModule,CheckoutModule],
+  imports: [
+    ProductsModule,
+    UserFeaturedProductsModule,
+    CartModule,
+    CheckoutModule,
+    PaymentModule,
+    CouponModule,
+  ],
   exports: [ProductsModule],
 })
 export class UserModule {}

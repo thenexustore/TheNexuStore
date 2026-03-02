@@ -1,140 +1,244 @@
 // app/(dashboard)/orders/page.tsx
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Search, Filter, Download, Eye, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { useEffect, useState } from "react";
+import { Search, Filter, Download, Eye, CheckCircle, XCircle, Clock } from "lucide-react";
+import { fetchOrders, type Order, type OrdersResponse } from "@/lib/api";
+import { toast } from "sonner";
 
-const orders = [
-  { id: 'ORD-1001', customer: 'John Doe', date: '2024-01-15', amount: '$299.99', status: 'Delivered', items: 2 },
-  { id: 'ORD-1002', customer: 'Jane Smith', date: '2024-01-14', amount: '$599.99', status: 'Processing', items: 3 },
-  { id: 'ORD-1003', customer: 'Bob Johnson', date: '2024-01-13', amount: '$199.99', status: 'Pending', items: 1 },
-  { id: 'ORD-1004', customer: 'Alice Brown', date: '2024-01-12', amount: '$899.99', status: 'Delivered', items: 4 },
-  { id: 'ORD-1005', customer: 'Charlie Wilson', date: '2024-01-11', amount: '$399.99', status: 'Cancelled', items: 2 },
-  { id: 'ORD-1006', customer: 'David Lee', date: '2024-01-10', amount: '$199.99', status: 'Delivered', items: 1 },
-]
+const statusColors: Record<string, string> = {
+  PENDING_PAYMENT: "bg-blue-100 text-blue-800",
+  PROCESSING: "bg-yellow-100 text-yellow-800",
+  PAID: "bg-green-100 text-green-800",
+  SHIPPED: "bg-purple-100 text-purple-800",
+  DELIVERED: "bg-emerald-100 text-emerald-800",
+  CANCELLED: "bg-red-100 text-red-800",
+  REFUNDED: "bg-zinc-100 text-zinc-800",
+  FAILED: "bg-red-100 text-red-800",
+};
 
-const statusColors = {
-  Delivered: 'bg-green-100 text-green-800',
-  Processing: 'bg-yellow-100 text-yellow-800',
-  Pending: 'bg-blue-100 text-blue-800',
-  Cancelled: 'bg-red-100 text-red-800',
-}
+const statusIcons: Record<string, any> = {
+  PENDING_PAYMENT: Clock,
+  PROCESSING: Clock,
+  PAID: CheckCircle,
+  SHIPPED: CheckCircle,
+  DELIVERED: CheckCircle,
+  CANCELLED: XCircle,
+  REFUNDED: XCircle,
+  FAILED: XCircle,
+};
 
-const statusIcons = {
-  Delivered: CheckCircle,
-  Processing: Clock,
-  Pending: Clock,
-  Cancelled: XCircle,
-}
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(
+    amount,
+  );
 
 export default function OrdersPage() {
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(search.toLowerCase()) ||
-                         order.customer.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const loadOrders = async (pageToLoad = 1) => {
+    try {
+      setLoading(true);
+      const data: OrdersResponse = await fetchOrders(
+        pageToLoad,
+        10,
+        statusFilter,
+        search,
+      );
+      setOrders(data.orders);
+      setPage(data.page);
+      setTotalPages(data.totalPages);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadOrders(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    loadOrders(newPage);
+  };
 
   return (
     <div>
       <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1">
+          <form onSubmit={handleSearchSubmit} className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by order ID or customer name..."
+              placeholder="Search by order number or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black/20 outline-none"
             />
-          </div>
-          
+          </form>
+
           <div className="flex items-center gap-4">
             <div className="flex items-center">
               <Filter className="w-5 h-5 text-gray-400 mr-2" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 focus:border-black/20 outline-none"
               >
                 <option value="all">All Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Processing">Processing</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Cancelled">Cancelled</option>
+                <option value="PENDING_PAYMENT">Pending payment</option>
+                <option value="PROCESSING">Processing</option>
+                <option value="PAID">Paid</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="REFUNDED">Refunded</option>
+                <option value="FAILED">Failed</option>
               </select>
             </div>
-            
-            <button className="flex items-center px-4 py-2 border rounded-lg hover:bg-gray-50">
-              <Download className="w-5 h-5 mr-2" />
-              Export
+
+            <button
+              type="button"
+              onClick={() => loadOrders(page)}
+              className="flex items-center px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Refresh
             </button>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredOrders.map((order) => {
-                const StatusIcon = statusIcons[order.status as keyof typeof statusIcons]
-                return (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-blue-600">{order.id}</span>
-                    </td>
-                    <td className="px-6 py-4">{order.customer}</td>
-                    <td className="px-6 py-4 text-gray-500">{order.date}</td>
-                    <td className="px-6 py-4 font-medium">{order.amount}</td>
-                    <td className="px-6 py-4">{order.items} item{order.items > 1 ? 's' : ''}</td>
-                    <td className="px-6 py-4">
-                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColors[order.status as keyof typeof statusColors]}`}>
-                        <StatusIcon className="w-4 h-4 mr-1" />
-                        {order.status}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button className="flex items-center text-blue-600 hover:text-blue-800">
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </button>
-                    </td>
+        {loading ? (
+          <div className="py-16 flex items-center justify-center text-sm text-gray-500">
+            Loading orders...
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="py-16 flex items-center justify-center text-sm text-gray-500">
+            No orders found.
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Order
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Customer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Actions
+                    </th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="px-6 py-4 border-t flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            Showing {filteredOrders.length} of {orders.length} orders
-          </div>
-          <div className="flex items-center space-x-2">
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">Previous</button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">1</button>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">2</button>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">3</button>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">Next</button>
-          </div>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {orders.map((order) => {
+                    const statusKey = order.status;
+                    const StatusIcon =
+                      statusIcons[statusKey] || Clock;
+                    const statusClass =
+                      statusColors[statusKey] ||
+                      "bg-zinc-100 text-zinc-700";
+
+                    return (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-medium text-blue-600">
+                              {order.orderNumber}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              #{order.id.slice(0, 8)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {order.customerName || "Guest"}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {order.customer}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-sm">
+                          {new Date(order.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 font-medium">
+                          {formatCurrency(Number(order.amount))}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}
+                          >
+                            <StatusIcon className="w-3 h-3 mr-1" />
+                            {order.status.replace("_", " ")}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button className="flex items-center text-blue-600 hover:text-blue-800 text-sm">
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-6 py-4 border-t flex items-center justify-between text-sm">
+              <div className="text-gray-500">
+                Page {page} of {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                  disabled={page <= 1}
+                  onClick={() => handlePageChange(page - 1)}
+                >
+                  Previous
+                </button>
+                <button
+                  className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                  disabled={page >= totalPages}
+                  onClick={() => handlePageChange(page + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
-  )
+  );
 }

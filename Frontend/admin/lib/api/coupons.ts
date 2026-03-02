@@ -26,6 +26,16 @@ export interface CreateCouponInput {
   usage_limit?: number;
 }
 
+export interface UpdateCouponInput {
+  type?: CouponType;
+  value?: number;
+  min_order_amount?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  usage_limit?: number | null;
+  is_active?: boolean;
+}
+
 export async function fetchCoupons(): Promise<Coupon[]> {
   return fetchWithAuth("/admin/coupons");
 }
@@ -37,3 +47,18 @@ export async function createCoupon(input: CreateCouponInput): Promise<Coupon> {
   });
 }
 
+export async function updateCoupon(
+  id: string,
+  input: UpdateCouponInput,
+): Promise<Coupon> {
+  return fetchWithAuth(`/admin/coupons/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function disableCoupon(id: string): Promise<Coupon> {
+  return fetchWithAuth(`/admin/coupons/${id}/disable`, {
+    method: "PATCH",
+  });
+}

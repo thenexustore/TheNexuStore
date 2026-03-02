@@ -9,7 +9,6 @@ import {
   Query,
   Request,
   UseGuards,
-  Optional,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { AddToCartDto, UpdateCartItemDto, CartQueryDto, ApplyCouponDto } from './dto/cart.dto';
@@ -94,6 +93,17 @@ export class CartController {
   @UseGuards(AuthGuard)
   async mergeCarts(@Request() req, @Body() body: { session_cart_id: string }) {
     return this.cartService.mergeCarts(body.session_cart_id, req.user.id);
+  }
+
+  @Post('coupon/validate')
+  async validateCoupon(
+    @Request() req,
+    @Body() dto: ApplyCouponDto,
+    @Query() query: CartQueryDto,
+  ) {
+    const customerId = req.user?.id;
+    const sessionId = query.session_id || req.headers['x-session-id'];
+    return this.cartService.validateCoupon(dto.coupon_code, customerId, sessionId);
   }
 
   @Post('coupon/apply')

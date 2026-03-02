@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Percent, Ticket, Loader2 } from "lucide-react";
-import { fetchCoupons, createCoupon, type Coupon } from "@/lib/api";
+import { Plus, Percent, Ticket, Loader2, Pencil } from "lucide-react";
+import {
+  fetchCoupons,
+  createCoupon,
+  updateCoupon,
+  disableCoupon,
+  type Coupon,
+} from "@/lib/api";
 import { toast } from "sonner";
 
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [savingCouponId, setSavingCouponId] = useState<string | null>(null);
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
 
   const [form, setForm] = useState({
     code: "",
@@ -16,6 +24,14 @@ export default function CouponsPage() {
     value: "",
     min_order_amount: "",
     usage_limit: "",
+  });
+
+  const [editForm, setEditForm] = useState({
+    type: "PERCENT" as "PERCENT" | "FIXED",
+    value: "",
+    min_order_amount: "",
+    usage_limit: "",
+    is_active: true,
   });
 
   const loadCoupons = async () => {
@@ -68,6 +84,61 @@ export default function CouponsPage() {
     }
   };
 
+  const openEditCoupon = (coupon: Coupon) => {
+    setEditingCoupon(coupon);
+    setEditForm({
+      type: coupon.type,
+      value: String(coupon.value),
+      min_order_amount:
+        coupon.min_order_amount === null || coupon.min_order_amount === undefined
+          ? ""
+          : String(coupon.min_order_amount),
+      usage_limit:
+        coupon.usage_limit === null || coupon.usage_limit === undefined
+          ? ""
+          : String(coupon.usage_limit),
+      is_active: coupon.is_active,
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoupon) return;
+
+    try {
+      setSavingCouponId(editingCoupon.id);
+      await updateCoupon(editingCoupon.id, {
+        type: editForm.type,
+        value: Number(editForm.value),
+        min_order_amount: editForm.min_order_amount
+          ? Number(editForm.min_order_amount)
+          : null,
+        usage_limit: editForm.usage_limit ? Number(editForm.usage_limit) : null,
+        is_active: editForm.is_active,
+      });
+      toast.success("Coupon updated");
+      setEditingCoupon(null);
+      await loadCoupons();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update coupon");
+    } finally {
+      setSavingCouponId(null);
+    }
+  };
+
+  const handleDisable = async (couponId: string) => {
+    try {
+      setSavingCouponId(couponId);
+      await disableCoupon(couponId);
+      toast.success("Coupon disabled");
+      await loadCoupons();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to disable coupon");
+    } finally {
+      setSavingCouponId(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -91,15 +162,11 @@ export default function CouponsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-600">
-                Code *
-              </label>
+              <label className="text-xs font-medium text-zinc-600">Code *</label>
               <input
                 type="text"
                 value={form.code}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, code: e.target.value }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 placeholder="SUMMER10"
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
               />
@@ -107,9 +174,7 @@ export default function CouponsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-600">
-                  Type *
-                </label>
+                <label className="text-xs font-medium text-zinc-600">Type *</label>
                 <select
                   value={form.type}
                   onChange={(e) =>
@@ -126,18 +191,14 @@ export default function CouponsPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-600">
-                  Value *
-                </label>
+                <label className="text-xs font-medium text-zinc-600">Value *</label>
                 <div className="relative">
                   <input
                     type="number"
                     min={0}
                     step="0.01"
                     value={form.value}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, value: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
                     className="w-full border rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
@@ -149,36 +210,27 @@ export default function CouponsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-600">
-                  Min order (€)
-                </label>
+                <label className="text-xs font-medium text-zinc-600">Min order (€)</label>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
                   value={form.min_order_amount}
                   onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      min_order_amount: e.target.value,
-                    }))
+                    setForm((f) => ({ ...f, min_order_amount: e.target.value }))
                   }
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-600">
-                  Usage limit
-                </label>
+                <label className="text-xs font-medium text-zinc-600">Usage limit</label>
                 <input
                   type="number"
                   min={1}
                   step={1}
                   value={form.usage_limit}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, usage_limit: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, usage_limit: e.target.value }))}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
                 />
               </div>
@@ -225,49 +277,28 @@ export default function CouponsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-zinc-50">
-                      <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                        Code
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                        Type
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                        Value
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                        Min Order
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                        Usage
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                        Active
-                      </th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Code</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Type</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Value</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Min Order</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Usage</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Active</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {coupons.map((c) => (
                       <tr key={c.id} className="border-b last:border-0">
-                        <td className="px-3 py-2 font-semibold">
-                          {c.code}
+                        <td className="px-3 py-2 font-semibold">{c.code}</td>
+                        <td className="px-3 py-2">{c.type === "PERCENT" ? "Percent" : "Fixed"}</td>
+                        <td className="px-3 py-2">
+                          {c.type === "PERCENT" ? `${c.value}%` : `${c.value.toFixed(2)} €`}
                         </td>
                         <td className="px-3 py-2">
-                          {c.type === "PERCENT" ? "Percent" : "Fixed"}
+                          {c.min_order_amount ? `${c.min_order_amount.toFixed(2)} €` : "—"}
                         </td>
                         <td className="px-3 py-2">
-                          {c.type === "PERCENT"
-                            ? `${c.value}%`
-                            : `${c.value.toFixed(2)} €`}
-                        </td>
-                        <td className="px-3 py-2">
-                          {c.min_order_amount
-                            ? `${c.min_order_amount.toFixed(2)} €`
-                            : "—"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {c.usage_limit
-                            ? `${c.usage_count}/${c.usage_limit}`
-                            : c.usage_count}
+                          {c.usage_limit ? `${c.usage_count}/${c.usage_limit}` : c.usage_count}
                         </td>
                         <td className="px-3 py-2">
                           <span
@@ -280,6 +311,26 @@ export default function CouponsPage() {
                             {c.is_active ? "Active" : "Inactive"}
                           </span>
                         </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditCoupon(c)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-zinc-50"
+                            >
+                              <Pencil className="w-3 h-3" />
+                              Edit
+                            </button>
+                            {c.is_active && (
+                              <button
+                                onClick={() => handleDisable(c.id)}
+                                disabled={savingCouponId === c.id}
+                                className="px-2 py-1 rounded border text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+                              >
+                                Disable
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -289,7 +340,100 @@ export default function CouponsPage() {
           </div>
         </div>
       </div>
+
+      {editingCoupon && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+          <form
+            onSubmit={handleSaveEdit}
+            className="w-full max-w-md bg-white rounded-xl border shadow-xl p-6 space-y-4"
+          >
+            <h3 className="text-lg font-semibold">Edit {editingCoupon.code}</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-zinc-600">Type</label>
+                <select
+                  value={editForm.type}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      type: e.target.value as "PERCENT" | "FIXED",
+                    }))
+                  }
+                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="PERCENT">Percent</option>
+                  <option value="FIXED">Fixed</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">Value</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editForm.value}
+                  onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
+                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-zinc-600">Min order (€)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editForm.min_order_amount}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, min_order_amount: e.target.value }))
+                  }
+                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">Usage limit</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={editForm.usage_limit}
+                  onChange={(e) => setEditForm((f) => ({ ...f, usage_limit: e.target.value }))}
+                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={editForm.is_active}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, is_active: e.target.checked }))
+                }
+              />
+              Active
+            </label>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingCoupon(null)}
+                className="px-3 py-2 border rounded-lg text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingCouponId === editingCoupon.id}
+                className="px-3 py-2 bg-black text-white rounded-lg text-sm disabled:opacity-60"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
-

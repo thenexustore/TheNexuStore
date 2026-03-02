@@ -138,8 +138,8 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-white text-black">
-      <div className="mb-6 text-sm text-gray-600">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
+      <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
         <Link href="/" className="hover:underline">
           Home
         </Link>
@@ -148,7 +148,7 @@ export default function ProductPage() {
           Products
         </Link>
         <span className="mx-2">/</span>
-        <span>{product.title}</span>
+        <span className="max-w-full break-words">{product.title}</span>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -224,9 +224,9 @@ export default function ProductPage() {
         </div>
 
         <div>
-          <h1 className="mb-2 text-3xl font-bold">{product.title}</h1>
+          <h1 className="mb-2 break-words text-2xl font-bold sm:text-3xl">{product.title}</h1>
 
-          <div className="mb-4 flex items-center gap-4">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center">
               <span className="text-2xl font-bold">
                 €{currentVariant.price.toFixed(2)}
@@ -312,8 +312,8 @@ export default function ProductPage() {
           )}
 
           <div className="mb-8">
-            <div className="mb-4 flex items-center gap-4">
-              <div className="flex items-center border border-gray-300 rounded">
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <div className="flex w-fit items-center rounded border border-gray-300">
                 <button
                   onClick={async () => {
                     if (!currentVariant) return;
@@ -370,7 +370,7 @@ export default function ProductPage() {
               <button
                 onClick={handleAddToCart}
                 disabled={isOutOfStock || addingToCart}
-                className={`flex-1 rounded px-6 py-3 font-medium transition-all ${
+                className={`w-full rounded px-6 py-3 font-medium transition-all sm:flex-1 ${
                   isOutOfStock || addingToCart
                     ? "cursor-not-allowed bg-gray-300 text-gray-500"
                     : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
@@ -425,12 +425,27 @@ export default function ProductPage() {
             <div className="mb-8">
               <h3 className="mb-4 text-xl font-semibold">Description</h3>
               <div
-                className="prose max-w-none"
+                className="prose max-w-none break-words"
                 dangerouslySetInnerHTML={{ __html: product.description_html }}
               />
             </div>
           )}
         </div>
+      </div>
+
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
+        <button
+          onClick={handleAddToCart}
+          disabled={isOutOfStock || addingToCart}
+          className={`w-full rounded-lg px-6 py-3 text-sm font-semibold transition-all ${
+            isOutOfStock || addingToCart
+              ? "cursor-not-allowed bg-gray-300 text-gray-500"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
+        >
+          {addingToCart ? "Adding..." : isOutOfStock ? "Out of Stock" : "Add to Cart"}
+        </button>
       </div>
 
       {relatedProducts.length > 0 && (

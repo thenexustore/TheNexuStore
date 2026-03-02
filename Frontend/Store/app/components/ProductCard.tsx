@@ -306,7 +306,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div
-      className={`group relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 ${
+      className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg ${
         isLoading ? "pointer-events-none" : ""
       } ${className}`}
     >
@@ -414,8 +414,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-lg font-bold text-gray-900 line-clamp-2 leading-tight">
+        <div className="space-y-3 min-w-0">
+          <h3 className="line-clamp-2 min-h-12 break-words text-base font-bold leading-tight text-gray-900 sm:text-lg">
             {product.title}
           </h3>
 
@@ -425,7 +425,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </p>
 
           {rating > 0 && reviewCount > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
               <div className="flex items-center">
                 <Star size={16} className="fill-amber-400 text-amber-400" />
                 <span className="ml-1 text-sm font-semibold">
@@ -439,18 +439,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-gray-900">
+          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-xl font-bold text-gray-900 sm:text-2xl">
               €{product.price.toFixed(2)}
             </span>
 
             {product.compare_at_price &&
               product.compare_at_price > product.price && (
                 <>
-                  <span className="text-lg text-gray-500 line-through">
+                  <span className="text-sm text-gray-500 line-through sm:text-base">
                     €{product.compare_at_price.toFixed(2)}
                   </span>
-                  <span className="text-sm font-semibold text-red-600">
+                  <span className="text-xs font-semibold text-red-600 sm:text-sm">
                     Save €
                     {(product.compare_at_price - product.price).toFixed(2)}
                   </span>
@@ -460,12 +460,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      <div className="px-4 pb-4 mt-2">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="mt-auto px-4 pb-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`flex-1 py-3 text-sm font-bold text-white rounded-lg transition-all duration-200 ${
+            className={`w-full py-3 text-xs font-bold text-white rounded-lg transition-all duration-200 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -503,7 +503,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full py-3 text-sm font-semibold text-white bg-gray-400 rounded-lg cursor-not-allowed"
+              className="w-full rounded-lg bg-gray-400 py-3 text-xs font-semibold text-white cursor-not-allowed sm:text-sm"
             >
               {t("outOfStock")}
             </button>
@@ -511,7 +511,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`w-full py-3 text-sm font-semibold text-white rounded-lg transition-colors duration-200 active:scale-95 ${
+              className={`w-full py-3 text-xs font-semibold text-white rounded-lg transition-colors duration-200 active:scale-95 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"

@@ -164,9 +164,14 @@ export default function Navbar() {
     }
   };
 
+  const closeMobilePanels = () => {
+    setSidebarOpen(false);
+    setShowSearchResults(false);
+  };
+
   const handleProductClick = (product: Product) => {
     router.push(`/products/${product.slug}`);
-    setShowSearchResults(false);
+    closeMobilePanels();
     setSearch("");
   };
 
@@ -183,7 +188,7 @@ export default function Navbar() {
 
   const handleCategoryClick = (categorySlug: string) => {
     router.push(`/products?categories=${categorySlug}`);
-    setSidebarOpen(false);
+    closeMobilePanels();
   };
 
   const handleLogout = async () => {
@@ -199,8 +204,8 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 h-20 w-full bg-white text-black border-b border-gray-200">
-        <div className="mx-auto flex h-full max-w-7xl items-center gap-4 px-4">
+      <header className="sticky top-0 z-50 min-h-20 w-full border-b border-gray-200 bg-white text-black">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
           <button
             onClick={() => setSidebarOpen(true)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -208,8 +213,8 @@ export default function Navbar() {
             <Menu size={24} />
           </button>
 
-          <Link href="/" className="flex-shrink-0">
-            <div className="h-10 w-32 rounded-lg flex items-center justify-center">
+          <Link href="/" className="min-w-0 flex-shrink-0">
+            <div className="flex h-10 w-24 items-center justify-center rounded-lg sm:w-32">
               <img src="/logo.png" alt="logo" />
             </div>
           </Link>
@@ -222,10 +227,10 @@ export default function Navbar() {
             {t("allCategories")}
           </button>
 
-          <div className="flex flex-1 justify-center px-4" ref={searchRef}>
+          <div className="order-3 w-full md:order-none md:flex-1 md:px-2" ref={searchRef}>
             <form
               onSubmit={handleSearchSubmit}
-              className="relative w-full max-w-xl"
+              className="relative w-full md:mx-auto md:max-w-xl"
             >
               <input
                 value={search}
@@ -366,32 +371,35 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="ml-auto flex items-center gap-1.5 shrink-0 sm:gap-2">
             <Link
               href="/chat"
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={closeMobilePanels}
+              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
               title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
             </Link>
             {!user ? (
-              <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-3 md:flex">
                 <Link
                   href="/login"
+                  onClick={closeMobilePanels}
                   className="text-sm font-medium text-gray-700 hover:text-[#0B123A] transition-colors"
                 >
                   {t("signIn")}
                 </Link>
                 <Link
                   href="/register"
+                  onClick={closeMobilePanels}
                   className="rounded-lg bg-[#0B123A] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a245a] transition-colors"
                 >
                   {t("signUp")}
                 </Link>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <Link href="/account">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Link href="/account" onClick={closeMobilePanels}>
                   {user.profile_image ? (
                     <img
                       src={user.profile_image}
@@ -415,7 +423,7 @@ export default function Navbar() {
             )}
 
             <button
-              className="relative h-10 w-10 rounded-full bg-cover bg-center flex items-center justify-center cursor-pointer overflow-hidden hover:opacity-90 transition-opacity"
+              className="relative hidden h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-cover bg-center transition-opacity hover:opacity-90 sm:flex"
               onClick={() => {
                 const nextLocale = locale === "en" ? "es" : "en";
                 router.replace(pathname, { locale: nextLocale });
@@ -428,12 +436,13 @@ export default function Navbar() {
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
-              <span className="relative z-10 text-white font-bold">{locale.toUpperCase()}</span>
+              <span className="relative z-10 text-xs font-bold text-white">{locale.toUpperCase()}</span>
             </button>
 
             <Link
               href="/cart"
-              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={closeMobilePanels}
+              className="relative rounded-lg p-2 transition-colors hover:bg-gray-100"
             >
               <ShoppingCart className="w-6 h-6 text-gray-700" />
               {displayCartCount > 0 && (
@@ -459,7 +468,7 @@ export default function Navbar() {
       />
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-80 bg-white shadow-xl transform transition-transform duration-300 ${
+        className={`fixed top-0 left-0 z-50 h-full w-[86vw] max-w-80 bg-white shadow-xl transform transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

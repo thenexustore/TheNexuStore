@@ -16,6 +16,10 @@ import {
   ProductReviewDto,
 } from './dto/product-response.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
+import {
+  generateDeterministicProductSlug,
+  normalizeSku,
+} from '../../infortisa/product-slug.util';
 
 @Injectable()
 export class ProductsService {
@@ -1016,7 +1020,7 @@ export class ProductsService {
   async upsertFromInfortisa(
     p: any,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const skuCode = String(p.SKU);
+    const skuCode = normalizeSku(p.SKU);
     const title = String(p.Name || 'Unknown Product');
     const price = Number(p.Price || 0);
     const stock = Number(p.Stock || 0);
@@ -1029,6 +1033,11 @@ export class ProductsService {
     const fullDesc = p.FullDescription || null;
 
     if (!skuCode || !title) {
+      return 'skipped';
+    }
+
+    const productSlug = generateDeterministicProductSlug(title, skuCode);
+    if (!productSlug) {
       return 'skipped';
     }
 
@@ -1083,8 +1092,6 @@ export class ProductsService {
     });
 
     if (!existingSku) {
-      const productSlug = p.slug || skuCode.toLowerCase();
-
       const product = await this.prisma.product.create({
         data: {
           title,
@@ -1148,6 +1155,7 @@ export class ProductsService {
         where: { id: existingSku.product_id },
         data: {
           title,
+          slug: productSlug,
           short_description: shortDesc,
           description_html: fullDesc,
           brand_id: brand.id,

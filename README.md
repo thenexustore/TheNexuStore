@@ -52,13 +52,15 @@ docs/               # Additional docs
 
 ### 1) Start infrastructure
 
-Use either command depending on your Docker setup:
-
 ```bash
-docker compose up -d
-# or
 docker-compose up -d
 ```
+
+Exposed services:
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+- RabbitMQ: `localhost:5672`
+- RabbitMQ UI: `http://localhost:15672`
 
 ### 2) Run backend
 
@@ -127,31 +129,6 @@ npm run lint
 npm run dev
 npm run build
 npm run start
-```
-
-## GitHub Sync (No-Conflict Workflow)
-
-Before opening a PR, keep your branch up to date with `main`:
-
-```bash
-git fetch origin
-git checkout main
-git pull origin main
-git checkout <your-branch>
-git rebase main
-```
-
-If there are conflicts, resolve them, then continue:
-
-```bash
-git add .
-git rebase --continue
-```
-
-Push your branch safely:
-
-```bash
-git push --force-with-lease
 ```
 
 ## Notes

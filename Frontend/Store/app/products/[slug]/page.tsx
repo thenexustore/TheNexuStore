@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import ProductCard from "../../components/ProductCard";
 import ReviewForm from "../../components/ReviewForm";
@@ -13,6 +15,7 @@ import { useCart } from "@/context/CartContext";
 export default function ProductPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const t = useTranslations("products");
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -115,12 +118,12 @@ export default function ProductPage() {
           <h2 className="text-xl font-semibold text-red-500">
             {error || "Product not found"}
           </h2>
-          <a
+          <Link
             href="/products"
             className="mt-4 inline-block text-blue-600 hover:underline"
           >
             Back to Products
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -137,13 +140,13 @@ export default function ProductPage() {
   return (
     <div className="container mx-auto px-4 py-8 bg-white text-black">
       <div className="mb-6 text-sm text-gray-600">
-        <a href="/" className="hover:underline">
+        <Link href="/" className="hover:underline">
           Home
-        </a>
+        </Link>
         <span className="mx-2">/</span>
-        <a href="/products" className="hover:underline">
+        <Link href="/products" className="hover:underline">
           Products
-        </a>
+        </Link>
         <span className="mx-2">/</span>
         <span>{product.title}</span>
       </div>

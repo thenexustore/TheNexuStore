@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import ProductCard from "../components/ProductCard";
 import { ProductFilters } from "../lib/products";
 import { useProductData } from "../hooks/useProductData";
@@ -13,6 +14,7 @@ import { MobileFilters } from "../components/MobileFilters";
 export default function ProductsPage() {
   const searchParams = useSearchParams();
   const { updateURL } = useURLSync();
+  const t = useTranslations("products");
 
   const initialFilters: ProductFilters = {
     page: parseInt(searchParams.get("page") || "1"),
@@ -66,9 +68,9 @@ export default function ProductsPage() {
   return (
     <div className="container mx-auto px-4 py-8 bg-white text-black">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">All Products</h1>
+        <h1 className="text-3xl font-bold">{t("all")}</h1>
         <p className="mt-2 text-gray-600">
-          {productsResponse?.total || 0} products found
+          {t("found", {count: productsResponse?.total || 0})}
         </p>
       </div>
 
@@ -94,16 +96,16 @@ export default function ProductsPage() {
                 />
               )}
               <span className="text-sm text-gray-600 hidden lg:inline">
-                Sort by:
+                {t("sortBy")}
               </span>
               <select
                 value={filters.sort_by}
                 onChange={(e) => handleSortChange(e.target.value)}
                 className="rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm outline-none text-black"
               >
-                <option value="newest">Newest</option>
-                <option value="name_a_to_z">Name: A to Z</option>
-                <option value="name_z_to_a">Name: Z to A</option>
+                <option value="newest">{t("newest")}</option>
+                <option value="name_a_to_z">{t("nameAZ")}</option>
+                <option value="name_z_to_a">{t("nameZA")}</option>
               </select>
             </div>
           </div>
@@ -114,9 +116,9 @@ export default function ProductsPage() {
             <ProductGridSkeleton />
           ) : productsResponse?.products.length === 0 ? (
             <div className="py-12 text-center">
-              <h3 className="text-xl font-semibold">No products found</h3>
+              <h3 className="text-xl font-semibold">{t("noProducts")}</h3>
               <p className="mt-2 text-gray-600">
-                Try adjusting your search or filters
+                {t("adjustFilters")}
               </p>
             </div>
           ) : (

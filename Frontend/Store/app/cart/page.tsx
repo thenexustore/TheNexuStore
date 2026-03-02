@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../providers/AuthProvider";
 
@@ -14,6 +15,7 @@ const formatCurrency = (amount: number) => {
 
 export default function CartPage() {
   const router = useRouter();
+  const t = useTranslations("cart");
   const { user } = useAuth();
   const {
     cart,
@@ -70,20 +72,20 @@ export default function CartPage() {
   };
 
   const handleClearCart = async () => {
-    if (confirm("Are you sure you want to clear your cart?")) {
+    if (confirm(t("confirmClear"))) {
       await clearCart();
     }
   };
 
   const handleSyncCart = async () => {
-    if (confirm("Sync your cart with your account to save items?")) {
+    if (confirm(t("confirmSync"))) {
       await syncLegacyCart();
     }
   };
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
-      setCouponError("Please enter a coupon code.");
+      setCouponError(t("couponRequired"));
       return;
     }
 
@@ -94,7 +96,7 @@ export default function CartPage() {
       setCouponCode("");
     } catch (error: any) {
       setCouponError(
-        error?.message || "Failed to apply coupon. Please try again.",
+        error?.message || t("couponApplyFailed"),
       );
     } finally {
       setIsApplyingCoupon(false);
@@ -108,7 +110,7 @@ export default function CartPage() {
       await removeCoupon();
     } catch (error: any) {
       setCouponError(
-        error?.message || "Failed to remove coupon. Please try again.",
+        error?.message || t("couponRemoveFailed"),
       );
     } finally {
       setIsApplyingCoupon(false);
@@ -155,16 +157,16 @@ export default function CartPage() {
             />
           </div>
           <h2 className="text-3xl font-bold text-black mb-3">
-            Your Cart is Empty
+            {t("emptyTitle")}
           </h2>
           <p className="text-gray-400 mb-10 text-lg">
-            Add some products to get started!
+            {t("emptyText")}
           </p>
           <button
             onClick={() => router.push("/products")}
             className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold cursor-pointer hover:bg-[#1a245a] active:scale-95 transition-all shadow-lg"
           >
-            Browse Products
+            {t("browse")}
           </button>
         </div>
       </div>
@@ -219,7 +221,7 @@ export default function CartPage() {
 
         <header className="mb-8">
           <h1 className="text-4xl font-black tracking-tighter">
-            SHOPPING CART
+            {t("title")}
           </h1>
           <p className="text-gray-500 mt-2">
             {cart.summary.item_count} item
@@ -265,7 +267,7 @@ export default function CartPage() {
                           {isOutOfStock && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                               <span className="text-white text-xs font-bold bg-red-500 px-2 py-1 rounded">
-                                Out of Stock
+                                {t("outOfStock")}
                               </span>
                             </div>
                           )}
@@ -343,13 +345,13 @@ export default function CartPage() {
 
                           {!item.in_stock && (
                             <p className="text-red-500 text-sm mt-2">
-                              This item is out of stock
+                              {t("itemOut")}
                             </p>
                           )}
 
                           {item.quantity > item.max_quantity && (
                             <p className="text-yellow-500 text-sm mt-2">
-                              Only {item.max_quantity} available
+                              {t("available", {count: item.max_quantity})}
                             </p>
                           )}
                         </div>
@@ -364,7 +366,7 @@ export default function CartPage() {
                   onClick={handleClearCart}
                   className="text-red-500 hover:text-red-700 font-medium text-sm"
                 >
-                  Clear All Items
+                  {t("clearAll")}
                 </button>
               </div>
             </div>
@@ -372,33 +374,33 @@ export default function CartPage() {
 
           <div className="lg:w-1/3">
             <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 sticky top-8">
-              <h2 className="text-xl font-bold mb-6">Order Summary</h2>
+              <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
+                  <span className="text-gray-600">{t("subtotal")}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.subtotal)}
                   </span>
                 </div>
                 {cart.summary.discount && cart.summary.discount > 0 && (
                   <div className="flex justify-between text-green-700">
-                    <span className="text-gray-600">Discount</span>
+                    <span className="text-gray-600">{t("discount")}</span>
                     <span className="font-medium">
                       -{formatCurrency(cart.summary.discount)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
+                  <span className="text-gray-600">{t("shipping")}</span>
                   <span className="font-medium">
                     {cart.summary.shipping === 0
-                      ? "FREE"
+                      ? t("free")
                       : formatCurrency(cart.summary.shipping)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
+                  <span className="text-gray-600">{t("tax")}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.tax)}
                   </span>
@@ -432,14 +434,14 @@ export default function CartPage() {
                 ) : (
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Coupon Code
+                      {t("coupon")}
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value)}
-                        placeholder="Enter coupon"
+                        placeholder={t("enterCoupon")}
                         className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
                       />
                       <button
@@ -447,7 +449,7 @@ export default function CartPage() {
                         disabled={isApplyingCoupon}
                         className="px-4 py-2 rounded-lg bg-[#0B123A] text-white text-sm font-semibold hover:bg-[#1a245a] disabled:opacity-50"
                       >
-                        {isApplyingCoupon ? "Applying..." : "Apply"}
+                        {isApplyingCoupon ? t("applying") : t("apply")}
                       </button>
                     </div>
                     {couponError && (
@@ -461,7 +463,7 @@ export default function CartPage() {
 
               <div className="border-t border-gray-300 pt-4 mb-6">
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
+                  <span>{t("total")}</span>
                   <span className="text-[#0B123A]">
                     {formatCurrency(cart.summary.total)}
                   </span>
@@ -478,14 +480,14 @@ export default function CartPage() {
                   onClick={() => router.push("/checkout")}
                   className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all"
                 >
-                  Proceed to Checkout
+                  {t("proceed")}
                 </button>
 
                 <button
                   onClick={() => router.push("/products")}
                   className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-xl font-medium hover:border-[#0B123A] hover:text-[#0B123A] transition-all"
                 >
-                  Continue Shopping
+                  {t("continue")}
                 </button>
               </div>
 

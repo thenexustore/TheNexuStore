@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { productAPI, Product } from "../lib/products";
 import { getCachedData } from "../lib/home-cache";
@@ -8,6 +9,7 @@ import { getCachedData } from "../lib/home-cache";
 export default function DealsSection() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const t = useTranslations("home");
 
   useEffect(() => {
     const load = async () => {
@@ -27,10 +29,10 @@ export default function DealsSection() {
 
   return (
     <HomeProductSection
-      title="Ofertas"
+      title={t("deals")}
       products={products}
       loading={loading}
-      emptyMessage="No hay ofertas activas en este momento."
+      emptyMessage={t("dealsEmpty")}
     />
   );
 }

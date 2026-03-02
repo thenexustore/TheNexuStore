@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Star } from "lucide-react";
 import { Product } from "../lib/products";
-import { useRouter } from "next/navigation";
 import { useCart } from "../../context/CartContext";
+import { useTranslations } from "next-intl";
 
 interface ProductCardProps {
   product: Product;
@@ -34,6 +34,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [buyNowLoading, setBuyNowLoading] = useState(false);
   const router = useRouter();
+  const t = useTranslations("products");
 
   const {
     addItem,
@@ -361,7 +362,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
               <span className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-bold text-white">
-                Out of Stock
+                {t("outOfStock")}
               </span>
             </div>
           )}
@@ -504,7 +505,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               disabled
               className="w-full py-3 text-sm font-semibold text-white bg-gray-400 rounded-lg cursor-not-allowed"
             >
-              Out of Stock
+              {t("outOfStock")}
             </button>
           ) : quantity === 0 ? (
             <button
@@ -516,7 +517,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
               }`}
             >
-              {cartLoading ? "Adding..." : "Add to Cart"}
+              {cartLoading ? "Adding..." : t("addToCart")}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">

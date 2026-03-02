@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { Menu, Search, ShoppingCart, X, MessageCircle } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
@@ -20,8 +20,7 @@ type User = {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
-  const [lang, setLang] = useState<"EN" | "ES">("EN");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -31,6 +30,9 @@ export default function Navbar() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -217,7 +219,7 @@ export default function Navbar() {
             className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Menu size={18} />
-            ALL CATEGORIES
+            {t("allCategories")}
           </button>
 
           <div className="flex flex-1 justify-center px-4" ref={searchRef}>
@@ -230,7 +232,7 @@ export default function Navbar() {
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => search.length >= 2 && setShowSearchResults(true)}
-                placeholder="Search products, brands, categories..."
+                placeholder={t("searchPlaceholder")}
                 className="w-full rounded-lg bg-gray-50 border border-gray-300 px-5 py-3 pr-12 text-sm outline-none focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/20 transition-all"
               />
               <button
@@ -246,14 +248,13 @@ export default function Navbar() {
                     {searchLoading ? (
                       <div className="p-4 text-center text-gray-500">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0B123A] mx-auto"></div>
-                        <p className="mt-2 text-sm">Searching...</p>
+                        <p className="mt-2 text-sm">{t("searching")}</p>
                       </div>
                     ) : searchResults.length > 0 ? (
                       <>
                         <div className="p-3 border-b border-gray-100 bg-gray-50 sticky top-0">
                           <p className="text-sm font-medium text-gray-700">
-                            {searchResults.length} product
-                            {searchResults.length !== 1 ? "s" : ""} found
+                            {t("productsFound", {count: searchResults.length})}
                           </p>
                         </div>
                         <div className="divide-y divide-gray-100">
@@ -317,7 +318,7 @@ export default function Navbar() {
                             }}
                             className="w-full text-center text-sm font-medium text-[#0B123A] hover:text-[#1a245a] py-2 flex items-center justify-center gap-2"
                           >
-                            View all search results
+                            {t("viewAllResults")}
                             <svg
                               className="w-4 h-4"
                               fill="none"
@@ -352,10 +353,10 @@ export default function Navbar() {
                           </svg>
                         </div>
                         <p className="text-gray-700 font-medium">
-                          No results found
+                          {t("noResults")}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
-                          Try different keywords
+                          {t("tryKeywords")}
                         </p>
                       </div>
                     ) : null}
@@ -369,7 +370,7 @@ export default function Navbar() {
             <Link
               href="/chat"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Support Chat"
+              title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
             </Link>
@@ -379,13 +380,13 @@ export default function Navbar() {
                   href="/login"
                   className="text-sm font-medium text-gray-700 hover:text-[#0B123A] transition-colors"
                 >
-                  Sign in
+                  {t("signIn")}
                 </Link>
                 <Link
                   href="/register"
                   className="rounded-lg bg-[#0B123A] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a245a] transition-colors"
                 >
-                  Sign up
+                  {t("signUp")}
                 </Link>
               </div>
             ) : (
@@ -408,23 +409,26 @@ export default function Navbar() {
                   onClick={handleLogout}
                   className="text-sm font-medium text-gray-700 hover:text-[#0B123A] transition-colors hidden md:block"
                 >
-                  Logout
+                  {t("logout")}
                 </button>
               </div>
             )}
 
             <button
               className="relative h-10 w-10 rounded-full bg-cover bg-center flex items-center justify-center cursor-pointer overflow-hidden hover:opacity-90 transition-opacity"
-              onClick={() => setLang(lang === "EN" ? "ES" : "EN")}
+              onClick={() => {
+                const nextLocale = locale === "en" ? "es" : "en";
+                router.replace(pathname, { locale: nextLocale });
+              }}
               style={{
                 backgroundImage:
-                  lang === "EN"
+                  locale === "en"
                     ? "url(https://flagcdn.com/w80/gb.png)"
                     : "url(https://flagcdn.com/w80/es.png)",
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
-              <span className="relative z-10 text-white font-bold">{lang}</span>
+              <span className="relative z-10 text-white font-bold">{locale.toUpperCase()}</span>
             </button>
 
             <Link
@@ -460,7 +464,7 @@ export default function Navbar() {
         }`}
       >
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold text-black">Categories</h2>
+          <h2 className="text-xl font-bold text-black">{t("categories")}</h2>
           <button
             onClick={() => setSidebarOpen(false)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
@@ -476,7 +480,7 @@ export default function Navbar() {
               type="text"
               value={categorySearch}
               onChange={(e) => setCategorySearch(e.target.value)}
-              placeholder="Search categories..."
+              placeholder={t("searchCategories")}
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
             />
           </div>
@@ -503,8 +507,8 @@ export default function Navbar() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 {categorySearch
-                  ? "No categories found"
-                  : "No categories available"}
+                  ? t("noCategoriesFound")
+                  : t("noCategoriesAvailable")}
               </div>
             )}
           </div>

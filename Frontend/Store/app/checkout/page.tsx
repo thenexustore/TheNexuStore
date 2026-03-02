@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { createOrder } from "../lib/checkout";
@@ -14,6 +15,7 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function CheckoutPage() {
+  const t = useTranslations("checkout");
   const router = useRouter();
   const { user, getSessionId } = useAuth();
   const { cart, isLoading: cartLoading } = useCart();
@@ -190,7 +192,7 @@ export default function CheckoutPage() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
+          <h2 className="text-2xl font-bold mb-4">{t("empty")}</h2>
           <button
             onClick={() => router.push("/products")}
             className="bg-[#0B123A] text-white px-6 py-3 rounded-lg hover:bg-[#1a245a]"
@@ -205,14 +207,14 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 text-black">
       <div className="container mx-auto px-4 max-w-6xl">
-        <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+        <h1 className="text-3xl font-bold mb-8">{t("title")}</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
-                  Contact Information
+                  {t("contact")}
                 </h2>
                 <div>
                   <label className="block text-sm font-medium mb-2">
@@ -234,7 +236,7 @@ export default function CheckoutPage() {
               </div>
 
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-semibold mb-6">Shipping Address</h2>
+                <h2 className="text-xl font-semibold mb-6">{t("shippingAddress")}</h2>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -427,7 +429,7 @@ export default function CheckoutPage() {
                 disabled={loading}
                 className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#1a245a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {loading ? "Processing..." : "Place Order"}
+                {loading ? t("processing") : t("placeOrder")}
               </button>
 
               {errors.submit && (

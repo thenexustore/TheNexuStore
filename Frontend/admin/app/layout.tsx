@@ -1,8 +1,6 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-
 
 export const metadata: Metadata = {
   title: "TheNexuStore Admin",

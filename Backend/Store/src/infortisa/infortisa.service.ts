@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
+import { generateDeterministicProductSlug } from './product-slug.util';
 
 @Injectable()
 export class InfortisaService implements OnModuleInit {
@@ -140,23 +141,10 @@ export class InfortisaService implements OnModuleInit {
 
       CODIGOINTERNO: sku,
 
-      slug: this.generateSlugFromTitle(title || 'unknown-product', sku || ''),
+      slug: generateDeterministicProductSlug(title || 'unknown-product', sku),
 
       _original: product,
     };
-  }
-
-  private generateSlugFromTitle(title: string, sku: string): string {
-    const baseSlug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-
-    if (baseSlug.length < 3) {
-      return sku.toLowerCase();
-    }
-
-    return baseSlug.substring(0, 200);
   }
 
   async getAllProducts(): Promise<any[]> {

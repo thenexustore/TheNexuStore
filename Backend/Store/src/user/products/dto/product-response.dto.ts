@@ -111,6 +111,10 @@ export class ProductsListResponseDto {
       name: string;
       slug: string;
       count: number;
+      parent_id?: string | null;
+      parent_name?: string | null;
+      parent_slug?: string | null;
+      display_name?: string;
     }>;
     brands: Array<{ id: string; name: string; slug: string; count: number }>;
     price_range: { min: number; max: number };

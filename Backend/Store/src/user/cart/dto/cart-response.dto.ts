@@ -19,14 +19,28 @@ export class AppliedCouponDto {
   discount_amount: number = 0;
 }
 
+export class CartTotalsMetaDto {
+  status: 'OK' | 'UNAVAILABLE' = 'OK';
+  zone_code: string = '';
+  tax_label: 'IVA' | 'VAT' | 'Taxes' = 'Taxes';
+  tax_mode: 'VAT' | 'OUTSIDE_VAT' = 'VAT';
+  tax_rate: number = 0;
+  customs_duty_rate: number = 0;
+  customs_duty_amount: number = 0;
+  message?: string;
+}
+
 export class CartSummaryDto {
   subtotal: number = 0;
   discount: number = 0;
   shipping: number = 0;
   tax: number = 0;
+  customs_duty: number = 0;
   total: number = 0;
   item_count: number = 0;
   currency: string = 'EUR';
+  checkout_available: boolean = true;
+  meta: CartTotalsMetaDto = new CartTotalsMetaDto();
 }
 
 export class CartResponseDto {

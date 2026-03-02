@@ -8,7 +8,7 @@ import { useCart } from "../../context/CartContext";
 import { createOrder } from "../lib/checkout";
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
   }).format(amount);
@@ -209,7 +209,7 @@ export default function CheckoutPage() {
       <div className="container mx-auto px-4 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">{t("title")}</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm p-6">
@@ -426,8 +426,8 @@ export default function CheckoutPage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#1a245a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                disabled={loading || cart.summary.checkout_available === false}
+                className="hidden w-full rounded-xl bg-[#0B123A] py-4 text-lg font-bold text-white transition-all hover:bg-[#1a245a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 md:block"
               >
                 {loading ? t("processing") : t("placeOrder")}
               </button>
@@ -446,10 +446,10 @@ export default function CheckoutPage() {
                 {cart.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between items-start"
+                    className="flex items-start justify-between gap-3"
                   >
                     <div className="flex-1">
-                      <p className="font-medium">{item.product_title}</p>
+                      <p className="font-medium break-words">{item.product_title}</p>
                       <p className="text-sm text-gray-500">
                         {t("qty")}: {item.quantity} × {formatCurrency(item.price)}
                       </p>
@@ -490,6 +490,14 @@ export default function CheckoutPage() {
                     {formatCurrency(cart.summary.tax)}
                   </span>
                 </div>
+                {(cart.summary.customs_duty || 0) > 0 && (
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-600 break-words">Customs duty</span>
+                    <span className="font-medium">
+                      {formatCurrency(cart.summary.customs_duty || 0)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-gray-300 pt-4">
@@ -508,6 +516,17 @@ export default function CheckoutPage() {
                 </p>
               </div>
 
+              {cart.summary.checkout_available === false && (
+                <p className="text-sm text-red-600 mb-3">
+                  Shipping not available for this destination. Contact support.
+                </p>
+              )}
+              {cart.summary.meta?.message && (
+                <p className="text-sm text-amber-700 mb-3">
+                  {cart.summary.meta.message}
+                </p>
+              )}
+
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
                   {t("secureNote")}
@@ -516,6 +535,17 @@ export default function CheckoutPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
+        <button
+          type="button"
+          onClick={() => (document.querySelector("form") as HTMLFormElement | null)?.requestSubmit()}
+          disabled={loading || cart.summary.checkout_available === false}
+          className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? t("processing") : t("placeOrder")}
+        </button>
       </div>
     </div>
   );

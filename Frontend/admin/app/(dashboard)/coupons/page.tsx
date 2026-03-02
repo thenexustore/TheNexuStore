@@ -172,7 +172,7 @@ export default function CouponsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-zinc-600">Type *</label>
                 <select
@@ -208,7 +208,7 @@ export default function CouponsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-zinc-600">Min order (€)</label>
                 <input
@@ -342,13 +342,13 @@ export default function CouponsPage() {
       </div>
 
       {editingCoupon && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/30 flex items-start sm:items-center justify-center p-4 z-50 overflow-y-auto">
           <form
             onSubmit={handleSaveEdit}
             className="w-full max-w-md bg-white rounded-xl border shadow-xl p-6 space-y-4"
           >
             <h3 className="text-lg font-semibold">Edit {editingCoupon.code}</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-zinc-600">Type</label>
                 <select
@@ -377,7 +377,7 @@ export default function CouponsPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-zinc-600">Min order (€)</label>
                 <input

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchDashboardStats } from "@/lib/api";
 import {
   ShoppingCart,
-  DollarSign,
+  Euro,
   Package,
   Users,
   AlertCircle,
@@ -68,8 +68,8 @@ export default function DashboardPage() {
     },
     {
       title: "Today's Revenue",
-      value: `₹${stats?.todayRevenue?.toLocaleString() || 0}`,
-      icon: DollarSign,
+      value: `€${stats?.todayRevenue?.toLocaleString("es-ES") || 0}`,
+      icon: Euro,
       color: "bg-green-500",
       change: "+8%",
     },
@@ -157,7 +157,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-slate-500">{order.customer}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-slate-900">₹{order.amount}</p>
+                <p className="font-bold text-slate-900">€{order.amount}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <Clock className="w-4 h-4 text-slate-400" />
                   <span className="text-sm text-slate-500">

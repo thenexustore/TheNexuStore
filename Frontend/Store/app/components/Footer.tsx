@@ -15,22 +15,10 @@ export default function Footer() {
   const t = useTranslations("footer");
 
   const socialLinks = [
-    {
-      Icon: FacebookIcon,
-      url: "https://www.facebook.com/people/Nexus-SP-Solutions/61574722507921/?locale=es_ES",
-    },
-    {
-      Icon: InstagramIcon,
-      url: "https://www.instagram.com/nexusspsolutions/",
-    },
-    {
-      Icon: LinkedInIcon,
-      url: "https://www.linkedin.com/company/nexus-sp-solutions/",
-    },
-    {
-      Icon: XIcon,
-      url: "https://x.com/nexusspsolution",
-    },
+    { Icon: FacebookIcon, url: "https://www.facebook.com/people/Nexus-SP-Solutions/61574722507921/?locale=es_ES" },
+    { Icon: InstagramIcon, url: "https://www.instagram.com/nexusspsolutions/" },
+    { Icon: LinkedInIcon, url: "https://www.linkedin.com/company/nexus-sp-solutions/" },
+    { Icon: XIcon, url: "https://x.com/nexusspsolution" }
   ];
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -89,60 +77,14 @@ export default function Footer() {
           <div className="md:justify-self-end w-full md:max-w-sm">
             <h3 className="text-lg font-semibold mb-4">{t("contact")}</h3>
             <div className="space-y-3 text-sm text-white/70">
-              <div
-                className="flex items-start gap-3 cursor-pointer group"
-                onClick={openLocationMap}
-              >
-                <LocationOnIcon
-                  sx={{ fontSize: 16 }}
-                  className="mt-0.5 shrink-0 group-hover:text-white transition"
-                />
-                <span className="group-hover:text-white transition">
-                  Paseo de las Palmeras, 3, Local B, 51001 Ceuta
-                </span>
-              </div>
-
-              <div
-                className="flex items-center gap-3 cursor-pointer group"
-                onClick={sendEmail}
-              >
-                <MailIcon
-                  sx={{ fontSize: 16 }}
-                  className="shrink-0 group-hover:text-white transition"
-                />
-                <span className="group-hover:text-white transition">
-                  administracion@nexusssolutions.com
-                </span>
-              </div>
-
-              <div
-                className="flex items-center gap-3 cursor-pointer group"
-                onClick={callPhone}
-              >
-                <PhoneIcon
-                  sx={{ fontSize: 16 }}
-                  className="shrink-0 group-hover:text-white transition"
-                />
-                <span className="group-hover:text-white transition">
-                  +34 656 806 899
-                </span>
-              </div>
+              <div className="flex items-start gap-3"><LocationOnIcon sx={{ fontSize: 16 }} /><span>Paseo de las Palmeras, 3, Local B, 51001 Ceuta</span></div>
+              <div className="flex items-center gap-3"><MailIcon sx={{ fontSize: 16 }} /><span>administracion@nexusssolutions.com</span></div>
+              <div className="flex items-center gap-3"><PhoneIcon sx={{ fontSize: 16 }} /><span>+34 656 806 899</span></div>
             </div>
-
-            <div className="flex gap-5 pt-5 text-white/80">
-              {socialLinks.map(({ Icon, url }, i) => (
-                <Icon
-                  key={i}
-                  sx={{ fontSize: 18 }}
-                  className="cursor-pointer hover:text-white transition"
-                  onClick={() => handleSocialClick(url)}
-                />
-              ))}
-            </div>
+            <div className="flex gap-5 pt-5 text-white/80">{socialLinks.map(({ Icon, url }, i) => <Icon key={i} sx={{ fontSize: 18 }} className="cursor-pointer hover:text-white transition" onClick={() => window.open(url, "_blank", "noopener,noreferrer")} />)}</div>
           </div>
         </div>
       </div>
-
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/60 text-center md:text-left">
           <p>

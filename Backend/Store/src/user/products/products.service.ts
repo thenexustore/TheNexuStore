@@ -20,6 +20,11 @@ import {
   generateDeterministicProductSlug,
   normalizeSku,
 } from '../../infortisa/product-slug.util';
+import {
+  getParentCategorySortOrder,
+  recommendParentCategory,
+  slugifyCategory,
+} from '../../infortisa/infortisa-category-mapping.util';
 
 @Injectable()
 export class ProductsService {
@@ -434,11 +439,19 @@ export class ProductsService {
               is_active: true,
             },
             include: {
+              parent: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  sort_order: true,
+                },
+              },
               _count: {
                 select: { products: { where: { product: where } } },
               },
             },
-            orderBy: { sort_order: 'asc' },
+            orderBy: [{ parent_id: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }],
           }),
           this.prisma.brand.findMany({
             where: {
@@ -463,6 +476,27 @@ export class ProductsService {
           }),
         ]);
 
+      const sortedCategories = categoriesResult
+        .slice()
+        .sort((a, b) => {
+          const aParentSort = a.parent?.sort_order ?? a.sort_order ?? 9999;
+          const bParentSort = b.parent?.sort_order ?? b.sort_order ?? 9999;
+          if (aParentSort !== bParentSort) return aParentSort - bParentSort;
+
+          const aParentName = a.parent?.name || a.name;
+          const bParentName = b.parent?.name || b.name;
+          const parentCmp = aParentName.localeCompare(bParentName, 'es', {
+            sensitivity: 'base',
+          });
+          if (parentCmp !== 0) return parentCmp;
+
+          const aSort = a.sort_order ?? 9999;
+          const bSort = b.sort_order ?? 9999;
+          if (aSort !== bSort) return aSort - bSort;
+
+          return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+        });
+
       const attributeFilters = await this.getAttributeFilters(where);
 
       const response: ProductsListResponseDto = {
@@ -472,11 +506,17 @@ export class ProductsService {
         limit,
         total_pages: Math.ceil(total / limit),
         filters: {
-          categories: categoriesResult.map((cat) => ({
+          categories: sortedCategories.map((cat) => ({
             id: cat.id,
             name: cat.name,
             slug: cat.slug,
             count: cat._count.products,
+            parent_id: cat.parent?.id || null,
+            parent_name: cat.parent?.name || null,
+            parent_slug: cat.parent?.slug || null,
+            display_name: cat.parent
+              ? `${cat.parent.name} > ${cat.name}`
+              : cat.name,
           })),
           brands: brandsResult.map((brand) => ({
             id: brand.id,
@@ -1165,25 +1205,65 @@ export class ProductsService {
       return 'skipped';
     }
 
-    const categoryName = p.CategoryName ? String(p.CategoryName) : 'Infortisa';
-    const categorySlug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const infortisaFamily = p.FamilyName
+      ? String(p.FamilyName)
+      : p.TITULO_FAMILIA
+        ? String(p.TITULO_FAMILIA)
+        : null;
+    const infortisaSubfamily = p.SubfamilyName
+      ? String(p.SubfamilyName)
+      : p.TITULOSUBFAMILIA
+        ? String(p.TITULOSUBFAMILIA)
+        : p.CategoryName
+          ? String(p.CategoryName)
+          : 'Infortisa';
 
-    let category = await this.prisma.category.findFirst({
-      where: { slug: categorySlug },
+    const recommendedParent = recommendParentCategory(
+      infortisaFamily,
+      infortisaSubfamily,
+    );
+
+    const parentCategorySlug = slugifyCategory(recommendedParent.label);
+    const parentCategorySortOrder = getParentCategorySortOrder(
+      recommendedParent.label,
+    );
+
+    const parentCategory = await this.prisma.category.upsert({
+      where: { slug: parentCategorySlug },
+      update: {
+        name: recommendedParent.label,
+        is_active: true,
+        sort_order: parentCategorySortOrder,
+      },
+      create: {
+        name: recommendedParent.label,
+        slug: parentCategorySlug,
+        is_active: true,
+        sort_order: parentCategorySortOrder,
+      },
     });
 
-    if (!category) {
-      category = await this.prisma.category.create({
-        data: {
-          name: categoryName,
-          slug: categorySlug,
-          is_active: true,
-          sort_order: 0,
-        },
-      });
-    }
+    const categoryName = infortisaSubfamily;
+    const childSlugPart = slugifyCategory(categoryName) || 'general';
+    const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
 
-    const brandSlug = brandName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const category = await this.prisma.category.upsert({
+      where: { slug: categorySlug },
+      update: {
+        parent_id: parentCategory.id,
+        name: categoryName,
+        is_active: true,
+      },
+      create: {
+        parent_id: parentCategory.id,
+        name: categoryName,
+        slug: categorySlug,
+        is_active: true,
+        sort_order: 0,
+      },
+    });
+
+    const brandSlug = slugifyCategory(brandName) || 'infortisa';
     let brand = await this.prisma.brand.findFirst({
       where: { slug: brandSlug },
     });

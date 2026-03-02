@@ -1,8 +1,8 @@
-import type { Metadata } from 'next';
 import StorePage from '../../store/page';
 
-export async function generateMetadata({params}:{params: Promise<{locale:string}>}): Promise<Metadata> {
-  const {locale} = await params;
+export async function generateMetadata({ params }: any) {
+  const { locale } = await params;
+
   return {
     alternates: {
       canonical: `/${locale}/store`,

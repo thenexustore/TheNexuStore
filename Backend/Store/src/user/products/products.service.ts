@@ -39,6 +39,130 @@ export class ProductsService {
     return 'IN_STOCK';
   }
 
+
+
+  async getDealsProducts(
+    limit: number = 48,
+    inStockOnly: boolean = true,
+  ): Promise<ProductListItemDto[]> {
+    try {
+      const products = await this.prisma.product.findMany({
+        where: {
+          status: 'ACTIVE',
+          skus: {
+            some: {
+              name: null,
+              prices: {
+                some: {
+                  compare_at_price: { not: null },
+                },
+              },
+              ...(inStockOnly
+                ? {
+                    inventory: {
+                      some: {
+                        qty_on_hand: { gt: 0 },
+                      },
+                    },
+                  }
+                : {}),
+            },
+          },
+        },
+        include: {
+          brand: true,
+          main_category: true,
+          media: {
+            where: { sku_id: null },
+            orderBy: { sort_order: 'asc' },
+            take: 1,
+          },
+          skus: {
+            where: {
+              name: null,
+              prices: {
+                some: {
+                  compare_at_price: { not: null },
+                },
+              },
+              ...(inStockOnly
+                ? {
+                    inventory: {
+                      some: {
+                        qty_on_hand: { gt: 0 },
+                      },
+                    },
+                  }
+                : {}),
+            },
+            include: {
+              prices: true,
+              inventory: true,
+            },
+            take: 1,
+          },
+        },
+      });
+
+      const dealsDraft: Array<ProductListItemDto | null> = products.map((product) => {
+        const defaultSku = product.skus[0];
+        const price = defaultSku?.prices?.[0];
+        const inventory = defaultSku?.inventory?.[0];
+
+        if (!price) return null;
+
+        const priceValue = Number(price.sale_price);
+        const compareAtPrice = price.compare_at_price
+          ? Number(price.compare_at_price)
+          : undefined;
+
+        if (!compareAtPrice || compareAtPrice <= priceValue) return null;
+
+        const discountPct = this.calculateDiscountPercentage(
+          priceValue,
+          compareAtPrice,
+        );
+
+        const stockQuantity = inventory?.qty_on_hand || 0;
+
+        return {
+          id: product.id,
+          title: product.title,
+          slug: product.slug,
+          brand_name: product.brand.name,
+          brand_slug: product.brand.slug,
+          category_name: product.main_category?.name || 'Uncategorized',
+          category_slug: product.main_category?.slug || 'uncategorized',
+          sku_code: defaultSku?.sku_code || 'N/A',
+          sku_id: defaultSku?.id || '',
+          price: priceValue,
+          compare_at_price: compareAtPrice,
+          discount_pct: discountPct,
+          discount_percentage: discountPct,
+          stock_quantity: stockQuantity,
+          stock_status: this.getStockStatus(stockQuantity),
+          short_description: product.short_description || undefined,
+          thumbnail: product.media[0]?.url || '',
+          rating_avg: product.rating_avg
+            ? Number(product.rating_avg)
+            : undefined,
+          rating_count: product.rating_count,
+          is_featured: product.main_category?.slug === 'featured',
+        };
+      });
+
+      const deals = dealsDraft
+        .filter((product): product is ProductListItemDto => product !== null)
+        .sort((a, b) => (b.discount_pct || 0) - (a.discount_pct || 0))
+        .slice(0, limit);
+
+      return deals;
+    } catch (error) {
+      console.error('Get deals products error:', error);
+      throw new BadRequestException('Failed to fetch deals products');
+    }
+  }
+
   async getProducts(dto: GetProductsDto): Promise<ProductsListResponseDto> {
     try {
       const {

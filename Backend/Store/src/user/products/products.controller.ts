@@ -11,6 +11,7 @@ import {
   HttpStatus,
   ParseIntPipe,
   DefaultValuePipe,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { GetProductsDto } from './dto/get-products.dto';
@@ -44,6 +45,16 @@ export class ProductsController {
     @Query('limit', new DefaultValuePipe(8), ParseIntPipe) limit: number,
   ) {
     return this.productsService.getFeaturedProducts(limit);
+  }
+
+
+  @Get('deals')
+  async getDealsProducts(
+    @Query('limit', new DefaultValuePipe(48), ParseIntPipe) limit: number,
+    @Query('in_stock_only', new DefaultValuePipe(true), ParseBoolPipe)
+    inStockOnly: boolean,
+  ) {
+    return this.productsService.getDealsProducts(limit, inStockOnly);
   }
 
   @Get(':id')

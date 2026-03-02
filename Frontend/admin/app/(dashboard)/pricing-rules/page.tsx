@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchBrands } from "../../lib/api/brands";
-import { fetchCategories } from "../../lib/api/categories";
+import { fetchBrands } from "@/lib/api/brands";
+import { fetchCategories } from "@/lib/api/categories";
 import {
   createPricingRule,
   fetchPricingRules,
@@ -10,7 +10,7 @@ import {
   togglePricingRuleStatus,
   updatePricingRule,
   type PricingRule,
-} from "../../lib/api/pricing-rules";
+} from "@/lib/api/pricing-rules";
 
 export default function PricingRulesPage() {
   const [rules, setRules] = useState<PricingRule[]>([]);

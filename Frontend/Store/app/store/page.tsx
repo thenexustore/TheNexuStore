@@ -1,16 +1,16 @@
 "use client";
 
 import StoreCarousel from "./StoreCarousel";
-import StoreExplore from "./StoreExplore";
 import FeaturedProducts from "./FeaturedProducts";
+import DealsSection from "./DealsSection";
 
 export default function StorePage() {
   return (
-    <main className="min-h-screen bg-white text-black">
-      <div className="space-y-12 p-8" style={{display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center'}}>
+    <main className="min-h-screen bg-slate-50 pb-10">
+      <div className="mx-auto flex w-full flex-col items-center gap-8">
         <StoreCarousel />
         <FeaturedProducts />
-        <StoreExplore />
+        <DealsSection />
       </div>
     </main>
   );

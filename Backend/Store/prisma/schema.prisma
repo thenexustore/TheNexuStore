@@ -184,6 +184,16 @@ enum TaxMode {
   OUTSIDE_VAT
 }
 
+enum HomepageSectionType {
+  HERO_BANNER_SLIDER
+  TOP_CATEGORIES_GRID
+  BEST_DEALS
+  NEW_ARRIVALS
+  FEATURED_PICKS
+  BRANDS_STRIP
+  TRUST_BAR
+}
+
 model Staff {
   id            String    @id @default(uuid())
   email         String    @unique @db.Citext
@@ -209,6 +219,20 @@ model Brand {
   updated_at    DateTime      @updatedAt
   products      Product[]
   pricing_rules PricingRule[]
+}
+
+model HomepageSection {
+  id         String              @id @default(uuid())
+  type       HomepageSectionType @unique
+  enabled    Boolean             @default(true)
+  position   Int
+  title      String?
+  config_json Json
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  @@index([enabled, position])
+  @@map("homepage_sections")
 }
 
 model Product {

@@ -31,6 +31,7 @@ const navigation = [
     children: [
       { name: "Banners", href: "/banners" },
       { name: "Featured Products", href: "/featured-products" },
+      { name: "Homepage Sections", href: "/homepage-sections" },
     ],
   },
 ];

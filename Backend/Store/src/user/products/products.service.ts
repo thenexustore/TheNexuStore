@@ -22,13 +22,109 @@ import {
 } from '../../infortisa/product-slug.util';
 import {
   getParentCategorySortOrder,
+  isKnownParentCategorySlug,
   recommendParentCategory,
   slugifyCategory,
 } from '../../infortisa/infortisa-category-mapping.util';
+import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
 
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
+
+  async getMenuTree() {
+    const [parents, children] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { is_active: true, parent_id: null },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          sort_order: true,
+        },
+        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.category.findMany({
+        where: {
+          is_active: true,
+          parent_id: { not: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          parent_id: true,
+          sort_order: true,
+          _count: {
+            select: {
+              products: true,
+            },
+          },
+        },
+        orderBy: [{ parent_id: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }],
+      }),
+    ]);
+
+    const parentById = new Map(parents.map((parent) => [parent.id, parent]));
+    const groups = parents.map((parent) => ({
+      parent_id: parent.id,
+      parent_name: parent.name,
+      parent_slug: parent.slug,
+      sort_order: parent.sort_order,
+      children: [] as Array<{
+        parent_id: string;
+        parent_name: string;
+        parent_slug: string;
+        child_id: string;
+        child_name: string;
+        child_slug: string;
+        sort_order: number;
+        product_count: number;
+      }>,
+    }));
+    const groupByParent = new Map(groups.map((group) => [group.parent_id, group]));
+
+    for (const child of children) {
+      if (!child.parent_id) continue;
+      const parent = parentById.get(child.parent_id);
+      const group = groupByParent.get(child.parent_id);
+      if (!parent || !group) continue;
+      group.children.push({
+        parent_id: parent.id,
+        parent_name: parent.name,
+        parent_slug: parent.slug,
+        child_id: child.id,
+        child_name: child.name,
+        child_slug: child.slug,
+        sort_order: child.sort_order,
+        product_count: child._count.products,
+      });
+    }
+
+    return {
+      parents: parents.map((parent) => ({
+        parent_id: parent.id,
+        parent_name: parent.name,
+        parent_slug: parent.slug,
+        sort_order: parent.sort_order,
+      })),
+      groups,
+      tree: groups.map((group) => ({
+        id: group.parent_id,
+        name: group.parent_name,
+        slug: group.parent_slug,
+        sort_order: group.sort_order,
+        children: group.children.map((child) => ({
+          id: child.child_id,
+          name: child.child_name,
+          slug: child.child_slug,
+          sort_order: child.sort_order,
+          product_count: child.product_count,
+        })),
+      })),
+    };
+  }
+
 
   private calculateDiscountPercentage(
     price: number,
@@ -1247,21 +1343,46 @@ export class ProductsService {
     const childSlugPart = slugifyCategory(categoryName) || 'general';
     const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
 
-    const category = await this.prisma.category.upsert({
+    const existingCategory = await this.prisma.category.findUnique({
       where: { slug: categorySlug },
-      update: {
-        parent_id: parentCategory.id,
-        name: categoryName,
-        is_active: true,
-      },
-      create: {
-        parent_id: parentCategory.id,
-        name: categoryName,
-        slug: categorySlug,
-        is_active: true,
-        sort_order: 0,
+      select: {
+        id: true,
+        parent_id: true,
+        parent_locked: true,
+        parent: {
+          select: {
+            slug: true,
+          },
+        },
       },
     });
+
+    const shouldReparent = shouldReparentImportedCategory({
+      isNewCategory: !existingCategory,
+      isParentLocked: Boolean(existingCategory?.parent_locked),
+      hasKnownCurrentParent: isKnownParentCategorySlug(existingCategory?.parent?.slug),
+      currentParentSlug: existingCategory?.parent?.slug,
+      recommendedParentSlug: parentCategory.slug,
+    });
+
+    const category = existingCategory
+      ? await this.prisma.category.update({
+          where: { slug: categorySlug },
+          data: {
+            parent_id: shouldReparent ? parentCategory.id : existingCategory.parent_id,
+            name: categoryName,
+            is_active: true,
+          },
+        })
+      : await this.prisma.category.create({
+          data: {
+            parent_id: parentCategory.id,
+            name: categoryName,
+            slug: categorySlug,
+            is_active: true,
+            sort_order: 0,
+          },
+        });
 
     const brandSlug = slugifyCategory(brandName) || 'infortisa';
     let brand = await this.prisma.brand.findFirst({

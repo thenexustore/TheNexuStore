@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  CategoryMenuTreeNode,
   HomepageOption,
   HomepageSection,
   homepageSectionsApi,
@@ -47,6 +48,82 @@ function supportsSource(type: string) {
   return MANUAL_TYPES.includes(type);
 }
 
+
+type PresetKey = "tv" | "gaming" | "laptops" | "networking" | "cctv";
+
+const PRESET_BUTTONS: Array<{ key: PresetKey; label: string; title: string; sortBy: "discount_desc" | "newest"; matcher: string[] }> = [
+  {
+    key: "tv",
+    label: "Add TV Section",
+    title: "TV",
+    sortBy: "discount_desc",
+    matcher: ["tv, audio y vídeo", "tv", "audio", "video", "television"],
+  },
+  {
+    key: "gaming",
+    label: "Add Gaming Section",
+    title: "Gaming",
+    sortBy: "discount_desc",
+    matcher: ["gaming", "consola", "juego", "game"],
+  },
+  {
+    key: "laptops",
+    label: "Add Laptops Section",
+    title: "Laptops",
+    sortBy: "newest",
+    matcher: ["portátil", "portatiles", "laptop", "notebook"],
+  },
+  {
+    key: "networking",
+    label: "Add Networking Section",
+    title: "Networking",
+    sortBy: "newest",
+    matcher: ["network", "redes", "router", "switch", "wifi"],
+  },
+  {
+    key: "cctv",
+    label: "Add CCTV Section",
+    title: "CCTV",
+    sortBy: "discount_desc",
+    matcher: ["cctv", "videovigilancia", "vigilancia", "seguridad", "camara", "cámara"],
+  },
+];
+
+function normalizeText(value?: string) {
+  return (value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function findPresetCategoryId(presetMatchers: string[], tree: CategoryMenuTreeNode[]): string | undefined {
+  if (!tree.length) return undefined;
+
+  const normalizedMatchers = presetMatchers.map(normalizeText);
+
+  const byExactParent = tree.find((parent) =>
+    normalizedMatchers.some((matcher) => normalizeText(parent.name) === matcher),
+  );
+  if (byExactParent) return byExactParent.id;
+
+  const byParentContains = tree.find((parent) => {
+    const parentName = normalizeText(parent.name);
+    return normalizedMatchers.some((matcher) => parentName.includes(matcher) || matcher.includes(parentName));
+  });
+  if (byParentContains) return byParentContains.id;
+
+  for (const parent of tree) {
+    const child = parent.children.find((node) => {
+      const name = normalizeText(node.name);
+      return normalizedMatchers.some((matcher) => name.includes(matcher) || matcher.includes(name));
+    });
+    if (child) return child.id;
+  }
+
+  return undefined;
+}
+
 export default function HomepageSectionsPage() {
   const [sections, setSections] = useState<HomepageSection[]>([]);
   const [search, setSearch] = useState<Record<string, string>>({});
@@ -55,6 +132,7 @@ export default function HomepageSectionsPage() {
     categories: HomepageOption[];
     brands: HomepageOption[];
   }>({ categories: [], brands: [] });
+  const [menuTree, setMenuTree] = useState<CategoryMenuTreeNode[]>([]);
   const [newType, setNewType] = useState("TOP_CATEGORIES_GRID");
 
   const sorted = useMemo(
@@ -74,11 +152,13 @@ export default function HomepageSectionsPage() {
     load();
     (async () => {
       try {
-        const [categories, brands] = await Promise.all([
+        const [categories, brands, menuTreeResponse] = await Promise.all([
           homepageSectionsApi.options("TOP_CATEGORIES_GRID", "", 100, "categories"),
           homepageSectionsApi.options("BRANDS_STRIP", "", 100, "brands"),
+          homepageSectionsApi.menuTree(),
         ]);
         setQueryCatalogs({ categories, brands });
+        setMenuTree(menuTreeResponse.tree || []);
       } catch {
         // silent
       }
@@ -133,6 +213,35 @@ export default function HomepageSectionsPage() {
       await load();
     } catch (e: any) {
       toast.error(e.message || "Create failed");
+    }
+  };
+
+  const createPresetSection = async (presetKey: PresetKey) => {
+    const preset = PRESET_BUTTONS.find((item) => item.key === presetKey);
+    if (!preset) return;
+
+    try {
+      const categoryId = findPresetCategoryId(preset.matcher, menuTree);
+      await homepageSectionsApi.create({
+        type: "FEATURED_PICKS",
+        position: sorted.length + 1,
+        enabled: true,
+        title: preset.title,
+        config_json: {
+          source: "query",
+          query: {
+            type: "products",
+            limit: 12,
+            inStockOnly: true,
+            sortBy: preset.sortBy,
+            ...(categoryId ? { categoryId } : {}),
+          },
+        },
+      });
+      toast.success(`${preset.title} section added`);
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || `Failed to create ${preset.title} preset`);
     }
   };
 
@@ -203,6 +312,21 @@ export default function HomepageSectionsPage() {
         <button onClick={create} className="px-3 py-2 rounded-lg bg-black text-white text-sm">
           Add Section
         </button>
+      </div>
+
+      <div className="rounded-xl border bg-white p-4">
+        <div className="text-sm font-medium text-slate-700 mb-3">Add Preset</div>
+        <div className="flex flex-wrap gap-2">
+          {PRESET_BUTTONS.map((preset) => (
+            <button
+              key={preset.key}
+              onClick={() => createPresetSection(preset.key)}
+              className="px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-sm hover:bg-slate-100"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {sorted.map((section, index) => {

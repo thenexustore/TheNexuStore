@@ -14,7 +14,8 @@
     "categories": "Categories",
     "searchCategories": "Search categories...",
     "noCategoriesFound": "No categories found",
-    "noCategoriesAvailable": "No categories available"
+    "noCategoriesAvailable": "No categories available",
+    "trending": "Trending"
   },
   "footer": {
     "title": "Be the first to know.",

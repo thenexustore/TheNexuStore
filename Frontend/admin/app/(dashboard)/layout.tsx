@@ -207,7 +207,7 @@ export default function DashboardLayout({
       </motion.aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden pt-16 lg:pt-0">
-        <div className="flex-1 overflow-y-auto p-8 bg-zinc-50">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-zinc-50">{children}</div>
       </main>
     </div>
   );

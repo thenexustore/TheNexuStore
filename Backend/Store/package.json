@@ -18,7 +18,11 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "infortisa:backfill-slugs": "ts-node scripts/backfill-infortisa-slugs.ts"
+    "infortisa:backfill-slugs": "ts-node scripts/backfill-infortisa-slugs.ts",
+    "prisma:generate": "prisma generate",
+    "prebuild": "npm run prisma:generate",
+    "prestart": "npm run prisma:generate",
+    "prestart:prod": "npm run prisma:generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

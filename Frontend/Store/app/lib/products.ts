@@ -1,7 +1,5 @@
 import { apiRequest } from "./api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
 export interface ProductFilters {
   page?: number;
   limit?: number;
@@ -31,6 +29,10 @@ export interface FilterOptions {
     name: string;
     slug: string;
     count: number;
+    parent_id?: string | null;
+    parent_name?: string | null;
+    parent_slug?: string | null;
+    display_name?: string;
   }>;
   brands: Array<{ id: string; name: string; slug: string; count: number }>;
   price_range: { min: number; max: number };
@@ -259,7 +261,7 @@ class ProductAPI {
     return apiRequest(endpoint);
   }
 
-  async createReview(productId: string, reviewData: ReviewData): Promise<any> {
+  async createReview(productId: string, reviewData: ReviewData): Promise<unknown> {
     return apiRequest(`/user/products/${productId}/reviews`, {
       method: "POST",
       body: JSON.stringify(reviewData),
@@ -270,7 +272,7 @@ class ProductAPI {
     try {
       const response = await apiRequest("/user/products?limit=1");
       if (response.filters && response.filters.categories) {
-        return response.filters.categories.map((cat: any) => ({
+        return response.filters.categories.map((cat: FilterOptions["categories"][number]) => ({
           id: cat.id,
           name: cat.name,
           slug: cat.slug,

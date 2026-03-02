@@ -3,6 +3,10 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma.service';
 import { InfortisaService } from './infortisa.service';
 import { ProductsService } from '../user/products/products.service';
+import {
+  extractInfortisaStock,
+  extractLifecycleCode,
+} from './infortisa-normalization.util';
 
 @Injectable()
 export class InfortisaSyncService {
@@ -70,7 +74,7 @@ export class InfortisaSyncService {
       const items = await this.infortisa.getModifiedProducts(lastSync);
 
       const activeItems = items.filter(
-        (p) => !['D', 'X'].includes(p.CodCicloVida),
+        (p) => !['D', 'X'].includes(extractLifecycleCode(p)),
       );
 
       const stats = await this.processProductsBatch(activeItems);
@@ -173,6 +177,8 @@ export class InfortisaSyncService {
         });
 
         if (warehouse) {
+          const { qtyOnHandForCatalog } = extractInfortisaStock(product);
+
           await this.prisma.inventoryLevel.upsert({
             where: {
               warehouse_id_sku_id: {
@@ -181,13 +187,13 @@ export class InfortisaSyncService {
               },
             },
             update: {
-              qty_on_hand: product.StockCentral || 0,
+              qty_on_hand: qtyOnHandForCatalog,
               updated_at: new Date(),
             },
             create: {
               warehouse_id: warehouse.id,
               sku_id: sku.id,
-              qty_on_hand: product.StockCentral || 0,
+              qty_on_hand: qtyOnHandForCatalog,
               qty_reserved: 0,
             },
           });

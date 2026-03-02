@@ -15,6 +15,26 @@ export interface HomepageOption {
   subtitle?: string;
 }
 
+export interface CategoryMenuTreeNode {
+  id: string;
+  name: string;
+  slug: string;
+  sort_order: number;
+  product_count?: number;
+  children: CategoryMenuTreeNode[];
+}
+
+export interface CategoryMenuTreeResponse {
+  parents: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    sort_order: number;
+    product_count?: number;
+  }>;
+  tree: CategoryMenuTreeNode[];
+}
+
 async function req(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem("admin_token");
   const res = await fetch(`${API_URL}${path}`, {
@@ -61,6 +81,7 @@ export const homepageSectionsApi = {
       method: "PUT",
       body: JSON.stringify({ items }),
     }),
+  menuTree: (): Promise<CategoryMenuTreeResponse> => req("/user/categories/menu-tree"),
   options: (
     type: string,
     q = "",

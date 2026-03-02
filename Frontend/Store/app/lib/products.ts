@@ -54,6 +54,40 @@ export interface Category {
   children?: Category[];
 }
 
+
+
+export interface MenuTreeParent {
+  parent_id: string;
+  parent_name: string;
+  parent_slug: string;
+  sort_order: number;
+}
+
+export interface MenuTreeChildItem {
+  parent_id: string;
+  parent_name: string;
+  parent_slug: string;
+  child_id: string;
+  child_name: string;
+  child_slug: string;
+  sort_order: number;
+  product_count?: number;
+}
+
+export interface MenuTreeGroup {
+  parent_id: string;
+  parent_name: string;
+  parent_slug: string;
+  sort_order: number;
+  children: MenuTreeChildItem[];
+}
+
+export interface MenuTreeResponse {
+  parents: MenuTreeParent[];
+  groups: MenuTreeGroup[];
+}
+
+
 export interface Product {
   id: string;
   title: string;
@@ -266,6 +300,10 @@ class ProductAPI {
       method: "POST",
       body: JSON.stringify(reviewData),
     });
+  }
+
+  async getMenuTree(): Promise<MenuTreeResponse> {
+    return apiRequest('/user/categories/menu-tree');
   }
 
   async getCategories(): Promise<Category[]> {

@@ -276,3 +276,16 @@ export function recommendParentCategory(
     label: scored[0].label,
   };
 }
+
+
+
+
+const KNOWN_PARENT_CATEGORY_SLUGS = new Set<string>([
+  ...MENU_PARENT_TAXONOMY.map((category) => slugifyCategory(category.label)),
+  slugifyCategory(DEFAULT_PARENT_CATEGORY.label),
+]);
+
+export function isKnownParentCategorySlug(slug: string | null | undefined): boolean {
+  if (!slug) return false;
+  return KNOWN_PARENT_CATEGORY_SLUGS.has(slug);
+}

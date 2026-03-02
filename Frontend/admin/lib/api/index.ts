@@ -57,3 +57,12 @@ export {
   type ChatStatus,
   type ConversationsResponse,
 } from "./chat";
+
+export {
+  fetchShippingZones,
+  updateShippingZones,
+  fetchTaxZones,
+  updateTaxZones,
+  type ShippingZone,
+  type TaxZone,
+} from './shipping-tax';

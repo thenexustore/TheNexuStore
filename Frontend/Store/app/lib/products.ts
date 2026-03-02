@@ -64,6 +64,7 @@ export interface Product {
   sku_id?: string;
   price: number;
   compare_at_price?: number;
+  discount_pct?: number;
   discount_percentage?: number;
   stock_quantity: number;
   stock_status: string;
@@ -168,6 +169,16 @@ class ProductAPI {
       params.toString() ? `?${params.toString()}` : ""
     }`;
     return apiRequest(endpoint); // Use apiRequest from single source
+  }
+
+  async getDealsProducts(
+    limit: number = 48,
+    inStockOnly: boolean = true,
+  ): Promise<Product[]> {
+    const data = await apiRequest(
+      `/user/products/deals?limit=${limit}&in_stock_only=${inStockOnly}`,
+    );
+    return data;
   }
 
   async getProductById(id: string): Promise<ProductDetail> {

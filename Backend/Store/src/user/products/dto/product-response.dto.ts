@@ -88,6 +88,7 @@ export class ProductListItemDto {
   sku_id!: string;
   price!: number;
   compare_at_price?: number;
+  discount_pct?: number;
   discount_percentage?: number;
   stock_quantity!: number;
   stock_status!: string;

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateCouponDto, UpdateCouponDto } from './dto/coupon.dto';
+import { CouponType } from '@prisma/client';
 
 @Injectable()
 export class CouponsService {
@@ -19,6 +20,7 @@ export class CouponsService {
 
   async create(dto: CreateCouponDto) {
     this.validateDateWindow(dto.starts_at, dto.ends_at);
+    this.validatePercentValue(dto.type, dto.value);
 
     try {
       return await this.prisma.coupon.create({
@@ -42,8 +44,13 @@ export class CouponsService {
   }
 
   async update(id: string, dto: UpdateCouponDto) {
-    await this.findById(id);
+    const existingCoupon = await this.findById(id);
     this.validateDateWindow(dto.starts_at ?? undefined, dto.ends_at ?? undefined);
+
+    this.validatePercentValue(
+      dto.type ?? existingCoupon.type,
+      dto.value ?? Number(existingCoupon.value),
+    );
 
     return this.prisma.coupon.update({
       where: { id },
@@ -88,6 +95,12 @@ export class CouponsService {
   private validateDateWindow(startsAt?: string | null, endsAt?: string | null) {
     if (startsAt && endsAt && new Date(startsAt) > new Date(endsAt)) {
       throw new BadRequestException('starts_at must be before ends_at');
+    }
+  }
+
+  private validatePercentValue(type: CouponType, value: number) {
+    if (type === CouponType.PERCENT && value > 100) {
+      throw new BadRequestException('Percentage coupons cannot exceed 100');
     }
   }
 }

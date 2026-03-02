@@ -1,72 +1,96 @@
-Nexus Store – Full Stack E-commerce Platform
+# The Nexu Store
 
-Nexus Store is a full-stack e-commerce platform built using modern web technologies.
-The project consists of a backend API, a customer-facing store, an admin panel, and supporting infrastructure services.
+Plataforma **e-commerce full stack** compuesta por:
 
-Tech Stack
+- API backend con NestJS.
+- Tienda pública (storefront) en Next.js.
+- Panel de administración en Next.js.
+- Servicios de infraestructura con Docker Compose (PostgreSQL, Redis y RabbitMQ).
 
-Backend
+## Stack tecnológico
 
+### Backend (`Backend/Store`)
 - NestJS
 - Prisma ORM
 - PostgreSQL
 - Redis
 - RabbitMQ
 
-Frontend
+### Frontend (`Frontend`)
+- **Store:** Next.js
+- **Admin:** Next.js
 
-- Store Frontend: Next.js
-- Admin Panel: Next.js
-
-Infrastructure
-
+### Infraestructura
 - Docker
 - Docker Compose
 
-Repository Structure
+## Estructura del repositorio
 
+```text
 Backend/
-Store – NestJS backend API
+  Store/           # API principal (NestJS)
 Frontend/
-Store – Customer-facing store (Next.js)
-Admin – Admin panel (Next.js)
-docker-compose.yml – Infrastructure services
-docs – Architecture and documentation
+  Store/           # Tienda pública (Next.js)
+  admin/           # Panel de administración (Next.js)
+docker-compose.yml # Servicios de infraestructura
+docs/              # Documentación adicional
+```
 
-Prerequisites
+## Prerrequisitos
 
-- Node.js (v18 or later)
+- Node.js 18+
+- npm
 - Docker
 - Docker Compose
 
-Setup Instructions
+## Puesta en marcha rápida
 
-1. Start Infrastructure Services
-   docker-compose up -d
+### 1) Levantar infraestructura
 
-2. Backend Setup
-   cd Backend/Store
-   npm install
-   npx prisma generate
-   npx prisma migrate deploy
-   npm run start:dev
+```bash
+docker-compose up -d
+```
 
-Backend URL: http://localhost:4000
+Servicios expuestos:
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+- RabbitMQ: `localhost:5672`
+- RabbitMQ UI: `http://localhost:15672`
 
-3. Store Frontend Setup
-   cd Frontend/Store
-   npm install
-   npm run dev
+### 2) Backend
 
-Store URL: http://localhost:3000
+```bash
+cd Backend/Store
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run start:dev
+```
 
-4. Admin Panel Setup
-   cd Frontend/admin
-   npm install
-   npm run dev
+API disponible en: `http://localhost:4000`
 
-Admin URL: http://localhost:3001
+### 3) Frontend Store
 
-Notes
-Docker is used only for infrastructure services.
-Backend and frontend applications run locally.
+```bash
+cd Frontend/Store
+npm install
+npm run dev
+```
+
+Store disponible en: `http://localhost:3000`
+
+### 4) Frontend Admin
+
+```bash
+cd Frontend/admin
+npm install
+PORT=3001 npm run dev
+```
+
+Admin disponible en: `http://localhost:3001`
+
+## Notas
+
+- Docker se usa para infraestructura compartida.
+- Backend y frontends se ejecutan localmente con Node.js.
+- Si no defines `PORT` en admin, Next.js usará el puerto por defecto (`3000`).

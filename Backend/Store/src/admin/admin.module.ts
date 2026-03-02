@@ -10,12 +10,14 @@ import { PrismaService } from '../common/prisma.service';
 import { BannersModule } from './banners/banners.module';
 import { FeaturedProductsModule } from './featured-products/featured-products.module';
 import { AuthModule } from '../auth/auth.module';
+import { CouponsModule } from './coupons/coupons.module';
 
 @Module({
   imports: [
     AuthModule,
     BannersModule,
     FeaturedProductsModule,
+    CouponsModule,
   ],
   controllers: [AdminController, DashboardController, ProductsController],
   providers: [

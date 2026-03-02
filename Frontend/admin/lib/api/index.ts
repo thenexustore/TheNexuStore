@@ -22,8 +22,11 @@ export { fetchDashboardStats, type DashboardStats } from "./dashboard";
 export {
   fetchCoupons,
   createCoupon,
+  updateCoupon,
+  disableCoupon,
   type Coupon,
   type CreateCouponInput,
+  type UpdateCouponInput,
 } from "./coupons";
 
 export { adminLogout } from "../utils";

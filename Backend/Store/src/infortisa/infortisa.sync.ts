@@ -9,6 +9,8 @@ export class InfortisaSyncService {
   private readonly logger = new Logger(InfortisaSyncService.name);
   private readonly BATCH_SIZE = 100;
 
+  private readonly emptyBatchStats = { created: 0, updated: 0, skipped: 0 };
+
   constructor(
     private prisma: PrismaService,
     private infortisa: InfortisaService,
@@ -71,13 +73,13 @@ export class InfortisaSyncService {
         (p) => !['D', 'X'].includes(p.CodCicloVida),
       );
 
-      await this.processProductsBatch(activeItems);
+      const stats = await this.processProductsBatch(activeItems);
       await this.setLastSync('product_incremental');
 
       const duration = Date.now() - startTime;
 
       this.logger.log(
-        `Product incremental sync: ${activeItems.length} items updated in ${duration}ms`,
+        `Product incremental sync: ${activeItems.length} items processed in ${duration}ms (created=${stats.created}, updated=${stats.updated}, skipped=${stats.skipped})`,
       );
     } catch (error: any) {
       this.logger.error('Product incremental sync failed', error.stack);
@@ -90,10 +92,14 @@ export class InfortisaSyncService {
     try {
       const allProducts = await this.infortisa.getAllProducts();
       const batchSize = 500;
+      const totals = { ...this.emptyBatchStats };
 
       for (let i = 0; i < allProducts.length; i += batchSize) {
         const batch = allProducts.slice(i, i + batchSize);
-        await this.processProductsBatch(batch);
+        const stats = await this.processProductsBatch(batch);
+        totals.created += stats.created;
+        totals.updated += stats.updated;
+        totals.skipped += stats.skipped;
 
         if (i + batchSize < allProducts.length) {
           await this.delay(1000);
@@ -103,7 +109,7 @@ export class InfortisaSyncService {
       await this.handleDiscontinuedProducts(allProducts);
 
       this.logger.log(
-        `Full catalog sync completed: ${allProducts.length} products`,
+        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped})`,
       );
     } catch (error: any) {
       this.logger.error('Full catalog sync failed', error.stack);
@@ -193,9 +199,12 @@ export class InfortisaSyncService {
   }
 
   private async processProductsBatch(products: any[]) {
+    const stats = { ...this.emptyBatchStats };
+
     for (const product of products) {
       try {
-        await this.products.upsertFromInfortisa(product);
+        const result = await this.products.upsertFromInfortisa(product);
+        stats[result] += 1;
       } catch (error: any) {
         this.logger.warn(
           `Failed to process product ${product.SKU}`,
@@ -203,6 +212,8 @@ export class InfortisaSyncService {
         );
       }
     }
+
+    return stats;
   }
 
   private async handleDiscontinuedProducts(allProducts: any[]) {

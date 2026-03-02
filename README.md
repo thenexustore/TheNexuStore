@@ -1,16 +1,11 @@
 # The Nexu Store
 
-The Nexu Store is a **full-stack e-commerce platform** with three main applications:
+A **full-stack e-commerce platform** composed of:
 
-- **Backend API** (`Backend/Store`) built with NestJS + Prisma
-- **Storefront** (`Frontend/Store`) built with Next.js
-- **Admin panel** (`Frontend/admin`) built with Next.js
-
-Infrastructure dependencies are provided through Docker Compose:
-
-- PostgreSQL
-- Redis
-- RabbitMQ (with Management UI)
+- A NestJS backend API.
+- A customer-facing store built with Next.js.
+- An admin panel built with Next.js.
+- Infrastructure services managed with Docker Compose (PostgreSQL, Redis, and RabbitMQ).
 
 ## Tech Stack
 
@@ -33,12 +28,12 @@ Infrastructure dependencies are provided through Docker Compose:
 
 ```text
 Backend/
-  Store/            # Main API (NestJS)
+  Store/           # Main API (NestJS)
 Frontend/
-  Store/            # Customer-facing storefront (Next.js)
-  admin/            # Admin panel (Next.js)
-docker-compose.yml  # Local infrastructure services
-docs/               # Additional docs
+  Store/           # Customer-facing store (Next.js)
+  admin/           # Admin panel (Next.js)
+docker-compose.yml # Infrastructure services
+docs/              # Additional documentation
 ```
 
 ## Prerequisites
@@ -62,7 +57,7 @@ Exposed services:
 - RabbitMQ: `localhost:5672`
 - RabbitMQ UI: `http://localhost:15672`
 
-### 2) Run backend
+### 2) Backend
 
 ```bash
 cd Backend/Store
@@ -72,9 +67,9 @@ npx prisma migrate deploy
 npm run start:dev
 ```
 
-Backend URL: `http://localhost:4000`
+API URL: `http://localhost:4000`
 
-### 3) Run storefront
+### 3) Store Frontend
 
 ```bash
 cd Frontend/Store
@@ -82,9 +77,9 @@ npm install
 npm run dev
 ```
 
-Storefront URL: `http://localhost:3000`
+Store URL: `http://localhost:3000`
 
-### 4) Run admin panel
+### 4) Admin Frontend
 
 ```bash
 cd Frontend/admin
@@ -94,45 +89,8 @@ PORT=3001 npm run dev
 
 Admin URL: `http://localhost:3001`
 
-## Local Services
-
-| Service | URL / Port | Notes |
-|---|---|---|
-| PostgreSQL | `localhost:5432` | DB: `nexustore`, user: `nexu` |
-| Redis | `localhost:6379` | Cache / queue support |
-| RabbitMQ | `localhost:5672` | AMQP |
-| RabbitMQ Management | `http://localhost:15672` | Web UI |
-
-## Useful Commands
-
-### Backend (`Backend/Store`)
-
-```bash
-npm run start:dev   # run in watch mode
-npm run test        # unit tests
-npm run test:e2e    # e2e tests
-npm run lint        # linting
-```
-
-### Storefront (`Frontend/Store`)
-
-```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
-```
-
-### Admin (`Frontend/admin`)
-
-```bash
-npm run dev
-npm run build
-npm run start
-```
-
 ## Notes
 
-- Docker is used for shared infrastructure only.
-- Application processes (backend/store/admin) run locally with Node.js.
-- If `PORT` is not set for the admin app, Next.js defaults to `3000`.
+- Docker is used for shared infrastructure services.
+- Backend and frontend apps run locally with Node.js.
+- If you do not set `PORT` for admin, Next.js uses the default port (`3000`).

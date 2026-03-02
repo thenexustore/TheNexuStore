@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsObject,
@@ -65,7 +66,7 @@ export class HomepageQueryConfigDto {
 
 export class HomepageSectionConfigDto {
   @IsOptional()
-  @IsString()
+  @IsIn(['manual', 'query'])
   source?: 'manual' | 'query';
 
   @IsOptional()
@@ -159,7 +160,7 @@ export class HomepageSectionOptionsQueryDto {
   q?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['products', 'categories', 'brands'])
   target?: 'products' | 'categories' | 'brands';
 
   @IsOptional()

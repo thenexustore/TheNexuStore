@@ -73,6 +73,35 @@ export class HomepageSectionsService {
     }
   }
 
+
+  private normalizeConfigBySectionType(
+    type: HomepageSectionType,
+    config: Record<string, any>,
+  ): Record<string, any> {
+    const next = { ...config };
+    if ((next.source || 'query') !== 'query') return next;
+
+    const query = { ...(next.query || {}) };
+
+    if (!query.type) {
+      if (type === HomepageSectionType.TOP_CATEGORIES_GRID) {
+        query.type = HomepageQueryType.CATEGORIES;
+      } else if (type === HomepageSectionType.BRANDS_STRIP) {
+        query.type = HomepageQueryType.BRANDS;
+      } else {
+        query.type = HomepageQueryType.PRODUCTS;
+      }
+    }
+
+    if (!query.limit && next.limit) {
+      query.limit = next.limit;
+    }
+
+    next.query = query;
+    next.source = 'query';
+    return next;
+  }
+
   private shouldBackfillLegacyConfig(
     type: HomepageSectionType,
     config: Record<string, any>,
@@ -364,14 +393,18 @@ export class HomepageSectionsService {
   }
 
   async create(dto: CreateHomepageSectionDto) {
-    this.validateConfig(dto.type, dto.config_json as Record<string, any>);
+    const normalizedConfig = this.normalizeConfigBySectionType(
+      dto.type,
+      dto.config_json as Record<string, any>,
+    );
+    this.validateConfig(dto.type, normalizedConfig);
     return this.prisma.homepageSection.create({
       data: {
         type: dto.type as any,
         enabled: dto.enabled ?? true,
         position: dto.position,
         title: dto.title,
-        config_json: dto.config_json as any,
+        config_json: normalizedConfig as any,
       },
     });
   }
@@ -380,10 +413,13 @@ export class HomepageSectionsService {
     const existing = await this.prisma.homepageSection.findUnique({ where: { id } });
     if (!existing) throw new BadRequestException('Section not found');
 
-    const mergedConfig = {
-      ...(existing.config_json as Record<string, any>),
-      ...(dto.config_json || {}),
-    };
+    const mergedConfig = this.normalizeConfigBySectionType(
+      existing.type as HomepageSectionType,
+      {
+        ...(existing.config_json as Record<string, any>),
+        ...(dto.config_json || {}),
+      },
+    );
     this.validateConfig(existing.type as HomepageSectionType, mergedConfig);
 
     return this.prisma.homepageSection.update({

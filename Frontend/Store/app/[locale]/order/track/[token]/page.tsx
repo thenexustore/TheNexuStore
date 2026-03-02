@@ -1,1 +1,1 @@
-export { default } from '../../../../order/track/[token]/page';
+export { default } from '@/app/order/track/[token]/page';

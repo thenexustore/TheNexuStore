@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { Product } from "../lib/products";
 import { getCachedData } from "../lib/home-cache";
@@ -26,6 +27,7 @@ interface FeaturedApiResponse {
 export default function FeaturedProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const t = useTranslations("home");
 
   useEffect(() => {
     const load = async () => {
@@ -79,10 +81,10 @@ export default function FeaturedProducts() {
 
   return (
     <HomeProductSection
-      title="Productos destacados"
+      title={t("featured")}
       products={products}
       loading={loading}
-      emptyMessage="No hay productos destacados activos."
+      emptyMessage={t("featuredEmpty")}
     />
   );
 }

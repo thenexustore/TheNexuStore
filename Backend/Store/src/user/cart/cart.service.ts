@@ -6,13 +6,15 @@ import {
 import { PrismaService } from '../../common/prisma.service';
 import { UpdateCartItemDto, AddToCartDto } from './dto/cart.dto';
 import { CartItemDto, CartResponseDto, AppliedCouponDto } from './dto/cart-response.dto';
-import { CouponService, DiscountCalculation } from '../coupon/coupon.service';
+import { CouponService } from '../coupon/coupon.service';
+import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
 
 @Injectable()
 export class CartService {
   constructor(
     private prisma: PrismaService,
     private couponService: CouponService,
+    private shippingTaxService: ShippingTaxService,
   ) {}
 
   private async getOrCreateCart(
@@ -152,9 +154,27 @@ export class CartService {
     );
   }
 
+  private buildDestinationOverride(destination?: { country?: string; region?: string; postal_code?: string }) {
+    return {
+      country: destination?.country || 'ES',
+      region: destination?.region || '',
+      postal_code: destination?.postal_code || '',
+    };
+  }
+
+  async getCartTotals(
+    customerId?: string,
+    sessionId?: string,
+    destination?: { country?: string; region?: string; postal_code?: string },
+  ) {
+    const cart = await this.getCart(customerId, sessionId, destination);
+    return cart.summary;
+  }
+
   async getCart(
     customerId?: string,
     sessionId?: string,
+    destination?: { country?: string; region?: string; postal_code?: string },
   ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(customerId, sessionId);
 
@@ -202,21 +222,36 @@ export class CartService {
       }
     }
 
-    const shipping = subtotal > 100 ? 0 : 9.99;
-    const tax = (subtotal - discount) * 0.21;
-    const total = subtotal - discount + shipping + tax;
+    const totals = await this.shippingTaxService.calculateTotals({
+      subtotalExclTax: subtotal,
+      discountExclTax: discount,
+      currency: cart.currency,
+      destination: this.buildDestinationOverride(destination),
+    });
 
     return {
       id: cart.id,
       items,
       summary: {
-        subtotal,
-        discount,
-        shipping,
-        tax,
-        total,
+        subtotal: totals.subtotal_excl_tax,
+        discount: totals.discount_excl_tax,
+        shipping: totals.shipping_excl_tax,
+        tax: totals.tax_amount,
+        customs_duty: totals.customs_duty_amount,
+        total: totals.total,
         item_count: items.reduce((sum, item) => sum + item.quantity, 0),
         currency: cart.currency,
+        checkout_available: totals.status === 'OK',
+        meta: {
+          status: totals.status,
+          zone_code: totals.zone_code,
+          tax_label: totals.tax_label,
+          tax_mode: totals.tax_mode,
+          tax_rate: totals.tax_rate,
+          customs_duty_rate: totals.customs_duty_rate,
+          customs_duty_amount: totals.customs_duty_amount,
+          message: totals.message,
+        },
       },
       applied_coupon: appliedCoupon,
     };

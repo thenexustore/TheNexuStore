@@ -179,6 +179,11 @@ enum StaffRole {
   WAREHOUSE
 }
 
+enum TaxMode {
+  VAT
+  OUTSIDE_VAT
+}
+
 model Staff {
   id            String    @id @default(uuid())
   email         String    @unique @db.Citext
@@ -610,6 +615,44 @@ model Cart {
   customer    Customer?  @relation(fields: [customer_id], references: [id])
   coupon      Coupon?    @relation(fields: [coupon_id], references: [id])
   items       CartItem[]
+}
+
+model ShippingZone {
+  code            String         @id
+  enabled         Boolean        @default(false)
+  description     String
+  country_codes   String[]
+  region_matchers String[]
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  rules           ShippingRule[]
+}
+
+model ShippingRule {
+  id                     String       @id @default(uuid())
+  zone_code              String
+  min_base_excl_tax      Decimal      @db.Decimal(12, 2)
+  max_base_excl_tax      Decimal?     @db.Decimal(12, 2)
+  shipping_base_excl_tax Decimal      @db.Decimal(12, 2)
+  currency               String       @default("EUR")
+  priority               Int          @default(0)
+  created_at             DateTime     @default(now())
+  updated_at             DateTime     @updatedAt
+  zone                   ShippingZone @relation(fields: [zone_code], references: [code], onDelete: Cascade)
+
+  @@index([zone_code, priority])
+  @@unique([zone_code, min_base_excl_tax, max_base_excl_tax, priority])
+}
+
+model TaxZone {
+  code          String   @id
+  enabled       Boolean  @default(false)
+  mode          TaxMode
+  standard_rate     Decimal  @db.Decimal(5, 4)
+  customs_duty_rate Decimal  @default(0) @db.Decimal(5, 4)
+  notes             String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 }
 
 model SyncLog {

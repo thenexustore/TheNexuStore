@@ -462,6 +462,14 @@ export default function CartPage() {
               </div>
 
               <div className="border-t border-gray-300 pt-4 mb-6">
+                {(cart.summary.customs_duty || 0) > 0 && (
+                  <div className="flex justify-between mb-2">
+                    <span className="text-gray-600">Customs duty</span>
+                    <span className="font-medium">
+                      {formatCurrency(cart.summary.customs_duty || 0)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t("total")}</span>
                   <span className="text-[#0B123A]">
@@ -469,18 +477,22 @@ export default function CartPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  {cart.summary.shipping === 0
-                    ? "Free shipping on orders over €100"
-                    : `Add €${Math.max(0, 100 - cart.summary.subtotal).toFixed(2)} for free shipping`}
+                  {cart.summary.meta?.message ||
+                    (cart.summary.shipping === 0
+                      ? "Free shipping applied"
+                      : "Shipping rates depend on destination")}
                 </p>
               </div>
 
               <div className="space-y-4">
                 <button
                   onClick={() => router.push("/checkout")}
-                  className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all"
+                  disabled={cart.summary.checkout_available === false}
+                  className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t("proceed")}
+                  {cart.summary.checkout_available === false
+                    ? "Shipping not available"
+                    : t("proceed")}
                 </button>
 
                 <button

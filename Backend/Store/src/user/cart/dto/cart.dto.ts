@@ -36,3 +36,18 @@ export class CartQueryDto {
   @IsString()
   session_id?: string;
 }
+
+
+export class CartTotalsQueryDto extends CartQueryDto {
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  region?: string;
+
+  @IsOptional()
+  @IsString()
+  postal_code?: string;
+}

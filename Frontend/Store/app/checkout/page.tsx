@@ -426,7 +426,7 @@ export default function CheckoutPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || cart.summary.checkout_available === false}
                 className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#1a245a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? t("processing") : t("placeOrder")}
@@ -485,11 +485,19 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
+                  <span className="text-gray-600">{cart.summary.meta?.tax_label || "Tax"}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.tax)}
                   </span>
                 </div>
+                {(cart.summary.customs_duty || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Customs duty</span>
+                    <span className="font-medium">
+                      {formatCurrency(cart.summary.customs_duty || 0)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-gray-300 pt-4">
@@ -500,13 +508,20 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  {cart.summary.shipping === 0
-                    ? "Free shipping applied"
-                    : `Add €${Math.max(0, 100 - cart.summary.subtotal).toFixed(
-                        2,
-                      )} for free shipping`}
+                  {cart.summary.meta?.message || "Shipping rates depend on destination"}
                 </p>
               </div>
+
+              {cart.summary.checkout_available === false && (
+                <p className="text-sm text-red-600 mb-3">
+                  Shipping not available for this destination. Contact support.
+                </p>
+              )}
+              {cart.summary.meta?.message && (
+                <p className="text-sm text-amber-700 mb-3">
+                  {cart.summary.meta.message}
+                </p>
+              )}
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-500">

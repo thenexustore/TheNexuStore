@@ -9,10 +9,30 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  Max,
   Min,
-  ValidateIf,
+  Validate,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+
+@ValidatorConstraint({ name: 'percentCouponValueMax', async: false })
+class PercentCouponValueMaxConstraint implements ValidatorConstraintInterface {
+  validate(value: number | undefined, args: ValidationArguments): boolean {
+    const dto = args.object as { type?: CouponType };
+
+    if (dto.type !== CouponType.PERCENT || value === undefined || value === null) {
+      return true;
+    }
+
+    return value <= 100;
+  }
+
+  defaultMessage(): string {
+    return 'value must not be greater than 100 for percent coupons';
+  }
+}
 
 export class CreateCouponDto {
   @IsString()
@@ -25,8 +45,7 @@ export class CreateCouponDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  @ValidateIf((dto: CreateCouponDto) => dto.type === CouponType.PERCENT)
-  @Max(100)
+  @Validate(PercentCouponValueMaxConstraint)
   value: number = 0;
 
   @IsOptional()
@@ -63,8 +82,7 @@ export class UpdateCouponDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  @ValidateIf((dto: UpdateCouponDto) => dto.type === CouponType.PERCENT)
-  @Max(100)
+  @Validate(PercentCouponValueMaxConstraint)
   value?: number;
 
   @IsOptional()

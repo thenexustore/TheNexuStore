@@ -2,9 +2,9 @@
 
 The Nexu Store is a **full-stack e-commerce platform** with three main applications:
 
-- **Backend API** (NestJS + Prisma)
-- **Storefront** (Next.js)
-- **Admin panel** (Next.js)
+- **Backend API** (`Backend/Store`) built with NestJS + Prisma
+- **Storefront** (`Frontend/Store`) built with Next.js
+- **Admin panel** (`Frontend/admin`) built with Next.js
 
 Infrastructure dependencies are provided through Docker Compose:
 
@@ -127,6 +127,31 @@ npm run lint
 npm run dev
 npm run build
 npm run start
+```
+
+## GitHub Sync (No-Conflict Workflow)
+
+Before opening a PR, keep your branch up to date with `main`:
+
+```bash
+git fetch origin
+git checkout main
+git pull origin main
+git checkout <your-branch>
+git rebase main
+```
+
+If there are conflicts, resolve them, then continue:
+
+```bash
+git add .
+git rebase --continue
+```
+
+Push your branch safely:
+
+```bash
+git push --force-with-lease
 ```
 
 ## Notes

@@ -374,8 +374,7 @@ export default function Navbar() {
           <div className="ml-auto flex items-center gap-1.5 shrink-0 sm:gap-2">
             <Link
               href="/chat"
-              onClick={closeMobilePanels}
-              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
@@ -423,7 +422,7 @@ export default function Navbar() {
             )}
 
             <button
-              className="relative hidden h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-cover bg-center transition-opacity hover:opacity-90 sm:flex"
+              className="relative h-10 w-10 rounded-full bg-cover bg-center flex items-center justify-center cursor-pointer overflow-hidden hover:opacity-90 transition-opacity"
               onClick={() => {
                 const nextLocale = locale === "en" ? "es" : "en";
                 router.replace(pathname, { locale: nextLocale });
@@ -436,7 +435,7 @@ export default function Navbar() {
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
-              <span className="relative z-10 text-xs font-bold text-white">{locale.toUpperCase()}</span>
+              <span className="relative z-10 text-white font-bold">{locale.toUpperCase()}</span>
             </button>
 
             <Link

@@ -150,8 +150,8 @@ export default function PricingRulesPage() {
         {previewData && <pre className="bg-gray-50 border rounded p-3 overflow-auto text-sm">{JSON.stringify(previewData, null, 2)}</pre>}
       </div>
 
-      <div className="border rounded overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="border rounded overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left p-3">Scope</th>
@@ -195,14 +195,14 @@ export default function PricingRulesPage() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6">
-          <div className="bg-white rounded w-full max-w-xl p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-white rounded w-full max-w-xl p-4 sm:p-6 space-y-4 my-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">{editing ? "Edit Rule" : "New Rule"}</h2>
               <button onClick={() => setOpen(false)} className="text-gray-600">✕</button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="space-y-1">
                 <div className="text-xs text-gray-600">Scope</div>
                 <select className="border rounded px-3 py-2 w-full" value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })}>

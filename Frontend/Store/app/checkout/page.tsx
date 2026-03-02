@@ -8,7 +8,7 @@ import { useCart } from "../../context/CartContext";
 import { createOrder } from "../lib/checkout";
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
   }).format(amount);

@@ -9,7 +9,6 @@ import { Logger } from '@nestjs/common';
 import { config as loadEnv } from 'dotenv';
 
 function validateEnvironment() {
-  loadEnv();
   const logger = new Logger('Bootstrap');
 
   if (!process.env.DATABASE_URL) {
@@ -30,6 +29,7 @@ function validateEnvironment() {
 }
 
 async function bootstrap() {
+  loadEnv();
   validateEnvironment();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));

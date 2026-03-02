@@ -6,6 +6,8 @@ import {
 } from './homepage-section.types';
 import {
   CreateHomepageSectionDto,
+  HomepageQuerySortBy,
+  HomepageQueryType,
   HomepageSectionOptionsQueryDto,
   ReorderHomepageSectionsDto,
   UpdateHomepageSectionDto,
@@ -27,35 +29,77 @@ export class HomepageSectionsService {
       throw new BadRequestException('config_json must be an object');
     }
 
-    const limit = config.limit;
-    if (
-      [
-        HomepageSectionType.TOP_CATEGORIES_GRID,
-        HomepageSectionType.BEST_DEALS,
-        HomepageSectionType.NEW_ARRIVALS,
-        HomepageSectionType.BRANDS_STRIP,
-        HomepageSectionType.FEATURED_PICKS,
-      ].includes(type) &&
-      limit !== undefined &&
-      (typeof limit !== 'number' || limit < 1 || limit > 24)
-    ) {
-      throw new BadRequestException('config_json.limit must be a number between 1 and 24');
+    const source = config.source || 'query';
+    if (!['manual', 'query'].includes(source)) {
+      throw new BadRequestException('config_json.source must be manual or query');
     }
 
-    if (
-      [HomepageSectionType.TOP_CATEGORIES_GRID, HomepageSectionType.BRANDS_STRIP, HomepageSectionType.FEATURED_PICKS].includes(type)
-    ) {
-      if (!['manual', 'query'].includes(config.source || 'query')) {
-        throw new BadRequestException('config_json.source must be manual or query');
-      }
-      if ((config.source || 'query') === 'manual' && !Array.isArray(config.ids)) {
-        throw new BadRequestException('manual source requires config_json.ids array');
+    const limit = config.limit ?? config?.query?.limit;
+    if (limit !== undefined && (typeof limit !== 'number' || limit < 1 || limit > 24)) {
+      throw new BadRequestException('limit must be a number between 1 and 24');
+    }
+
+    if (source === 'manual' && !Array.isArray(config.ids)) {
+      throw new BadRequestException('manual source requires config_json.ids array');
+    }
+
+    if (source === 'query') {
+      const query = config.query;
+      if (query && typeof query === 'object') {
+        if (![HomepageQueryType.PRODUCTS, HomepageQueryType.CATEGORIES, HomepageQueryType.BRANDS].includes(query.type)) {
+          throw new BadRequestException('query.type must be products, categories or brands');
+        }
+
+        if (query.type !== HomepageQueryType.PRODUCTS && (query.categoryId || query.brandId || query.priceMin !== undefined || query.priceMax !== undefined)) {
+          throw new BadRequestException('category/brand/price filters are valid only for products query');
+        }
+
+        if (query.sortBy && ![HomepageQuerySortBy.NEWEST, HomepageQuerySortBy.PRICE_ASC, HomepageQuerySortBy.PRICE_DESC, HomepageQuerySortBy.DISCOUNT_DESC].includes(query.sortBy)) {
+          throw new BadRequestException('Invalid query.sortBy');
+        }
+
+        if (
+          query.priceMin !== undefined &&
+          query.priceMax !== undefined &&
+          Number(query.priceMin) > Number(query.priceMax)
+        ) {
+          throw new BadRequestException('query.priceMin cannot be greater than query.priceMax');
+        }
       }
     }
 
     if (type === HomepageSectionType.TRUST_BAR && !Array.isArray(config.items)) {
       throw new BadRequestException('TRUST_BAR config_json.items must be an array');
     }
+  }
+
+
+  private normalizeConfigBySectionType(
+    type: HomepageSectionType,
+    config: Record<string, any>,
+  ): Record<string, any> {
+    const next = { ...config };
+    if ((next.source || 'query') !== 'query') return next;
+
+    const query = { ...(next.query || {}) };
+
+    if (!query.type) {
+      if (type === HomepageSectionType.TOP_CATEGORIES_GRID) {
+        query.type = HomepageQueryType.CATEGORIES;
+      } else if (type === HomepageSectionType.BRANDS_STRIP) {
+        query.type = HomepageQueryType.BRANDS;
+      } else {
+        query.type = HomepageQueryType.PRODUCTS;
+      }
+    }
+
+    if (!query.limit && next.limit) {
+      query.limit = next.limit;
+    }
+
+    next.query = query;
+    next.source = 'query';
+    return next;
   }
 
   private shouldBackfillLegacyConfig(
@@ -67,7 +111,14 @@ export class HomepageSectionsService {
     }
 
     if (type === HomepageSectionType.TOP_CATEGORIES_GRID || type === HomepageSectionType.BRANDS_STRIP) {
-      return !config.source;
+      return !config.source || !config.query;
+    }
+
+    if (
+      type === HomepageSectionType.BEST_DEALS ||
+      type === HomepageSectionType.NEW_ARRIVALS
+    ) {
+      return !config.query;
     }
 
     return false;
@@ -184,34 +235,82 @@ export class HomepageSectionsService {
       .filter(Boolean);
   }
 
+  private async executeProductsQuery(config: Record<string, any>, sectionType: HomepageSectionType) {
+    const query = config.query || {};
+    const categoryId = query.categoryId;
+    const brandId = query.brandId;
+
+    const [category, brand] = await Promise.all([
+      categoryId
+        ? this.prisma.category.findUnique({ where: { id: categoryId }, select: { slug: true } })
+        : Promise.resolve(null),
+      brandId
+        ? this.prisma.brand.findUnique({ where: { id: brandId }, select: { slug: true } })
+        : Promise.resolve(null),
+    ]);
+
+    const sortByMap: Record<string, ProductSortBy> = {
+      [HomepageQuerySortBy.NEWEST]: ProductSortBy.NEWEST,
+      [HomepageQuerySortBy.PRICE_ASC]: ProductSortBy.PRICE_LOW_TO_HIGH,
+      [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
+    };
+
+    const selectedSort = query.sortBy || config.sort_by || ProductSortBy.NEWEST;
+
+    if (
+      selectedSort === HomepageQuerySortBy.DISCOUNT_DESC &&
+      !category?.slug &&
+      !brand?.slug &&
+      query.priceMin === undefined &&
+      query.priceMax === undefined
+    ) {
+      return this.productsService.getDealsProducts(query.limit || config.limit || 12, query.inStockOnly ?? true);
+    }
+
+    const result = await this.productsService.getProducts({
+      page: 1,
+      limit: query.limit || config.limit || 12,
+      categories: category?.slug ? [category.slug] : undefined,
+      brand: brand?.slug || undefined,
+      min_price: query.priceMin,
+      max_price: query.priceMax,
+      in_stock_only: query.inStockOnly ?? true,
+      sort_by:
+        sectionType === HomepageSectionType.NEW_ARRIVALS
+          ? ProductSortBy.NEWEST
+          : sortByMap[selectedSort] || ProductSortBy.NEWEST,
+      featured_only: sectionType === HomepageSectionType.FEATURED_PICKS,
+    });
+
+    if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+      return [...result.products].sort(
+        (a: any, b: any) =>
+          Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+      );
+    }
+
+    return result.products;
+  }
+
   private async resolveSectionData(type: HomepageSectionType, config: Record<string, any>) {
+    const source = config.source || 'query';
+
     switch (type) {
       case HomepageSectionType.HERO_BANNER_SLIDER:
         return this.bannersService.findAll();
       case HomepageSectionType.BEST_DEALS:
+        if (source === 'query' && config.query?.type === HomepageQueryType.PRODUCTS) {
+          return this.executeProductsQuery(config, type);
+        }
         return this.productsService.getDealsProducts(config.limit || 12, true);
       case HomepageSectionType.NEW_ARRIVALS:
-        return (
-          await this.productsService.getProducts({
-            page: 1,
-            limit: config.limit || 12,
-            sort_by: ProductSortBy.NEWEST,
-            in_stock_only: true,
-          })
-        ).products;
       case HomepageSectionType.FEATURED_PICKS:
-        return (config.source || 'query') === 'manual'
-          ? this.getManualProducts(config.ids || [])
-          : (
-              await this.productsService.getProducts({
-                page: 1,
-                limit: config.limit || 12,
-                featured_only: true,
-                in_stock_only: true,
-              })
-            ).products;
+        if (source === 'manual') {
+          return this.getManualProducts(config.ids || []);
+        }
+        return this.executeProductsQuery(config, type);
       case HomepageSectionType.TOP_CATEGORIES_GRID:
-        if ((config.source || 'query') === 'manual') {
+        if (source === 'manual') {
           const ids = config.ids || [];
           const order = new Map(ids.map((id: string, index: number) => [id, index]));
           const categories = await this.prisma.category.findMany({
@@ -223,10 +322,10 @@ export class HomepageSectionsService {
         return this.prisma.category.findMany({
           where: { is_active: true },
           orderBy: { sort_order: 'asc' },
-          take: config.limit || 10,
+          take: config.query?.limit || config.limit || 10,
         });
       case HomepageSectionType.BRANDS_STRIP:
-        if ((config.source || 'query') === 'manual') {
+        if (source === 'manual') {
           const ids = config.ids || [];
           const order = new Map(ids.map((id: string, index: number) => [id, index]));
           const brands = await this.prisma.brand.findMany({
@@ -238,7 +337,7 @@ export class HomepageSectionsService {
         return this.prisma.brand.findMany({
           where: { is_active: true },
           orderBy: { name: 'asc' },
-          take: config.limit || 12,
+          take: config.query?.limit || config.limit || 12,
         });
       case HomepageSectionType.TRUST_BAR:
         return config.items || [];
@@ -250,8 +349,14 @@ export class HomepageSectionsService {
   async getOptions(query: HomepageSectionOptionsQueryDto) {
     const limit = query.limit || 10;
     const q = query.q || '';
+    const target = query.target ||
+      (query.type === HomepageSectionType.BRANDS_STRIP
+        ? 'brands'
+        : query.type === HomepageSectionType.TOP_CATEGORIES_GRID
+          ? 'categories'
+          : 'products');
 
-    if (query.type === HomepageSectionType.FEATURED_PICKS) {
+    if (target === 'products') {
       const res = await this.prisma.product.findMany({
         where: {
           status: 'ACTIVE',
@@ -264,7 +369,7 @@ export class HomepageSectionsService {
       return res.map((x) => ({ id: x.id, label: x.title, subtitle: x.slug }));
     }
 
-    if (query.type === HomepageSectionType.TOP_CATEGORIES_GRID) {
+    if (target === 'categories') {
       const res = await this.prisma.category.findMany({
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true },
@@ -274,7 +379,7 @@ export class HomepageSectionsService {
       return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug }));
     }
 
-    if (query.type === HomepageSectionType.BRANDS_STRIP) {
+    if (target === 'brands') {
       const res = await this.prisma.brand.findMany({
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true },
@@ -288,14 +393,18 @@ export class HomepageSectionsService {
   }
 
   async create(dto: CreateHomepageSectionDto) {
-    this.validateConfig(dto.type, dto.config_json);
+    const normalizedConfig = this.normalizeConfigBySectionType(
+      dto.type,
+      dto.config_json as Record<string, any>,
+    );
+    this.validateConfig(dto.type, normalizedConfig);
     return this.prisma.homepageSection.create({
       data: {
         type: dto.type as any,
         enabled: dto.enabled ?? true,
         position: dto.position,
         title: dto.title,
-        config_json: dto.config_json,
+        config_json: normalizedConfig as any,
       },
     });
   }
@@ -304,10 +413,13 @@ export class HomepageSectionsService {
     const existing = await this.prisma.homepageSection.findUnique({ where: { id } });
     if (!existing) throw new BadRequestException('Section not found');
 
-    const mergedConfig = {
-      ...(existing.config_json as Record<string, any>),
-      ...(dto.config_json || {}),
-    };
+    const mergedConfig = this.normalizeConfigBySectionType(
+      existing.type as HomepageSectionType,
+      {
+        ...(existing.config_json as Record<string, any>),
+        ...(dto.config_json || {}),
+      },
+    );
     this.validateConfig(existing.type as HomepageSectionType, mergedConfig);
 
     return this.prisma.homepageSection.update({
@@ -316,7 +428,7 @@ export class HomepageSectionsService {
         enabled: dto.enabled,
         position: dto.position,
         title: dto.title,
-        config_json: dto.config_json ? mergedConfig : undefined,
+        config_json: dto.config_json ? (mergedConfig as any) : undefined,
       },
     });
   }

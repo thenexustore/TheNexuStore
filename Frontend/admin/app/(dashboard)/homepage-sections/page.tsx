@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/homepage-sections";
 
 const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
+const PRODUCT_QUERY_TYPES = ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
 const SECTION_TYPES = [
   "HERO_BANNER_SLIDER",
   "TOP_CATEGORIES_GRID",
@@ -19,13 +20,20 @@ const SECTION_TYPES = [
   "TRUST_BAR",
 ];
 
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
+  { value: "discount_desc", label: "Biggest Discount" },
+];
+
 const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, any>> = {
   HERO_BANNER_SLIDER: { items_per_carousel: 1 },
-  TOP_CATEGORIES_GRID: { source: "query", limit: 10 },
-  BEST_DEALS: { source: "query", limit: 12 },
-  NEW_ARRIVALS: { source: "query", limit: 12, sort_by: "newest" },
-  FEATURED_PICKS: { source: "query", limit: 12 },
-  BRANDS_STRIP: { source: "query", limit: 12 },
+  TOP_CATEGORIES_GRID: { source: "query", query: { type: "categories", limit: 10 } },
+  BEST_DEALS: { source: "query", query: { type: "products", sortBy: "discount_desc", inStockOnly: true, limit: 12 } },
+  NEW_ARRIVALS: { source: "query", query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 } },
+  FEATURED_PICKS: { source: "query", query: { type: "products", inStockOnly: true, limit: 12 } },
+  BRANDS_STRIP: { source: "query", query: { type: "brands", limit: 12 } },
   TRUST_BAR: {
     items: [
       { icon: "truck", text: "Fast delivery" },
@@ -43,6 +51,10 @@ export default function HomepageSectionsPage() {
   const [sections, setSections] = useState<HomepageSection[]>([]);
   const [search, setSearch] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, HomepageOption[]>>({});
+  const [queryCatalogs, setQueryCatalogs] = useState<{
+    categories: HomepageOption[];
+    brands: HomepageOption[];
+  }>({ categories: [], brands: [] });
   const [newType, setNewType] = useState("TOP_CATEGORIES_GRID");
 
   const sorted = useMemo(
@@ -60,6 +72,17 @@ export default function HomepageSectionsPage() {
 
   useEffect(() => {
     load();
+    (async () => {
+      try {
+        const [categories, brands] = await Promise.all([
+          homepageSectionsApi.options("TOP_CATEGORIES_GRID", "", 100, "categories"),
+          homepageSectionsApi.options("BRANDS_STRIP", "", 100, "brands"),
+        ]);
+        setQueryCatalogs({ categories, brands });
+      } catch {
+        // silent
+      }
+    })();
   }, []);
 
   const updateLocal = (id: string, patch: Partial<HomepageSection>) => {
@@ -68,6 +91,19 @@ export default function HomepageSectionsPage() {
 
   const updateConfig = (section: HomepageSection, patch: Record<string, any>) => {
     updateLocal(section.id, { config_json: { ...section.config_json, ...patch } });
+  };
+
+  const updateQueryConfig = (section: HomepageSection, patch: Record<string, any>) => {
+    updateLocal(section.id, {
+      config_json: {
+        ...section.config_json,
+        source: "query",
+        query: {
+          ...(section.config_json.query || {}),
+          ...patch,
+        },
+      },
+    });
   };
 
   const save = async (section: HomepageSection) => {
@@ -133,10 +169,14 @@ export default function HomepageSectionsPage() {
     }
   };
 
-  const loadOptions = async (section: HomepageSection, q: string) => {
+  const loadOptions = async (
+    section: HomepageSection,
+    q: string,
+    target: "products" | "categories" | "brands" = "products",
+  ) => {
     if (!supportsSource(section.type)) return;
     try {
-      const data = await homepageSectionsApi.options(section.type, q, 10);
+      const data = await homepageSectionsApi.options(section.type, q, 10, target);
       setOptions((prev) => ({ ...prev, [section.id]: data }));
     } catch (e: any) {
       toast.error(e.message || "Search failed");
@@ -147,7 +187,7 @@ export default function HomepageSectionsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-3xl font-bold">Homepage Sections</h1>
-        <p className="text-sm text-slate-500">Manage ordering, visibility and section-specific settings.</p>
+        <p className="text-sm text-slate-500">Manage ordering, visibility and section-specific merchandising settings.</p>
       </div>
 
       <div className="rounded-xl border bg-white p-4 flex flex-wrap items-center gap-2">
@@ -167,6 +207,7 @@ export default function HomepageSectionsPage() {
 
       {sorted.map((section, index) => {
         const source = section.config_json.source || "query";
+        const query = section.config_json.query || {};
 
         return (
           <div key={section.id} className="rounded-xl border bg-white p-4 space-y-3">
@@ -198,18 +239,6 @@ export default function HomepageSectionsPage() {
                 onChange={(e) => updateLocal(section.id, { title: e.target.value })}
                 placeholder="Section title"
               />
-
-              {section.type !== "TRUST_BAR" && section.type !== "HERO_BANNER_SLIDER" ? (
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  className="border rounded-lg px-3 py-2"
-                  value={section.config_json.limit || 12}
-                  onChange={(e) => updateConfig(section, { limit: Number(e.target.value) || 12 })}
-                  placeholder="limit"
-                />
-              ) : null}
             </div>
 
             {supportsSource(section.type) && (
@@ -221,6 +250,10 @@ export default function HomepageSectionsPage() {
                     updateConfig(section, {
                       source: e.target.value,
                       ids: e.target.value === "manual" ? section.config_json.ids || [] : [],
+                      query:
+                        e.target.value === "query"
+                          ? section.config_json.query || DEFAULT_CONFIG_BY_TYPE[section.type].query
+                          : undefined,
                     })
                   }
                 >
@@ -239,7 +272,17 @@ export default function HomepageSectionsPage() {
                       />
                       <button
                         className="px-3 py-2 border rounded-lg"
-                        onClick={() => loadOptions(section, search[section.id] || "")}
+                        onClick={() =>
+                          loadOptions(
+                            section,
+                            search[section.id] || "",
+                            section.type === "TOP_CATEGORIES_GRID"
+                              ? "categories"
+                              : section.type === "BRANDS_STRIP"
+                                ? "brands"
+                                : "products",
+                          )
+                        }
                       >
                         Search
                       </button>
@@ -262,19 +305,112 @@ export default function HomepageSectionsPage() {
                       ))}
                     </div>
 
-                    <textarea
-                      className="border rounded-lg px-3 py-2 w-full min-h-16 text-xs font-mono"
-                      value={JSON.stringify(section.config_json.ids || [])}
-                      onChange={(e) => {
-                        try {
-                          updateConfig(section, { ids: JSON.parse(e.target.value) });
-                        } catch {
-                          // ignore partial json
-                        }
-                      }}
-                    />
+                    <div className="text-xs text-slate-500">Selected IDs: {(section.config_json.ids || []).join(", ") || "none"}</div>
                   </div>
                 )}
+
+                {source === "query" && (
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      min={1}
+                      max={24}
+                      className="border rounded-lg px-3 py-2"
+                      value={query.limit || 12}
+                      onChange={(e) => updateQueryConfig(section, { limit: Number(e.target.value) || 12 })}
+                      placeholder="limit"
+                    />
+
+                    {PRODUCT_QUERY_TYPES.includes(section.type) ? (
+                      <>
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={query.categoryId || ""}
+                          onChange={(e) => updateQueryConfig(section, { type: "products", categoryId: e.target.value || undefined })}
+                        >
+                          <option value="">All categories</option>
+                          {queryCatalogs.categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>{cat.label}</option>
+                          ))}
+                        </select>
+
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={query.brandId || ""}
+                          onChange={(e) => updateQueryConfig(section, { type: "products", brandId: e.target.value || undefined })}
+                        >
+                          <option value="">All brands</option>
+                          {queryCatalogs.brands.map((brand) => (
+                            <option key={brand.id} value={brand.id}>{brand.label}</option>
+                          ))}
+                        </select>
+
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={query.sortBy || "newest"}
+                          onChange={(e) => updateQueryConfig(section, { type: "products", sortBy: e.target.value })}
+                        >
+                          {SORT_OPTIONS.map((sort) => (
+                            <option key={sort.value} value={sort.value}>{sort.label}</option>
+                          ))}
+                        </select>
+
+                        <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={query.inStockOnly ?? true}
+                            onChange={(e) => updateQueryConfig(section, { type: "products", inStockOnly: e.target.checked })}
+                          />
+                          In stock only
+                        </label>
+
+                        <input
+                          type="number"
+                          min={0}
+                          className="border rounded-lg px-3 py-2"
+                          value={query.priceMin ?? ""}
+                          onChange={(e) => updateQueryConfig(section, { type: "products", priceMin: e.target.value ? Number(e.target.value) : undefined })}
+                          placeholder="Price min"
+                        />
+
+                        <input
+                          type="number"
+                          min={0}
+                          className="border rounded-lg px-3 py-2"
+                          value={query.priceMax ?? ""}
+                          onChange={(e) => updateQueryConfig(section, { type: "products", priceMax: e.target.value ? Number(e.target.value) : undefined })}
+                          placeholder="Price max"
+                        />
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500 md:col-span-2">
+                        Query preset for this section is handled automatically ({section.type === "TOP_CATEGORIES_GRID" ? "categories" : "brands"}).
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!supportsSource(section.type) && section.type !== "TRUST_BAR" && section.type !== "HERO_BANNER_SLIDER" && (
+              <div className="grid md:grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  className="border rounded-lg px-3 py-2"
+                  value={query.limit || section.config_json.limit || 12}
+                  onChange={(e) =>
+                    updateConfig(section, {
+                      source: "query",
+                      query: {
+                        ...(section.config_json.query || { type: "products" }),
+                        limit: Number(e.target.value) || 12,
+                      },
+                    })
+                  }
+                  placeholder="limit"
+                />
               </div>
             )}
 

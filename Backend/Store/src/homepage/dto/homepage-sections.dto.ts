@@ -2,7 +2,9 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -12,6 +14,83 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { HomepageSectionType } from '../homepage-section.types';
+
+export enum HomepageQueryType {
+  PRODUCTS = 'products',
+  CATEGORIES = 'categories',
+  BRANDS = 'brands',
+}
+
+export enum HomepageQuerySortBy {
+  NEWEST = 'newest',
+  PRICE_ASC = 'price_asc',
+  PRICE_DESC = 'price_desc',
+  DISCOUNT_DESC = 'discount_desc',
+}
+
+export class HomepageQueryConfigDto {
+  @IsEnum(HomepageQueryType)
+  type!: HomepageQueryType;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  brandId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  priceMin?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  priceMax?: number;
+
+  @IsOptional()
+  @IsEnum(HomepageQuerySortBy)
+  sortBy?: HomepageQuerySortBy;
+
+  @IsOptional()
+  @IsBoolean()
+  inStockOnly?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limit?: number;
+}
+
+export class HomepageSectionConfigDto {
+  @IsOptional()
+  @IsIn(['manual', 'query'])
+  source?: 'manual' | 'query';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsArray()
+  ids?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => HomepageQueryConfigDto)
+  query?: HomepageQueryConfigDto;
+
+  @IsOptional()
+  @IsArray()
+  items?: Array<{ icon?: string; text: string }>;
+
+  @IsOptional()
+  @IsString()
+  sort_by?: string;
+}
 
 export class CreateHomepageSectionDto {
   @IsEnum(HomepageSectionType)
@@ -30,7 +109,9 @@ export class CreateHomepageSectionDto {
   title?: string;
 
   @IsObject()
-  config_json!: Record<string, any>;
+  @ValidateNested()
+  @Type(() => HomepageSectionConfigDto)
+  config_json!: HomepageSectionConfigDto;
 }
 
 export class UpdateHomepageSectionDto {
@@ -49,7 +130,9 @@ export class UpdateHomepageSectionDto {
 
   @IsOptional()
   @IsObject()
-  config_json?: Record<string, any>;
+  @ValidateNested()
+  @Type(() => HomepageSectionConfigDto)
+  config_json?: HomepageSectionConfigDto;
 }
 
 export class ReorderItemDto {
@@ -75,6 +158,10 @@ export class HomepageSectionOptionsQueryDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  @IsOptional()
+  @IsIn(['products', 'categories', 'brands'])
+  target?: 'products' | 'categories' | 'brands';
 
   @IsOptional()
   @Type(() => Number)

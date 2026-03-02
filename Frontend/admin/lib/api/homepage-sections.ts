@@ -61,8 +61,13 @@ export const homepageSectionsApi = {
       method: "PUT",
       body: JSON.stringify({ items }),
     }),
-  options: (type: string, q = "", limit = 10): Promise<HomepageOption[]> =>
+  options: (
+    type: string,
+    q = "",
+    limit = 10,
+    target?: "products" | "categories" | "brands",
+  ): Promise<HomepageOption[]> =>
     req(
-      `/admin/homepage/sections/options?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=${limit}`,
+      `/admin/homepage/sections/options?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=${limit}${target ? `&target=${encodeURIComponent(target)}` : ""}`,
     ),
 };

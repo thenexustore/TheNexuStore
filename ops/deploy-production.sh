@@ -5,6 +5,7 @@ set -Eeuo pipefail
 # Goal: make /opt/TheNexuStore the single source of truth.
 
 REPO_DIR="${REPO_DIR:-/opt/TheNexuStore}"
+REPO_URL="${REPO_URL:-}"
 BRANCH="${BRANCH:-main}"
 API_DOMAIN="${API_DOMAIN:-https://api.thenexustore.com}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
@@ -22,14 +23,20 @@ log() {
 }
 
 log "Validating required commands"
-for c in git npm npx pm2 sed; do
+for c in git npm npx pm2 sed curl; do
   require_cmd "$c"
 done
 
 if [[ ! -d "$REPO_DIR/.git" ]]; then
-  echo "[ERROR] Repo not found in $REPO_DIR (missing .git)." >&2
-  echo "Clone this repository there first." >&2
-  exit 1
+  if [[ -z "$REPO_URL" ]]; then
+    echo "[ERROR] Repo not found in $REPO_DIR and REPO_URL is empty." >&2
+    echo "Set REPO_URL and rerun, e.g.:" >&2
+    echo "REPO_URL='git@github.com:ORG/REPO.git' bash $0" >&2
+    exit 1
+  fi
+  log "Repository not found. Cloning $REPO_URL into $REPO_DIR"
+  mkdir -p "$(dirname "$REPO_DIR")"
+  git clone "$REPO_URL" "$REPO_DIR"
 fi
 
 if [[ ! -f "$BACKEND_ENV_FILE" ]]; then

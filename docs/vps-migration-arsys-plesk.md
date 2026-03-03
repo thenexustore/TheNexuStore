@@ -17,11 +17,12 @@ Usa el script versionado en este repo:
 
 Ese script:
 
-1. Actualiza código en `/opt/TheNexuStore`.
-2. Builda backend y frontends.
-3. Reescribe el arranque backend en `/usr/local/bin/nexus-backend-start.sh` apuntando al repo nuevo.
-4. Reemplaza procesos PM2 (`nexus-backend`, `nexus-store`, `nexus-admin`).
-5. Ejecuta health checks.
+1. Crea/clona el repo si falta (si le pasas `REPO_URL`).
+2. Actualiza código en `/opt/TheNexuStore`.
+3. Builda backend y frontends.
+4. Reescribe el arranque backend en `/usr/local/bin/nexus-backend-start.sh` apuntando al repo nuevo.
+5. Reemplaza procesos PM2 (`nexus-backend`, `nexus-store`, `nexus-admin`).
+6. Ejecuta health checks.
 
 Con esto, cada deploy **sobrescribe** el estado anterior y consolida este repo como source of truth.
 
@@ -29,7 +30,6 @@ Con esto, cada deploy **sobrescribe** el estado anterior y consolida este repo c
 
 ## Requisitos
 
-- Repo clonado en `/opt/TheNexuStore`.
 - `pm2`, `node/npm`, `git` disponibles.
 - Entorno backend en `/root/nexus-backend.env` (source of truth para variables sensibles).
 - Proxy (Plesk/Nginx) ya enruta:
@@ -41,17 +41,29 @@ Con esto, cada deploy **sobrescribe** el estado anterior y consolida este repo c
 
 ## Comando único de despliegue
 
-> Ejecutar en el VPS como root.
+### Caso A: `/opt/TheNexuStore` ya existe
 
 ```bash
 cd /opt/TheNexuStore
 bash ops/deploy-production.sh
 ```
 
+### Caso B: `/opt/TheNexuStore` no existe (tu error actual)
+
+```bash
+curl -fsSL <RAW_URL_DE_ESTE_SCRIPT> -o /root/deploy-production.sh
+chmod +x /root/deploy-production.sh
+REPO_URL='git@github.com:ORG/REPO.git' /root/deploy-production.sh
+```
+
+> Si prefieres HTTPS en vez de SSH:
+>
+> `REPO_URL='https://github.com/ORG/REPO.git' /root/deploy-production.sh`
+
 Opciones útiles:
 
 ```bash
-BRANCH=main API_DOMAIN=https://api.thenexustore.com bash ops/deploy-production.sh
+BRANCH=main API_DOMAIN=https://api.thenexustore.com /root/deploy-production.sh
 ```
 
 ---

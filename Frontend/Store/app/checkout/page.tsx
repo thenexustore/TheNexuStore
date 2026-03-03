@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
@@ -24,6 +24,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasRedirected, setHasRedirected] = useState(false);
+  const checkoutFormRef = useRef<HTMLFormElement>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -217,7 +218,12 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
-            <form id={CHECKOUT_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
+            <form
+              id={CHECKOUT_FORM_ID}
+              ref={checkoutFormRef}
+              onSubmit={handleSubmit}
+              className="space-y-6"
+            >
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
                   {t("contact")}
@@ -545,8 +551,8 @@ export default function CheckoutPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
         <button
-          type="submit"
-          form={CHECKOUT_FORM_ID}
+          type="button"
+          onClick={() => checkoutFormRef.current?.requestSubmit()}
           disabled={loading || cart.summary.checkout_available === false}
           className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >

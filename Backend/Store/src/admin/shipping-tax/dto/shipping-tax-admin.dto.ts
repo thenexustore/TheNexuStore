@@ -1,7 +1,7 @@
 import {
   IsArray,
   IsBoolean,
-  IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -59,7 +59,7 @@ export class UpsertTaxZoneDto {
   @IsBoolean()
   enabled!: boolean;
 
-  @IsEnum(['VAT', 'OUTSIDE_VAT'])
+  @IsIn(['VAT', 'OUTSIDE_VAT'])
   mode!: 'VAT' | 'OUTSIDE_VAT';
 
   @IsNumber()

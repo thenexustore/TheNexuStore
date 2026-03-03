@@ -334,7 +334,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               />
             </svg>
             <span className="text-sm font-semibold text-gray-700">
-              {buyNowLoading ? "Adding to cart..." : "Loading..."}
+              {buyNowLoading ? t("adding") : "Loading..."}
             </span>
           </div>
         </div>
@@ -409,7 +409,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
           {cartItem && (
             <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
-              {quantity} in cart
+              {t("inCart", {count: quantity})}
             </span>
           )}
         </div>
@@ -421,7 +421,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
             {product.short_description ||
-              "Premium quality product with excellent features and performance."}
+              t("premiumDesc")}
           </p>
 
           {rating > 0 && reviewCount > 0 && (
@@ -434,7 +434,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </div>
               <span className="text-xs text-gray-500">/ 5</span>
               <span className="text-xs text-gray-400">
-                ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
+                ({reviewCount} {reviewCount === 1 ? t("review") : t("reviews")})
               </span>
             </div>
           )}
@@ -450,9 +450,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   <span className="text-sm text-gray-500 line-through sm:text-base">
                     €{product.compare_at_price.toFixed(2)}
                   </span>
-                  <span className="text-xs font-semibold text-red-600 sm:text-sm">
-                    Save €
-                    {(product.compare_at_price - product.price).toFixed(2)}
+                  <span className="text-sm font-semibold text-red-600">
+                    {t("save", {amount: (product.compare_at_price - product.price).toFixed(2)})}
                   </span>
                 </>
               )}
@@ -493,10 +492,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Adding...
+                {t("adding")}
               </span>
             ) : (
-              "Buy Now"
+              t("buyNow")
             )}
           </button>
 
@@ -517,7 +516,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
               }`}
             >
-              {cartLoading ? "Adding..." : t("addToCart")}
+              {cartLoading ? t("adding") : t("addToCart")}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "export": "next export",
-    "test:e2e": "playwright test"
+    "check:merge-markers": "node scripts/check-merge-markers.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

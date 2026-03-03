@@ -23,35 +23,38 @@ import { AdminGuard } from '../admin/admin.guard';
 export class HomepageSectionsController {
   constructor(private readonly homepageSectionsService: HomepageSectionsService) {}
 
-  @Get('homepage/sections')
+  @Get(['homepage/sections', 'homepage-sections'])
   async getHomepageSections() {
     const data = await this.homepageSectionsService.getPublicSections();
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
-  @Get('admin/homepage/sections')
+  @Get(['admin/homepage/sections', 'admin/homepage-sections'])
   async getAdminSections() {
     const data = await this.homepageSectionsService.getAdminSections();
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
-  @Get('admin/homepage/sections/options')
+  @Get([
+    'admin/homepage/sections/options',
+    'admin/homepage-sections/options',
+  ])
   async getOptions(@Query() query: HomepageSectionOptionsQueryDto) {
     const data = await this.homepageSectionsService.getOptions(query);
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
-  @Post('admin/homepage/sections')
+  @Post(['admin/homepage/sections', 'admin/homepage-sections'])
   async create(@Body() body: CreateHomepageSectionDto) {
     const data = await this.homepageSectionsService.create(body);
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
-  @Put('admin/homepage/sections/reorder')
+  @Put(['admin/homepage/sections/reorder', 'admin/homepage-sections/reorder'])
   async reorder(@Body() body: ReorderHomepageSectionsDto) {
     const data = await this.homepageSectionsService.reorder(body);
     return { success: true, data };

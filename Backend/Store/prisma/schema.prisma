@@ -184,16 +184,6 @@ enum TaxMode {
   OUTSIDE_VAT
 }
 
-enum HomepageSectionType {
-  HERO_BANNER_SLIDER
-  TOP_CATEGORIES_GRID
-  BEST_DEALS
-  NEW_ARRIVALS
-  FEATURED_PICKS
-  BRANDS_STRIP
-  TRUST_BAR
-}
-
 model Staff {
   id            String    @id @default(uuid())
   email         String    @unique @db.Citext
@@ -731,12 +721,13 @@ model Order {
 
 model Category {
   id         String   @id @default(uuid())
-  parent_id  String?  @map("parent_id")
-  name       String
-  slug       String   @unique
-  sort_order Int
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
+  parent_id      String?  @map("parent_id")
+  name           String
+  slug           String   @unique
+  sort_order     Int
+  is_active      Boolean  @default(true)
+  parent_locked  Boolean  @default(false) @map("parent_locked")
+  created_at     DateTime @default(now())
   updated_at DateTime @updatedAt
 
   parent   Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])

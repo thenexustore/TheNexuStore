@@ -14,6 +14,8 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+const CHECKOUT_FORM_ID = "checkout-form";
+
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();
@@ -211,7 +213,7 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form id={CHECKOUT_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
                   {t("contact")}
@@ -535,8 +537,8 @@ export default function CheckoutPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
         <button
-          type="button"
-          onClick={() => (document.querySelector("form") as HTMLFormElement | null)?.requestSubmit()}
+          type="submit"
+          form={CHECKOUT_FORM_ID}
           disabled={loading || cart.summary.checkout_available === false}
           className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >

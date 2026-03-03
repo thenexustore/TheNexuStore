@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import HomeProductSection from "./HomeProductSection";
+import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
 
 type Section = {
@@ -111,8 +112,7 @@ export default function HomeDynamicSections() {
   useEffect(() => {
     const load = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const res = await fetch(`${apiUrl}/homepage/sections`, { cache: "no-store" });
+        const res = await fetch(`${API_URL}/homepage/sections`, { cache: "no-store" });
         const json = await res.json();
         setSections((json.data || []) as Section[]);
       } catch {

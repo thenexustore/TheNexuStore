@@ -4,8 +4,10 @@ import { HomepageSectionsService } from './homepage-sections.service';
 import { PrismaService } from '../common/prisma.service';
 import { ProductsService } from '../user/products/products.service';
 import { BannersService } from '../admin/banners/banners.service';
+import { AdminModule } from '../admin/admin.module';
 
 @Module({
+  imports: [AdminModule],
   controllers: [HomepageSectionsController],
   providers: [
     HomepageSectionsService,

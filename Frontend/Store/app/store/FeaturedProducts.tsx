@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { Product } from "../lib/products";
 import { getCachedData } from "../lib/home-cache";
+import { API_URL } from "../lib/env";
 
 interface FeaturedApiResponse {
   success: boolean;
@@ -33,8 +34,7 @@ export default function FeaturedProducts() {
     const load = async () => {
       try {
         const data = await getCachedData("home:featured", 60_000, async () => {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-          const res = await fetch(`${apiUrl}/featured-products?limit=12`);
+          const res = await fetch(`${API_URL}/featured-products?limit=12`);
           if (!res.ok) throw new Error("Failed to fetch featured products");
           const json: FeaturedApiResponse = await res.json();
 

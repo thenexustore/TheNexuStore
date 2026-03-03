@@ -1,17 +1,12 @@
-# Producción VPS (ARSYS + Plesk): comando único anti-cortes (incluye fix de ramas divergentes)
+# Producción VPS (ARSYS + Plesk): comando único anti-cortes (incluye fix DATABASE_URL)
 
-Tu último error fue este:
-
-- `fatal: Not possible to fast-forward, aborting.`
-
-Eso pasa cuando la rama local y `origin/main` divergen. El script ya quedó preparado para eso: ahora puede forzar sincronización con `origin/main` durante el deploy.
-
-## Copiar/pegar AHORA (bloque único)
+Tu problema real ahora no es clonación, es que Prisma no ve `DATABASE_URL` durante deploy.
+Para evitar más cortes de sesión, usa **este bloque único** (copiar/pegar):
 
 ```bash
 set -Eeuo pipefail
 
-# 1) Normaliza env y exporta DATABASE_URL
+# 1) Normaliza env y exporta DATABASE_URL en esta misma shell
 sed -i 's/\r$//' /root/nexus-backend.env
 export DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' /root/nexus-backend.env | tail -n 1 | sed 's/^"//; s/"$//')"
 if [ -z "${DATABASE_URL:-}" ]; then
@@ -19,19 +14,15 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-# 2) Asegura runtime repo desde checkout local
+# 2) Asegura repo runtime desde el checkout local existente
 if [ ! -d /opt/TheNexuStore/.git ]; then
   git clone /opt/Nexus-Store /opt/TheNexuStore
 fi
 
-# 3) Deploy forzando sync con origin/main para evitar divergencias
+# 3) Ejecuta deploy con fallback local
 cd /opt/TheNexuStore
 chmod +x ops/deploy-production.sh
-DATABASE_URL="$DATABASE_URL" \
-FALLBACK_LOCAL_REPO=/opt/Nexus-Store \
-BACKEND_ENV_FILE=/root/nexus-backend.env \
-FORCE_SYNC_WITH_ORIGIN=1 \
-bash ops/deploy-production.sh
+DATABASE_URL="$DATABASE_URL" FALLBACK_LOCAL_REPO=/opt/Nexus-Store BACKEND_ENV_FILE=/root/nexus-backend.env bash ops/deploy-production.sh
 ```
 
 ---
@@ -49,12 +40,12 @@ curl -I https://api.thenexustore.com/
 
 ---
 
-## Nota importante (FORCE_SYNC_WITH_ORIGIN)
+## Qué cambié en el script
 
-`FORCE_SYNC_WITH_ORIGIN=1` (por defecto) hace esto al actualizar repo:
+`ops/deploy-production.sh` ahora:
 
-- `git checkout -B <branch> origin/<branch>`
-- `git reset --hard origin/<branch>`
-- `git clean -fd`
+1. Carga env desde `BACKEND_ENV_FILE`.
+2. Si `DATABASE_URL` no aparece al hacer `source`, lo extrae por parse directo del fichero.
+3. Ejecuta Prisma con `DATABASE_URL=... npx prisma ...` explícito.
 
-Con esto se evita el error de fast-forward por ramas divergentes y el deploy siempre queda alineado con `origin/<branch>`.
+Así no depende de comportamientos de shell/exports en VPS.

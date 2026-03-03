@@ -11,7 +11,6 @@ API_DOMAIN="${API_DOMAIN:-https://api.thenexustore.com}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
 BACKEND_START_SCRIPT="/usr/local/bin/nexus-backend-start.sh"
 FALLBACK_LOCAL_REPO="${FALLBACK_LOCAL_REPO:-/opt/Nexus-Store}"
-FORCE_SYNC_WITH_ORIGIN="${FORCE_SYNC_WITH_ORIGIN:-1}"
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {

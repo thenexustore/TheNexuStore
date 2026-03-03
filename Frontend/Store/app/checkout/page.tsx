@@ -20,7 +20,7 @@ export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();
   const { user, getSessionId } = useAuth();
-  const { cart, isLoading: cartLoading } = useCart();
+  const { cart, isLoading: cartLoading, refreshCartWithDestination } = useCart();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasRedirected, setHasRedirected] = useState(false);
@@ -93,6 +93,25 @@ export default function CheckoutPage() {
       router.push("/cart");
     }
   }, [cart, cartLoading, router, hasRedirected]);
+
+
+  useEffect(() => {
+    const destination = {
+      country: formData.shipping_address.country,
+      region: formData.shipping_address.region,
+      postal_code: formData.shipping_address.postal_code,
+    };
+
+    const timer = setTimeout(() => {
+      refreshCartWithDestination(destination);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [
+    formData.shipping_address.country,
+    formData.shipping_address.region,
+    formData.shipping_address.postal_code,
+  ]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,

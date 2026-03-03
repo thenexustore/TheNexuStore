@@ -6,6 +6,7 @@ import * as bodyParser from 'body-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Logger } from '@nestjs/common';
+import { config as loadEnv } from 'dotenv';
 
 function validateEnvironment() {
   const logger = new Logger('Bootstrap');
@@ -28,6 +29,7 @@ function validateEnvironment() {
 }
 
 async function bootstrap() {
+  loadEnv();
   validateEnvironment();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));

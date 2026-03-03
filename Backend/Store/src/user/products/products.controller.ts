@@ -87,6 +87,7 @@ export class ProductsController {
     return this.productsService.createReview(productId, customerId, dto);
   }
 
+
   @Get('categories/:slug/products')
   async getProductsByCategory(
     @Param('slug') slug: string,

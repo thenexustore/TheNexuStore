@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -58,14 +59,17 @@ export class HomepageSectionsController {
 
   @UseGuards(AdminGuard)
   @Put('admin/homepage/sections/:id')
-  async update(@Param('id') id: string, @Body() body: UpdateHomepageSectionDto) {
+  async update(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() body: UpdateHomepageSectionDto,
+  ) {
     const data = await this.homepageSectionsService.update(id, body);
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
   @Delete('admin/homepage/sections/:id')
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.homepageSectionsService.remove(id);
   }
 }

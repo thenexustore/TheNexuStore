@@ -33,14 +33,28 @@ interface CartItem {
   product_id?: string;
 }
 
+interface CartSummaryMeta {
+  status: "OK" | "UNAVAILABLE";
+  zone_code: string;
+  tax_label: "IVA" | "VAT" | "Taxes";
+  tax_mode: "VAT" | "OUTSIDE_VAT";
+  tax_rate: number;
+  customs_duty_rate: number;
+  customs_duty_amount: number;
+  message?: string;
+}
+
 interface CartSummary {
   subtotal: number;
   discount?: number;
   shipping: number;
   tax: number;
+  customs_duty?: number;
   total: number;
   item_count: number;
   currency: string;
+  checkout_available?: boolean;
+  meta?: CartSummaryMeta;
 }
 
 interface AppliedCoupon {
@@ -69,6 +83,7 @@ interface CartContextType {
   syncLegacyCart: () => Promise<void>;
   applyCoupon: (code: string) => Promise<void>;
   removeCoupon: () => Promise<void>;
+  refreshCartWithDestination: (destination: { country?: string; region?: string; postal_code?: string }) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -105,9 +120,20 @@ const convertLegacyToBackendFormat = (legacyItems: any[]): Cart => {
       subtotal,
       shipping,
       tax,
+      customs_duty: 0,
       total: subtotal + shipping + tax,
       item_count: items.reduce((sum, item) => sum + item.quantity, 0),
       currency: "EUR",
+      checkout_available: true,
+      meta: {
+        status: "OK",
+        zone_code: "ES_PENINSULA_BALEARES",
+        tax_label: "IVA",
+        tax_mode: "VAT",
+        tax_rate: 0.21,
+        customs_duty_rate: 0,
+        customs_duty_amount: 0,
+      },
     },
   };
 };
@@ -131,11 +157,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasSynced, setHasSynced] = useState(false);
 
-  const fetchBackendCart = async (): Promise<Cart | null> => {
+  const fetchBackendCart = async (destination?: { country?: string; region?: string; postal_code?: string }): Promise<Cart | null> => {
     try {
       const sessionId = getSessionId();
       if (!sessionId) return null;
-      return await getCart(sessionId);
+      return await getCart(sessionId, destination);
     } catch {
       return null;
     }
@@ -153,11 +179,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const fetchCart = async () => {
+  const fetchCart = async (destination?: { country?: string; region?: string; postal_code?: string }) => {
     try {
       setIsLoading(true);
 
-      const backendCart = await fetchBackendCart();
+      const backendCart = await fetchBackendCart(destination);
 
       if (backendCart) {
         setCart(backendCart);
@@ -283,9 +309,18 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, cart?.id, hasSynced]);
 
+  const refreshCartWithDestination = async (destination: {
+    country?: string;
+    region?: string;
+    postal_code?: string;
+  }) => {
+    await fetchCart(destination);
+  };
+
   const cartCount = cart?.summary.item_count || 0;
 
   return (
+
     <CartContext.Provider
       value={{
         cart,
@@ -296,6 +331,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         removeItem,
         clearCart,
         refreshCart: fetchCart,
+        refreshCartWithDestination,
         syncLegacyCart,
         applyCoupon,
         removeCoupon,

@@ -15,14 +15,28 @@ export interface CartItem {
   product_id?: string;
 }
 
+export interface CartSummaryMeta {
+  status: "OK" | "UNAVAILABLE";
+  zone_code: string;
+  tax_label: "IVA" | "VAT" | "Taxes";
+  tax_mode: "VAT" | "OUTSIDE_VAT";
+  tax_rate: number;
+  customs_duty_rate: number;
+  customs_duty_amount: number;
+  message?: string;
+}
+
 export interface CartSummary {
   subtotal: number;
   discount?: number;
   shipping: number;
   tax: number;
+  customs_duty?: number;
   total: number;
   item_count: number;
   currency: string;
+  checkout_available?: boolean;
+  meta?: CartSummaryMeta;
 }
 
 export interface AppliedCoupon {
@@ -32,6 +46,13 @@ export interface AppliedCoupon {
   discount_amount: number;
 }
 
+
+export interface DestinationQuoteInput {
+  country?: string;
+  region?: string;
+  postal_code?: string;
+}
+
 export interface CartResponse {
   id: string;
   items: CartItem[];
@@ -39,8 +60,16 @@ export interface CartResponse {
   applied_coupon?: AppliedCoupon;
 }
 
-export const getCart = async (sessionId?: string): Promise<CartResponse> => {
-  return apiRequestWithSession("/cart", { method: "GET" }, sessionId);
+export const getCart = async (
+  sessionId?: string,
+  destination?: DestinationQuoteInput,
+): Promise<CartResponse> => {
+  const params = new URLSearchParams();
+  if (destination?.country) params.set("country", destination.country);
+  if (destination?.region) params.set("region", destination.region);
+  if (destination?.postal_code) params.set("postal_code", destination.postal_code);
+  const path = params.toString() ? `/cart?${params.toString()}` : "/cart";
+  return apiRequestWithSession(path, { method: "GET" }, sessionId);
 };
 
 export const addToCart = async (

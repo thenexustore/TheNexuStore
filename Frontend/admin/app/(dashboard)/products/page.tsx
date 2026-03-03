@@ -14,6 +14,7 @@ import {
   Hash,
   RefreshCw,
 } from "lucide-react";
+import { API_URL } from "@/lib/constants";
 import {
   fetchProducts,
   deleteProduct,
@@ -38,7 +39,7 @@ export default function ProductsPage() {
     try {
       setSyncing(true);
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync`,
+        `${API_URL}/admin/infortisa/sync`,
         {
           method: "POST",
           credentials: "include",
@@ -61,7 +62,7 @@ export default function ProductsPage() {
     try {
       setSyncing(true);
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync/full`,
+        `${API_URL}/admin/infortisa/sync/full`,
         {
           method: "POST",
           credentials: "include",
@@ -82,7 +83,7 @@ export default function ProductsPage() {
     try {
       setSyncing(true);
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync/stock`,
+        `${API_URL}/admin/infortisa/sync/stock`,
         {
           method: "POST",
           credentials: "include",

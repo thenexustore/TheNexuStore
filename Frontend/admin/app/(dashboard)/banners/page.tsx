@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_URL } from "@/lib/constants";
 import {
   PencilIcon,
   TrashIcon,
@@ -37,8 +38,6 @@ interface Banner {
   created_at: string;
   updated_at: string;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function BannersPage() {
   const router = useRouter();

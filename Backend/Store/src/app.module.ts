@@ -11,11 +11,13 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { InfortisaModule } from './infortisa/infortisa.module';
 import { PrismaService } from './common/prisma.service';
 import { HomepageSectionsModule } from './homepage/homepage-sections.module';
+import { JwtAuthModule } from './auth/jwt-auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    JwtAuthModule,
     AuthModule,
     AdminModule,
     StaffAuthModule,

@@ -172,10 +172,14 @@ export default function CheckoutPage() {
       const trackingToken =
         response.order.tracking_token || response.order.id;
       router.push(`/order/track/${trackingToken}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Checkout error:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to create order. Please try again.";
       setErrors({
-        submit: error.message || "Failed to create order. Please try again.",
+        submit: message,
       });
     } finally {
       setLoading(false);
@@ -213,7 +217,7 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
-            <form id={CHECKOUT_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
+            <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
                   {t("contact")}
@@ -538,7 +542,7 @@ export default function CheckoutPage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
         <button
           type="submit"
-          form={CHECKOUT_FORM_ID}
+          form="checkout-form"
           disabled={loading || cart.summary.checkout_available === false}
           className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >

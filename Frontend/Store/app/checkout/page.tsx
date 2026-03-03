@@ -20,10 +20,11 @@ export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();
   const { user, getSessionId } = useAuth();
-  const { cart, isLoading: cartLoading } = useCart();
+  const { cart, isLoading: cartLoading, refreshCartWithDestination } = useCart();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasRedirected, setHasRedirected] = useState(false);
+  const checkoutFormRef = useRef<HTMLFormElement>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -92,6 +93,25 @@ export default function CheckoutPage() {
       router.push("/cart");
     }
   }, [cart, cartLoading, router, hasRedirected]);
+
+
+  useEffect(() => {
+    const destination = {
+      country: formData.shipping_address.country,
+      region: formData.shipping_address.region,
+      postal_code: formData.shipping_address.postal_code,
+    };
+
+    const timer = setTimeout(() => {
+      refreshCartWithDestination(destination);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [
+    formData.shipping_address.country,
+    formData.shipping_address.region,
+    formData.shipping_address.postal_code,
+  ]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -179,7 +199,7 @@ export default function CheckoutPage() {
           ? error.message
           : "Failed to create order. Please try again.";
       setErrors({
-        submit: message,
+        submit: error.message || t("createOrderFailed"),
       });
     } finally {
       setLoading(false);
@@ -217,7 +237,12 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
-            <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
+            <form
+              id={CHECKOUT_FORM_ID}
+              ref={checkoutFormRef}
+              onSubmit={handleSubmit}
+              className="space-y-6"
+            >
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
                   {t("contact")}
@@ -433,7 +458,7 @@ export default function CheckoutPage() {
               <button
                 type="submit"
                 disabled={loading || cart.summary.checkout_available === false}
-                className="hidden w-full rounded-xl bg-[#0B123A] py-4 text-lg font-bold text-white transition-all hover:bg-[#1a245a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 md:block"
+                className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#1a245a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? t("processing") : t("placeOrder")}
               </button>
@@ -491,14 +516,14 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t("tax")}</span>
+                  <span className="text-gray-600">{cart.summary.meta?.tax_label || "Tax"}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.tax)}
                   </span>
                 </div>
                 {(cart.summary.customs_duty || 0) > 0 && (
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-600 break-words">Customs duty</span>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Customs duty</span>
                     <span className="font-medium">
                       {formatCurrency(cart.summary.customs_duty || 0)}
                     </span>
@@ -514,11 +539,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  {cart.summary.shipping === 0
-                    ? t("freeShippingApplied")
-                    : t("addForFreeShipping", {
-                        amount: Math.max(0, 100 - cart.summary.subtotal).toFixed(2),
-                      })}
+                  {cart.summary.meta?.message || "Shipping rates depend on destination"}
                 </p>
               </div>
 
@@ -545,8 +566,8 @@ export default function CheckoutPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
         <button
-          type="submit"
-          form="checkout-form"
+          type="button"
+          onClick={() => checkoutFormRef.current?.requestSubmit()}
           disabled={loading || cart.summary.checkout_available === false}
           className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >

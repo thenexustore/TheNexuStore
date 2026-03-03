@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
@@ -199,7 +199,7 @@ export default function CheckoutPage() {
           ? error.message
           : "Failed to create order. Please try again.";
       setErrors({
-        submit: message || t("createOrderFailed"),
+        submit: error.message || t("createOrderFailed"),
       });
     } finally {
       setLoading(false);
@@ -516,7 +516,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{cart.summary.meta?.tax_label || "Tax"}</span>
+                  <span className="text-gray-600">{t("tax")}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.tax)}
                   </span>
@@ -539,7 +539,11 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  {cart.summary.meta?.message || "Shipping rates depend on destination"}
+                  {cart.summary.shipping === 0
+                    ? t("freeShippingApplied")
+                    : t("addForFreeShipping", {
+                        amount: Math.max(0, 100 - cart.summary.subtotal).toFixed(2),
+                      })}
                 </p>
               </div>
 

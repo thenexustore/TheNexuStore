@@ -1,6 +1,5 @@
-// app/page.tsx
-import { redirect } from 'next/navigation'
+import { redirect } from '@/i18n/navigation';
 
 export default function Home() {
-  redirect('/login')
+  redirect({href:'/login', locale:'es'});
 }

@@ -8,9 +8,29 @@ REPO_DIR="${REPO_DIR:-/opt/TheNexuStore}"
 REPO_URL="${REPO_URL:-}"
 BRANCH="${BRANCH:-main}"
 API_DOMAIN="${API_DOMAIN:-https://api.thenexustore.com}"
+SITE_DOMAIN="${SITE_DOMAIN:-https://www.thenexustore.com}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
 BACKEND_START_SCRIPT="/usr/local/bin/nexus-backend-start.sh"
 FALLBACK_LOCAL_REPO="${FALLBACK_LOCAL_REPO:-/opt/Nexus-Store}"
+FORCE_SYNC_WITH_ORIGIN="${FORCE_SYNC_WITH_ORIGIN:-0}"
+
+wait_for_url() {
+  local url="$1"
+  local retries="${2:-15}"
+  local delay_s="${3:-2}"
+
+  for ((i = 1; i <= retries; i++)); do
+    if curl -fsS "$url" >/dev/null; then
+      log "Health check OK: $url"
+      return 0
+    fi
+    log "Waiting for health check ($i/$retries): $url"
+    sleep "$delay_s"
+  done
+
+  log "Health check FAILED: $url"
+  return 1
+}
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -108,7 +128,7 @@ cat > "$BACKEND_START_SCRIPT" <<SCRIPT
 set -Eeuo pipefail
 cd "$REPO_DIR/Backend/Store"
 source "$BACKEND_ENV_FILE"
-exec node dist/main.js
+exec node dist/src/main.js
 SCRIPT
 chmod +x "$BACKEND_START_SCRIPT"
 sed -i 's/\r$//' "$BACKEND_START_SCRIPT"
@@ -117,11 +137,18 @@ log "Deploying backend process via PM2"
 pm2 delete nexus-backend >/dev/null 2>&1 || true
 pm2 start "$BACKEND_START_SCRIPT" --name nexus-backend --time
 
+if ! wait_for_url "http://127.0.0.1:4000/admin/health" 20 2; then
+  log "Backend failed after deploy; dumping PM2 logs"
+  pm2 logs nexus-backend --lines 120 --nostream || true
+  exit 1
+fi
+
 log "Installing/building Store frontend"
 cd "$REPO_DIR/Frontend/Store"
 npm ci
 cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
+NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
 npm run build
 pm2 delete nexus-store >/dev/null 2>&1 || true
@@ -132,6 +159,7 @@ cd "$REPO_DIR/Frontend/admin"
 npm ci
 cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
+NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
 npm run build
 pm2 delete nexus-admin >/dev/null 2>&1 || true
@@ -142,7 +170,8 @@ pm2 save
 
 log "Basic checks"
 pm2 status
-curl -fsS "http://127.0.0.1:4000/admin/health" >/dev/null && log "Backend health OK"
-curl -fsS "http://127.0.0.1:4000/admin/infortisa/health" >/dev/null && log "Infortisa health OK"
+wait_for_url "http://127.0.0.1:4000/admin/health" 10 2
+wait_for_url "http://127.0.0.1:4000/admin/infortisa/health" 10 2
+wait_for_url "$API_DOMAIN/admin/health" 10 2
 
 log "Deployment complete. Source of truth is now: $REPO_DIR"

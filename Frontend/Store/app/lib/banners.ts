@@ -1,3 +1,5 @@
+import { API_URL } from "./env";
+
 export interface Banner {
   id: string;
   image: string;
@@ -22,7 +24,6 @@ export interface Banner {
 }
 
 export async function getActiveBanners(): Promise<Banner[]> {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const response = await fetch(`${API_URL}/admin/banners/active`);
 
   if (!response.ok) {

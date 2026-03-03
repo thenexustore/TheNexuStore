@@ -50,16 +50,16 @@ export class HomepageSectionsController {
   }
 
   @UseGuards(AdminGuard)
-  @Put('admin/homepage/sections/:id')
-  async update(@Param('id') id: string, @Body() body: UpdateHomepageSectionDto) {
-    const data = await this.homepageSectionsService.update(id, body);
+  @Put('admin/homepage/sections/reorder')
+  async reorder(@Body() body: ReorderHomepageSectionsDto) {
+    const data = await this.homepageSectionsService.reorder(body);
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
-  @Put('admin/homepage/sections/reorder')
-  async reorder(@Body() body: ReorderHomepageSectionsDto) {
-    const data = await this.homepageSectionsService.reorder(body);
+  @Put('admin/homepage/sections/:id')
+  async update(@Param('id') id: string, @Body() body: UpdateHomepageSectionDto) {
+    const data = await this.homepageSectionsService.update(id, body);
     return { success: true, data };
   }
 

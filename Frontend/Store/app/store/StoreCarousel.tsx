@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Banner, getActiveBanners } from "../lib/banners";
 import { getCachedData } from "../lib/home-cache";
 

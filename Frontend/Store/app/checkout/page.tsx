@@ -14,6 +14,8 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+const CHECKOUT_FORM_ID = "checkout-form";
+
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();

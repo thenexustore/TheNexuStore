@@ -103,7 +103,6 @@ export class HomepageSectionsService {
   }
 
   async getAdminSections() {
-    await this.ensureDefaultSections();
     return this.prisma.homepageSection.findMany({ orderBy: { position: 'asc' } });
   }
 

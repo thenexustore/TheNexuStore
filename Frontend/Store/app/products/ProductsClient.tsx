@@ -66,9 +66,9 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
-      <div className="mb-6">
-        <h1 className="break-words text-2xl font-bold sm:text-3xl">{t("all")}</h1>
+    <div className="container mx-auto px-4 py-8 bg-white text-black">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">{t("all")}</h1>
         <p className="mt-2 text-gray-600">
           {t("found", {count: productsResponse?.total || 0})}
         </p>

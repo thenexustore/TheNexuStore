@@ -376,7 +376,7 @@ function Sidebar({ product }: { product: Product }) {
         <InfoRow label="Brand" value={brandName || "No Brand"} />
         <InfoRow
           label="Created"
-          value={new Date(product.created_at).toLocaleString("en-IN", {
+          value={new Date(product.created_at).toLocaleString("es-ES", {
             dateStyle: "medium",
             timeStyle: "short",
           })}

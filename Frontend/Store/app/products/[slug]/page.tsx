@@ -26,6 +26,7 @@ export default function ProductPage() {
   const [error, setError] = useState<string | null>(null);
   const [addingToCart, setAddingToCart] = useState(false);
   const [addToCartMessage, setAddToCartMessage] = useState<string | null>(null);
+  const [addToCartError, setAddToCartError] = useState(false);
   const { addItem, updateItem, removeItem, cart } = useCart();
   const [quantity, setQuantity] = useState(1);
 
@@ -43,7 +44,7 @@ export default function ProductPage() {
           setSelectedVariant(productData.variants[0].id);
         }
       } catch {
-        setError("Failed to load product");
+        setError(t("loadFailed"));
       } finally {
         setLoading(false);
       }
@@ -88,13 +89,15 @@ export default function ProductPage() {
 
       await addItem(currentVariant.sku_code, quantity);
 
-      setAddToCartMessage(`Added ${quantity} × ${product.title} to cart!`);
+      setAddToCartError(false);
+      setAddToCartMessage(t("addedToCart", {quantity, title: product.title}));
 
       setTimeout(() => {
         setAddToCartMessage(null);
       }, 3000);
     } catch {
-      setAddToCartMessage("Failed to add item to cart. Please try again.");
+      setAddToCartError(true);
+      setAddToCartMessage(t("loadAddFailed"));
     } finally {
       setAddingToCart(false);
     }
@@ -116,13 +119,13 @@ export default function ProductPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-500">
-            {error || "Product not found"}
+            {error || t("notFound")}
           </h2>
           <Link
             href="/products"
             className="mt-4 inline-block text-blue-600 hover:underline"
           >
-            Back to Products
+            {t("backToProducts")}
           </Link>
         </div>
       </div>
@@ -132,20 +135,20 @@ export default function ProductPage() {
   if (!currentVariant) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-500">Variant not available</div>
+        <div className="text-center text-red-500">{t("variantUnavailable")}</div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
-      <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
+    <div className="container mx-auto px-4 py-8 bg-white text-black">
+      <div className="mb-6 text-sm text-gray-600">
         <Link href="/" className="hover:underline">
-          Home
+          {t("home")}
         </Link>
         <span className="mx-2">/</span>
         <Link href="/products" className="hover:underline">
-          Products
+          {t("all")}
         </Link>
         <span className="mx-2">/</span>
         <span className="max-w-full break-words">{product.title}</span>
@@ -178,7 +181,7 @@ export default function ProductPage() {
               </div>
             ) : (
               <div className="flex h-full items-center justify-center bg-gray-100">
-                <span className="text-gray-400">No Image</span>
+                <span className="text-gray-400">{t("noImage")}</span>
               </div>
             )}
           </div>
@@ -263,16 +266,16 @@ export default function ProductPage() {
               }`}
             >
               {currentVariant.stock_status === "IN_STOCK"
-                ? `In Stock (${currentVariant.stock_quantity} available)`
+                ? t("inStock", {count: currentVariant.stock_quantity})
                 : currentVariant.stock_status === "LOW_STOCK"
-                  ? `Low Stock (${currentVariant.stock_quantity} left)`
-                  : "Out of Stock"}
+                  ? t("lowStock", {count: currentVariant.stock_quantity})
+                  : t("outOfStock")}
             </span>
           </div>
 
           {product.variants.length > 1 && (
             <div className="mb-6">
-              <h3 className="mb-2 font-medium">Options</h3>
+              <h3 className="mb-2 font-medium">{t("options")}</h3>
               <div className="flex flex-wrap gap-2">
                 {product.variants.map((variant) => (
                   <button
@@ -299,7 +302,7 @@ export default function ProductPage() {
 
           {product.attributes.length > 0 && (
             <div className="mb-6">
-              <h3 className="mb-2 font-medium">Specifications</h3>
+              <h3 className="mb-2 font-medium">{t("specifications")}</h3>
               <div className="space-y-1">
                 {product.attributes.map((attr) => (
                   <div key={attr.key} className="flex">
@@ -398,12 +401,12 @@ export default function ProductPage() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Adding...
+                    {t("adding")}
                   </span>
                 ) : isOutOfStock ? (
-                  "Out of Stock"
+                  t("outOfStock")
                 ) : (
-                  "Add to Cart"
+                  t("addToCart")
                 )}
               </button>
             </div>
@@ -411,7 +414,7 @@ export default function ProductPage() {
             {addToCartMessage && (
               <div
                 className={`p-3 rounded-lg text-sm font-medium ${
-                  addToCartMessage.includes("Failed")
+                  addToCartError
                     ? "bg-red-100 text-red-700"
                     : "bg-green-100 text-green-700"
                 }`}
@@ -423,7 +426,7 @@ export default function ProductPage() {
 
           {product.description_html && (
             <div className="mb-8">
-              <h3 className="mb-4 text-xl font-semibold">Description</h3>
+              <h3 className="mb-4 text-xl font-semibold">{t("description")}</h3>
               <div
                 className="prose max-w-none break-words"
                 dangerouslySetInnerHTML={{ __html: product.description_html }}
@@ -450,7 +453,7 @@ export default function ProductPage() {
 
       {relatedProducts.length > 0 && (
         <div>
-          <h2 className="mb-6 text-2xl font-bold">Related Products</h2>
+          <h2 className="mb-6 text-2xl font-bold">{t("relatedProducts")}</h2>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {relatedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />

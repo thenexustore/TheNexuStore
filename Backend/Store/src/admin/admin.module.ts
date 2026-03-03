@@ -12,10 +12,12 @@ import { FeaturedProductsModule } from './featured-products/featured-products.mo
 import { AuthModule } from '../auth/auth.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { ShippingTaxAdminModule } from './shipping-tax/shipping-tax-admin.module';
+import { JwtAuthModule } from '../auth/jwt-auth.module';
 
 @Module({
   imports: [
     AuthModule,
+    JwtAuthModule,
     BannersModule,
     FeaturedProductsModule,
     CouponsModule,

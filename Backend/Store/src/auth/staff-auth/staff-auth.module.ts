@@ -1,25 +1,12 @@
 import { Module } from '@nestjs/common';
 import { StaffAuthService } from './staff-auth.service';
 import { StaffAuthController } from './staff-auth.controller';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { CommonModule } from '../../common/common.module';
+import { JwtAuthModule } from '../jwt-auth.module';
 
 @Module({
-  imports: [
-    CommonModule,
-    ConfigModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET'),
-        signOptions: {
-          expiresIn: config.get('JWT_EXPIRES_IN') || '7d',
-        },
-      }),
-    }),
-  ],
+  imports: [CommonModule, ConfigModule, JwtAuthModule],
   controllers: [StaffAuthController],
   providers: [StaffAuthService],
 })

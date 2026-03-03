@@ -68,6 +68,12 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.listen(process.env.PORT as any);
+  const port = Number(process.env.PORT ?? 4000);
+  const host = process.env.HOST ?? '0.0.0.0';
+
+  await app.listen(port, host);
+
+  const logger = new Logger('Bootstrap');
+  logger.log(`Backend listening on ${host}:${port}`);
 }
 bootstrap();

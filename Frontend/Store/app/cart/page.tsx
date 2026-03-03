@@ -447,7 +447,7 @@ export default function CartPage() {
                   <div className="flex justify-between mb-2">
                     <span className="text-gray-600">Customs duty</span>
                     <span className="font-medium">
-                      {formatCurrency(cart.summary.customs_duty || 0)}
+                      {formatCurrency(cart.summary.customs_duty || 0, locale)}
                     </span>
                   </div>
                 )}

@@ -74,12 +74,10 @@ export class HomepageSectionsService {
   }
 
   async ensureDefaultSections() {
-    for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
-      const existing = await this.prisma.homepageSection.findUnique({
-        where: { type: section.type as any },
-      });
+    const existingSections = await this.prisma.homepageSection.findMany();
 
-      if (!existing) {
+    if (existingSections.length === 0) {
+      for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
         await this.prisma.homepageSection.create({
           data: {
             type: section.type as any,
@@ -89,6 +87,16 @@ export class HomepageSectionsService {
             config_json: section.config_json,
           },
         });
+      }
+      return;
+    }
+
+    const sectionByType = new Map(existingSections.map((section) => [section.type, section]));
+
+    for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
+      const existing = sectionByType.get(section.type as any);
+
+      if (!existing) {
         continue;
       }
 
@@ -103,6 +111,7 @@ export class HomepageSectionsService {
   }
 
   async getAdminSections() {
+    await this.ensureDefaultSections();
     return this.prisma.homepageSection.findMany({ orderBy: { position: 'asc' } });
   }
 

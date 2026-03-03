@@ -13,6 +13,7 @@ BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
 BACKEND_START_SCRIPT="/usr/local/bin/nexus-backend-start.sh"
 FALLBACK_LOCAL_REPO="${FALLBACK_LOCAL_REPO:-/opt/Nexus-Store}"
 FORCE_SYNC_WITH_ORIGIN="${FORCE_SYNC_WITH_ORIGIN:-0}"
+PREV_SHA=""
 
 wait_for_url() {
   local url="$1"
@@ -32,6 +33,25 @@ wait_for_url() {
   return 1
 }
 
+wait_for_port() {
+  local host="$1"
+  local port="$2"
+  local retries="${3:-15}"
+  local delay_s="${4:-2}"
+
+  for ((i = 1; i <= retries; i++)); do
+    if timeout 1 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then
+      log "Port open: ${host}:${port}"
+      return 0
+    fi
+    log "Waiting for port (${i}/${retries}): ${host}:${port}"
+    sleep "$delay_s"
+  done
+
+  log "Port check FAILED: ${host}:${port}"
+  return 1
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "[ERROR] Missing command: $1" >&2
@@ -43,8 +63,71 @@ log() {
   echo "[$(date +'%F %T')] $*"
 }
 
+build_backend() {
+  log "Installing/building backend"
+  cd "$REPO_DIR/Backend/Store"
+  npm ci
+  DATABASE_URL="$DATABASE_URL" npx prisma generate
+  DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
+  npm run build
+}
+
+restart_backend() {
+  log "Starting backend process via PM2"
+  pm2 delete nexus-backend >/dev/null 2>&1 || true
+  pm2 start "$BACKEND_START_SCRIPT" --name nexus-backend --time
+}
+
+rollback_backend() {
+  if [[ -z "$PREV_SHA" ]]; then
+    log "Rollback skipped: PREV_SHA is empty"
+    return 1
+  fi
+
+  log "Rolling back backend to PREV_SHA=$PREV_SHA"
+  cd "$REPO_DIR"
+  git reset --hard "$PREV_SHA"
+  git clean -fd
+
+  pm2 stop nexus-backend >/dev/null 2>&1 || true
+  build_backend
+  restart_backend
+
+  if ! wait_for_url "http://127.0.0.1:4000/admin/health" 15 2; then
+    log "Rollback health check failed"
+    pm2 logs nexus-backend --lines 120 --nostream || true
+    return 1
+  fi
+
+  log "Rollback succeeded"
+}
+
+deploy_next_app() {
+  local app_name="$1"
+  local app_dir="$2"
+  local port="$3"
+  local smoke_url="$4"
+
+  log "Deploying ${app_name} from ${app_dir}"
+  cd "$app_dir"
+
+  pm2 stop "$app_name" >/dev/null 2>&1 || true
+  rm -rf .next
+  npm ci
+  npm run build
+
+  if pm2 describe "$app_name" >/dev/null 2>&1; then
+    pm2 restart "$app_name"
+  else
+    pm2 start npm --name "$app_name" --cwd "$app_dir" -- start -- -p "$port"
+  fi
+
+  wait_for_port "127.0.0.1" "$port" 20 2
+  wait_for_url "$smoke_url" 20 2
+}
+
 log "Validating required commands"
-for c in git npm npx pm2 sed curl; do
+for c in git npm npx pm2 sed curl timeout; do
   require_cmd "$c"
 done
 
@@ -98,6 +181,11 @@ fi
 
 log "Updating repository to branch $BRANCH"
 cd "$REPO_DIR"
+PREV_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+if [[ -n "$PREV_SHA" ]]; then
+  log "Saved PREV_SHA=$PREV_SHA"
+fi
+
 git fetch --all --prune
 
 if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
@@ -115,13 +203,6 @@ else
   git checkout "$BRANCH"
 fi
 
-log "Installing/building backend"
-cd "$REPO_DIR/Backend/Store"
-npm ci
-DATABASE_URL="$DATABASE_URL" npx prisma generate
-DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
-npm run build
-
 log "Writing backend start script at $BACKEND_START_SCRIPT"
 cat > "$BACKEND_START_SCRIPT" <<SCRIPT
 #!/usr/bin/env bash
@@ -133,37 +214,29 @@ SCRIPT
 chmod +x "$BACKEND_START_SCRIPT"
 sed -i 's/\r$//' "$BACKEND_START_SCRIPT"
 
-log "Deploying backend process via PM2"
-pm2 delete nexus-backend >/dev/null 2>&1 || true
-pm2 start "$BACKEND_START_SCRIPT" --name nexus-backend --time
+pm2 stop nexus-backend >/dev/null 2>&1 || true
+build_backend
+restart_backend
 
-if ! wait_for_url "http://127.0.0.1:4000/admin/health" 20 2; then
-  log "Backend failed after deploy; dumping PM2 logs"
+if ! wait_for_url "http://127.0.0.1:4000/admin/health" 15 2; then
+  log "Backend failed after deploy; attempting auto-rollback"
   pm2 logs nexus-backend --lines 120 --nostream || true
-  exit 1
+  if ! rollback_backend; then
+    exit 1
+  fi
 fi
 
-log "Installing/building Store frontend"
-cd "$REPO_DIR/Frontend/Store"
-npm ci
-cat > .env.production <<ENV
+cat > "$REPO_DIR/Frontend/Store/.env.production" <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
-npm run build
-pm2 delete nexus-store >/dev/null 2>&1 || true
-pm2 start npm --name nexus-store --cwd "$REPO_DIR/Frontend/Store" -- start -- -p 3000
+deploy_next_app "nexus-store" "$REPO_DIR/Frontend/Store" "3000" "http://127.0.0.1:3000"
 
-log "Installing/building Admin frontend"
-cd "$REPO_DIR/Frontend/admin"
-npm ci
-cat > .env.production <<ENV
+cat > "$REPO_DIR/Frontend/admin/.env.production" <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
-npm run build
-pm2 delete nexus-admin >/dev/null 2>&1 || true
-pm2 start npm --name nexus-admin --cwd "$REPO_DIR/Frontend/admin" -- start -- -p 3001
+deploy_next_app "nexus-admin" "$REPO_DIR/Frontend/admin" "3001" "http://127.0.0.1:3001"
 
 log "Saving PM2 process list"
 pm2 save

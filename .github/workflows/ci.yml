@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: backend
+  backend-required:
+    name: Backend required checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,27 +26,25 @@ jobs:
           cache: npm
           cache-dependency-path: Backend/Store/package-lock.json
 
+      - name: Verify lockfile exists
+        run: test -f package-lock.json
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Prisma generate
-        run: npm run prisma:generate
-
-      - name: Typecheck
-        run: npx tsc --noEmit
-
-      - name: Lint (advisory while baseline is being fixed)
-        id: lint
-        continue-on-error: true
-        run: npm run lint -- --max-warnings=0
-
-      - name: Lint summary
-        if: steps.lint.outcome == 'failure'
+      - name: Verify lockfile in sync
         run: |
-          echo "⚠️ Backend lint has existing baseline issues. This step is advisory until baseline cleanup is completed." >> $GITHUB_STEP_SUMMARY
+          npm install --package-lock-only --ignore-scripts
+          git diff --exit-code -- package-lock.json
 
-  admin:
-    name: admin
+      - name: Build backend
+        run: npm run build
+
+      - name: Bootstrap DI regression test
+        run: npm test -- app.bootstrap.spec.ts --runInBand
+
+  admin-required:
+    name: Frontend admin required checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -59,24 +57,25 @@ jobs:
           cache: npm
           cache-dependency-path: Frontend/admin/package-lock.json
 
+      - name: Verify lockfile exists
+        run: test -f package-lock.json
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint (advisory while baseline is being fixed)
-        id: lint
-        continue-on-error: true
-        run: npm run lint -- --max-warnings=0
-
-      - name: Lint summary
-        if: steps.lint.outcome == 'failure'
+      - name: Verify lockfile in sync
         run: |
-          echo "⚠️ Admin lint has existing baseline issues. This step is advisory until baseline cleanup is completed." >> $GITHUB_STEP_SUMMARY
+          npm install --package-lock-only --ignore-scripts
+          git diff --exit-code -- package-lock.json
 
-  storefront:
-    name: storefront
+      - name: Build admin
+        run: npm run build
+
+      - name: Verify admin Next build artifacts
+        run: npm run check:next-build-artifacts
+
+  storefront-required:
+    name: Frontend store required checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -89,18 +88,25 @@ jobs:
           cache: npm
           cache-dependency-path: Frontend/Store/package-lock.json
 
+      - name: Verify lockfile exists
+        run: test -f package-lock.json
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
+      - name: Verify lockfile in sync
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          git diff --exit-code -- package-lock.json
+
+      - name: Guard runtime entrypoint exclusivity
+        run: npm run check:runtime-entrypoint
+
+      - name: Typecheck storefront
         run: npx tsc --noEmit
 
-      - name: Lint (advisory while baseline is being fixed)
-        id: lint
-        continue-on-error: true
-        run: npm run lint -- --max-warnings=0
+      - name: Build storefront
+        run: npm run build
 
-      - name: Lint summary
-        if: steps.lint.outcome == 'failure'
-        run: |
-          echo "⚠️ Storefront lint has existing baseline issues. This step is advisory until baseline cleanup is completed." >> $GITHUB_STEP_SUMMARY
+      - name: Verify storefront Next build artifacts
+        run: npm run check:next-build-artifacts

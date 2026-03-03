@@ -7,15 +7,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Logger } from '@nestjs/common';
 import { config as loadEnv } from 'dotenv';
+import { validateEnvironment } from './env.validation';
 
-function validateEnvironment() {
+function warnOptionalDependencies() {
   const logger = new Logger('Bootstrap');
-
-  if (!process.env.DATABASE_URL) {
-    throw new Error(
-      'Missing required environment variable: DATABASE_URL. Please set DATABASE_URL before starting the backend.',
-    );
-  }
 
   if (!process.env.REDIS_URL) {
     logger.warn('REDIS_URL is not configured. Redis-backed features are disabled.');
@@ -30,7 +25,17 @@ function validateEnvironment() {
 
 async function bootstrap() {
   loadEnv();
-  validateEnvironment();
+  const env = validateEnvironment(process.env);
+
+  process.env.PORT = String(env.PORT);
+  process.env.HOST = env.HOST;
+  process.env.JWT_EXPIRES_IN = env.JWT_EXPIRES_IN;
+  if (env.JWT_SECRET) {
+    process.env.JWT_SECRET = env.JWT_SECRET;
+  }
+
+  warnOptionalDependencies();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
   app.set('trust proxy', 1);
@@ -68,12 +73,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = Number(process.env.PORT ?? 4000);
-  const host = process.env.HOST ?? '0.0.0.0';
-
-  await app.listen(port, host);
+  await app.listen(env.PORT, env.HOST);
 
   const logger = new Logger('Bootstrap');
-  logger.log(`Backend listening on ${host}:${port}`);
+  logger.log(`Backend listening on ${env.HOST}:${env.PORT}`);
 }
 bootstrap();

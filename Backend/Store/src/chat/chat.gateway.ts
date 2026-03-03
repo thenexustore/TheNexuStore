@@ -65,8 +65,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      const secret =
-        this.configService.get<string>('JWT_SECRET') || 'dev_secret';
+      const secret = this.configService.getOrThrow<string>('JWT_SECRET');
       const payload = this.jwtService.verify(token, { secret });
 
       const role = payload.role === 'admin' ? 'admin' : 'customer';

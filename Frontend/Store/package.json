@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "NEXT_DISABLE_TURBOPACK=1 next dev -p 3000",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "export": "next export",
-    "check:merge-markers": "node scripts/check-merge-markers.mjs"
+    "check:merge-markers": "node scripts/check-merge-markers.mjs",
+    "check:runtime-entrypoint": "node scripts/check-runtime-entrypoint.mjs",
+    "prebuild": "npm run check:runtime-entrypoint",
+    "check:next-build-artifacts": "node scripts/check-next-build-artifacts.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

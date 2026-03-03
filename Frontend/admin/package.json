@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "check:merge-markers": "node scripts/check-merge-markers.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:next-build-artifacts": "node scripts/check-next-build-artifacts.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

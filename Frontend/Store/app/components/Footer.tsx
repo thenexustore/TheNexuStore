@@ -23,7 +23,28 @@ export default function Footer() {
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) setEmail("");
+    if (email) {
+      setEmail("");
+    }
+  };
+
+  const handleSocialClick = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const openLocationMap = () => {
+    const address = "Paseo de las Palmeras, 3, Local B, 51001 Ceuta";
+    const encodedAddress = encodeURIComponent(address);
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+    window.open(mapUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const callPhone = () => {
+    window.location.href = "tel:+34656806899";
+  };
+
+  const sendEmail = () => {
+    window.location.href = "mailto:administracion@nexusssolutions.com";
   };
 
   return (
@@ -32,9 +53,24 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
           <div>
             <h3 className="text-lg font-semibold mb-4">{t("title")}</h3>
-            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-md">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("placeholder")} className="w-full rounded-full px-5 py-3 bg-transparent border border-white/30 text-sm outline-none focus:border-white transition" required />
-              <button type="submit" className="rounded-full bg-white text-black px-6 py-3 text-sm font-medium hover:bg-gray-200 transition">{t("subscribe")}</button>
+            <form
+              onSubmit={handleSubscribe}
+              className="flex flex-col sm:flex-row gap-3 max-w-md"
+            >
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("placeholder")}
+                className="w-full rounded-full px-5 py-3 bg-transparent border border-white/30 text-sm outline-none focus:border-white transition"
+                required
+              />
+              <button
+                type="submit"
+                className="rounded-full bg-white text-black px-6 py-3 text-sm font-medium hover:bg-gray-200 transition"
+              >
+                {t("subscribe")}
+              </button>
             </form>
           </div>
 
@@ -51,8 +87,23 @@ export default function Footer() {
       </div>
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/60 text-center md:text-left">
-          <p>© {new Date().getFullYear()} Sánchez Peinado Solutions SL — <span className="font-semibold text-white">NEXUS SP Solutions</span>. {t("rights")}</p>
-          <div className="flex flex-wrap justify-center gap-6"><span>{t("legal")}</span><span>{t("privacy")}</span><span>{t("terms")}</span></div>
+          <p>
+            © {new Date().getFullYear()} Sánchez Peinado Solutions SL —{" "}
+            <span className="font-semibold text-white">NEXUS SP Solutions</span>
+            . {t("rights")}
+          </p>
+
+          <div className="flex flex-wrap justify-center gap-6">
+            <span className="cursor-pointer hover:text-white transition">
+              {t("legal")}
+            </span>
+            <span className="cursor-pointer hover:text-white transition">
+              {t("privacy")}
+            </span>
+            <span className="cursor-pointer hover:text-white transition">
+              {t("terms")}
+            </span>
+          </div>
         </div>
       </div>
     </footer>

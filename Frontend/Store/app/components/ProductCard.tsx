@@ -306,7 +306,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div
-      className={`group relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 ${
+      className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg ${
         isLoading ? "pointer-events-none" : ""
       } ${className}`}
     >
@@ -334,7 +334,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               />
             </svg>
             <span className="text-sm font-semibold text-gray-700">
-              {buyNowLoading ? "Adding to cart..." : "Loading..."}
+              {buyNowLoading ? t("adding") : "Loading..."}
             </span>
           </div>
         </div>
@@ -409,23 +409,23 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
           {cartItem && (
             <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
-              {quantity} in cart
+              {t("inCart", {count: quantity})}
             </span>
           )}
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-lg font-bold text-gray-900 line-clamp-2 leading-tight">
+        <div className="space-y-3 min-w-0">
+          <h3 className="line-clamp-2 min-h-12 break-words text-base font-bold leading-tight text-gray-900 sm:text-lg">
             {product.title}
           </h3>
 
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
             {product.short_description ||
-              "Premium quality product with excellent features and performance."}
+              t("premiumDesc")}
           </p>
 
           {rating > 0 && reviewCount > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
               <div className="flex items-center">
                 <Star size={16} className="fill-amber-400 text-amber-400" />
                 <span className="ml-1 text-sm font-semibold">
@@ -434,25 +434,24 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </div>
               <span className="text-xs text-gray-500">/ 5</span>
               <span className="text-xs text-gray-400">
-                ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
+                ({reviewCount} {reviewCount === 1 ? t("review") : t("reviews")})
               </span>
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-gray-900">
+          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-xl font-bold text-gray-900 sm:text-2xl">
               €{product.price.toFixed(2)}
             </span>
 
             {product.compare_at_price &&
               product.compare_at_price > product.price && (
                 <>
-                  <span className="text-lg text-gray-500 line-through">
+                  <span className="text-sm text-gray-500 line-through sm:text-base">
                     €{product.compare_at_price.toFixed(2)}
                   </span>
                   <span className="text-sm font-semibold text-red-600">
-                    Save €
-                    {(product.compare_at_price - product.price).toFixed(2)}
+                    {t("save", {amount: (product.compare_at_price - product.price).toFixed(2)})}
                   </span>
                 </>
               )}
@@ -460,12 +459,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      <div className="px-4 pb-4 mt-2">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="mt-auto px-4 pb-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`flex-1 py-3 text-sm font-bold text-white rounded-lg transition-all duration-200 ${
+            className={`w-full py-3 text-xs font-bold text-white rounded-lg transition-all duration-200 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -493,17 +492,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Adding...
+                {t("adding")}
               </span>
             ) : (
-              "Buy Now"
+              t("buyNow")
             )}
           </button>
 
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full py-3 text-sm font-semibold text-white bg-gray-400 rounded-lg cursor-not-allowed"
+              className="w-full rounded-lg bg-gray-400 py-3 text-xs font-semibold text-white cursor-not-allowed sm:text-sm"
             >
               {t("outOfStock")}
             </button>
@@ -511,13 +510,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`w-full py-3 text-sm font-semibold text-white rounded-lg transition-colors duration-200 active:scale-95 ${
+              className={`w-full py-3 text-xs font-semibold text-white rounded-lg transition-colors duration-200 active:scale-95 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
               }`}
             >
-              {cartLoading ? "Adding..." : t("addToCart")}
+              {cartLoading ? t("adding") : t("addToCart")}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">

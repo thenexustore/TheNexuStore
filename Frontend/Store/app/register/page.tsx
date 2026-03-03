@@ -17,11 +17,11 @@ import { registerUser, verifyOtp } from "../lib/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"register" | "verify">("register");
+  const [step, setStep] = useState("register");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [image, setImage] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState(null as any);
   const [otp, setOtp] = useState("");
   const [form, setForm] = useState({
     first_name: "",
@@ -37,7 +37,7 @@ export default function RegisterPage() {
     return () => URL.revokeObjectURL(url);
   }, [image]);
 
-  const toBase64 = (file: File): Promise<string> =>
+  const toBase64 = (file: any) =>
     new Promise((res, rej) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -45,12 +45,12 @@ export default function RegisterPage() {
       reader.onerror = rej;
     });
 
-  const onRegister = async (e: React.FormEvent) => {
+  const onRegister = async (e: any) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const profile_image = image ? await toBase64(image) : null;
+      const profile_image = image ? String(await toBase64(image)) : null;
       await registerUser({ ...form, profile_image });
       setStep("verify");
     } catch (err: any) {
@@ -60,7 +60,7 @@ export default function RegisterPage() {
     }
   };
 
-  const onVerify = async (e: React.FormEvent) => {
+  const onVerify = async (e: any) => {
     e.preventDefault();
     setError("");
     setLoading(true);

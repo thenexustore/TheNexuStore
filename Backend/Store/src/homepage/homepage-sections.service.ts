@@ -126,7 +126,7 @@ export class HomepageSectionsService {
 
   async ensureDefaultSections() {
     for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
-      const existing = await this.prisma.homepageSection.findUnique({
+      const existing = await this.prisma.homepageSection.findFirst({
         where: { type: section.type as any },
       });
 

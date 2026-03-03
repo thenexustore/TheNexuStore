@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
@@ -180,7 +180,7 @@ export default function CheckoutPage() {
           ? error.message
           : "Failed to create order. Please try again.";
       setErrors({
-        submit: message,
+        submit: error.message || t("createOrderFailed"),
       });
     } finally {
       setLoading(false);

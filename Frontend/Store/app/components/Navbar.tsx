@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Menu, Search, ShoppingCart, X, MessageCircle, ChevronDown } from "lucide-react";
+import { Menu, Search, ShoppingCart, X, MessageCircle } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
@@ -20,6 +20,7 @@ type User = {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
+    const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -281,7 +282,6 @@ export default function Navbar() {
           >
             <Menu size={18} />
             {t("allCategories")}
-            <ChevronDown size={16} />
           </button>
 
           <div className="order-3 w-full md:order-none md:flex-1 md:px-2" ref={searchRef}>
@@ -538,22 +538,28 @@ export default function Navbar() {
           </button>
         </div>
 
-        <section
-          id="all-categories-panel"
-          ref={categoryPanelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("allCategories")}
-          className="h-[calc(100vh-88px)] overflow-hidden"
-        >
-          {categoriesLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
-            </div>
-          ) : menuGroups.length > 0 ? (
-            <div className="grid h-full grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
-              <nav className="border-r border-gray-200 overflow-y-auto">
-                {menuGroups.map((group) => (
+        <div className="p-4 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              placeholder={t("searchCategories")}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
+            />
+          </div>
+        </div>
+
+        <div className="h-[calc(100vh-144px)] overflow-y-auto">
+          <div className="p-4">
+            {categoriesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
+              </div>
+            ) : filteredCategories.length > 0 ? (
+              <div className="space-y-1">
+                {filteredCategories.map((category) => (
                   <button
                     key={group.parent_id}
                     onClick={() => setSelectedParentId(group.parent_id)}
@@ -600,11 +606,15 @@ export default function Navbar() {
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">{t("noCategoriesAvailable")}</div>
-          )}
-        </section>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                {categorySearch
+                  ? t("noCategoriesFound")
+                  : t("noCategoriesAvailable")}
+              </div>
+            )}
+          </div>
+        </div>
       </aside>
     </>
   );

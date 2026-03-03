@@ -11,6 +11,25 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 
+const parseMaybeNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatAmount = (value: unknown): string => {
+  const parsed = parseMaybeNumber(value);
+  return parsed === null ? "—" : `${parsed.toFixed(2)} €`;
+};
+
+const formatCouponValue = (type: "PERCENT" | "FIXED", value: unknown): string => {
+  const parsed = parseMaybeNumber(value);
+  if (parsed === null) return "—";
+
+  return type === "PERCENT" ? `${parsed}%` : `${parsed.toFixed(2)} €`;
+};
+
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,52 +306,50 @@ export default function CouponsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {coupons.map((c) => (
-                      <tr key={c.id} className="border-b last:border-0">
-                        <td className="px-3 py-2 font-semibold">{c.code}</td>
-                        <td className="px-3 py-2">{c.type === "PERCENT" ? "Percent" : "Fixed"}</td>
-                        <td className="px-3 py-2">
-                          {c.type === "PERCENT" ? `${c.value}%` : `${c.value.toFixed(2)} €`}
-                        </td>
-                        <td className="px-3 py-2">
-                          {c.min_order_amount ? `${c.min_order_amount.toFixed(2)} €` : "—"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {c.usage_limit ? `${c.usage_count}/${c.usage_limit}` : c.usage_count}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              c.is_active
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-zinc-100 text-zinc-500"
-                            }`}
-                          >
-                            {c.is_active ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => openEditCoupon(c)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-zinc-50"
+                    {coupons.map((c) => {
+                      return (
+                        <tr key={c.id} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-semibold">{c.code}</td>
+                          <td className="px-3 py-2">{c.type === "PERCENT" ? "Percent" : "Fixed"}</td>
+                          <td className="px-3 py-2">{formatCouponValue(c.type, c.value)}</td>
+                          <td className="px-3 py-2">{formatAmount(c.min_order_amount)}</td>
+                          <td className="px-3 py-2">
+                            {c.usage_limit ? `${c.usage_count}/${c.usage_limit}` : c.usage_count}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                c.is_active
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-zinc-100 text-zinc-500"
+                              }`}
                             >
-                              <Pencil className="w-3 h-3" />
-                              Edit
-                            </button>
-                            {c.is_active && (
+                              {c.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
                               <button
-                                onClick={() => handleDisable(c.id)}
-                                disabled={savingCouponId === c.id}
-                                className="px-2 py-1 rounded border text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+                                onClick={() => openEditCoupon(c)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-zinc-50"
                               >
-                                Disable
+                                <Pencil className="w-3 h-3" />
+                                Edit
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {c.is_active && (
+                                <button
+                                  onClick={() => handleDisable(c.id)}
+                                  disabled={savingCouponId === c.id}
+                                  className="px-2 py-1 rounded border text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+                                >
+                                  Disable
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

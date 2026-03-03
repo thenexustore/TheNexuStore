@@ -7,8 +7,10 @@ import { AuthModule } from '../../auth/auth.module';
 import { CouponModule } from '../coupon/coupon.module';
 import { MailModule } from '../../auth/mail/mail.module';
 
+import { ShippingTaxModule } from '../../shipping-tax/shipping-tax.module';
+
 @Module({
-  imports: [CommonModule, CartModule, AuthModule, CouponModule, MailModule],
+  imports: [CommonModule, CartModule, AuthModule, CouponModule, MailModule, ShippingTaxModule],
   controllers: [CheckoutController],
   providers: [CheckoutService],
   exports: [CheckoutService],

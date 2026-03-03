@@ -11,6 +11,7 @@ import { BillingAddressDto, CreateOrderDto, ShippingAddressDto } from './dto/che
 import { OrderResponseDto, PaymentIntentDto } from './dto/checkout-response.dto';
 import { PaymentProvider } from '@prisma/client';
 import { MailService } from '../../auth/mail/mail.service';
+import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
 
 @Injectable()
 export class CheckoutService {
@@ -19,6 +20,7 @@ export class CheckoutService {
     private cartService: CartService,
     private couponService: CouponService,
     private mailService: MailService,
+    private shippingTaxService: ShippingTaxService,
   ) {}
 
   private readonly FRONTEND_URL =
@@ -114,10 +116,24 @@ export class CheckoutService {
 
     const subtotal = cart.summary.subtotal;
     const discountAmount = cart.summary.discount || 0;
-    const shippingAmount = subtotal > 100 ? 0 : 5.99;
-    const taxableAmount = subtotal - discountAmount + shippingAmount;
-    const tax = taxableAmount * 0.21;
-    const total = taxableAmount + tax;
+
+    const totals = await this.shippingTaxService.calculateTotals({
+      subtotalExclTax: subtotal,
+      discountExclTax: discountAmount,
+      destination: dto.shipping_address,
+      currency: 'EUR',
+    });
+
+    if (totals.status !== 'OK') {
+      throw new BadRequestException(
+        totals.message ||
+          'Shipping not available for this destination. Contact support.',
+      );
+    }
+
+    const shippingAmount = totals.shipping_excl_tax;
+    const tax = totals.tax_amount + totals.customs_duty_amount;
+    const total = totals.total;
 
     const billingAddressJson = JSON.parse(JSON.stringify(dto.billing_address));
     const shippingAddressJson = JSON.parse(
@@ -182,8 +198,9 @@ export class CheckoutService {
           unit_price: Number(price.sale_price),
           qty: cartItem.qty,
           line_subtotal: Number(price.sale_price) * cartItem.qty,
-          tax_amount: Number(price.sale_price) * cartItem.qty * 0.21,
-          line_total: Number(price.sale_price) * cartItem.qty * 1.21,
+          tax_amount: Number(price.sale_price) * cartItem.qty * totals.tax_rate,
+          line_total:
+            Number(price.sale_price) * cartItem.qty * (1 + totals.tax_rate),
           fulfillment_type: 'INTERNAL',
         },
       });

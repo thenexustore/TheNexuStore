@@ -1,7 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { API_URL } from "./env";
 
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  const url = `${API_BASE}${endpoint}`;
+  const url = `${API_URL}${endpoint}`;
 
   const response = await fetch(url, {
     ...options,

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Banner, CreateBannerData } from "@/lib/api/banners";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { API_URL, SITE_URL } from "@/lib/constants";
 
 interface ProductOption {
   id: string;
@@ -21,8 +22,6 @@ interface BannerFormProps {
   onSubmit: (data: CreateBannerData) => Promise<void>;
   isSubmitting: boolean;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function BannerForm({
   banner,
@@ -216,7 +215,7 @@ export default function BannerForm({
 
   const getFullUrlPreview = () => {
     if (!formData.button_link) return "";
-    const baseUrl = "http://localhost:3000";
+    const baseUrl = SITE_URL;
     return `${baseUrl}${formData.button_link}`;
   };
 

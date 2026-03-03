@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { API_URL } from "../lib/env";
 import Image from "next/image";
 import {
   Camera,
@@ -227,7 +228,7 @@ flex items-center justify-center gap-2
               </div>
 
               <a
-                href={`${process.env.NEXT_PUBLIC_API_URL}/auth/google`}
+                href={`${API_URL}/auth/google`}
                 className="w-full flex items-center justify-center gap-3 border-2 border-slate-200 py-4 font-black uppercase tracking-widest hover:bg-slate-50 transition text-xs"
               >
                 <Image

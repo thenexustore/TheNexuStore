@@ -155,8 +155,8 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-black py-8">
-      <div className="container mx-auto px-4 max-w-6xl">
+    <div className="min-h-screen bg-white py-6 text-black sm:py-8">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         {isLegacyCart && user && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center justify-between">
@@ -211,7 +211,7 @@ export default function CartPage() {
           </p>
         </header>
 
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
           <div className="lg:w-2/3">
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="divide-y divide-gray-100">
@@ -225,10 +225,10 @@ export default function CartPage() {
                   return (
                     <div
                       key={item.id}
-                      className="p-6 hover:bg-gray-50 transition-colors"
+                      className="p-4 transition-colors hover:bg-gray-50 sm:p-6"
                     >
-                      <div className="flex gap-4">
-                        <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100">
+                      <div className="flex flex-col gap-4 sm:flex-row">
+                        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-32 sm:w-32">
                           <img
                             src={
                               item.thumbnail?.trim() ||
@@ -254,10 +254,10 @@ export default function CartPage() {
                           )}
                         </div>
 
-                        <div className="flex-1">
-                          <div className="flex justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
                             <div>
-                              <h3 className="text-lg font-bold mb-1">
+                              <h3 className="mb-1 break-words text-base font-bold sm:text-lg">
                                 {item.product_title}
                               </h3>
                               <p className="text-gray-500 text-sm mb-2">
@@ -287,7 +287,7 @@ export default function CartPage() {
                             </button>
                           </div>
 
-                          <div className="flex items-center justify-between mt-4">
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center border border-gray-200 rounded-lg">
                               <button
                                 onClick={() =>
@@ -443,6 +443,14 @@ export default function CartPage() {
               </div>
 
               <div className="border-t border-gray-300 pt-4 mb-6">
+                {(cart.summary.customs_duty || 0) > 0 && (
+                  <div className="flex justify-between mb-2">
+                    <span className="text-gray-600">Customs duty</span>
+                    <span className="font-medium">
+                      {formatCurrency(cart.summary.customs_duty || 0, locale)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t("total")}</span>
                   <span className="text-[#0B123A]">
@@ -461,7 +469,8 @@ export default function CartPage() {
               <div className="space-y-4">
                 <button
                   onClick={() => router.push("/checkout")}
-                  className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all"
+                  disabled={cart.summary.checkout_available === false}
+                  className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t("proceed")}
                 </button>

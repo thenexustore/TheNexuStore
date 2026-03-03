@@ -11,6 +11,7 @@ import { BannersModule } from './banners/banners.module';
 import { FeaturedProductsModule } from './featured-products/featured-products.module';
 import { AuthModule } from '../auth/auth.module';
 import { CouponsModule } from './coupons/coupons.module';
+import { ShippingTaxAdminModule } from './shipping-tax/shipping-tax-admin.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CouponsModule } from './coupons/coupons.module';
     BannersModule,
     FeaturedProductsModule,
     CouponsModule,
+    ShippingTaxAdminModule,
   ],
   controllers: [AdminController, DashboardController, ProductsController],
   providers: [

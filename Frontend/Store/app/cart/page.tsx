@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../providers/AuthProvider";
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
+const formatCurrency = (amount: number, locale: string) => {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "EUR",
   }).format(amount);
@@ -14,6 +15,8 @@ const formatCurrency = (amount: number) => {
 
 export default function CartPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("cart");
   const { user } = useAuth();
   const {
     cart,
@@ -70,20 +73,20 @@ export default function CartPage() {
   };
 
   const handleClearCart = async () => {
-    if (confirm("Are you sure you want to clear your cart?")) {
+    if (confirm(t("confirmClear"))) {
       await clearCart();
     }
   };
 
   const handleSyncCart = async () => {
-    if (confirm("Sync your cart with your account to save items?")) {
+    if (confirm(t("confirmSync"))) {
       await syncLegacyCart();
     }
   };
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
-      setCouponError("Please enter a coupon code.");
+      setCouponError(t("couponRequired"));
       return;
     }
 
@@ -94,7 +97,7 @@ export default function CartPage() {
       setCouponCode("");
     } catch (error: any) {
       setCouponError(
-        error?.message || "Failed to apply coupon. Please try again.",
+        error?.message || t("couponApplyFailed"),
       );
     } finally {
       setIsApplyingCoupon(false);
@@ -108,32 +111,12 @@ export default function CartPage() {
       await removeCoupon();
     } catch (error: any) {
       setCouponError(
-        error?.message || "Failed to remove coupon. Please try again.",
+        error?.message || t("couponRemoveFailed"),
       );
     } finally {
       setIsApplyingCoupon(false);
     }
   };
-
-  useEffect(() => {
-    if (cart) {
-      console.log("Cart Data:", cart);
-      console.log("Cart Items:", cart.items);
-      console.log("Cart Summary:", cart.summary);
-
-      // Check for duplicate items
-      const skuMap = new Map();
-      cart.items.forEach((item, index) => {
-        if (skuMap.has(item.sku_code)) {
-          console.warn(
-            `Duplicate SKU found: ${item.sku_code} at positions ${skuMap.get(item.sku_code)} and ${index}`,
-          );
-        } else {
-          skuMap.set(item.sku_code, index);
-        }
-      });
-    }
-  }, [cart]);
 
   if (isLoading) {
     return (
@@ -150,21 +133,21 @@ export default function CartPage() {
           <div className="relative w-full aspect-square mb-8">
             <img
               src="https://www.svgrepo.com/show/17356/empty-cart.svg"
-              alt="Empty Cart"
+              alt={t("secureAlt")}
               className="w-full h-full object-cover rounded-3xl opacity-80"
             />
           </div>
           <h2 className="text-3xl font-bold text-black mb-3">
-            Your Cart is Empty
+            {t("emptyTitle")}
           </h2>
           <p className="text-gray-400 mb-10 text-lg">
-            Add some products to get started!
+            {t("emptyText")}
           </p>
           <button
             onClick={() => router.push("/products")}
             className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold cursor-pointer hover:bg-[#1a245a] active:scale-95 transition-all shadow-lg"
           >
-            Browse Products
+            {t("browse")}
           </button>
         </div>
       </div>
@@ -179,18 +162,17 @@ export default function CartPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-yellow-800">
-                  You have items in your local cart. Sync them with your
-                  account?
+                  {t("localCartPrompt")}
                 </p>
                 <p className="text-sm text-yellow-600 mt-1">
-                  This will save your cart items across devices.
+                  {t("localCartHelp")}
                 </p>
               </div>
               <button
                 onClick={handleSyncCart}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium"
               >
-                Sync Cart
+                {t("syncCart")}
               </button>
             </div>
           </div>
@@ -201,17 +183,17 @@ export default function CartPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-blue-800">
-                  Want to save your cart? Login or create an account.
+                  {t("saveCartPrompt")}
                 </p>
                 <p className="text-sm text-blue-600 mt-1">
-                  Your cart items will be saved across devices.
+                  {t("localCartHelp")}
                 </p>
               </div>
               <button
                 onClick={() => router.push("/login")}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
               >
-                Login
+                {t("login")}
               </button>
             </div>
           </div>
@@ -219,12 +201,13 @@ export default function CartPage() {
 
         <header className="mb-8">
           <h1 className="text-4xl font-black tracking-tighter">
-            SHOPPING CART
+            {t("title")}
           </h1>
           <p className="text-gray-500 mt-2">
-            {cart.summary.item_count} item
-            {cart.summary.item_count !== 1 ? "s" : ""} in your cart
-            {isLegacyCart && " (Local Storage)"}
+            {t("itemsInCart", {
+              count: cart.summary.item_count,
+              suffix: isLegacyCart ? t("localStorageSuffix") : "",
+            })}
           </p>
         </header>
 
@@ -265,7 +248,7 @@ export default function CartPage() {
                           {isOutOfStock && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                               <span className="text-white text-xs font-bold bg-red-500 px-2 py-1 rounded">
-                                Out of Stock
+                                {t("outOfStock")}
                               </span>
                             </div>
                           )}
@@ -278,10 +261,10 @@ export default function CartPage() {
                                 {item.product_title}
                               </h3>
                               <p className="text-gray-500 text-sm mb-2">
-                                SKU: {item.sku_code}
+                                {t("sku")}: {item.sku_code}
                               </p>
                               <p className="text-xl font-bold text-[#0B123A]">
-                                {formatCurrency(item.price)}
+                                {formatCurrency(item.price, locale)}
                               </p>
                             </div>
                             <button
@@ -337,19 +320,19 @@ export default function CartPage() {
                               </button>
                             </div>
                             <p className="text-xl font-bold">
-                              {formatCurrency(item.line_total)}
+                              {formatCurrency(item.line_total, locale)}
                             </p>
                           </div>
 
                           {!item.in_stock && (
                             <p className="text-red-500 text-sm mt-2">
-                              This item is out of stock
+                              {t("itemOut")}
                             </p>
                           )}
 
                           {item.quantity > item.max_quantity && (
                             <p className="text-yellow-500 text-sm mt-2">
-                              Only {item.max_quantity} available
+                              {t("available", {count: item.max_quantity})}
                             </p>
                           )}
                         </div>
@@ -364,7 +347,7 @@ export default function CartPage() {
                   onClick={handleClearCart}
                   className="text-red-500 hover:text-red-700 font-medium text-sm"
                 >
-                  Clear All Items
+                  {t("clearAll")}
                 </button>
               </div>
             </div>
@@ -372,35 +355,35 @@ export default function CartPage() {
 
           <div className="lg:w-1/3">
             <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 sticky top-8">
-              <h2 className="text-xl font-bold mb-6">Order Summary</h2>
+              <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
+                  <span className="text-gray-600">{t("subtotal")}</span>
                   <span className="font-medium">
-                    {formatCurrency(cart.summary.subtotal)}
+                    {formatCurrency(cart.summary.subtotal, locale)}
                   </span>
                 </div>
                 {cart.summary.discount && cart.summary.discount > 0 && (
                   <div className="flex justify-between text-green-700">
-                    <span className="text-gray-600">Discount</span>
+                    <span className="text-gray-600">{t("discount")}</span>
                     <span className="font-medium">
-                      -{formatCurrency(cart.summary.discount)}
+                      -{formatCurrency(cart.summary.discount, locale)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
+                  <span className="text-gray-600">{t("shipping")}</span>
                   <span className="font-medium">
                     {cart.summary.shipping === 0
-                      ? "FREE"
-                      : formatCurrency(cart.summary.shipping)}
+                      ? t("free")
+                      : formatCurrency(cart.summary.shipping, locale)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
+                  <span className="text-gray-600">{t("tax")}</span>
                   <span className="font-medium">
-                    {formatCurrency(cart.summary.tax)}
+                    {formatCurrency(cart.summary.tax, locale)}
                   </span>
                 </div>
               </div>
@@ -410,14 +393,14 @@ export default function CartPage() {
                   <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-green-800">
-                        Coupon "{cart.applied_coupon.code}" applied
+                        {t("couponApplied", {code: cart.applied_coupon.code})}
                       </p>
                       <p className="text-xs text-green-700">
-                        You saved{" "}
-                        {formatCurrency(
+                        {t("youSaved")} {formatCurrency(
                           cart.applied_coupon.discount_amount ||
                             cart.summary.discount ||
                             0,
+                          locale,
                         )}
                       </p>
                     </div>
@@ -432,14 +415,14 @@ export default function CartPage() {
                 ) : (
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Coupon Code
+                      {t("coupon")}
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value)}
-                        placeholder="Enter coupon"
+                        placeholder={t("enterCoupon")}
                         className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
                       />
                       <button
@@ -447,7 +430,7 @@ export default function CartPage() {
                         disabled={isApplyingCoupon}
                         className="px-4 py-2 rounded-lg bg-[#0B123A] text-white text-sm font-semibold hover:bg-[#1a245a] disabled:opacity-50"
                       >
-                        {isApplyingCoupon ? "Applying..." : "Apply"}
+                        {isApplyingCoupon ? t("applying") : t("apply")}
                       </button>
                     </div>
                     {couponError && (
@@ -461,15 +444,17 @@ export default function CartPage() {
 
               <div className="border-t border-gray-300 pt-4 mb-6">
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
+                  <span>{t("total")}</span>
                   <span className="text-[#0B123A]">
-                    {formatCurrency(cart.summary.total)}
+                    {formatCurrency(cart.summary.total, locale)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
                   {cart.summary.shipping === 0
-                    ? "Free shipping on orders over €100"
-                    : `Add €${Math.max(0, 100 - cart.summary.subtotal).toFixed(2)} for free shipping`}
+                    ? t("freeShippingOver100")
+                    : t("addForFreeShipping", {
+                        amount: Math.max(0, 100 - cart.summary.subtotal).toFixed(2),
+                      })}
                 </p>
               </div>
 
@@ -478,20 +463,20 @@ export default function CartPage() {
                   onClick={() => router.push("/checkout")}
                   className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all"
                 >
-                  Proceed to Checkout
+                  {t("proceed")}
                 </button>
 
                 <button
                   onClick={() => router.push("/products")}
                   className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-xl font-medium hover:border-[#0B123A] hover:text-[#0B123A] transition-all"
                 >
-                  Continue Shopping
+                  {t("continue")}
                 </button>
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
-                  Secure checkout · Free returns · 30-day warranty
+                  {t("secureNote")}
                 </p>
               </div>
             </div>

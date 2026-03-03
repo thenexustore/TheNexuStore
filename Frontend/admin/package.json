@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:merge-markers": "node scripts/check-merge-markers.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

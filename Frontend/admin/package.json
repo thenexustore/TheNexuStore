@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check:merge-markers": "node scripts/check-merge-markers.mjs"
+    "check:merge-markers": "node scripts/check-merge-markers.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

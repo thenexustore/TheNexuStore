@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Menu, Search, ShoppingCart, X, MessageCircle } from "lucide-react";
@@ -27,6 +27,7 @@ export default function Navbar() {
   const [menuGroups, setMenuGroups] = useState<MenuTreeGroup[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const categoryPanelRef = useRef<HTMLElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
@@ -208,6 +209,18 @@ export default function Navbar() {
     }
     return menuGroups[0];
   }, [menuGroups, selectedParentId]);
+
+  const filteredGroups = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return menuGroups;
+
+    return menuGroups.filter((group) => {
+      if (group.parent_name.toLowerCase().includes(query)) return true;
+      return group.children.some((child) =>
+        child.child_name.toLowerCase().includes(query),
+      );
+    });
+  }, [menuGroups, categorySearch]);
 
   useEffect(() => {
     if (!categoryPanelOpen) return;
@@ -557,24 +570,25 @@ export default function Navbar() {
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
               </div>
-            ) : filteredCategories.length > 0 ? (
-              <div className="space-y-1">
-                {filteredCategories.map((category) => (
-                  <button
-                    key={group.parent_id}
-                    onClick={() => setSelectedParentId(group.parent_id)}
-                    className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors truncate ${
-                      selectedGroup?.parent_id === group.parent_id
-                        ? "bg-[#0B123A] text-white"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    {group.parent_name}
-                  </button>
-                ))}
-              </nav>
+            ) : filteredGroups.length > 0 ? (
+              <>
+                <div className="space-y-1">
+                  {filteredGroups.map((group) => (
+                    <button
+                      key={group.parent_id}
+                      onClick={() => setSelectedParentId(group.parent_id)}
+                      className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors truncate ${
+                        selectedGroup?.parent_id === group.parent_id
+                          ? "bg-[#0B123A] text-white"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {group.parent_name}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="overflow-y-auto p-4">
+                <div className="overflow-y-auto p-4">
                 <div className="mb-4">
                   <h3 className="text-lg font-semibold text-[#0B123A] truncate">{selectedGroup?.parent_name}</h3>
                 </div>
@@ -605,7 +619,8 @@ export default function Navbar() {
                     ))}
                   </div>
                 </div>
-              </div>
+                </div>
+              </>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 {categorySearch

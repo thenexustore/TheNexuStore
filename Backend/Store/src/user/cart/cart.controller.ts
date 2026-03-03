@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
-import { AddToCartDto, UpdateCartItemDto, CartQueryDto, ApplyCouponDto } from './dto/cart.dto';
+import { AddToCartDto, UpdateCartItemDto, CartQueryDto, ApplyCouponDto, CartTotalsQueryDto } from './dto/cart.dto';
 import { AuthGuard } from '../../auth/auth.guard';
 import { PrismaService } from 'src/common/prisma.service';
 
@@ -23,7 +23,7 @@ export class CartController {
   ) {}
 
   @Get()
-  async getCart(@Request() req, @Query() query: CartQueryDto) {
+  async getCart(@Request() req, @Query() query: CartTotalsQueryDto) {
     const customerId = req.user?.id;
     const sessionId = query.session_id || req.headers['x-session-id'];
 
@@ -33,9 +33,37 @@ export class CartController {
       headers: req.headers,
     });
 
-    return this.cartService.getCart(customerId, sessionId);
+    return this.cartService.getCart(customerId, sessionId, {
+      country: query.country,
+      region: query.region,
+      postal_code: query.postal_code,
+    });
   }
 
+
+  @Get('totals')
+  async getTotals(@Request() req, @Query() query: CartTotalsQueryDto) {
+    const customerId = req.user?.id;
+    const sessionId = query.session_id || req.headers['x-session-id'];
+
+    return this.cartService.getCartTotals(customerId, sessionId, {
+      country: query.country,
+      region: query.region,
+      postal_code: query.postal_code,
+    });
+  }
+
+  @Get('shipping/quote')
+  async shippingQuote(@Request() req, @Query() query: CartTotalsQueryDto) {
+    const customerId = req.user?.id;
+    const sessionId = query.session_id || req.headers['x-session-id'];
+
+    return this.cartService.getCartTotals(customerId, sessionId, {
+      country: query.country,
+      region: query.region,
+      postal_code: query.postal_code,
+    });
+  }
   @Post('add')
   async addToCart(
     @Request() req,

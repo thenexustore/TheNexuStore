@@ -9,7 +9,9 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateCouponDto {
@@ -23,6 +25,8 @@ export class CreateCouponDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @ValidateIf((dto: CreateCouponDto) => dto.type === CouponType.PERCENT)
+  @Max(100)
   value: number = 0;
 
   @IsOptional()
@@ -59,6 +63,8 @@ export class UpdateCouponDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  @ValidateIf((dto: UpdateCouponDto) => dto.type === CouponType.PERCENT)
+  @Max(100)
   value?: number;
 
   @IsOptional()

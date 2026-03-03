@@ -15,14 +15,28 @@ export interface CartItem {
   product_id?: string;
 }
 
+export interface CartSummaryMeta {
+  status: "OK" | "UNAVAILABLE";
+  zone_code: string;
+  tax_label: "IVA" | "VAT" | "Taxes";
+  tax_mode: "VAT" | "OUTSIDE_VAT";
+  tax_rate: number;
+  customs_duty_rate: number;
+  customs_duty_amount: number;
+  message?: string;
+}
+
 export interface CartSummary {
   subtotal: number;
   discount?: number;
   shipping: number;
   tax: number;
+  customs_duty?: number;
   total: number;
   item_count: number;
   currency: string;
+  checkout_available?: boolean;
+  meta?: CartSummaryMeta;
 }
 
 export interface AppliedCoupon {

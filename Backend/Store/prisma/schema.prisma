@@ -179,6 +179,21 @@ enum StaffRole {
   WAREHOUSE
 }
 
+enum TaxMode {
+  VAT
+  OUTSIDE_VAT
+}
+
+enum HomepageSectionType {
+  HERO_BANNER_SLIDER
+  TOP_CATEGORIES_GRID
+  BEST_DEALS
+  NEW_ARRIVALS
+  FEATURED_PICKS
+  BRANDS_STRIP
+  TRUST_BAR
+}
+
 model Staff {
   id            String    @id @default(uuid())
   email         String    @unique @db.Citext
@@ -204,6 +219,20 @@ model Brand {
   updated_at    DateTime      @updatedAt
   products      Product[]
   pricing_rules PricingRule[]
+}
+
+model HomepageSection {
+  id         String              @id @default(uuid())
+  type       HomepageSectionType @unique
+  enabled    Boolean             @default(true)
+  position   Int
+  title      String?
+  config_json Json
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  @@index([enabled, position])
+  @@map("homepage_sections")
 }
 
 model Product {
@@ -612,6 +641,44 @@ model Cart {
   items       CartItem[]
 }
 
+model ShippingZone {
+  code            String         @id
+  enabled         Boolean        @default(false)
+  description     String
+  country_codes   String[]
+  region_matchers String[]
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  rules           ShippingRule[]
+}
+
+model ShippingRule {
+  id                     String       @id @default(uuid())
+  zone_code              String
+  min_base_excl_tax      Decimal      @db.Decimal(12, 2)
+  max_base_excl_tax      Decimal?     @db.Decimal(12, 2)
+  shipping_base_excl_tax Decimal      @db.Decimal(12, 2)
+  currency               String       @default("EUR")
+  priority               Int          @default(0)
+  created_at             DateTime     @default(now())
+  updated_at             DateTime     @updatedAt
+  zone                   ShippingZone @relation(fields: [zone_code], references: [code], onDelete: Cascade)
+
+  @@index([zone_code, priority])
+  @@unique([zone_code, min_base_excl_tax, max_base_excl_tax, priority])
+}
+
+model TaxZone {
+  code          String   @id
+  enabled       Boolean  @default(false)
+  mode          TaxMode
+  standard_rate     Decimal  @db.Decimal(5, 4)
+  customs_duty_rate Decimal  @default(0) @db.Decimal(5, 4)
+  notes             String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
+
 model SyncLog {
   id        Int      @id @default(autoincrement())
   type      String   @unique
@@ -664,12 +731,13 @@ model Order {
 
 model Category {
   id         String   @id @default(uuid())
-  parent_id  String?  @map("parent_id")
-  name       String
-  slug       String   @unique
-  sort_order Int
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
+  parent_id      String?  @map("parent_id")
+  name           String
+  slug           String   @unique
+  sort_order     Int
+  is_active      Boolean  @default(true)
+  parent_locked  Boolean  @default(false) @map("parent_locked")
+  created_at     DateTime @default(now())
   updated_at DateTime @updatedAt
 
   parent   Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])

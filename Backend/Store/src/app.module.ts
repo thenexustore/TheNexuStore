@@ -9,6 +9,8 @@ import { UserModule } from './user/user.module';
 import { ChatModule } from './chat/chat.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { InfortisaModule } from './infortisa/infortisa.module';
+import { PrismaService } from './common/prisma.service';
+import { HomepageSectionsModule } from './homepage/homepage-sections.module';
 
 @Module({
   imports: [
@@ -20,8 +22,9 @@ import { InfortisaModule } from './infortisa/infortisa.module';
     InfortisaModule,
     UserModule,
     ChatModule,
+    HomepageSectionsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, PrismaService],
 })
 export class AppModule {}

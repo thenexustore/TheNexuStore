@@ -33,14 +33,28 @@ interface CartItem {
   product_id?: string;
 }
 
+interface CartSummaryMeta {
+  status: "OK" | "UNAVAILABLE";
+  zone_code: string;
+  tax_label: "IVA" | "VAT" | "Taxes";
+  tax_mode: "VAT" | "OUTSIDE_VAT";
+  tax_rate: number;
+  customs_duty_rate: number;
+  customs_duty_amount: number;
+  message?: string;
+}
+
 interface CartSummary {
   subtotal: number;
   discount?: number;
   shipping: number;
   tax: number;
+  customs_duty?: number;
   total: number;
   item_count: number;
   currency: string;
+  checkout_available?: boolean;
+  meta?: CartSummaryMeta;
 }
 
 interface AppliedCoupon {
@@ -105,9 +119,20 @@ const convertLegacyToBackendFormat = (legacyItems: any[]): Cart => {
       subtotal,
       shipping,
       tax,
+      customs_duty: 0,
       total: subtotal + shipping + tax,
       item_count: items.reduce((sum, item) => sum + item.quantity, 0),
       currency: "EUR",
+      checkout_available: true,
+      meta: {
+        status: "OK",
+        zone_code: "ES_PENINSULA_BALEARES",
+        tax_label: "IVA",
+        tax_mode: "VAT",
+        tax_rate: 0.21,
+        customs_duty_rate: 0,
+        customs_duty_amount: 0,
+      },
     },
   };
 };

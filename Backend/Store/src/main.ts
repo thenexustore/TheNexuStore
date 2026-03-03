@@ -5,8 +5,32 @@ import { ValidationPipe } from '@nestjs/common';
 import * as bodyParser from 'body-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { Logger } from '@nestjs/common';
+import { config as loadEnv } from 'dotenv';
+
+function validateEnvironment() {
+  const logger = new Logger('Bootstrap');
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'Missing required environment variable: DATABASE_URL. Please set DATABASE_URL before starting the backend.',
+    );
+  }
+
+  if (!process.env.REDIS_URL) {
+    logger.warn('REDIS_URL is not configured. Redis-backed features are disabled.');
+  }
+
+  if (!process.env.RABBITMQ_URL) {
+    logger.warn(
+      'RABBITMQ_URL is not configured. RabbitMQ-backed features are disabled.',
+    );
+  }
+}
 
 async function bootstrap() {
+  loadEnv();
+  validateEnvironment();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
   app.set('trust proxy', 1);

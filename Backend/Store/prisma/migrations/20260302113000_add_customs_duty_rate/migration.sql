@@ -1,0 +1,2 @@
+ALTER TABLE "TaxZone"
+ADD COLUMN "customs_duty_rate" DECIMAL(5,4) NOT NULL DEFAULT 0;

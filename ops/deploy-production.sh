@@ -79,8 +79,21 @@ fi
 log "Updating repository to branch $BRANCH"
 cd "$REPO_DIR"
 git fetch --all --prune
-git checkout "$BRANCH"
-git pull --ff-only
+
+if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+  if [[ "$FORCE_SYNC_WITH_ORIGIN" == "1" ]]; then
+    log "Force-sync enabled: hard resetting $BRANCH to origin/$BRANCH"
+    git checkout -B "$BRANCH" "origin/$BRANCH"
+    git reset --hard "origin/$BRANCH"
+    git clean -fd
+  else
+    git checkout "$BRANCH"
+    git pull --ff-only
+  fi
+else
+  log "origin/$BRANCH not found; using local branch checkout"
+  git checkout "$BRANCH"
+fi
 
 log "Installing/building backend"
 cd "$REPO_DIR/Backend/Store"

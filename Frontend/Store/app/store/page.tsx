@@ -1,12 +1,47 @@
-"use client";
+import HomeRenderer from './HomeRenderer';
+import { API_URL } from '../lib/env';
 
-import HomeDynamicSections from "./HomeDynamicSections";
+const fallbackData = {
+  layout: null,
+  sections: [
+    {
+      id: 'fallback-categories',
+      type: 'CATEGORY_STRIP',
+      title: 'Top Categories',
+      resolved: [],
+    },
+    {
+      id: 'fallback-arrivals',
+      type: 'PRODUCT_CAROUSEL',
+      title: 'New Arrivals',
+      resolved: [],
+    },
+  ],
+};
 
-export default function StorePage() {
+async function getHome(previewLayoutId?: string) {
+  const query = new URLSearchParams();
+  if (previewLayoutId) query.set('previewLayoutId', previewLayoutId);
+  const endpoint = `${API_URL}/home${query.toString() ? `?${query.toString()}` : ''}`;
+
+  try {
+    const res = await fetch(endpoint, { next: { revalidate: 300 } });
+    if (!res.ok) return fallbackData;
+    const json = await res.json();
+    return json.data || fallbackData;
+  } catch {
+    return fallbackData;
+  }
+}
+
+export default async function StorePage({ searchParams }: { searchParams?: Promise<{ previewLayoutId?: string }> }) {
+  const sp = (await searchParams) || {};
+  const data = await getHome(sp.previewLayoutId);
+
   return (
     <main className="min-h-screen bg-slate-50 pb-10">
       <div className="mx-auto flex w-full flex-col items-center gap-8">
-        <HomeDynamicSections />
+        <HomeRenderer payload={data} />
       </div>
     </main>
   );

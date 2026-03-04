@@ -21,8 +21,15 @@ export interface PricingRule {
   updated_at: string;
 }
 
-export async function fetchPricingRules(): Promise<PricingRule[]> {
-  return fetchWithAuth('/admin/pricing/rules');
+export async function fetchPricingRules(query?: {
+  scope?: PricingRuleScope | 'ALL';
+  active?: 'all' | 'true' | 'false';
+}): Promise<PricingRule[]> {
+  const params = new URLSearchParams();
+  if (query?.scope && query.scope !== 'ALL') params.set('scope', query.scope);
+  if (query?.active && query.active !== 'all') params.set('active', query.active);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return fetchWithAuth(`/admin/pricing/rules${suffix}`);
 }
 
 export async function createPricingRule(payload: Partial<PricingRule>): Promise<PricingRule> {

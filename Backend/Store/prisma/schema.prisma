@@ -196,6 +196,24 @@ enum HomepageSectionType {
   TRUST_BAR
 }
 
+enum HomePageSectionType {
+  HERO_CAROUSEL
+  CATEGORY_STRIP
+  PRODUCT_CAROUSEL
+  BRAND_STRIP
+  VALUE_PROPS
+  TRENDING_CHIPS
+  CUSTOM_HTML
+}
+
+enum HomePageSectionItemType {
+  BANNER
+  CATEGORY
+  BRAND
+  PRODUCT
+  LINK
+}
+
 model Staff {
   id            String    @id @default(uuid())
   email         String    @unique @db.Citext
@@ -221,6 +239,7 @@ model Brand {
   updated_at    DateTime      @updatedAt
   products      Product[]
   pricing_rules PricingRule[]
+  home_section_items HomePageSectionItem[]
 }
 
 model HomepageSection {
@@ -235,6 +254,67 @@ model HomepageSection {
 
   @@index([enabled, position])
   @@map("homepage_sections")
+}
+
+model HomePageLayout {
+  id         String            @id @default(uuid())
+  locale     String?
+  is_active  Boolean           @default(false)
+  name       String
+  created_at DateTime          @default(now())
+  updated_at DateTime          @updatedAt
+  sections   HomePageSection[]
+
+  @@index([locale, is_active])
+  @@map("home_page_layouts")
+}
+
+model HomePageSection {
+  id         String                 @id @default(uuid())
+  layout_id  String
+  type       HomePageSectionType
+  title      String?
+  subtitle   String?
+  position   Int
+  is_enabled Boolean                @default(true)
+  variant    String?
+  config     Json
+  created_at DateTime               @default(now())
+  updated_at DateTime               @updatedAt
+
+  layout HomePageLayout      @relation(fields: [layout_id], references: [id], onDelete: Cascade)
+  items  HomePageSectionItem[]
+
+  @@unique([layout_id, position])
+  @@index([layout_id, is_enabled, position])
+  @@map("home_page_sections")
+}
+
+model HomePageSectionItem {
+  id          String                  @id @default(uuid())
+  section_id  String
+  position    Int
+  type        HomePageSectionItemType
+  banner_id   String?
+  category_id String?
+  brand_id    String?
+  product_id  String?
+  label       String?
+  image_url   String?
+  href        String?
+  config      Json?
+  created_at  DateTime                @default(now())
+  updated_at  DateTime                @updatedAt
+
+  section  HomePageSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  banner   Banner?         @relation(fields: [banner_id], references: [id])
+  category Category?       @relation(fields: [category_id], references: [id])
+  brand    Brand?          @relation(fields: [brand_id], references: [id])
+  product  Product?        @relation(fields: [product_id], references: [id])
+
+  @@unique([section_id, position])
+  @@index([section_id, type])
+  @@map("home_page_section_items")
 }
 
 model Product {
@@ -260,6 +340,7 @@ model Product {
   media            ProductMedia[]
   reviews          ProductReview[]
   featured_product FeaturedProduct?
+  home_section_items HomePageSectionItem[]
 
   @@index([slug])
 }
@@ -350,6 +431,8 @@ model Banner {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  home_section_items HomePageSectionItem[]
 
   @@index([is_active, sort_order])
 }
@@ -784,6 +867,7 @@ model Category {
   products_main Product[]         @relation("ProductMainCategory")
 
   pricing_rules PricingRule[]
+  home_section_items HomePageSectionItem[]
 
   @@index([parent_id, sort_order])
 }

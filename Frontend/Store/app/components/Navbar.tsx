@@ -26,7 +26,7 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
+  const [categoryTreeState, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [desktopMegaOpen, setDesktopMegaOpen] = useState(false);
@@ -41,8 +41,8 @@ export default function Navbar() {
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const curatedCategoryTree = useMemo(
-    () => buildCuratedCategoryTree(categoryTree),
-    [categoryTree],
+    () => buildCuratedCategoryTree(categoryTreeState),
+    [categoryTreeState],
   );
 
   // Use context providers

@@ -15,7 +15,16 @@ export { fetchBrands, createBrand, type Brand } from "./brands";
 
 export { fetchCategories, createCategory, type Category } from "./categories";
 
-export { fetchOrders, type Order, type OrdersResponse } from "./orders";
+export {
+  fetchOrders,
+  fetchOrderById,
+  fetchOrderTimeline,
+  addOrderNote,
+  type Order,
+  type OrderDetail,
+  type OrderTimelineEntry,
+  type OrdersResponse,
+} from "./orders";
 
 export { fetchDashboardStats, type DashboardStats } from "./dashboard";
 
@@ -69,3 +78,18 @@ export {
   type ShippingRule,
   type TaxZone,
 } from './shipping-tax';
+
+export {
+  fetchImportHistory,
+  triggerImport,
+  type ImportHistoryItem,
+  type ImportHistoryResponse,
+} from "./imports";
+
+export {
+  fetchRmas,
+  fetchRmaById,
+  updateRmaStatus,
+  type Rma,
+  type RmaStatus,
+} from "./rmas";

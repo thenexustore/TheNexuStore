@@ -25,6 +25,15 @@ export class PricingAdminService {
     if (scope === 'SKU' && !sku_id) throw new BadRequestException('SKU scope requires sku_id or sku_code');
   }
 
+
+
+  private validateDateWindow(startsAt?: string | null, endsAt?: string | null) {
+    if (!startsAt || !endsAt) return;
+    const s = new Date(startsAt).getTime();
+    const e = new Date(endsAt).getTime();
+    if (isNaN(s) || isNaN(e)) return;
+    if (s > e) throw new BadRequestException('starts_at must be before ends_at');
+  }
   async listRules(query: RulesQueryDto) {
     return this.prisma.pricingRule.findMany({
       where: {
@@ -41,6 +50,7 @@ export class PricingAdminService {
   async createRule(dto: RulePayloadDto) {
     const sku_id = await this.resolveSkuId(dto);
     this.validateScope(dto.scope, dto.category_id ?? null, dto.brand_id ?? null, sku_id);
+    this.validateDateWindow(dto.starts_at ?? null, dto.ends_at ?? null);
 
     const created = await this.prisma.pricingRule.create({
       data: {
@@ -74,6 +84,7 @@ export class PricingAdminService {
     const brand_id = dto.brand_id ?? exists.brand_id;
 
     this.validateScope(scope, category_id, brand_id, sku_id);
+    this.validateDateWindow(dto.starts_at ?? null, dto.ends_at ?? null);
 
     const updated = await this.prisma.pricingRule.update({
       where: { id },
@@ -132,6 +143,20 @@ export class PricingAdminService {
     };
   }
 
+
+
+  private validateRecalcFilter(dto: RecalculateDto) {
+    if (dto.scope === 'brand' && !dto.brandId) {
+      throw new BadRequestException('brandId is required when scope=brand');
+    }
+    if (dto.scope === 'category' && !dto.categoryId) {
+      throw new BadRequestException('categoryId is required when scope=category');
+    }
+    if (dto.scope === 'sku' && (!dto.skuIds || !dto.skuIds.length)) {
+      throw new BadRequestException('skuIds is required when scope=sku');
+    }
+  }
+
   private async listSkuIdsByFilter(dto: RecalculateDto): Promise<string[]> {
     if (dto.scope === 'sku' && dto.skuIds?.length) return dto.skuIds;
     if (dto.scope === 'brand' && dto.brandId) {
@@ -156,6 +181,7 @@ export class PricingAdminService {
   }
 
   async enqueueRecalculate(dto: RecalculateDto) {
+    this.validateRecalcFilter(dto);
     const skuIds = await this.listSkuIdsByFilter(dto);
     const job = await this.prisma.pricingRecalculationJob.create({
       data: {
@@ -180,46 +206,72 @@ export class PricingAdminService {
     let updated = 0;
     let warnings = 0;
 
-    await this.prisma.pricingRecalculationJob.update({ where: { id: jobId }, data: { status: 'RUNNING', started_at: new Date() } });
+    const existingJob = await this.prisma.pricingRecalculationJob.findUnique({ where: { id: jobId } });
+    const dryRun = existingJob?.dry_run ?? false;
 
-    for (let i = 0; i < skuIds.length; i += chunkSize) {
-      const batch = skuIds.slice(i, i + chunkSize);
-      for (const skuId of batch) {
-        try {
-          const computed = await this.pricingCore.applyAndUpsertSkuPriceBySkuId({ skuId });
-          processed += 1;
-          updated += 1;
-          if (computed.warnings?.length) warnings += 1;
-        } catch (error: any) {
-          processed += 1;
-          errors.push({ skuId, error: error.message ?? 'unknown_error' });
+    await this.prisma.pricingRecalculationJob.update({
+      where: { id: jobId },
+      data: { status: 'RUNNING', started_at: new Date() },
+    });
+
+    try {
+      for (let i = 0; i < skuIds.length; i += chunkSize) {
+        const batch = skuIds.slice(i, i + chunkSize);
+        for (const skuId of batch) {
+          try {
+            const computed = dryRun
+              ? await this.pricingCore.computeForSkuId({ skuId })
+              : await this.pricingCore.applyAndUpsertSkuPriceBySkuId({ skuId });
+
+            processed += 1;
+            if (!dryRun) updated += 1;
+            if (computed.warnings?.length) warnings += 1;
+          } catch (error: any) {
+            processed += 1;
+            errors.push({ skuId, error: error.message ?? 'unknown_error' });
+          }
         }
+
+        await this.prisma.pricingRecalculationJob.update({
+          where: { id: jobId },
+          data: {
+            processed,
+            updated_count: updated,
+            warning_count: warnings,
+            failed_count: errors.length,
+            errors_json: errors as any,
+          },
+        });
       }
 
       await this.prisma.pricingRecalculationJob.update({
         where: { id: jobId },
         data: {
+          status: errors.length ? 'DONE_WITH_ERRORS' : 'SUCCEEDED',
           processed,
           updated_count: updated,
           warning_count: warnings,
           failed_count: errors.length,
           errors_json: errors as any,
+          finished_at: new Date(),
         },
       });
+    } catch (error: any) {
+      await this.prisma.pricingRecalculationJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'FAILED',
+          last_error: error?.message ?? 'job_failed',
+          processed,
+          updated_count: updated,
+          warning_count: warnings,
+          failed_count: errors.length,
+          errors_json: errors as any,
+          finished_at: new Date(),
+        },
+      });
+      throw error;
     }
-
-    await this.prisma.pricingRecalculationJob.update({
-      where: { id: jobId },
-      data: {
-        status: errors.length ? 'DONE_WITH_ERRORS' : 'SUCCEEDED',
-        processed,
-        updated_count: updated,
-        warning_count: warnings,
-        failed_count: errors.length,
-        errors_json: errors as any,
-        finished_at: new Date(),
-      },
-    });
   }
 
   async recalcJob(jobId: string) {

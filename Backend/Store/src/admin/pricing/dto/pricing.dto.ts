@@ -1,9 +1,10 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -53,7 +54,16 @@ export class RulePayloadDto {
 
 export class RulesQueryDto {
   @IsOptional() @IsEnum(PricingRuleScope) scope?: PricingRuleScope;
-  @IsOptional() @IsBoolean() active?: boolean;
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return undefined;
+  })
+  @IsBoolean()
+  active?: boolean;
+
   @IsOptional() @IsString() categoryId?: string;
   @IsOptional() @IsString() brandId?: string;
   @IsOptional() @IsString() skuId?: string;
@@ -71,9 +81,15 @@ export class PreviewDto {
 }
 
 export class RecalculateDto {
-  @IsOptional() @IsString() scope?: 'all' | 'sku' | 'brand' | 'category';
+  @IsOptional() @IsIn(['all', 'sku', 'brand', 'category']) scope?: 'all' | 'sku' | 'brand' | 'category';
   @IsOptional() @IsArray() @IsString({ each: true }) skuIds?: string[];
   @IsOptional() @IsString() brandId?: string;
   @IsOptional() @IsString() categoryId?: string;
-  @IsOptional() @IsBoolean() dryRun?: boolean;
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    return value === true || value === 'true';
+  })
+  @IsBoolean()
+  dryRun?: boolean;
 }

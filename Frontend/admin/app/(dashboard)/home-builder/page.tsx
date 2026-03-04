@@ -9,6 +9,31 @@ const SECTION_TYPES = ['HERO_CAROUSEL', 'CATEGORY_STRIP', 'PRODUCT_CAROUSEL', 'B
 
 type SectionType = (typeof SECTION_TYPES)[number];
 
+const STARTER_TEMPLATES: Array<{ key: string; label: string; description: string; sections: Array<{ type: SectionType; title: string; subtitle?: string; config: Record<string, unknown> }> }> = [
+  {
+    key: 'basic',
+    label: 'Plantilla Básica',
+    description: 'Hero + categorías + productos nuevos + marcas',
+    sections: [
+      { type: 'HERO_CAROUSEL', title: 'Ofertas destacadas', subtitle: 'Lo mejor de hoy', config: {} },
+      { type: 'CATEGORY_STRIP', title: 'Categorías principales', config: { limit: 10 } },
+      { type: 'PRODUCT_CAROUSEL', title: 'Novedades', subtitle: 'Últimos lanzamientos', config: { source: 'NEW_ARRIVALS', limit: 12, inStockOnly: true } },
+      { type: 'BRAND_STRIP', title: 'Marcas top', config: { limit: 12 } },
+    ],
+  },
+  {
+    key: 'sales',
+    label: 'Plantilla Rebajas',
+    description: 'Enfocada a ofertas y urgencia comercial',
+    sections: [
+      { type: 'HERO_CAROUSEL', title: 'Rebajas de la semana', subtitle: 'Hasta fin de existencias', config: {} },
+      { type: 'PRODUCT_CAROUSEL', title: 'Mejores descuentos', config: { source: 'BEST_DEALS', limit: 12, inStockOnly: true } },
+      { type: 'TRENDING_CHIPS', title: 'Búsquedas populares', config: { items: [{ title: 'Gaming', href: '/products?categories=gaming' }, { title: 'Laptops', href: '/products?categories=laptops' }] } },
+      { type: 'VALUE_PROPS', title: 'Confianza Nexus', config: { items: [{ text: 'Envío rápido' }, { text: 'Pago seguro' }, { text: 'Soporte cercano' }] } },
+    ],
+  },
+];
+
 function prettyJson(value: Record<string, unknown>) {
   return JSON.stringify(value || {}, null, 2);
 }
@@ -130,6 +155,69 @@ export default function HomeBuilderPage() {
     }
   };
 
+
+  const createFromTemplate = async (templateKey: string) => {
+    const template = STARTER_TEMPLATES.find((item) => item.key === templateKey);
+    if (!template) return;
+
+    const layoutName = `${template.label} ${new Date().toLocaleDateString('es-ES')}`;
+    try {
+      const created = await homeBuilderApi.createLayout({ name: layoutName, locale: newLayoutLocale.trim() || undefined });
+
+      for (let index = 0; index < template.sections.length; index += 1) {
+        const section = template.sections[index];
+        await homeBuilderApi.createSection(created.id, {
+          type: section.type,
+          position: index + 1,
+          is_enabled: true,
+          title: section.title,
+          subtitle: section.subtitle || '',
+          variant: '',
+          config: section.config,
+        });
+      }
+
+      toast.success(`Layout "${layoutName}" creado con plantilla`);
+      await loadLayouts();
+      setSelectedLayoutId(created.id);
+      await loadSections(created.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo crear desde plantilla');
+    }
+  };
+
+  const saveAllSections = async () => {
+    if (!sections.length) return;
+
+    try {
+      for (const section of sections) {
+        const parsedConfig = safeParseJson(configDrafts[section.id] ?? prettyJson(section.config));
+        if (!parsedConfig.ok) {
+          toast.error(`JSON inválido en sección: ${section.title || section.type}`);
+          return;
+        }
+      }
+
+      await Promise.all(
+        sections.map((section) => {
+          const parsedConfig = safeParseJson(configDrafts[section.id] ?? prettyJson(section.config));
+          return homeBuilderApi.updateSection(section.id, {
+            title: section.title || undefined,
+            subtitle: section.subtitle || undefined,
+            variant: section.variant || undefined,
+            is_enabled: section.is_enabled,
+            config: parsedConfig.ok ? parsedConfig.value : section.config,
+          });
+        }),
+      );
+
+      toast.success('Todas las secciones guardadas');
+      await loadSections(selectedLayoutId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudieron guardar todas las secciones');
+    }
+  };
+
   const createLayout = async () => {
     const name = newLayoutName.trim();
     if (!name) {
@@ -239,6 +327,18 @@ export default function HomeBuilderPage() {
         </div>
       </section>
 
+      <section className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+        <div className="text-sm font-semibold text-zinc-700">Plantillas rápidas (para usuarios no técnicos)</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {STARTER_TEMPLATES.map((template) => (
+            <button key={template.key} className="rounded-xl border p-3 text-left hover:bg-zinc-50" onClick={() => void createFromTemplate(template.key)}>
+              <div className="font-medium text-sm">{template.label}</div>
+              <div className="text-xs text-zinc-500 mt-1">{template.description}</div>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="rounded-2xl border bg-white p-4 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-zinc-700">Layouts disponibles</div>
@@ -334,6 +434,9 @@ export default function HomeBuilderPage() {
             </select>
             <button className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-50" disabled={!selectedLayoutId} onClick={() => void createSection()}>
               Añadir sección
+            </button>
+            <button className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50" disabled={!selectedLayoutId || !sections.length} onClick={() => void saveAllSections()}>
+              Guardar todo
             </button>
           </div>
         </div>

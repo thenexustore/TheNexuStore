@@ -273,6 +273,30 @@ export default function HomepageSectionsPage() {
     }
   };
 
+
+  const setAllVisibility = (enabled: boolean) => {
+    setSections((prev) => prev.map((section) => ({ ...section, enabled })));
+  };
+
+  const saveAll = async () => {
+    if (!sections.length) return;
+    try {
+      await Promise.all(
+        sections.map((section) =>
+          homepageSectionsApi.update(section.id, {
+            enabled: section.enabled,
+            title: section.title,
+            config_json: section.config_json,
+          }),
+        ),
+      );
+      toast.success('Todos los cambios guardados');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar todo');
+    }
+  };
+
   const loadOptions = async (section: HomepageSection, q: string, target: "products" | "categories" | "brands") => {
     if (!supportsSource(section.type)) return;
     try {
@@ -291,6 +315,11 @@ export default function HomepageSectionsPage() {
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
+          <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
+          <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={!sections.length} onClick={() => void saveAll()}>Guardar todo</button>
+        </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
             {SECTION_TYPES.map((type) => (

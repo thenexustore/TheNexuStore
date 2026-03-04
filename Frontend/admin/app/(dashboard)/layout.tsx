@@ -16,23 +16,51 @@ import {
   Ticket,
   Tags,
   Truck,
+  type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const navigation = [
+type NavChild = {
+  key: string;
+  href: string;
+  requiredPermissions?: string[];
+};
+
+type NavParentItem = {
+  key: string;
+  icon: LucideIcon;
+  children: NavChild[];
+  requiredPermissions?: never;
+  href?: never;
+};
+
+type NavLinkItem = {
+  key: string;
+  href: string;
+  icon: LucideIcon;
+  requiredPermissions?: string[];
+  children?: never;
+};
+
+type NavItem = NavParentItem | NavLinkItem;
+
+const navigation: NavItem[] = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { key: "products", href: "/products", icon: Package },
-  { key: "orders", href: "/orders", icon: ShoppingCart },
-  { key: "coupons", href: "/coupons", icon: Ticket },
-  { key: "pricing", href: "/pricing", icon: Tags },
-  { key: "chat", href: "/chat", icon: MessageCircle },
+  { key: "products", href: "/products", icon: Package, requiredPermissions: ["inventory:read"] },
+  { key: "orders", href: "/orders", icon: ShoppingCart, requiredPermissions: ["orders:read"] },
+  { key: "imports", href: "/imports", icon: Truck, requiredPermissions: ["imports:run", "imports:retry"] },
+  { key: "rmas", href: "/rmas", icon: Package, requiredPermissions: ["orders:read", "orders:update"] },
+  { key: "coupons", href: "/coupons", icon: Ticket, requiredPermissions: ["full_access"] },
+  { key: "pricing", href: "/pricing", icon: Tags, requiredPermissions: ["full_access"] },
+  { key: "chat", href: "/chat", icon: MessageCircle, requiredPermissions: ["full_access"] },
   {
     key: "homeContent",
     icon: LayoutTemplate,
     children: [
-      { key: "banners", href: "/banners" },
-      { key: "homepageSections", href: "/homepage-sections" },
-      { key: "featuredProducts", href: "/featured-products" },
+      { key: "banners", href: "/banners", requiredPermissions: ["full_access"] },
+      { key: "homepageSections", href: "/homepage-sections", requiredPermissions: ["full_access"] },
+      { key: "homeBuilder", href: "/home-builder", requiredPermissions: ["full_access"] },
+      { key: "featuredProducts", href: "/featured-products", requiredPermissions: ["full_access"] },
     ],
   },
 ];
@@ -48,15 +76,65 @@ export default function DashboardLayout({
   const t = useTranslations("nav");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const userPermissions = (() => {
+    try {
+      const rawUser = localStorage.getItem("admin_user");
+      if (!rawUser) return null;
+
+      const parsed = JSON.parse(rawUser) as { permissions?: unknown };
+      return Array.isArray(parsed.permissions)
+        ? parsed.permissions.map((permission) => String(permission))
+        : null;
+    } catch {
+      return null;
+    }
+  })() as string[] | null;
+
+  const hasAccess = (requiredPermissions?: string[]) => {
+    if (!userPermissions) {
+      return true;
+    }
+
+    if (!requiredPermissions || requiredPermissions.length === 0) {
+      return true;
+    }
+
+    if (userPermissions.includes("full_access")) {
+      return true;
+    }
+
+    return requiredPermissions.some((permission) =>
+      userPermissions.includes(permission)
+    );
+  };
+
+  const filteredNavigation = navigation
+    .map((item) => {
+      if (item.children) {
+        const allowedChildren = item.children.filter((sub) =>
+          hasAccess(sub.requiredPermissions)
+        );
+
+        if (allowedChildren.length === 0) {
+          return null;
+        }
+
+        return { ...item, children: allowedChildren };
+      }
+
+      return hasAccess(item.requiredPermissions) ? item : null;
+    })
+    .filter((item): item is NavItem => item !== null);
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_user");
     router.push("/login");
   };
 
   const NavItems = () => (
     <div className="space-y-1.5 px-4">
-      {navigation.map((item) => {
+      {filteredNavigation.map((item) => {
         const isParentActive = item.children?.some(
           (sub) => pathname === sub.href
         );

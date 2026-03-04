@@ -9,7 +9,6 @@ import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
 import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
-import { CategoryMegaMenu } from "./CategoryMegaMenu";
 import { buildCuratedCategoryTree } from "../lib/category-navigation";
 
 type User = {
@@ -18,6 +17,12 @@ type User = {
   lastName?: string;
   email?: string;
   profile_image?: string;
+};
+
+type NavbarCategory = {
+  id: string;
+  name: string;
+  slug: string;
 };
 
 export default function Navbar() {
@@ -34,7 +39,6 @@ export default function Navbar() {
   const [categorySearch, setCategorySearch] = useState("");
   const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
-  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
@@ -202,7 +206,6 @@ export default function Navbar() {
   const handleCategoryClick = (categorySlug: string) => {
     router.push(`/products?categories=${categorySlug}`);
     closeMobilePanels();
-    setDesktopMegaOpen(false);
   };
 
   const handleLogout = async () => {
@@ -239,7 +242,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 min-h-20 w-full border-b border-gray-200 bg-white text-black">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
           <button
-            onClick={() => setCategoryPanelOpen(true)}
+            onClick={() => setCategoryPanelOpen((v) => !v)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Menu size={24} />
@@ -251,19 +254,16 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <div className="relative hidden md:block" onMouseLeave={() => setDesktopMegaOpen(false)}>
+          <div className="hidden md:block">
             <button
-              ref={categoryTriggerRef}
-              onClick={() => setDesktopMegaOpen((v) => !v)}
-              onMouseEnter={() => setDesktopMegaOpen(true)}
+              onClick={() => setCategoryPanelOpen(true)}
               className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-haspopup="menu"
-              aria-expanded={desktopMegaOpen}
+              aria-haspopup="dialog"
+              aria-expanded={categoryPanelOpen}
             >
               <Menu size={18} />
               {t("allCategories")}
             </button>
-            <CategoryMegaMenu open={desktopMegaOpen} tree={curatedCategoryTree} onNavigate={handleCategoryClick} />
           </div>
 
           <div className="order-3 w-full md:order-none md:flex-1 md:px-2" ref={searchRef}>
@@ -308,7 +308,12 @@ export default function Navbar() {
                               onClick={() => handleProductClick(product)}
                               className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
                             >
-                              <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                              <div className="relative h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                                {product.compare_at_price && product.compare_at_price > product.price && (
+                                  <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                                    -{Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)}%
+                                  </span>
+                                )}
                                 <img
                                   src={
                                     product.thumbnail &&
@@ -335,9 +340,22 @@ export default function Navbar() {
                                   {product.brand_name}
                                 </p>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-sm font-bold text-[#0B123A]">
-                                    €{product.price.toFixed(2)}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p
+                                      className={`text-sm font-extrabold ${
+                                        product.compare_at_price && product.compare_at_price > product.price
+                                          ? "text-red-600"
+                                          : "text-[#0B123A]"
+                                      }`}
+                                    >
+                                      €{product.price.toFixed(2)}
+                                    </p>
+                                    {product.compare_at_price && product.compare_at_price > product.price && (
+                                      <p className="text-xs text-black/70 line-through">
+                                        €{product.compare_at_price.toFixed(2)}
+                                      </p>
+                                    )}
+                                  </div>
                                   {product.rating_avg && (
                                     <div className="flex items-center text-xs text-gray-600">
                                       <span className="text-yellow-400">★</span>
@@ -413,7 +431,8 @@ export default function Navbar() {
           <div className="ml-auto flex items-center gap-1.5 shrink-0 sm:gap-2">
             <Link
               href="/chat"
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={closeMobilePanels}
+              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
               title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
@@ -461,7 +480,7 @@ export default function Navbar() {
             )}
 
             <button
-              className="relative h-10 w-10 rounded-full bg-cover bg-center flex items-center justify-center cursor-pointer overflow-hidden hover:opacity-90 transition-opacity"
+              className="relative hidden h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-cover bg-center transition-opacity hover:opacity-90 sm:flex"
               onClick={() => {
                 const nextLocale = locale === "en" ? "es" : "en";
                 router.replace(pathname, { locale: nextLocale });
@@ -474,7 +493,7 @@ export default function Navbar() {
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
-              <span className="relative z-10 text-white font-bold">{locale.toUpperCase()}</span>
+              <span className="relative z-10 text-xs font-bold text-white">{locale.toUpperCase()}</span>
             </button>
 
             <Link
@@ -509,6 +528,63 @@ export default function Navbar() {
         onClose={() => setCategoryPanelOpen(false)}
         onNavigate={handleCategoryClick}
       />
+
+      <aside
+        className={`fixed top-0 left-0 z-50 h-full w-[86vw] max-w-80 bg-white shadow-xl transform transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-xl font-bold text-black">{t("categories")}</h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-4 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              placeholder={t("searchCategories")}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
+            />
+          </div>
+        </div>
+
+        <div className="h-[calc(100vh-144px)] overflow-y-auto">
+          <div className="p-4">
+            {categoriesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
+              </div>
+            ) : filteredCategories.length > 0 ? (
+              <div className="space-y-1">
+                {filteredCategories.map((category: NavbarCategory) => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategoryClick(category.slug)}
+                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
+                  >
+                    <span>{category.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                {categorySearch
+                  ? t("noCategoriesFound")
+                  : t("noCategoriesAvailable")}
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
     </>
   );
 }

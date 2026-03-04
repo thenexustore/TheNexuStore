@@ -66,9 +66,9 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-white text-black">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">{t("all")}</h1>
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
+      <div className="mb-6">
+        <h1 className="break-words text-2xl font-bold sm:text-3xl">{t("all")}</h1>
         <p className="mt-2 text-gray-600">
           {t("found", {count: productsResponse?.total || 0})}
         </p>
@@ -86,8 +86,8 @@ export default function ProductsPage() {
         )}
 
         <div className="flex-1">
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
               {filterOptions && (
                 <MobileFilters
                   filterOptions={filterOptions}
@@ -101,7 +101,7 @@ export default function ProductsPage() {
               <select
                 value={filters.sort_by}
                 onChange={(e) => handleSortChange(e.target.value)}
-                className="rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm outline-none text-black"
+                className="w-full min-w-0 rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-black outline-none sm:w-auto"
               >
                 <option value="newest">{t("newest")}</option>
                 <option value="name_a_to_z">{t("nameAZ")}</option>
@@ -123,7 +123,7 @@ export default function ProductsPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
                 {productsResponse?.products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

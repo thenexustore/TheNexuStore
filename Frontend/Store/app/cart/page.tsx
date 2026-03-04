@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../providers/AuthProvider";
 
-const formatCurrency = (amount: number, locale: string) => {
+const formatCurrency = (amount: number, locale: string = "es-ES") => {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "EUR",

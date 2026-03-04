@@ -48,6 +48,10 @@ function safeParseJson(value: string): { ok: true; value: Record<string, unknown
   }
 }
 
+function prettyJson(value: Record<string, unknown>) {
+  return JSON.stringify(value || {}, null, 2);
+}
+
 export default function HomeBuilderPage() {
   const [layouts, setLayouts] = useState<HomeLayout[]>([]);
   const [selectedLayoutId, setSelectedLayoutId] = useState('');

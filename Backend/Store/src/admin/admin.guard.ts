@@ -4,12 +4,19 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { ROLES_KEY } from '../auth/staff-auth/roles.decorator';
+import { StaffRole } from '@prisma/client';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private reflector: Reflector,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
@@ -23,14 +30,40 @@ export class AdminGuard implements CanActivate {
 
     try {
       const payload = this.jwtService.verify(token);
+      const requiredRoles = this.reflector.getAllAndOverride<StaffRole[]>(
+        ROLES_KEY,
+        [context.getHandler(), context.getClass()],
+      );
 
-      if (payload.role !== 'admin') {
-        throw new UnauthorizedException('Admin access required');
+      const role = String(payload.role || '').toUpperCase();
+      const isLegacyAdmin = payload.role === 'admin';
+      const isStaffToken = payload.type === 'STAFF';
+
+      if (!isStaffToken && !isLegacyAdmin) {
+        throw new UnauthorizedException('Staff access required');
       }
 
-      request.user = payload;
+      if (requiredRoles?.length) {
+        if (!requiredRoles.includes(role as StaffRole)) {
+          throw new ForbiddenException('Insufficient role permissions');
+        }
+      } else if (role !== StaffRole.ADMIN && !isLegacyAdmin) {
+        throw new ForbiddenException('Admin access required');
+      }
+
+      request.user = {
+        ...payload,
+        role,
+      };
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+
       throw new UnauthorizedException('Invalid or expired token');
     }
   }

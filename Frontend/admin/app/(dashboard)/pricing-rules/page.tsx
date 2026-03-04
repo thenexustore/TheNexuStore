@@ -8,8 +8,10 @@ import {
   fetchPricingRules,
   previewPricingRule,
   togglePricingRuleStatus,
+  transitionPricingRuleStatus,
   updatePricingRule,
   type PricingRule,
+  type PricingApprovalStatus,
 } from "@/lib/api/pricing-rules";
 
 export default function PricingRulesPage() {
@@ -117,6 +119,15 @@ export default function PricingRulesPage() {
     }
   }
 
+  async function transition(r: PricingRule, status: PricingApprovalStatus) {
+    try {
+      await transitionPricingRuleStatus(r.id, status);
+      await refresh();
+    } catch (e: any) {
+      alert(e?.message ?? "Status transition failed");
+    }
+  }
+
   async function doPreview() {
     setPreviewErr(null);
     setPreviewData(null);
@@ -127,6 +138,13 @@ export default function PricingRulesPage() {
       setPreviewErr(e?.message ?? "Preview failed");
     }
   }
+
+  const statusBadge: Record<PricingApprovalStatus, string> = {
+    DRAFT: "bg-slate-100 text-slate-700",
+    PENDING: "bg-amber-100 text-amber-800",
+    APPROVED: "bg-blue-100 text-blue-800",
+    PUBLISHED: "bg-emerald-100 text-emerald-800",
+  };
 
   return (
     <div className="space-y-6">
@@ -151,7 +169,7 @@ export default function PricingRulesPage() {
       </div>
 
       <div className="border rounded overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
+        <table className="w-full text-sm min-w-[980px]">
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left p-3">Scope</th>
@@ -161,6 +179,7 @@ export default function PricingRulesPage() {
               <th className="text-left p-3">Rounding</th>
               <th className="text-left p-3">Priority</th>
               <th className="text-left p-3">Active</th>
+              <th className="text-left p-3">Workflow</th>
               <th className="text-left p-3">Actions</th>
             </tr>
           </thead>
@@ -178,16 +197,36 @@ export default function PricingRulesPage() {
                 <td className="p-3">{r.min_margin_amount ?? 0}</td>
                 <td className="p-3">{r.rounding_mode}</td>
                 <td className="p-3">{r.priority}</td>
-                <td className="p-3">{r.is_active ? "YES" : "NO"}</td>
-                <td className="p-3 flex gap-2">
-                  <button className="underline" onClick={() => startEdit(r)}>Edit</button>
-                  <button className="underline" onClick={() => toggle(r)}>{r.is_active ? "Disable" : "Enable"}</button>
+                <td className="p-3">{String(r.is_active)}</td>
+                <td className="p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs px-2 py-1 rounded ${statusBadge[r.approval_status || "DRAFT"]}`}>
+                      {r.approval_status || "DRAFT"}
+                    </span>
+                    {r.approval_status === "DRAFT" && (
+                      <button className="px-2 py-1 text-xs rounded border" onClick={() => transition(r, "PENDING")}>Submit</button>
+                    )}
+                    {r.approval_status === "PENDING" && (
+                      <button className="px-2 py-1 text-xs rounded border" onClick={() => transition(r, "APPROVED")}>Approve</button>
+                    )}
+                    {r.approval_status === "APPROVED" && (
+                      <button className="px-2 py-1 text-xs rounded border" onClick={() => transition(r, "PUBLISHED")}>Publish</button>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <button className="px-2 py-1 rounded border" onClick={() => startEdit(r)}>Edit</button>
+                    <button className="px-2 py-1 rounded border" onClick={() => toggle(r)}>
+                      {r.is_active ? "Disable" : "Enable"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
-            {!rules.length && (
+            {!rules.length && !loading && (
               <tr>
-                <td className="p-3" colSpan={8}>No rules yet.</td>
+                <td className="p-4 text-gray-500" colSpan={9}>No rules</td>
               </tr>
             )}
           </tbody>
@@ -195,11 +234,11 @@ export default function PricingRulesPage() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-white rounded w-full max-w-xl p-4 sm:p-6 space-y-4 my-4">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-2xl rounded-lg border p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">{editing ? "Edit Rule" : "New Rule"}</h2>
-              <button onClick={() => setOpen(false)} className="text-gray-600">✕</button>
+              <h3 className="font-semibold">{editing ? "Edit Rule" : "New Rule"}</h3>
+              <button onClick={() => setOpen(false)} className="text-gray-500">✕</button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

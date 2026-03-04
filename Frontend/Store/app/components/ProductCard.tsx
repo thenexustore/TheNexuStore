@@ -375,8 +375,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           {product.discount_percentage && product.discount_percentage > 0 && (
-            <div className="absolute top-2 right-2">
-              <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+            <div className="absolute top-2 left-2 z-10">
+              <span className="rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow">
                 -{product.discount_percentage}%
               </span>
             </div>
@@ -385,7 +385,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={toggleFavorite}
             className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-            style={{ right: product.discount_percentage ? "3.5rem" : "0.5rem" }}
+            style={{ right: "0.5rem" }}
           >
             <svg
               className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
@@ -450,8 +450,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   <span className="text-sm text-gray-500 line-through sm:text-base">
                     €{product.compare_at_price.toFixed(2)}
                   </span>
-                  <span className="text-sm font-semibold text-red-600">
-                    {t("save", {amount: (product.compare_at_price - product.price).toFixed(2)})}
+                  <span className="text-xs font-semibold text-red-600 sm:text-sm">
+                    Save €
+                    {(product.compare_at_price - product.price).toFixed(2)}
                   </span>
                 </>
               )}

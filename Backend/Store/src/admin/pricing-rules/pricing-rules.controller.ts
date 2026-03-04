@@ -88,6 +88,8 @@ export class PricingRulesController {
     @Body() dto: TransitionPricingRuleStatusDto,
     @Req() req: Request,
   ) {
+    const previous = await this.service.getById(id);
+
     const data = await this.service.transitionStatus(
       id,
       dto.status,
@@ -103,7 +105,17 @@ export class PricingRulesController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      metadata: { approval_status: data.approval_status },
+      requestId: req.get('x-request-id') || undefined,
+      metadata: {
+        from_status: previous.approval_status,
+        to_status: data.approval_status,
+      },
+      before: {
+        approval_status: previous.approval_status,
+      },
+      after: {
+        approval_status: data.approval_status,
+      },
     });
 
     return { success: true, data };

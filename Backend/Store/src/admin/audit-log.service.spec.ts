@@ -43,4 +43,30 @@ describe('AuditLogService', () => {
     expect(result.total).toBe(1);
     expect(result.items).toEqual([{ id: '1' }]);
   });
+
+  it('adds requestId and shallow diff metadata when before/after provided', async () => {
+    await service.logAction({
+      action: 'PRICING_RULE_STATUS_CHANGED',
+      resource: 'PRICING_RULE',
+      requestId: 'req-123',
+      before: { approval_status: 'PENDING' },
+      after: { approval_status: 'APPROVED' },
+      metadata: { from_status: 'PENDING', to_status: 'APPROVED' },
+    });
+
+    expect(prisma.adminAuditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'PRICING_RULE_STATUS_CHANGED',
+        metadata_json: expect.objectContaining({
+          requestId: 'req-123',
+          diff: {
+            approval_status: {
+              before: 'PENDING',
+              after: 'APPROVED',
+            },
+          },
+        }),
+      }),
+    });
+  });
 });

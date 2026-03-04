@@ -19,13 +19,21 @@ export class PricingRulesService {
   ) {}
 
   async list() {
-    return this.prisma.pricingRule.findMany({
+    return (this.prisma.pricingRule as any).findMany({
       orderBy: [
         { approval_status: 'asc' },
         { priority: 'desc' },
         { updated_at: 'desc' },
       ],
     });
+  }
+
+  async getById(id: string) {
+    const rule = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
+    if (!rule) {
+      throw new NotFoundException('rule not found');
+    }
+    return rule;
   }
 
   private async resolveSkuId(input: { sku_id?: string | null; sku_code?: string | null }) {
@@ -63,7 +71,7 @@ export class PricingRulesService {
       sku_id,
     );
 
-    return this.prisma.pricingRule.create({
+    return (this.prisma.pricingRule as any).create({
       data: {
         scope: dto.scope as any,
         category_id: dto.category_id ?? null,
@@ -81,7 +89,7 @@ export class PricingRulesService {
   }
 
   async update(id: string, dto: UpdatePricingRuleDto) {
-    const exists = await this.prisma.pricingRule.findUnique({ where: { id } });
+    const exists = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('rule not found');
 
     if (exists.approval_status === PricingApprovalStatus.PUBLISHED) {
@@ -97,7 +105,7 @@ export class PricingRulesService {
 
     this.validateFinal(finalScope, finalCategoryId, finalBrandId, resolvedSkuId);
 
-    return this.prisma.pricingRule.update({
+    return (this.prisma.pricingRule as any).update({
       where: { id },
       data: {
         scope: dto.scope as any,
@@ -118,7 +126,7 @@ export class PricingRulesService {
     status: PricingApprovalStatus,
     actorId?: string,
   ) {
-    const exists = await this.prisma.pricingRule.findUnique({ where: { id } });
+    const exists = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('rule not found');
 
     const current = exists.approval_status as unknown as PricingApprovalStatus;
@@ -128,7 +136,7 @@ export class PricingRulesService {
         throw new BadRequestException('Only DRAFT rules can be submitted');
       }
 
-      return this.prisma.pricingRule.update({
+      return (this.prisma.pricingRule as any).update({
         where: { id },
         data: {
           approval_status: PricingApprovalStatus.PENDING,
@@ -147,7 +155,7 @@ export class PricingRulesService {
         throw new BadRequestException('4-eyes rule: creator cannot approve');
       }
 
-      return this.prisma.pricingRule.update({
+      return (this.prisma.pricingRule as any).update({
         where: { id },
         data: {
           approval_status: PricingApprovalStatus.APPROVED,
@@ -162,7 +170,7 @@ export class PricingRulesService {
         throw new BadRequestException('Only APPROVED rules can be published');
       }
 
-      return this.prisma.pricingRule.update({
+      return (this.prisma.pricingRule as any).update({
         where: { id },
         data: {
           approval_status: PricingApprovalStatus.PUBLISHED,
@@ -180,7 +188,7 @@ export class PricingRulesService {
         );
       }
 
-      return this.prisma.pricingRule.update({
+      return (this.prisma.pricingRule as any).update({
         where: { id },
         data: {
           approval_status: PricingApprovalStatus.DRAFT,
@@ -192,9 +200,9 @@ export class PricingRulesService {
   }
 
   async toggle(id: string, is_active: boolean) {
-    const exists = await this.prisma.pricingRule.findUnique({ where: { id } });
+    const exists = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('rule not found');
-    return this.prisma.pricingRule.update({ where: { id }, data: { is_active } });
+    return (this.prisma.pricingRule as any).update({ where: { id }, data: { is_active } });
   }
 
   async preview(sku_code: string) {

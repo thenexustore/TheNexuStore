@@ -157,6 +157,7 @@ export class ProductsController {
     @Body() body: UpdateProductDto,
     @Req() req: Request,
   ) {
+    const previous = await this.productsService.getProductById(id);
     const product = await this.productsService.updateProduct(id, body);
 
     await this.auditLogService.logAction({
@@ -168,8 +169,17 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: req.get('x-request-id') || undefined,
       metadata: {
         changedFields: Object.keys(body || {}),
+      },
+      before: {
+        title: previous.title,
+        slug: previous.slug,
+      },
+      after: {
+        title: product.title,
+        slug: product.slug,
       },
     });
 

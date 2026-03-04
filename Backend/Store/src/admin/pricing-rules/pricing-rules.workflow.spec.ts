@@ -24,7 +24,7 @@ describe('PricingRulesService workflow', () => {
     (prisma.pricingRule.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', approval_status: 'DRAFT' });
     (prisma.pricingRule.update as jest.Mock).mockResolvedValue({ id: 'r1', approval_status: 'PENDING' });
 
-    const result = await service.transitionStatus('r1', 'PENDING' as any, 'u1');
+    const result: any = await service.transitionStatus('r1', 'PENDING' as any, 'u1');
 
     expect(result.approval_status).toBe('PENDING');
     expect(prisma.pricingRule.update).toHaveBeenCalled();

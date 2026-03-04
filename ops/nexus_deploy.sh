@@ -42,6 +42,17 @@ install_deps() {
   fi
 }
 
+fix_next_proxy_conflict() {
+  local app_dir="$1"
+  local middleware_file="$app_dir/middleware.ts"
+  local proxy_file="$app_dir/proxy.ts"
+
+  if [[ -f "$middleware_file" && -f "$proxy_file" ]]; then
+    run "rm -f '$middleware_file'"
+    log "Detected Next.js conflict in $app_dir (middleware.ts + proxy.ts). Removed middleware.ts"
+  fi
+}
+
 pm2_has_process() {
   pm2 jlist | grep -q "\"name\":\"$1\""
 }
@@ -114,10 +125,12 @@ run "chmod +x '$BACKEND_START_SCRIPT'"
 run "sed -i 's/\\r$//' '$BACKEND_START_SCRIPT'"
 
 log "Building store"
+fix_next_proxy_conflict "$STORE_DIR"
 install_deps "$STORE_DIR"
 run "cd '$STORE_DIR' && npm run build"
 
 log "Building admin"
+fix_next_proxy_conflict "$ADMIN_DIR"
 install_deps "$ADMIN_DIR"
 run "cd '$ADMIN_DIR' && npm run build"
 

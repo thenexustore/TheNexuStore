@@ -114,6 +114,15 @@ What it does:
 7. PM2 save
 8. Local health checks (ports 3000/3001/4000)
 
+If a legacy checkout still contains both `middleware.ts` and `proxy.ts`, deploy scripts automatically remove `middleware.ts` before build to avoid Next.js 16 conflict.
+
+Manual emergency fix (before deploy) if needed:
+
+```bash
+rm -f /opt/TheNexuStore/Frontend/Store/middleware.ts
+rm -f /opt/TheNexuStore/Frontend/admin/middleware.ts
+```
+
 ## 7) Rollback
 
 Restore latest backup:

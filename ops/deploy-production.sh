@@ -43,6 +43,17 @@ log() {
   echo "[$(date +'%F %T')] $*"
 }
 
+fix_next_proxy_conflict() {
+  local app_dir="$1"
+  local middleware_file="$app_dir/middleware.ts"
+  local proxy_file="$app_dir/proxy.ts"
+
+  if [[ -f "$middleware_file" && -f "$proxy_file" ]]; then
+    log "Detected Next.js conflict in $app_dir (middleware.ts + proxy.ts). Removing middleware.ts"
+    rm -f "$middleware_file"
+  fi
+}
+
 log "Validating required commands"
 for c in git npm npx pm2 sed curl; do
   require_cmd "$c"
@@ -145,6 +156,7 @@ fi
 
 log "Installing/building Store frontend"
 cd "$REPO_DIR/Frontend/Store"
+fix_next_proxy_conflict "$REPO_DIR/Frontend/Store"
 npm ci
 cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
@@ -157,6 +169,7 @@ pm2 start npm --name nexus-store --cwd "$REPO_DIR/Frontend/Store" -- start -- -p
 
 log "Installing/building Admin frontend"
 cd "$REPO_DIR/Frontend/admin"
+fix_next_proxy_conflict "$REPO_DIR/Frontend/admin"
 npm ci
 cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN

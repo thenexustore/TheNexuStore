@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { OrderStatus, StaffRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
@@ -12,25 +17,50 @@ export class AdminService {
     private readonly categoriesService: CategoriesService,
   ) {}
 
-  validateAdmin(email: string, password: string): boolean {
-    return email === 'admin@thenexusstore.com' && password === 'Suraj@123';
+  private getPermissionsForRole(role: StaffRole): string[] {
+    if (role === StaffRole.ADMIN) {
+      return ['full_access'];
+    }
+
+    if (role === StaffRole.WAREHOUSE) {
+      return ['orders:read', 'orders:update', 'inventory:read', 'inventory:update'];
+    }
+
+    return [];
   }
 
-  login(email: string) {
+  async login(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const staff = await this.prisma.staff.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!staff || !staff.is_active) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const passwordMatch = await bcrypt.compare(password, staff.password_hash);
+    if (!passwordMatch) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const payload = {
-      email: email,
-      role: 'admin',
-      permissions: ['full_access'],
-      sub: 'admin_user',
+      sub: staff.id,
+      email: staff.email,
+      role: staff.role,
+      warehouseId: staff.warehouse_id,
+      type: 'STAFF',
     };
 
     return {
       access_token: this.jwtService.sign(payload),
       user: {
-        email: email,
-        role: 'admin',
-        name: 'Admin User',
-        permissions: ['full_access'],
+        id: staff.id,
+        email: staff.email,
+        role: staff.role,
+        name: staff.email,
+        permissions: this.getPermissionsForRole(staff.role),
       },
     };
   }
@@ -123,7 +153,7 @@ export class AdminService {
       });
 
       if (!order) {
-        throw new Error('Order not found');
+        throw new NotFoundException('Order not found');
       }
 
       const customer = order.customer_id
@@ -149,6 +179,9 @@ export class AdminService {
         items,
       };
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       console.error('Get order by ID error:', error);
       throw new Error('Failed to fetch order details');
     }
@@ -166,6 +199,60 @@ export class AdminService {
       console.error('Update order status error:', error);
       throw new Error('Failed to update order status');
     }
+  }
+
+  async bulkUpdateOrderStatus(ids: string[], status: OrderStatus) {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) {
+      return { affected: 0, ids: [], status };
+    }
+
+    const result = await this.prisma.order.updateMany({
+      where: { id: { in: uniqueIds } },
+      data: { status },
+    });
+
+    return {
+      affected: result.count,
+      ids: uniqueIds,
+      status,
+    };
+  }
+
+
+
+  async getOrderTimeline(orderId: string) {
+    const logs = await this.prisma.adminAuditLog.findMany({
+      where: {
+        resource: 'ORDER',
+        resource_id: orderId,
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      actorEmail: log.actor_email,
+      actorRole: log.actor_role,
+      status: log.status,
+      metadata: log.metadata_json,
+      createdAt: log.created_at,
+    }));
+  }
+
+  async addOrderNote(orderId: string, note: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return {
+      success: true,
+      orderId,
+      note,
+    };
   }
 
   async getBrands() {

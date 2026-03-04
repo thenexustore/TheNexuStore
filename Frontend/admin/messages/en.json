@@ -20,6 +20,9 @@
     "homepageSections": "Home Control",
     "featuredProducts": "Featured Products",
     "pricing": "Pricing",
-    "logout": "Logout"
+    "logout": "Logout",
+    "homeBuilder": "Home Builder",
+    "imports": "Imports",
+    "rmas": "Returns (RMA)"
   }
 }

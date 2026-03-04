@@ -24,6 +24,17 @@ import {
   type Product,
 } from "@/lib/api";
 
+
+interface SavedProductView {
+  name: string;
+  search: string;
+  statusFilter: string;
+  categoryFilter: string;
+  stockFilter: string;
+}
+
+const SAVED_VIEWS_KEY = "admin_products_saved_views_v1";
+
 export default function ProductsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -37,6 +48,8 @@ export default function ProductsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [syncing, setSyncing] = useState(false);
   const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>([]);
+  const [savedViews, setSavedViews] = useState<SavedProductView[]>([]);
+  const [viewName, setViewName] = useState("");
 
   const loadImportHistory = async () => {
     try {
@@ -111,6 +124,53 @@ export default function ProductsPage() {
   useEffect(() => {
     loadImportHistory();
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setSavedViews(parsed as SavedProductView[]);
+      }
+    } catch (error) {
+      console.error("Failed to load saved views", error);
+    }
+  }, []);
+
+  const persistViews = (views: SavedProductView[]) => {
+    setSavedViews(views);
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
+  };
+
+  const saveCurrentView = () => {
+    const name = viewName.trim();
+    if (!name) {
+      alert("Please enter a view name");
+      return;
+    }
+
+    const next = [
+      ...savedViews.filter((v) => v.name.toLowerCase() !== name.toLowerCase()),
+      { name, search, statusFilter, categoryFilter, stockFilter },
+    ];
+
+    persistViews(next);
+    setViewName("");
+  };
+
+  const applyView = (view: SavedProductView) => {
+    setSearch(view.search);
+    setStatusFilter(view.statusFilter);
+    setCategoryFilter(view.categoryFilter);
+    setStockFilter(view.stockFilter);
+    setPage(1);
+  };
+
+  const deleteView = (name: string) => {
+    const next = savedViews.filter((v) => v.name !== name);
+    persistViews(next);
+  };
 
   const getPaginatedProducts = () => {
     const startIndex = (page - 1) * 20;
@@ -215,6 +275,51 @@ export default function ProductsPage() {
                 <span className="font-medium text-gray-800">{item.type}</span>
                 <span>{new Date(item.last_sync).toLocaleString()}</span>
                 <span className="text-gray-500">{item.details || "-"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-sm font-semibold text-gray-900">Saved views</h2>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <input
+              value={viewName}
+              onChange={(e) => setViewName(e.target.value)}
+              placeholder="View name..."
+              className="w-full sm:w-56 px-3 py-1.5 text-xs border border-gray-300 rounded"
+            />
+            <button
+              onClick={saveCurrentView}
+              className="px-3 py-1.5 text-xs rounded bg-gray-900 text-white"
+            >
+              Save view
+            </button>
+          </div>
+        </div>
+
+        {savedViews.length === 0 ? (
+          <p className="text-xs text-gray-500">No saved views yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {savedViews.map((view) => (
+              <div key={view.name} className="inline-flex items-center gap-1 border border-gray-200 rounded-full pl-3 pr-1 py-1 bg-gray-50">
+                <button
+                  onClick={() => applyView(view)}
+                  className="text-xs text-gray-700 hover:text-black"
+                >
+                  {view.name}
+                </button>
+                <button
+                  onClick={() => deleteView(view.name)}
+                  className="w-5 h-5 rounded-full text-[10px] text-gray-500 hover:bg-red-100 hover:text-red-700"
+                  title="Delete view"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>

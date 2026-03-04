@@ -29,19 +29,7 @@ export class AdminController {
 
   @Post('login')
   async adminLogin(@Body() body: { email: string; password: string }) {
-    const isValid = await this.adminService.validateAdmin(
-      body.email,
-      body.password,
-    );
-
-    if (!isValid) {
-      return {
-        success: false,
-        message: 'Invalid credentials',
-      };
-    }
-
-    const loginData = await this.adminService.login(body.email);
+    const loginData = await this.adminService.login(body.email, body.password);
 
     return {
       success: true,

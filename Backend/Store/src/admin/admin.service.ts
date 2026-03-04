@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { StaffRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
@@ -16,25 +17,50 @@ export class AdminService {
     private readonly categoriesService: CategoriesService,
   ) {}
 
-  validateAdmin(email: string, password: string): boolean {
-    return email === 'admin@thenexusstore.com' && password === 'Suraj@123';
+  private getPermissionsForRole(role: StaffRole): string[] {
+    if (role === StaffRole.ADMIN) {
+      return ['full_access'];
+    }
+
+    if (role === StaffRole.WAREHOUSE) {
+      return ['orders:read', 'orders:update', 'inventory:read', 'inventory:update'];
+    }
+
+    return [];
   }
 
-  login(email: string) {
+  async login(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const staff = await this.prisma.staff.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!staff || !staff.is_active) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const passwordMatch = await bcrypt.compare(password, staff.password_hash);
+    if (!passwordMatch) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const payload = {
-      email: email,
-      role: 'admin',
-      permissions: ['full_access'],
-      sub: 'admin_user',
+      sub: staff.id,
+      email: staff.email,
+      role: staff.role,
+      warehouseId: staff.warehouse_id,
+      type: 'STAFF',
     };
 
     return {
       access_token: this.jwtService.sign(payload),
       user: {
-        email: email,
-        role: 'admin',
-        name: 'Admin User',
-        permissions: ['full_access'],
+        id: staff.id,
+        email: staff.email,
+        role: staff.role,
+        name: staff.email,
+        permissions: this.getPermissionsForRole(staff.role),
       },
     };
   }

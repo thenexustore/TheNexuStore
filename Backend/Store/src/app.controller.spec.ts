@@ -34,4 +34,19 @@ describe('AppController', () => {
       rabbit: 'fail',
     });
   });
+  it('returns admin health alias', async () => {
+    await expect(controller.adminHealth()).resolves.toEqual({
+      app: 'ok',
+      db: 'ok',
+      redis: 'fail',
+      rabbit: 'fail',
+    });
+  });
+
+  it('returns admin infortisa fallback health', async () => {
+    await expect(controller.adminInfortisaHealth()).resolves.toMatchObject({
+      healthy: true,
+      source: 'app-fallback',
+    });
+  });
 });

@@ -5,6 +5,8 @@ import { ProductsController } from './products/products.controller';
 import { AdminService } from './admin.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { ProductsService } from './products/products.service';
+import { AuditLogController } from './audit-log.controller';
+import { AuditLogService } from './audit-log.service';
 import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
 import { BannersModule } from './banners/banners.module';
@@ -14,7 +16,6 @@ import { CouponsModule } from './coupons/coupons.module';
 import { ShippingTaxAdminModule } from './shipping-tax/shipping-tax-admin.module';
 import { JwtAuthModule } from '../auth/jwt-auth.module';
 import { PricingAdminModule } from './pricing/pricing.module';
-import { CategoriesModule } from '../user/categories/categories.module';
 
 @Module({
   imports: [
@@ -25,15 +26,14 @@ import { CategoriesModule } from '../user/categories/categories.module';
     CouponsModule,
     ShippingTaxAdminModule,
     PricingAdminModule,
-    CategoriesModule,
   ],
-  controllers: [AdminController, DashboardController, ProductsController],
   providers: [
     AdminService,
     DashboardService,
     ProductsService,
     AdminGuard,
     PrismaService,
+    AuditLogService,
   ],
   exports: [AdminGuard],
 })

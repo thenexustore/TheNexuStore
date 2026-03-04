@@ -39,4 +39,16 @@ describe('PricingRulesService workflow', () => {
 
     await expect(service.transitionStatus('r1', 'APPROVED' as any, 'u1')).rejects.toThrow(BadRequestException);
   });
+
+  it('does not allow reverting PUBLISHED rule to DRAFT', async () => {
+    (prisma.pricingRule.findUnique as jest.Mock).mockResolvedValue({
+      id: 'r1',
+      approval_status: 'PUBLISHED',
+    });
+
+    await expect(service.transitionStatus('r1', 'DRAFT' as any, 'u2')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.pricingRule.update).not.toHaveBeenCalled();
+  });
 });

@@ -174,6 +174,12 @@ export class PricingRulesService {
     }
 
     if (status === PricingApprovalStatus.DRAFT) {
+      if (current === PricingApprovalStatus.PUBLISHED) {
+        throw new BadRequestException(
+          'Published rules cannot be moved back to draft',
+        );
+      }
+
       return this.prisma.pricingRule.update({
         where: { id },
         data: {

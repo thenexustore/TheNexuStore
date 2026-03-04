@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { StaffRole } from '@prisma/client';
 import { Roles } from '../auth/staff-auth/roles.decorator';
 import { AdminGuard } from './admin.guard';
+import { AuditLogsQueryDto } from './audit-log.dto';
 import { AuditLogService } from './audit-log.service';
 
 @Controller('admin/audit-logs')
@@ -14,25 +15,19 @@ export class AuditLogController {
   @Get()
   async getAuditLogs(
     @Req() req: Request,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('actorEmail') actorEmail?: string,
-    @Query('action') action?: string,
-    @Query('resource') resource?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query() query: AuditLogsQueryDto,
   ) {
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 20;
+    const pageNum = query.page;
+    const limitNum = query.limit;
 
     const data = await this.auditLogService.list({
       page: pageNum,
       limit: limitNum,
-      actorEmail,
-      action,
-      resource,
-      from: from ? new Date(from) : undefined,
-      to: to ? new Date(to) : undefined,
+      actorEmail: query.actorEmail,
+      action: query.action,
+      resource: query.resource,
+      from: query.from,
+      to: query.to,
     });
 
     await this.auditLogService.logAction({

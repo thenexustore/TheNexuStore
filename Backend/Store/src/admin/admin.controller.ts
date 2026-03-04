@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -10,7 +11,12 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
-import { CreateBrandDto, CreateCategoryDto } from './admin.dto';
+import {
+  AddOrderNoteDto,
+  AdminOrdersQueryDto,
+  CreateBrandDto,
+  CreateCategoryDto,
+} from './admin.dto';
 import { AuditLogService } from './audit-log.service';
 import { Request } from 'express';
 
@@ -54,20 +60,15 @@ export class AdminController {
 
   @UseGuards(AdminGuard)
   @Get('orders')
-  async getOrders(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: string,
-    @Query('search') search?: string,
-  ) {
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 10;
+  async getOrders(@Query() query: AdminOrdersQueryDto) {
+    const pageNum = query.page;
+    const limitNum = query.limit;
 
     const data = await this.adminService.getOrders(
       pageNum,
       limitNum,
-      status,
-      search,
+      query.status,
+      query.search,
     );
 
     return {
@@ -100,15 +101,12 @@ export class AdminController {
   @Post('orders/:id/notes')
   async addOrderNote(
     @Param('id') id: string,
-    @Body() body: { note: string },
+    @Body() body: AddOrderNoteDto,
     @Req() req: Request,
   ) {
     const note = (body.note || '').trim();
     if (!note) {
-      return {
-        success: false,
-        message: 'Note is required',
-      };
+      throw new BadRequestException('Note is required');
     }
 
     const data = await this.adminService.addOrderNote(id, note);

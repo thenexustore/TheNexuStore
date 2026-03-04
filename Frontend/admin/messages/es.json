@@ -21,8 +21,6 @@
     "featuredProducts": "Productos Destacados",
     "pricing": "Precios / PVP",
     "logout": "Cerrar sesión",
-    "homeBuilder": "Home Builder",
-    "imports": "Importaciones",
-    "rmas": "Devoluciones (RMA)"
+    "homeBuilder": "Home Builder"
   }
 }

@@ -20,7 +20,6 @@ import { ShippingTaxAdminModule } from './shipping-tax/shipping-tax-admin.module
 import { JwtAuthModule } from '../auth/jwt-auth.module';
 import { PricingAdminModule } from './pricing/pricing.module';
 import { CategoriesModule } from '../user/categories/categories.module';
-import { InfortisaModule } from '../infortisa/infortisa.module';
 
 @Module({
   imports: [
@@ -32,15 +31,6 @@ import { InfortisaModule } from '../infortisa/infortisa.module';
     ShippingTaxAdminModule,
     PricingAdminModule,
     CategoriesModule,
-    InfortisaModule,
-  ],
-  controllers: [
-    AdminController,
-    DashboardController,
-    ProductsController,
-    AuditLogController,
-    ImportsController,
-    RmaController,
   ],
   providers: [
     AdminService,

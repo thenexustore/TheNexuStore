@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, UseGuards, Query, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Query,
+  Req,
+  Param,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
 import { CreateBrandDto, CreateCategoryDto } from './admin.dto';
@@ -60,6 +69,63 @@ export class AdminController {
       status,
       search,
     );
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('orders/:id')
+  async getOrderById(@Param('id') id: string) {
+    const data = await this.adminService.getOrderById(id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('orders/:id/timeline')
+  async getOrderTimeline(@Param('id') id: string) {
+    const data = await this.adminService.getOrderTimeline(id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('orders/:id/notes')
+  async addOrderNote(
+    @Param('id') id: string,
+    @Body() body: { note: string },
+    @Req() req: Request,
+  ) {
+    const note = (body.note || '').trim();
+    if (!note) {
+      return {
+        success: false,
+        message: 'Note is required',
+      };
+    }
+
+    const data = await this.adminService.addOrderNote(id, note);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'ORDER_NOTE_ADDED',
+      resource: 'ORDER',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        note,
+      },
+    });
 
     return {
       success: true,

@@ -15,7 +15,16 @@ export { fetchBrands, createBrand, type Brand } from "./brands";
 
 export { fetchCategories, createCategory, type Category } from "./categories";
 
-export { fetchOrders, type Order, type OrdersResponse } from "./orders";
+export {
+  fetchOrders,
+  fetchOrderById,
+  fetchOrderTimeline,
+  addOrderNote,
+  type Order,
+  type OrderDetail,
+  type OrderTimelineEntry,
+  type OrdersResponse,
+} from "./orders";
 
 export { fetchDashboardStats, type DashboardStats } from "./dashboard";
 

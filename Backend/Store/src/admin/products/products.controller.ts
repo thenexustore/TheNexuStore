@@ -9,17 +9,27 @@ import {
   Delete,
   Param,
   Patch,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ProductsService } from './products.service';
 import { AdminGuard } from '../admin.guard';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
+import {
+  BulkDeleteProductsDto,
+  BulkUpdateProductStatusDto,
+} from './dto/bulk-product-actions.dto';
+import { AuditLogService } from '../audit-log.service';
 
 @Controller('admin/products')
 @UseGuards(AdminGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @Get()
   async getProducts(
@@ -46,6 +56,67 @@ export class ProductsController {
     };
   }
 
+
+  @Put('bulk/status')
+  async bulkUpdateStatus(
+    @Body() body: BulkUpdateProductStatusDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.productsService.bulkUpdateProductStatus(
+      body.ids,
+      body.status,
+    );
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_BULK_STATUS_UPDATED',
+      resource: 'PRODUCT',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        ids: body.ids,
+        status: body.status,
+        affected: data.affected,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Products status updated',
+    };
+  }
+
+  @Delete('bulk')
+  async bulkDelete(
+    @Body() body: BulkDeleteProductsDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.productsService.bulkDeleteProducts(body.ids);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_BULK_DELETED',
+      resource: 'PRODUCT',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        ids: body.ids,
+        affected: data.affected,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Products deleted successfully',
+    };
+  }
+
   @Get(':id')
   async getProductById(@Param('id') id: string) {
     const product = await this.productsService.getProductById(id);
@@ -56,8 +127,23 @@ export class ProductsController {
   }
 
   @Post()
-  async createProduct(@Body() body: CreateProductDto) {
+  async createProduct(@Body() body: CreateProductDto, @Req() req: Request) {
     const product = await this.productsService.createProduct(body);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_CREATED',
+      resource: 'PRODUCT',
+      resourceId: product.id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        title: product.title,
+      },
+    });
+
     return {
       success: true,
       data: product,
@@ -66,8 +152,37 @@ export class ProductsController {
   }
 
   @Put(':id')
-  async updateProduct(@Param('id') id: string, @Body() body: UpdateProductDto) {
+  async updateProduct(
+    @Param('id') id: string,
+    @Body() body: UpdateProductDto,
+    @Req() req: Request,
+  ) {
+    const previous = await this.productsService.getProductById(id);
     const product = await this.productsService.updateProduct(id, body);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_UPDATED',
+      resource: 'PRODUCT',
+      resourceId: product.id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: req.get('x-request-id') || undefined,
+      metadata: {
+        changedFields: Object.keys(body || {}),
+      },
+      before: {
+        title: previous.title,
+        slug: previous.slug,
+      },
+      after: {
+        title: product.title,
+        slug: product.slug,
+      },
+    });
+
     return {
       success: true,
       data: product,
@@ -76,8 +191,20 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  async deleteProduct(@Param('id') id: string) {
+  async deleteProduct(@Param('id') id: string, @Req() req: Request) {
     await this.productsService.deleteProduct(id);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_DELETED',
+      resource: 'PRODUCT',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+    });
+
     return {
       success: true,
       message: 'Product deleted successfully',
@@ -88,11 +215,26 @@ export class ProductsController {
   async updateProductStatus(
     @Param('id') id: string,
     @Body() body: UpdateProductStatusDto,
+    @Req() req: Request,
   ) {
     const product = await this.productsService.updateProductStatus(
       id,
       body.status,
     );
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_STATUS_UPDATED',
+      resource: 'PRODUCT',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        status: body.status,
+      },
+    });
 
     return {
       success: true,
@@ -102,8 +244,20 @@ export class ProductsController {
   }
 
   @Patch(':id/toggle-featured')
-  async toggleFeatured(@Param('id') id: string) {
+  async toggleFeatured(@Param('id') id: string, @Req() req: Request) {
     const product = await this.productsService.toggleFeatured(id);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_FEATURED_TOGGLED',
+      resource: 'PRODUCT',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+    });
+
     return {
       success: true,
       data: product,

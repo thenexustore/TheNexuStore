@@ -47,23 +47,32 @@ async function bootstrap() {
     }),
   );
 
+  const envOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  const allowedOrigins = new Set<string>([
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000',
+    'https://www.thenexustore.com',
+    'https://admin.thenexustore.com',
+    'https://nexus-store-vpq8.vercel.app',
+    'https://nexus-store-eight.vercel.app',
+    process.env.FRONTEND_URL ?? '',
+    process.env.ADMIN_URL ?? '',
+    ...envOrigins,
+  ]);
+
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:4000',
-        'https://www.thenexustore.com',
-        'https://admin.thenexustore.com',
-        'https://nexus-store-vpq8.vercel.app',
-        'https://nexus-store-eight.vercel.app',
-      ];
-
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+        return;
       }
+
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     credentials: true,
   });

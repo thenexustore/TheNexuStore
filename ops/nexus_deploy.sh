@@ -7,7 +7,7 @@ if [[ "${1:-}" == "--dry-run" || "${1:-}" == "-n" ]]; then
 fi
 
 REPO_DIR="${REPO_DIR:-/opt/TheNexuStore}"
-BRANCH="${BRANCH:-main}"
+BRANCH="${BRANCH:-}"
 BACKUP_ROOT="${BACKUP_ROOT:-/root/nexus_backups}"
 BACKEND_DIR="$REPO_DIR/Backend/Store"
 STORE_DIR="$REPO_DIR/Frontend/Store"
@@ -16,6 +16,11 @@ BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
 BACKEND_START_SCRIPT="${BACKEND_START_SCRIPT:-/usr/local/bin/nexus-backend-start.sh}"
 STORE_ENV_FILE="${STORE_ENV_FILE:-$STORE_DIR/.env.production}"
 ADMIN_ENV_FILE="${ADMIN_ENV_FILE:-$ADMIN_DIR/.env.production}"
+API_DOMAIN="${API_DOMAIN:-}"
+SITE_DOMAIN="${SITE_DOMAIN:-}"
+ADMIN_DOMAIN="${ADMIN_DOMAIN:-}"
+SKIP_EXTERNAL_HEALTHCHECKS="${SKIP_EXTERNAL_HEALTHCHECKS:-1}"
+SYNC_FRONTEND_ENV="${SYNC_FRONTEND_ENV:-1}"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 run() {
@@ -68,6 +73,38 @@ require_cmd() {
   }
 }
 
+detect_branch() {
+  if [[ -n "$BRANCH" ]]; then
+    return 0
+  fi
+
+  if git -C "$REPO_DIR" show-ref --verify --quiet refs/remotes/origin/main; then
+    BRANCH="main"
+    return 0
+  fi
+
+  if git -C "$REPO_DIR" show-ref --verify --quiet refs/remotes/origin/master; then
+    BRANCH="master"
+    return 0
+  fi
+
+  BRANCH="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
+}
+
+ensure_pm2() {
+  if command -v pm2 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] pm2 not found. Would install globally with npm install -g pm2"
+    return 0
+  fi
+
+  log "pm2 not found. Installing globally with npm"
+  run "npm install -g pm2"
+}
+
 install_deps() {
   local app_dir="$1"
   if [[ -f "$app_dir/package-lock.json" ]]; then
@@ -89,6 +126,10 @@ fix_next_proxy_conflict() {
 }
 
 pm2_has_process() {
+  if ! command -v pm2 >/dev/null 2>&1; then
+    return 1
+  fi
+
   pm2 jlist | grep -q "\"name\":\"$1\""
 }
 
@@ -118,12 +159,16 @@ wait_for_url() {
   return 1
 }
 
-for cmd in git npm npx pm2 sed curl tar; do
+for cmd in git npm npx sed curl tar; do
   require_cmd "$cmd"
 done
 
+ensure_pm2
+
 [[ -d "$REPO_DIR/.git" ]] || { echo "[ERROR] Missing git repo at $REPO_DIR" >&2; exit 1; }
 [[ -f "$BACKEND_ENV_FILE" ]] || { echo "[ERROR] Missing backend env file: $BACKEND_ENV_FILE" >&2; exit 1; }
+
+detect_branch
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
@@ -131,7 +176,6 @@ run "mkdir -p '$BACKUP_DIR'"
 create_repo_backup "$BACKUP_DIR/repo_snapshot.tgz"
 
 run "sed -i 's/\r$//' '$BACKEND_ENV_FILE'"
-run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
 
 run "cd '$REPO_DIR' && git fetch --all --prune"
 run "cd '$REPO_DIR' && git checkout '$BRANCH'"
@@ -147,6 +191,28 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "[ERROR] DATABASE_URL is required in $BACKEND_ENV_FILE" >&2
   exit 1
 fi
+
+DEPLOY_API_URL="${API_DOMAIN:-${BASE_URL:-}}"
+DEPLOY_SITE_URL="${SITE_DOMAIN:-${FRONTEND_URL:-}}"
+if [[ -z "$DEPLOY_API_URL" ]]; then
+  DEPLOY_API_URL="https://api.thenexustore.com"
+  log "WARN: API_DOMAIN/BASE_URL missing. Falling back to $DEPLOY_API_URL"
+fi
+
+if [[ -z "$DEPLOY_SITE_URL" ]]; then
+  DEPLOY_SITE_URL="https://www.thenexustore.com"
+  log "WARN: SITE_DOMAIN/FRONTEND_URL missing. Falling back to $DEPLOY_SITE_URL"
+fi
+
+
+if [[ "$SYNC_FRONTEND_ENV" == "1" ]]; then
+  run "cat > '$STORE_ENV_FILE' <<ENV\nNEXT_PUBLIC_API_URL=$DEPLOY_API_URL\nNEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL\nENV"
+  run "cat > '$ADMIN_ENV_FILE' <<ENV\nNEXT_PUBLIC_API_URL=$DEPLOY_API_URL\nNEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL\nENV"
+else
+  log "Skipping frontend env sync because SYNC_FRONTEND_ENV=$SYNC_FRONTEND_ENV"
+fi
+
+run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
 
 log "Building backend"
 install_deps "$BACKEND_DIR"
@@ -181,6 +247,10 @@ if [[ "$DRY_RUN" == "0" ]]; then
   wait_for_url "http://127.0.0.1:4000/admin/infortisa/health"
   wait_for_url "http://127.0.0.1:3000"
   wait_for_url "http://127.0.0.1:3001"
+
+  if [[ "$SKIP_EXTERNAL_HEALTHCHECKS" != "1" ]]; then
+    wait_for_url "$DEPLOY_API_URL/admin/health"
+  fi
 fi
 
 log "Deploy finished. Backup created at: $BACKUP_DIR"

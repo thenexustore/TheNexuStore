@@ -86,6 +86,17 @@ sed -i 's/\r$//' /opt/TheNexuStore/Frontend/admin/.env.production
 sudo /usr/local/bin/nexus_deploy.sh
 ```
 
+If `nexus_deploy.sh` is not found, update repo first and reinstall scripts:
+
+```bash
+cd /opt/TheNexuStore
+git fetch --all --prune
+git checkout main
+git reset --hard origin/main
+sudo install -m 755 ops/nexus_deploy.sh /usr/local/bin/nexus_deploy.sh
+sudo install -m 755 ops/nexus_rollback.sh /usr/local/bin/nexus_rollback.sh
+```
+
 Dry run:
 
 ```bash

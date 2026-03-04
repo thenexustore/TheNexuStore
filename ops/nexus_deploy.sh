@@ -13,6 +13,7 @@ BACKEND_DIR="$REPO_DIR/Backend/Store"
 STORE_DIR="$REPO_DIR/Frontend/Store"
 ADMIN_DIR="$REPO_DIR/Frontend/admin"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
+BACKEND_START_SCRIPT="${BACKEND_START_SCRIPT:-/usr/local/bin/nexus-backend-start.sh}"
 STORE_ENV_FILE="${STORE_ENV_FILE:-$STORE_DIR/.env.production}"
 ADMIN_ENV_FILE="${ADMIN_ENV_FILE:-$ADMIN_DIR/.env.production}"
 
@@ -38,6 +39,21 @@ install_deps() {
     run "cd '$app_dir' && npm ci"
   else
     run "cd '$app_dir' && npm install"
+  fi
+}
+
+pm2_has_process() {
+  pm2 jlist | grep -q "\"name\":\"$1\""
+}
+
+restart_or_start_pm2() {
+  local name="$1"
+  local start_cmd="$2"
+
+  if pm2_has_process "$name"; then
+    run "pm2 restart '$name' --update-env"
+  else
+    run "$start_cmd"
   fi
 }
 
@@ -92,6 +108,11 @@ run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma generate"
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate deploy"
 run "cd '$BACKEND_DIR' && npm run build"
 
+log "Ensuring backend start script"
+run "cat > '$BACKEND_START_SCRIPT' <<'SCRIPT'\n#!/usr/bin/env bash\nset -Eeuo pipefail\ncd '$BACKEND_DIR'\nsource '$BACKEND_ENV_FILE'\nexec node dist/src/main.js\nSCRIPT"
+run "chmod +x '$BACKEND_START_SCRIPT'"
+run "sed -i 's/\\r$//' '$BACKEND_START_SCRIPT'"
+
 log "Building store"
 install_deps "$STORE_DIR"
 run "cd '$STORE_DIR' && npm run build"
@@ -101,9 +122,10 @@ install_deps "$ADMIN_DIR"
 run "cd '$ADMIN_DIR' && npm run build"
 
 log "Restarting PM2"
-run "pm2 restart nexus-backend --update-env"
-run "pm2 restart nexus-store --update-env"
-run "pm2 restart nexus-admin --update-env"
+run "pm2 delete nexus-frontend >/dev/null 2>&1 || true"
+restart_or_start_pm2 "nexus-backend" "pm2 start '$BACKEND_START_SCRIPT' --name nexus-backend --time"
+restart_or_start_pm2 "nexus-store" "pm2 start npm --name nexus-store --cwd '$STORE_DIR' -- start -- -p 3000"
+restart_or_start_pm2 "nexus-admin" "pm2 start npm --name nexus-admin --cwd '$ADMIN_DIR' -- start -- -p 3001"
 run "pm2 save"
 
 if [[ "$DRY_RUN" == "0" ]]; then

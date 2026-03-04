@@ -1,5 +1,14 @@
 import { fetchWithAuth } from "../utils";
 
+export interface DashboardAlert {
+  id: string;
+  severity: "error" | "warning" | "info";
+  title: string;
+  description: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
 export interface DashboardStats {
   todayOrders: number;
   todayRevenue: number;
@@ -7,6 +16,7 @@ export interface DashboardStats {
   totalCustomers: number;
   pendingOrders: number;
   activeProducts: number;
+  alerts: DashboardAlert[];
   recentOrders: Array<{
     id: string;
     orderNumber: string;

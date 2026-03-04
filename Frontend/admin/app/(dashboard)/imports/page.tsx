@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   fetchImportHistory,
+  retryImport,
   triggerImport,
   type ImportHistoryItem,
 } from "@/lib/api";
@@ -15,6 +16,7 @@ export default function ImportsPage() {
     null,
   );
   const [items, setItems] = useState<ImportHistoryItem[]>([]);
+  const [retryReason, setRetryReason] = useState("");
 
   const loadHistory = async () => {
     try {
@@ -44,6 +46,25 @@ export default function ImportsPage() {
     }
   };
 
+  const runRetry = async (mode: "full" | "stock" | "images") => {
+    const reason = retryReason.trim();
+    if (!reason) {
+      toast.error("Retry reason is required");
+      return;
+    }
+
+    setRunning(mode);
+    try {
+      await retryImport(mode, reason);
+      toast.success(`Retry ${mode} executed successfully`);
+      await loadHistory();
+    } catch (error: any) {
+      toast.error(error.message || `Failed to retry ${mode} import`);
+    } finally {
+      setRunning(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -67,6 +88,18 @@ export default function ImportsPage() {
         </button>
 
         <button
+          onClick={() => runRetry("full")}
+          disabled={running !== null}
+          className="bg-white border border-slate-200 rounded-2xl p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <Database className="w-5 h-5 text-amber-700 mb-3" />
+          <p className="font-semibold text-slate-900">Retry full import</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Re-run full sync with an explicit retry reason.
+          </p>
+        </button>
+
+        <button
           onClick={() => runImport("stock")}
           disabled={running !== null}
           className="bg-white border border-slate-200 rounded-2xl p-4 text-left hover:border-slate-300 disabled:opacity-60"
@@ -75,6 +108,18 @@ export default function ImportsPage() {
           <p className="font-semibold text-slate-900">Run stock sync</p>
           <p className="text-sm text-slate-500 mt-1">
             Refresh inventory levels from supplier feed.
+          </p>
+        </button>
+
+        <button
+          onClick={() => runRetry("stock")}
+          disabled={running !== null}
+          className="bg-white border border-slate-200 rounded-2xl p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <Box className="w-5 h-5 text-amber-700 mb-3" />
+          <p className="font-semibold text-slate-900">Retry stock sync</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Re-run stock synchronization with retry reason.
           </p>
         </button>
 
@@ -89,6 +134,30 @@ export default function ImportsPage() {
             Backfill missing product images.
           </p>
         </button>
+
+        <button
+          onClick={() => runRetry("images")}
+          disabled={running !== null}
+          className="bg-white border border-slate-200 rounded-2xl p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <ImageIcon className="w-5 h-5 text-amber-700 mb-3" />
+          <p className="font-semibold text-slate-900">Retry image sync</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Re-run image synchronization with retry reason.
+          </p>
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4">
+        <label className="block text-sm font-medium text-slate-700 mb-2">
+          Retry reason (required for retry actions)
+        </label>
+        <input
+          value={retryReason}
+          onChange={(e) => setRetryReason(e.target.value)}
+          placeholder="e.g. Previous supplier timeout / stock mismatch"
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+        />
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6">

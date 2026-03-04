@@ -14,7 +14,11 @@ import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
 import { PrismaService } from '../../common/prisma.service';
 import { AdminGuard } from '../admin.guard';
 import { AuditLogService } from '../audit-log.service';
-import { ImportHistoryQueryDto, TriggerImportDto } from './dto/imports.dto';
+import {
+  ImportHistoryQueryDto,
+  RetryImportDto,
+  TriggerImportDto,
+} from './dto/imports.dto';
 
 @Controller('admin/imports')
 @UseGuards(AdminGuard)
@@ -25,6 +29,70 @@ export class ImportsController {
     private readonly infortisaSync: InfortisaSyncService,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  private async executeImport(
+    body: { mode: TriggerImportDto['mode']; reason?: string },
+    req: Request,
+    options?: { isRetry?: boolean },
+  ) {
+    const startedAt = Date.now();
+
+    const modeHandlers: Record<
+      TriggerImportDto['mode'],
+      () => Promise<unknown>
+    > = {
+      full: () => this.infortisaSync.fullSync(),
+      stock: () => this.infortisaSync.syncStockRealTime(),
+      images: () => this.infortisaSync.syncImages(),
+    };
+
+    await modeHandlers[body.mode]();
+
+    const durationMs = Date.now() - startedAt;
+    const detailsParts = [
+      `mode=${body.mode}`,
+      `durationMs=${durationMs}`,
+      options?.isRetry ? 'retry=true' : 'retry=false',
+    ];
+
+    if (body.reason) {
+      detailsParts.push(`reason=${body.reason}`);
+    }
+
+    await this.prisma.syncLog.upsert({
+      where: { type: `manual_${body.mode}` },
+      update: {
+        last_sync: new Date(),
+        details: detailsParts.join('; '),
+      },
+      create: {
+        type: `manual_${body.mode}`,
+        last_sync: new Date(),
+        details: detailsParts.join('; '),
+      },
+    });
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: options?.isRetry ? 'IMPORT_RETRY_TRIGGERED' : 'IMPORT_TRIGGERED',
+      resource: 'IMPORT_JOB',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        mode: body.mode,
+        durationMs,
+        ...(body.reason ? { reason: body.reason } : {}),
+      },
+    });
+
+    return {
+      mode: body.mode,
+      durationMs,
+      ...(body.reason ? { reason: body.reason } : {}),
+    };
+  }
 
   @Get('history')
   async history(@Query() query: ImportHistoryQueryDto) {
@@ -57,55 +125,23 @@ export class ImportsController {
 
   @Post('run')
   async run(@Body() body: TriggerImportDto, @Req() req: Request) {
-    const startedAt = Date.now();
-
-    const modeHandlers: Record<
-      TriggerImportDto['mode'],
-      () => Promise<unknown>
-    > = {
-      full: () => this.infortisaSync.fullSync(),
-      stock: () => this.infortisaSync.syncStockRealTime(),
-      images: () => this.infortisaSync.syncImages(),
-    };
-
-    await modeHandlers[body.mode]();
-
-    const durationMs = Date.now() - startedAt;
-
-    await this.prisma.syncLog.upsert({
-      where: { type: `manual_${body.mode}` },
-      update: {
-        last_sync: new Date(),
-        details: `mode=${body.mode}; durationMs=${durationMs}`,
-      },
-      create: {
-        type: `manual_${body.mode}`,
-        last_sync: new Date(),
-        details: `mode=${body.mode}; durationMs=${durationMs}`,
-      },
-    });
-
-    await this.auditLogService.logAction({
-      actor: req.user as any,
-      action: 'IMPORT_TRIGGERED',
-      resource: 'IMPORT_JOB',
-      method: req.method,
-      path: req.originalUrl,
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent') || undefined,
-      metadata: {
-        mode: body.mode,
-        durationMs,
-      },
-    });
+    const data = await this.executeImport(body, req);
 
     return {
       success: true,
       message: `Import ${body.mode} executed successfully`,
-      data: {
-        mode: body.mode,
-        durationMs,
-      },
+      data,
+    };
+  }
+
+  @Post('retry')
+  async retry(@Body() body: RetryImportDto, @Req() req: Request) {
+    const data = await this.executeImport(body, req, { isRetry: true });
+
+    return {
+      success: true,
+      message: `Retry ${body.mode} executed successfully`,
+      data,
     };
   }
 }

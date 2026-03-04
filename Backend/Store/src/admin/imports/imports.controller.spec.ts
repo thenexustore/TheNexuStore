@@ -79,4 +79,39 @@ describe('ImportsController', () => {
     expect(result.success).toBe(true);
     expect(result.data.mode).toBe('stock');
   });
+
+  it('retries import with reason and emits retry audit action', async () => {
+    const req = {
+      user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },
+      method: 'POST',
+      originalUrl: '/admin/imports/retry',
+      ip: '127.0.0.1',
+      get: jest.fn().mockReturnValue('jest'),
+    } as any;
+
+    const result = await controller.retry(
+      { mode: 'images', reason: 'Previous run failed due to provider timeout' },
+      req,
+    );
+
+    expect(infortisaSync.syncImages).toHaveBeenCalledTimes(1);
+    expect(prisma.syncLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { type: 'manual_images' },
+        update: expect.objectContaining({
+          details: expect.stringContaining('retry=true'),
+        }),
+      }),
+    );
+    expect(auditLogService.logAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'IMPORT_RETRY_TRIGGERED',
+        metadata: expect.objectContaining({
+          mode: 'images',
+          reason: 'Previous run failed due to provider timeout',
+        }),
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
 });

@@ -31,3 +31,13 @@ export async function triggerImport(mode: "full" | "stock" | "images") {
     body: JSON.stringify({ mode }),
   });
 }
+
+export async function retryImport(
+  mode: "full" | "stock" | "images",
+  reason: string,
+) {
+  return fetchWithAuth("/admin/imports/retry", {
+    method: "POST",
+    body: JSON.stringify({ mode, reason }),
+  });
+}

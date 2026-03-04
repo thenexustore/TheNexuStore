@@ -81,6 +81,7 @@ export {
 
 export {
   fetchImportHistory,
+  retryImport,
   triggerImport,
   type ImportHistoryItem,
   type ImportHistoryResponse,

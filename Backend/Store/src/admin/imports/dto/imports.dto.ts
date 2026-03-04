@@ -1,5 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class ImportHistoryQueryDto {
   @IsOptional()
@@ -23,4 +32,11 @@ export class ImportHistoryQueryDto {
 export class TriggerImportDto {
   @IsIn(['full', 'stock', 'images'])
   mode!: 'full' | 'stock' | 'images';
+}
+
+export class RetryImportDto extends TriggerImportDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(250)
+  reason!: string;
 }

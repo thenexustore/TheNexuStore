@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
@@ -123,7 +127,7 @@ export class AdminService {
       });
 
       if (!order) {
-        throw new Error('Order not found');
+        throw new NotFoundException('Order not found');
       }
 
       const customer = order.customer_id
@@ -149,6 +153,9 @@ export class AdminService {
         items,
       };
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       console.error('Get order by ID error:', error);
       throw new Error('Failed to fetch order details');
     }
@@ -166,6 +173,42 @@ export class AdminService {
       console.error('Update order status error:', error);
       throw new Error('Failed to update order status');
     }
+  }
+
+
+
+  async getOrderTimeline(orderId: string) {
+    const logs = await this.prisma.adminAuditLog.findMany({
+      where: {
+        resource: 'ORDER',
+        resource_id: orderId,
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      actorEmail: log.actor_email,
+      actorRole: log.actor_role,
+      status: log.status,
+      metadata: log.metadata_json,
+      createdAt: log.created_at,
+    }));
+  }
+
+  async addOrderNote(orderId: string, note: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return {
+      success: true,
+      orderId,
+      note,
+    };
   }
 
   async getBrands() {

@@ -29,6 +29,7 @@ const navigation = [
     icon: LayoutTemplate,
     children: [
       { key: "banners", href: "/banners" },
+      { key: "homepageSections", href: "/homepage-sections" },
       { key: "featuredProducts", href: "/featured-products" },
     ],
   },

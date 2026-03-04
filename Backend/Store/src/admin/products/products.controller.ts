@@ -17,6 +17,10 @@ import { AdminGuard } from '../admin.guard';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
+import {
+  BulkDeleteProductsDto,
+  BulkUpdateProductStatusDto,
+} from './dto/bulk-product-actions.dto';
 import { AuditLogService } from '../audit-log.service';
 
 @Controller('admin/products')
@@ -49,6 +53,67 @@ export class ProductsController {
     return {
       success: true,
       data,
+    };
+  }
+
+
+  @Put('bulk/status')
+  async bulkUpdateStatus(
+    @Body() body: BulkUpdateProductStatusDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.productsService.bulkUpdateProductStatus(
+      body.ids,
+      body.status,
+    );
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_BULK_STATUS_UPDATED',
+      resource: 'PRODUCT',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        ids: body.ids,
+        status: body.status,
+        affected: data.affected,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Products status updated',
+    };
+  }
+
+  @Delete('bulk')
+  async bulkDelete(
+    @Body() body: BulkDeleteProductsDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.productsService.bulkDeleteProducts(body.ids);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'PRODUCT_BULK_DELETED',
+      resource: 'PRODUCT',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        ids: body.ids,
+        affected: data.affected,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Products deleted successfully',
     };
   }
 

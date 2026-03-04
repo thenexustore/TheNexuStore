@@ -1008,6 +1008,74 @@ export class ProductsService {
     }
   }
 
+
+  async bulkUpdateProductStatus(ids: string[], status: string) {
+    const validStatuses = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
+
+    if (!validStatuses.includes(status)) {
+      throw new Error(`Invalid status: ${status}`);
+    }
+
+    const uniqueIds = Array.from(new Set(ids));
+
+    const result = await this.prisma.product.updateMany({
+      where: { id: { in: uniqueIds } },
+      data: {
+        status: status as 'DRAFT' | 'ACTIVE' | 'ARCHIVED',
+      },
+    });
+
+    return {
+      affected: result.count,
+      ids: uniqueIds,
+      status,
+    };
+  }
+
+  async bulkDeleteProducts(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids));
+
+    const skus = await this.prisma.sku.findMany({
+      where: { product_id: { in: uniqueIds } },
+      select: { id: true },
+    });
+
+    const skuIds = skus.map((s) => s.id);
+
+    await this.prisma.skuPrice.deleteMany({
+      where: { sku_id: { in: skuIds } },
+    });
+
+    await this.prisma.inventoryLevel.deleteMany({
+      where: { sku_id: { in: skuIds } },
+    });
+
+    await this.prisma.productMedia.deleteMany({
+      where: { product_id: { in: uniqueIds } },
+    });
+
+    await this.prisma.skuAttribute.deleteMany({
+      where: { sku_id: { in: skuIds } },
+    });
+
+    await this.prisma.productCategory.deleteMany({
+      where: { product_id: { in: uniqueIds } },
+    });
+
+    await this.prisma.sku.deleteMany({
+      where: { product_id: { in: uniqueIds } },
+    });
+
+    const deleted = await this.prisma.product.deleteMany({
+      where: { id: { in: uniqueIds } },
+    });
+
+    return {
+      affected: deleted.count,
+      ids: uniqueIds,
+    };
+  }
+
   async toggleFeatured(id: string) {
     try {
       const product = await this.prisma.product.findUnique({

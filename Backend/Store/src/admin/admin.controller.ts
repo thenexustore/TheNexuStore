@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
+import { Permissions } from '../auth/staff-auth/permissions.decorator';
 import {
   AddOrderNoteDto,
   AdminOrdersQueryDto,
@@ -69,6 +70,7 @@ export class AdminController {
 
   @UseGuards(AdminGuard)
   @Put('orders/bulk/status')
+  @Permissions('orders:bulk_update')
   async bulkUpdateOrderStatus(
     @Body() body: BulkUpdateOrderStatusDto,
     @Req() req: Request,

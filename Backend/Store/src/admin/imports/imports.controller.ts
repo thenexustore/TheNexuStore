@@ -10,6 +10,7 @@ import {
 import { StaffRole } from '@prisma/client';
 import { Request } from 'express';
 import { Roles } from '../../auth/staff-auth/roles.decorator';
+import { Permissions } from '../../auth/staff-auth/permissions.decorator';
 import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
 import { PrismaService } from '../../common/prisma.service';
 import { AdminGuard } from '../admin.guard';
@@ -124,6 +125,7 @@ export class ImportsController {
   }
 
   @Post('run')
+  @Permissions('imports:run')
   async run(@Body() body: TriggerImportDto, @Req() req: Request) {
     const data = await this.executeImport(body, req);
 
@@ -135,6 +137,7 @@ export class ImportsController {
   }
 
   @Post('retry')
+  @Permissions('imports:retry')
   async retry(@Body() body: RetryImportDto, @Req() req: Request) {
     const data = await this.executeImport(body, req, { isRetry: true });
 

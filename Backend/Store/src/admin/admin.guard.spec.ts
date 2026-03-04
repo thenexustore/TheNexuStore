@@ -7,6 +7,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { StaffRole } from '@prisma/client';
 import { ROLES_KEY } from '../auth/staff-auth/roles.decorator';
+import { PERMISSIONS_KEY } from '../auth/staff-auth/permissions.decorator';
 import { AdminGuard } from './admin.guard';
 
 describe('AdminGuard', () => {
@@ -87,6 +88,44 @@ describe('AdminGuard', () => {
     (reflector.getAllAndOverride as jest.Mock).mockImplementation((key) => {
       if (key === ROLES_KEY) {
         return [StaffRole.ADMIN];
+      }
+
+      return undefined;
+    });
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('enforces permissions metadata when present', () => {
+    const context = getContext('Bearer warehouse-token');
+
+    (jwtService.verify as jest.Mock).mockReturnValue({
+      role: StaffRole.WAREHOUSE,
+      type: 'STAFF',
+      permissions: ['orders:read'],
+    });
+    (reflector.getAllAndOverride as jest.Mock).mockImplementation((key) => {
+      if (key === PERMISSIONS_KEY) {
+        return ['orders:bulk_update'];
+      }
+
+      return undefined;
+    });
+
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+  });
+
+  it('allows permission-protected route when token has full_access', () => {
+    const context = getContext('Bearer admin-token');
+
+    (jwtService.verify as jest.Mock).mockReturnValue({
+      role: StaffRole.ADMIN,
+      type: 'STAFF',
+      permissions: ['full_access'],
+    });
+    (reflector.getAllAndOverride as jest.Mock).mockImplementation((key) => {
+      if (key === PERMISSIONS_KEY) {
+        return ['imports:retry'];
       }
 
       return undefined;

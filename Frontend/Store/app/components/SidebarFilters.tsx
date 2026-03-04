@@ -14,6 +14,7 @@ type FilterListItem = {
   name: string;
   slug: string;
   count: number;
+  parent_id?: string | null;
   parent_name?: string | null;
   display_name?: string;
 };
@@ -89,7 +90,7 @@ function SearchableCheckboxList({
   );
 }
 
-function GroupedCategoryFilters({
+function CategoryTreeFilter({
   items,
   selected,
   onToggle,
@@ -98,64 +99,53 @@ function GroupedCategoryFilters({
   selected: string[];
   onToggle: (slug: string) => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return items;
-
-    const q = query.toLowerCase();
-    return items.filter((item) => {
-      const parent = item.parent_name || "";
-      return (
-        item.name.toLowerCase().includes(q) ||
-        parent.toLowerCase().includes(q) ||
-        (item.display_name || "").toLowerCase().includes(q)
-      );
-    });
-  }, [items, query]);
-
-  const groups = useMemo(() => {
-    const map = new Map<string, FilterListItem[]>();
-    for (const item of filtered) {
-      const key = item.parent_name || "Más categorías";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(item);
+  const tree = useMemo(() => {
+    const byId = new Map(items.map((item) => [item.id, { ...item, children: [] as any[] }]));
+    const roots: any[] = [];
+    for (const item of byId.values()) {
+      const pid = item.parent_id as string | null | undefined;
+      if (pid && byId.has(pid)) {
+        byId.get(pid)!.children.push(item);
+      } else {
+        roots.push(item);
+      }
     }
-    return Array.from(map.entries());
-  }, [filtered]);
+    return roots;
+  }, [items]);
+
+  const renderNode = (node: any, depth: number) => {
+    const open = expanded[node.id] ?? depth < 1;
+    return (
+      <div key={node.id} className="space-y-1">
+        <div className="flex items-center" style={{ paddingLeft: `${depth * 12}px` }}>
+          {node.children.length ? (
+            <button className="mr-1 text-xs" onClick={() => setExpanded((prev) => ({ ...prev, [node.id]: !open }))}>
+              {open ? "−" : "+"}
+            </button>
+          ) : (
+            <span className="mr-3" />
+          )}
+          <label className="flex cursor-pointer items-center text-sm">
+            <input
+              type="checkbox"
+              checked={selected.includes(node.slug)}
+              onChange={() => onToggle(node.slug)}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="ml-2">{node.name} ({node.count})</span>
+          </label>
+        </div>
+        {open ? node.children.map((child: any) => renderNode(child, depth + 1)) : null}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-3">
       <h4 className="font-medium">Categories</h4>
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search categories..."
-        className="w-full rounded border px-2 py-1 text-sm"
-      />
-
-      <div className="max-h-80 space-y-4 overflow-auto pr-1">
-        {groups.map(([groupName, groupItems]) => (
-          <div key={groupName} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              {groupName}
-            </p>
-            {groupItems.map((item) => (
-              <label key={item.id} className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(item.slug)}
-                  onChange={() => onToggle(item.slug)}
-                  className="rounded border-gray-300 text-blue-600"
-                />
-                <span className="ml-2 text-sm">
-                  {item.name} ({item.count})
-                </span>
-              </label>
-            ))}
-          </div>
-        ))}
-      </div>
+      <div className="max-h-80 overflow-auto pr-1">{tree.map((node) => renderNode(node, 0))}</div>
     </div>
   );
 }
@@ -247,7 +237,7 @@ export function SidebarFilters({
       </div>
 
       {filterOptions.categories.length > 0 && (
-        <GroupedCategoryFilters
+        <CategoryTreeFilter
           items={filterOptions.categories}
           selected={categories}
           onToggle={(v) => toggleArrayValue(v, categories, setCategories)}

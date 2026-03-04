@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Menu, Search, ShoppingCart, X, MessageCircle } from "lucide-react";
+import { Menu, Search, ShoppingCart, MessageCircle } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
-import { productAPI, Product, MenuTreeGroup } from "../lib/products";
+import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
+import { CategoryDrawer } from "./CategoryDrawer";
+import { buildCuratedCategoryTree } from "../lib/category-navigation";
 
 type User = {
   id: string;
@@ -20,23 +22,25 @@ type User = {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
-    const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [menuGroups, setMenuGroups] = useState<MenuTreeGroup[]>([]);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
-  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
-  const categoryPanelRef = useRef<HTMLElement>(null);
-  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
+  const [categorySearchLoading, setCategorySearchLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const curatedCategoryTree = useMemo(
+    () => buildCuratedCategoryTree(categoryTree),
+    [categoryTree],
+  );
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -51,7 +55,7 @@ export default function Navbar() {
       if (res) setUser(res);
     });
 
-    loadMenuTree();
+    loadCategoryTree();
 
     // Legacy cart count loading (for backward compatibility)
     const loadLegacyCartCount = () => {
@@ -94,16 +98,14 @@ export default function Navbar() {
     }
   }, [authUser]);
 
-  const loadMenuTree = async () => {
+  const loadCategoryTree = async () => {
     try {
       setCategoriesLoading(true);
-      const response = await productAPI.getMenuTree();
-      setMenuGroups(response.groups ?? []);
-      setSelectedParentId((response.groups?.[0]?.parent_id ?? null));
+      const response = await productAPI.getCategoryTree(5);
+      setCategoryTree(response.items ?? []);
     } catch (error) {
-      console.error("Failed to load categories menu tree:", error);
-      setMenuGroups([]);
-      setSelectedParentId(null);
+      console.error("Failed to load categories tree:", error);
+      setCategoryTree([]);
     } finally {
       setCategoriesLoading(false);
     }
@@ -202,69 +204,26 @@ export default function Navbar() {
   };
 
 
-  const selectedGroup = useMemo(() => {
-    if (!menuGroups.length) return null;
-    if (selectedParentId) {
-      return menuGroups.find((group) => group.parent_id === selectedParentId) ?? menuGroups[0];
-    }
-    return menuGroups[0];
-  }, [menuGroups, selectedParentId]);
-
-  const filteredGroups = useMemo(() => {
-    const query = categorySearch.trim().toLowerCase();
-    if (!query) return menuGroups;
-
-    return menuGroups.filter((group: MenuTreeGroup) => {
-      if (group.parent_name.toLowerCase().includes(query)) return true;
-      return group.children.some((child: MenuTreeGroup["children"][number]) =>
-        child.child_name.toLowerCase().includes(query),
-      );
-    });
-  }, [menuGroups, categorySearch]);
 
   useEffect(() => {
-    if (!categoryPanelOpen) return;
+    if (categorySearch.trim().length < 2) {
+      setCategorySearchResults([]);
+      setCategorySearchLoading(false);
+      return;
+    }
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setCategoryPanelOpen(false);
-        return;
+    const timer = setTimeout(async () => {
+      setCategorySearchLoading(true);
+      try {
+        const results = await productAPI.searchCategories(categorySearch, 5);
+        setCategorySearchResults(results);
+      } finally {
+        setCategorySearchLoading(false);
       }
+    }, 250);
 
-      if (event.key !== "Tab" || !categoryPanelRef.current) return;
-      const focusable = categoryPanelRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
-      );
-      if (!focusable.length) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    const focusFirst = () => {
-      const firstButton = categoryPanelRef.current?.querySelector<HTMLElement>('button, a[href]');
-      firstButton?.focus();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    setTimeout(focusFirst, 0);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      if (window.matchMedia("(min-width: 768px)").matches) {
-        categoryTriggerRef.current?.focus();
-      }
-    };
-  }, [categoryPanelOpen]);
+    return () => clearTimeout(timer);
+  }, [categorySearch]);
 
   const displayCartCount = cartLoading ? legacyCartCount : cartCount;
 
@@ -273,7 +232,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 min-h-20 w-full border-b border-gray-200 bg-white text-black">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
           <button
-            onClick={() => setCategoryPanelOpen(true)}
+            onClick={() => setCategoryPanelOpen((v) => !v)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Menu size={24} />
@@ -285,17 +244,17 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <button
-            ref={categoryTriggerRef}
-            onClick={() => setCategoryPanelOpen(true)}
-            className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-haspopup="dialog"
-            aria-expanded={categoryPanelOpen}
-            aria-controls="all-categories-panel"
-          >
-            <Menu size={18} />
-            {t("allCategories")}
-          </button>
+          <div className="hidden md:block">
+            <button
+              onClick={() => setCategoryPanelOpen(true)}
+              className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-haspopup="dialog"
+              aria-expanded={categoryPanelOpen}
+            >
+              <Menu size={18} />
+              {t("allCategories")}
+            </button>
+          </div>
 
           <div className="order-3 w-full md:order-none md:flex-1 md:px-2" ref={searchRef}>
             <form
@@ -547,108 +506,17 @@ export default function Navbar() {
         </div>
       </header>
 
-      <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity ${
-          categoryPanelOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={() => setCategoryPanelOpen(false)}
+      <CategoryDrawer
+        open={categoryPanelOpen}
+        loading={categoriesLoading}
+        tree={curatedCategoryTree}
+        query={categorySearch}
+        searchResults={categorySearchResults}
+        searchLoading={categorySearchLoading}
+        onQueryChange={setCategorySearch}
+        onClose={() => setCategoryPanelOpen(false)}
+        onNavigate={handleCategoryClick}
       />
-
-      <aside
-        className={`fixed top-0 left-0 z-50 h-full w-[95vw] max-w-[980px] overflow-x-hidden bg-white shadow-xl transform transition-transform duration-300 ${
-          categoryPanelOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold text-black">{t("categories")}</h2>
-          <button
-            onClick={() => setCategoryPanelOpen(false)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="p-4 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
-              placeholder={t("searchCategories")}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
-            />
-          </div>
-        </div>
-
-        <div className="h-[calc(100vh-144px)] overflow-y-auto">
-          <div className="p-4">
-            {categoriesLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
-              </div>
-            ) : filteredGroups.length > 0 ? (
-              <>
-                <div className="space-y-1">
-                  {filteredGroups.map((group) => (
-                    <button
-                      key={group.parent_id}
-                      onClick={() => setSelectedParentId(group.parent_id)}
-                      className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors truncate ${
-                        selectedGroup?.parent_id === group.parent_id
-                          ? "bg-[#0B123A] text-white"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {group.parent_name}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="overflow-y-auto p-4">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-[#0B123A] truncate">{selectedGroup?.parent_name}</h3>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                  {selectedGroup?.children.map((child) => (
-                    <button
-                      key={child.child_id}
-                      onClick={() => handleCategoryClick(child.child_slug)}
-                      className="w-full text-left rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:border-[#0B123A] hover:text-[#0B123A] truncate"
-                    >
-                      {child.child_name}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-6 border-t border-gray-200 pt-4">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{t("trending")}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {["gaming", "laptops", "smart-tv", "networking"].map((slug) => (
-                      <button
-                        key={slug}
-                        onClick={() => handleCategoryClick(slug)}
-                        className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:border-[#0B123A] hover:text-[#0B123A]"
-                      >
-                        {slug}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                {categorySearch
-                  ? t("noCategoriesFound")
-                  : t("noCategoriesAvailable")}
-              </div>
-            )}
-          </div>
-        </div>
-      </aside>
     </>
   );
 }

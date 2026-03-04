@@ -21,6 +21,8 @@
     "featuredProducts": "Featured Products",
     "pricing": "Pricing",
     "logout": "Logout",
-    "homeBuilder": "Home Builder"
+    "homeBuilder": "Home Builder",
+    "imports": "Imports",
+    "rmas": "Returns (RMA)"
   }
 }

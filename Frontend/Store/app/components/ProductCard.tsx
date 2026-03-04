@@ -375,8 +375,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           {product.discount_percentage && product.discount_percentage > 0 && (
-            <div className="absolute top-2 right-2">
-              <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+            <div className="absolute top-2 left-2 z-10">
+              <span className="rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow">
                 -{product.discount_percentage}%
               </span>
             </div>
@@ -385,7 +385,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={toggleFavorite}
             className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-            style={{ right: product.discount_percentage ? "3.5rem" : "0.5rem" }}
+            style={{ right: "0.5rem" }}
           >
             <svg
               className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
@@ -425,7 +425,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </p>
 
           {rating > 0 && reviewCount > 0 && (
-            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1 rounded-md">
               <div className="flex items-center">
                 <Star size={16} className="fill-amber-400 text-amber-400" />
                 <span className="ml-1 text-sm font-semibold">
@@ -439,19 +439,22 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-xl font-bold text-gray-900 sm:text-2xl">
+          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1 rounded-md">
+            <span
+              className={`text-xl font-extrabold sm:text-2xl ${
+                product.compare_at_price && product.compare_at_price > product.price
+                  ? "text-red-600"
+                  : "text-gray-900"
+              }`}
+            >
               €{product.price.toFixed(2)}
             </span>
 
             {product.compare_at_price &&
               product.compare_at_price > product.price && (
                 <>
-                  <span className="text-sm text-gray-500 line-through sm:text-base">
+                  <span className="text-sm text-black/75 line-through sm:text-base">
                     €{product.compare_at_price.toFixed(2)}
-                  </span>
-                  <span className="text-sm font-semibold text-red-600">
-                    {t("save", {amount: (product.compare_at_price - product.price).toFixed(2)})}
                   </span>
                 </>
               )}

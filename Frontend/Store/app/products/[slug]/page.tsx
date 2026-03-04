@@ -160,6 +160,11 @@ export default function ProductPage() {
           <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
             {images.length > 0 ? (
               <div className="relative h-full w-full bg-gray-100">
+                {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price && (
+                  <span className="absolute left-3 top-3 z-10 rounded-md bg-red-600 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow">
+                    -{Math.round(((currentVariant.compare_at_price - currentVariant.price) / currentVariant.compare_at_price) * 100)}%
+                  </span>
+                )}
                 <Image
                   src={
                     imagesError[selectedImage]
@@ -229,18 +234,34 @@ export default function ProductPage() {
         <div>
           <h1 className="mb-2 break-words text-2xl font-bold sm:text-3xl">{product.title}</h1>
 
+          <div className="mb-1 text-sm font-bold text-red-600">
+            {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price ? "¡Precio mínimo histórico!" : ""}
+          </div>
+
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center">
-              <span className="text-2xl font-bold">
+              <span
+                className={`text-2xl font-extrabold ${
+                  currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price
+                    ? "text-red-600"
+                    : "text-gray-900"
+                }`}
+              >
                 €{currentVariant.price.toFixed(2)}
               </span>
               {currentVariant.compare_at_price &&
                 currentVariant.compare_at_price > currentVariant.price && (
-                  <span className="ml-2 text-lg text-gray-500 line-through">
+                  <span className="ml-2 text-lg text-black/80 line-through">
                     €{currentVariant.compare_at_price.toFixed(2)}
                   </span>
                 )}
             </div>
+
+            {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price && (
+              <span className="rounded-md bg-red-600 px-2 py-1 text-xs font-extrabold text-white shadow">
+                -{Math.round(((currentVariant.compare_at_price - currentVariant.price) / currentVariant.compare_at_price) * 100)}%
+              </span>
+            )}
 
             {product.rating_avg && (
               <div className="flex items-center">
@@ -315,7 +336,11 @@ export default function ProductPage() {
           )}
 
           <div className="mb-8">
-            <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="mb-1 text-sm font-bold text-red-600">
+            {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price ? "¡Precio mínimo histórico!" : ""}
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-3">
               <div className="flex w-fit items-center rounded border border-gray-300">
                 <button
                   onClick={async () => {

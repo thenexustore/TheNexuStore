@@ -32,6 +32,18 @@ export class HomeLayoutController {
     return { success: true, data };
   }
 
+
+  @UseGuards(AdminGuard)
+  @Get('/admin/home/options')
+  async options(
+    @Query('target') target: 'products' | 'categories' | 'brands' | 'banners',
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.service.searchOptions(target, q, Number(limit || 12));
+    return { success: true, data };
+  }
+
   @UseGuards(AdminGuard)
   @Get('/admin/home/layouts')
   async layouts() {

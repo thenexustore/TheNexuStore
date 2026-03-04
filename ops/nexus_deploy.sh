@@ -26,6 +26,21 @@ run() {
   eval "$*"
 }
 
+write_backend_start_script() {
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] writing backend start script to $BACKEND_START_SCRIPT"
+    return 0
+  fi
+
+  cat > "$BACKEND_START_SCRIPT" <<SCRIPT
+#!/usr/bin/env bash
+set -Eeuo pipefail
+cd "$BACKEND_DIR"
+source "$BACKEND_ENV_FILE"
+exec node dist/src/main.js
+SCRIPT
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "[ERROR] Missing command: $1" >&2
@@ -120,7 +135,7 @@ run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate deploy
 run "cd '$BACKEND_DIR' && npm run build"
 
 log "Ensuring backend start script"
-run "cat > '$BACKEND_START_SCRIPT' <<'SCRIPT'\n#!/usr/bin/env bash\nset -Eeuo pipefail\ncd '$BACKEND_DIR'\nsource '$BACKEND_ENV_FILE'\nexec node dist/src/main.js\nSCRIPT"
+write_backend_start_script
 run "chmod +x '$BACKEND_START_SCRIPT'"
 run "sed -i 's/\\r$//' '$BACKEND_START_SCRIPT'"
 

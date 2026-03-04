@@ -19,13 +19,19 @@ type User = {
   profile_image?: string;
 };
 
+type NavbarCategory = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
+  const [categories, setCategories] = useState<NavbarCategory[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
@@ -172,7 +178,7 @@ export default function Navbar() {
   };
 
   const closeMobilePanels = () => {
-    setCategoryPanelOpen(false);
+    setSidebarOpen(false);
     setShowSearchResults(false);
   };
 
@@ -421,7 +427,8 @@ export default function Navbar() {
           <div className="ml-auto flex items-center gap-1.5 shrink-0 sm:gap-2">
             <Link
               href="/chat"
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={closeMobilePanels}
+              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
               title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
@@ -469,7 +476,7 @@ export default function Navbar() {
             )}
 
             <button
-              className="relative h-10 w-10 rounded-full bg-cover bg-center flex items-center justify-center cursor-pointer overflow-hidden hover:opacity-90 transition-opacity"
+              className="relative hidden h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-cover bg-center transition-opacity hover:opacity-90 sm:flex"
               onClick={() => {
                 const nextLocale = locale === "en" ? "es" : "en";
                 router.replace(pathname, { locale: nextLocale });
@@ -482,7 +489,7 @@ export default function Navbar() {
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
-              <span className="relative z-10 text-white font-bold">{locale.toUpperCase()}</span>
+              <span className="relative z-10 text-xs font-bold text-white">{locale.toUpperCase()}</span>
             </button>
 
             <Link
@@ -517,6 +524,63 @@ export default function Navbar() {
         onClose={() => setCategoryPanelOpen(false)}
         onNavigate={handleCategoryClick}
       />
+
+      <aside
+        className={`fixed top-0 left-0 z-50 h-full w-[86vw] max-w-80 bg-white shadow-xl transform transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-xl font-bold text-black">{t("categories")}</h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-4 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              placeholder={t("searchCategories")}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
+            />
+          </div>
+        </div>
+
+        <div className="h-[calc(100vh-144px)] overflow-y-auto">
+          <div className="p-4">
+            {categoriesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
+              </div>
+            ) : filteredCategories.length > 0 ? (
+              <div className="space-y-1">
+                {filteredCategories.map((category: NavbarCategory) => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategoryClick(category.slug)}
+                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
+                  >
+                    <span>{category.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                {categorySearch
+                  ? t("noCategoriesFound")
+                  : t("noCategoriesAvailable")}
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
     </>
   );
 }

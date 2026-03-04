@@ -141,8 +141,8 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-white text-black">
-      <div className="mb-6 text-sm text-gray-600">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
+      <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
         <Link href="/" className="hover:underline">
           {t("home")}
         </Link>
@@ -233,10 +233,6 @@ export default function ProductPage() {
 
         <div>
           <h1 className="mb-2 break-words text-2xl font-bold sm:text-3xl">{product.title}</h1>
-
-          <div className="mb-1 text-sm font-bold text-red-600">
-            {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price ? "¡Precio mínimo histórico!" : ""}
-          </div>
 
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center">
@@ -336,11 +332,7 @@ export default function ProductPage() {
           )}
 
           <div className="mb-8">
-            <div className="mb-1 text-sm font-bold text-red-600">
-            {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price ? "¡Precio mínimo histórico!" : ""}
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="mb-4 flex flex-wrap items-center gap-3">
               <div className="flex w-fit items-center rounded border border-gray-300">
                 <button
                   onClick={async () => {

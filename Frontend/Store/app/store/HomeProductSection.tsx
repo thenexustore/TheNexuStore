@@ -63,7 +63,7 @@ export default function HomeProductSection({
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   />
                   {hasDeal && product.discount_percentage ? (
-                    <span className="absolute left-2 top-2 rounded-md bg-red-600 px-2 py-1 text-[11px] font-extrabold leading-none text-white shadow">
+                    <span className="absolute left-2 top-2 rounded bg-red-600 px-2 py-1 text-[11px] font-bold leading-none text-white">
                       -{product.discount_percentage}%
                     </span>
                   ) : null}
@@ -73,7 +73,7 @@ export default function HomeProductSection({
                 <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{product.brand_name}</p>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className={`text-[1.35rem] leading-none font-extrabold ${hasDeal ? "text-red-600" : "text-slate-900"}`}>{eur.format(product.price)}</span>
+                  <span className="text-base font-bold text-red-600">{eur.format(product.price)}</span>
                   {hasDeal && product.compare_at_price ? (
                     <span className="text-xs text-black/70 line-through">
                       {eur.format(product.compare_at_price)}

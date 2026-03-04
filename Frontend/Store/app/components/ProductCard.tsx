@@ -425,7 +425,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </p>
 
           {rating > 0 && reviewCount > 0 && (
-            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1 rounded-md">
+            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
               <div className="flex items-center">
                 <Star size={16} className="fill-amber-400 text-amber-400" />
                 <span className="ml-1 text-sm font-semibold">
@@ -439,22 +439,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1 rounded-md">
-            <span
-              className={`text-xl font-extrabold sm:text-2xl ${
-                product.compare_at_price && product.compare_at_price > product.price
-                  ? "text-red-600"
-                  : "text-gray-900"
-              }`}
-            >
+          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-xl font-bold text-gray-900 sm:text-2xl">
               €{product.price.toFixed(2)}
             </span>
 
             {product.compare_at_price &&
               product.compare_at_price > product.price && (
                 <>
-                  <span className="text-sm text-black/75 line-through sm:text-base">
+                  <span className="text-sm text-gray-500 line-through sm:text-base">
                     €{product.compare_at_price.toFixed(2)}
+                  </span>
+                  <span className="text-xs font-semibold text-red-600 sm:text-sm">
+                    Save €
+                    {(product.compare_at_price - product.price).toFixed(2)}
                   </span>
                 </>
               )}

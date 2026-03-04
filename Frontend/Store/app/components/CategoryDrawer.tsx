@@ -53,18 +53,30 @@ export function CategoryDrawer({
     setActiveChildId(firstParentWithChildren?.children[0]?.id ?? null);
   }, [open, firstParentWithChildren]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, onClose]);
+
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/45 transition-opacity ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-40 bg-slate-900/55 transition-opacity ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
         onClick={onClose}
       />
+
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[96vw] max-w-[1200px] bg-white shadow-2xl transition-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 w-[96vw] max-w-[1180px] bg-white shadow-2xl transition-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-900">Categorías</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100">
+          <h2 className="text-base font-semibold text-slate-900">Todas las categorías</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100">
             <X size={20} />
           </button>
         </div>
@@ -76,7 +88,7 @@ export function CategoryDrawer({
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/15"
-              placeholder="Buscar categorías"
+              placeholder="Buscar categorías, marcas, familias..."
             />
           </div>
         </div>
@@ -102,8 +114,8 @@ export function CategoryDrawer({
               </div>
             </div>
           ) : (
-            <div className="grid h-full grid-cols-1 md:grid-cols-[290px_320px_1fr]">
-              <div className="border-r border-slate-200 p-3">
+            <div className="grid h-full grid-cols-1 md:grid-cols-[280px_320px_1fr]">
+              <section className="border-r border-slate-200 bg-slate-50/50 p-3">
                 <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Categorías padre
                 </p>
@@ -133,9 +145,9 @@ export function CategoryDrawer({
                     })
                   )}
                 </div>
-              </div>
+              </section>
 
-              <div className="border-r border-slate-200 p-3">
+              <section className="border-r border-slate-200 p-3">
                 <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Subcategorías
                 </p>
@@ -148,32 +160,40 @@ export function CategoryDrawer({
                       >
                         Ver todo en {activeParent.name}
                       </button>
+
                       {activeParent.children.map((child) => {
                         const isActive = activeChild?.id === child.id;
+
                         return (
-                          <button
-                            key={child.id}
-                            onClick={() => setActiveChildId(child.id)}
-                            onDoubleClick={() => onNavigate(child.slug)}
-                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                              isActive
-                                ? "bg-[#0B123A] text-white"
-                                : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
-                            }`}
-                          >
-                            <span>{child.name}</span>
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
+                          <div key={child.id} className="flex items-center gap-1">
+                            <button
+                              onClick={() => setActiveChildId(child.id)}
+                              className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                                isActive
+                                  ? "bg-[#0B123A] text-white"
+                                  : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
+                              }`}
+                            >
+                              {child.name}
+                            </button>
+                            <button
+                              onClick={() => onNavigate(child.slug)}
+                              className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                              aria-label={`Ver ${child.name}`}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
                         );
                       })}
                     </>
                   ) : (
-                    <p className="px-2 text-sm text-slate-500">No hay datos</p>
+                    <p className="px-2 text-sm text-slate-500">No hay datos disponibles.</p>
                   )}
                 </div>
-              </div>
+              </section>
 
-              <div className="p-3">
+              <section className="p-3">
                 <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Niveles inferiores
                 </p>
@@ -186,6 +206,7 @@ export function CategoryDrawer({
                       >
                         Ver todo en {activeChild.name}
                       </button>
+
                       <div className="grid gap-2 sm:grid-cols-2">
                         {activeChild.children.map((grandchild) => (
                           <button
@@ -204,7 +225,7 @@ export function CategoryDrawer({
                     </p>
                   )}
                 </div>
-              </div>
+              </section>
             </div>
           )}
         </div>

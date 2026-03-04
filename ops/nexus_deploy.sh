@@ -7,7 +7,7 @@ if [[ "${1:-}" == "--dry-run" || "${1:-}" == "-n" ]]; then
 fi
 
 REPO_DIR="${REPO_DIR:-/opt/TheNexuStore}"
-BRANCH="${BRANCH:-main}"
+BRANCH="${BRANCH:-}"
 BACKUP_ROOT="${BACKUP_ROOT:-/root/nexus_backups}"
 BACKEND_DIR="$REPO_DIR/Backend/Store"
 STORE_DIR="$REPO_DIR/Frontend/Store"
@@ -16,6 +16,9 @@ BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/root/nexus-backend.env}"
 BACKEND_START_SCRIPT="${BACKEND_START_SCRIPT:-/usr/local/bin/nexus-backend-start.sh}"
 STORE_ENV_FILE="${STORE_ENV_FILE:-$STORE_DIR/.env.production}"
 ADMIN_ENV_FILE="${ADMIN_ENV_FILE:-$ADMIN_DIR/.env.production}"
+API_DOMAIN="${API_DOMAIN:-https://api.thenexustore.com}"
+SITE_DOMAIN="${SITE_DOMAIN:-https://www.thenexustore.com}"
+SKIP_EXTERNAL_HEALTHCHECKS="${SKIP_EXTERNAL_HEALTHCHECKS:-1}"
 
 log() { echo "[$(date +'%F %T')] $*"; }
 run() {
@@ -68,6 +71,38 @@ require_cmd() {
   }
 }
 
+detect_branch() {
+  if [[ -n "$BRANCH" ]]; then
+    return 0
+  fi
+
+  if git -C "$REPO_DIR" show-ref --verify --quiet refs/remotes/origin/main; then
+    BRANCH="main"
+    return 0
+  fi
+
+  if git -C "$REPO_DIR" show-ref --verify --quiet refs/remotes/origin/master; then
+    BRANCH="master"
+    return 0
+  fi
+
+  BRANCH="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
+}
+
+ensure_pm2() {
+  if command -v pm2 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] pm2 not found. Would install globally with npm install -g pm2"
+    return 0
+  fi
+
+  log "pm2 not found. Installing globally with npm"
+  run "npm install -g pm2"
+}
+
 install_deps() {
   local app_dir="$1"
   if [[ -f "$app_dir/package-lock.json" ]]; then
@@ -89,6 +124,10 @@ fix_next_proxy_conflict() {
 }
 
 pm2_has_process() {
+  if ! command -v pm2 >/dev/null 2>&1; then
+    return 1
+  fi
+
   pm2 jlist | grep -q "\"name\":\"$1\""
 }
 
@@ -118,9 +157,12 @@ wait_for_url() {
   return 1
 }
 
-for cmd in git npm npx pm2 sed curl tar; do
+for cmd in git npm npx sed curl tar; do
   require_cmd "$cmd"
 done
+
+ensure_pm2
+detect_branch
 
 [[ -d "$REPO_DIR/.git" ]] || { echo "[ERROR] Missing git repo at $REPO_DIR" >&2; exit 1; }
 [[ -f "$BACKEND_ENV_FILE" ]] || { echo "[ERROR] Missing backend env file: $BACKEND_ENV_FILE" >&2; exit 1; }
@@ -131,6 +173,15 @@ run "mkdir -p '$BACKUP_DIR'"
 create_repo_backup "$BACKUP_DIR/repo_snapshot.tgz"
 
 run "sed -i 's/\r$//' '$BACKEND_ENV_FILE'"
+
+if [[ ! -f "$STORE_ENV_FILE" ]]; then
+  run "cat > '$STORE_ENV_FILE' <<'ENV'\nNEXT_PUBLIC_API_URL=$API_DOMAIN\nNEXT_PUBLIC_SITE_URL=$SITE_DOMAIN\nENV"
+fi
+
+if [[ ! -f "$ADMIN_ENV_FILE" ]]; then
+  run "cat > '$ADMIN_ENV_FILE' <<'ENV'\nNEXT_PUBLIC_API_URL=$API_DOMAIN\nNEXT_PUBLIC_SITE_URL=$SITE_DOMAIN\nENV"
+fi
+
 run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
 
 run "cd '$REPO_DIR' && git fetch --all --prune"
@@ -181,6 +232,10 @@ if [[ "$DRY_RUN" == "0" ]]; then
   wait_for_url "http://127.0.0.1:4000/admin/infortisa/health"
   wait_for_url "http://127.0.0.1:3000"
   wait_for_url "http://127.0.0.1:3001"
+
+  if [[ "$SKIP_EXTERNAL_HEALTHCHECKS" != "1" ]]; then
+    wait_for_url "$API_DOMAIN/admin/health"
+  fi
 fi
 
 log "Deploy finished. Backup created at: $BACKUP_DIR"

@@ -339,7 +339,12 @@ export default function Navbar() {
                               onClick={() => handleProductClick(product)}
                               className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
                             >
-                              <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                              <div className="relative h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                                {product.compare_at_price && product.compare_at_price > product.price && (
+                                  <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                                    -{Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)}%
+                                  </span>
+                                )}
                                 <img
                                   src={
                                     product.thumbnail &&
@@ -366,9 +371,22 @@ export default function Navbar() {
                                   {product.brand_name}
                                 </p>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-sm font-bold text-[#0B123A]">
-                                    €{product.price.toFixed(2)}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p
+                                      className={`text-sm font-extrabold ${
+                                        product.compare_at_price && product.compare_at_price > product.price
+                                          ? "text-red-600"
+                                          : "text-[#0B123A]"
+                                      }`}
+                                    >
+                                      €{product.price.toFixed(2)}
+                                    </p>
+                                    {product.compare_at_price && product.compare_at_price > product.price && (
+                                      <p className="text-xs text-black/70 line-through">
+                                        €{product.compare_at_price.toFixed(2)}
+                                      </p>
+                                    )}
+                                  </div>
                                   {product.rating_avg && (
                                     <div className="flex items-center text-xs text-gray-600">
                                       <span className="text-yellow-400">★</span>

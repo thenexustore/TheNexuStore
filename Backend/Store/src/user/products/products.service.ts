@@ -27,10 +27,14 @@ import {
   slugifyCategory,
 } from '../../infortisa/infortisa-category-mapping.util';
 import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
+import { PricingService } from '../../pricing/pricing.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly pricingService: PricingService,
+  ) {}
 
   async getMenuTree() {
     const [parents, children] = await Promise.all([
@@ -1445,13 +1449,10 @@ export class ProductsService {
         },
       });
 
-      await this.prisma.skuPrice.create({
-        data: {
-          sku_id: newSku.id,
-          sale_price: price,
-          currency: 'EUR',
-          price_source: 'INFORTISA',
-        },
+      await this.pricingService.applyAndUpsertSkuPriceBySkuId({
+        skuId: newSku.id,
+        costPrice: price,
+        fallbackSource: 'INFORTISA',
       });
 
       await this.prisma.inventoryLevel.create({
@@ -1504,15 +1505,10 @@ export class ProductsService {
         },
       });
 
-      await this.prisma.skuPrice.upsert({
-        where: { sku_id: existingSku.id },
-        update: { sale_price: price },
-        create: {
-          sku_id: existingSku.id,
-          sale_price: price,
-          currency: 'EUR',
-          price_source: 'INFORTISA',
-        },
+      await this.pricingService.applyAndUpsertSkuPriceBySkuId({
+        skuId: existingSku.id,
+        costPrice: price,
+        fallbackSource: 'INFORTISA',
       });
 
       await this.prisma.inventoryLevel.upsert({

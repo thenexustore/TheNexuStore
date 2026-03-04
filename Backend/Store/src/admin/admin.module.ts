@@ -13,6 +13,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { ShippingTaxAdminModule } from './shipping-tax/shipping-tax-admin.module';
 import { JwtAuthModule } from '../auth/jwt-auth.module';
+import { PricingAdminModule } from './pricing/pricing.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { JwtAuthModule } from '../auth/jwt-auth.module';
     FeaturedProductsModule,
     CouponsModule,
     ShippingTaxAdminModule,
+    PricingAdminModule,
   ],
   controllers: [AdminController, DashboardController, ProductsController],
   providers: [

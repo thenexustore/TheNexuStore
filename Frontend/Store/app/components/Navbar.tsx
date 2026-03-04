@@ -10,6 +10,7 @@ import { getMe } from "../lib/auth";
 import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
 import { CategoryMegaMenu } from "./CategoryMegaMenu";
+import { buildCuratedCategoryTree } from "../lib/category-navigation";
 
 type User = {
   id: string;
@@ -22,7 +23,6 @@ type User = {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
-    const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -40,6 +40,10 @@ export default function Navbar() {
   const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const curatedCategoryTree = useMemo(
+    () => buildCuratedCategoryTree(categoryTree),
+    [categoryTree],
+  );
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -256,7 +260,7 @@ export default function Navbar() {
               <Menu size={18} />
               {t("allCategories")}
             </button>
-            <CategoryMegaMenu open={desktopMegaOpen} tree={categoryTree} onNavigate={handleCategoryClick} />
+            <CategoryMegaMenu open={desktopMegaOpen} tree={curatedCategoryTree} onNavigate={handleCategoryClick} />
           </div>
 
           <div className="order-3 w-full md:order-none md:flex-1 md:px-2" ref={searchRef}>
@@ -494,7 +498,7 @@ export default function Navbar() {
       <CategoryDrawer
         open={categoryPanelOpen}
         loading={categoriesLoading}
-        tree={categoryTree}
+        tree={curatedCategoryTree}
         query={categorySearch}
         searchResults={categorySearchResults}
         searchLoading={categorySearchLoading}

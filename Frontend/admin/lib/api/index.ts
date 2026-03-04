@@ -85,3 +85,11 @@ export {
   type ImportHistoryItem,
   type ImportHistoryResponse,
 } from "./imports";
+
+export {
+  fetchRmas,
+  fetchRmaById,
+  updateRmaStatus,
+  type Rma,
+  type RmaStatus,
+} from "./rmas";

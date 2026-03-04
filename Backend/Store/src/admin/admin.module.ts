@@ -8,6 +8,8 @@ import { ProductsService } from './products/products.service';
 import { AuditLogController } from './audit-log.controller';
 import { AuditLogService } from './audit-log.service';
 import { ImportsController } from './imports/imports.controller';
+import { RmaController } from './rma/rma.controller';
+import { RmaService } from './rma/rma.service';
 import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
 import { BannersModule } from './banners/banners.module';
@@ -38,6 +40,7 @@ import { InfortisaModule } from '../infortisa/infortisa.module';
     ProductsController,
     AuditLogController,
     ImportsController,
+    RmaController,
   ],
   providers: [
     AdminService,
@@ -46,6 +49,7 @@ import { InfortisaModule } from '../infortisa/infortisa.module';
     AdminGuard,
     PrismaService,
     AuditLogService,
+    RmaService,
   ],
   exports: [AdminGuard],
 })

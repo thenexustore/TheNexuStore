@@ -5,6 +5,8 @@ import { ProductsController } from './products/products.controller';
 import { AdminService } from './admin.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { ProductsService } from './products/products.service';
+import { AuditLogController } from './audit-log.controller';
+import { AuditLogService } from './audit-log.service';
 import { AdminGuard } from './admin.guard';
 import { PrismaService } from '../common/prisma.service';
 import { BannersModule } from './banners/banners.module';
@@ -27,13 +29,19 @@ import { CategoriesModule } from '../user/categories/categories.module';
     PricingAdminModule,
     CategoriesModule,
   ],
-  controllers: [AdminController, DashboardController, ProductsController],
+  controllers: [
+    AdminController,
+    DashboardController,
+    ProductsController,
+    AuditLogController,
+  ],
   providers: [
     AdminService,
     DashboardService,
     ProductsService,
     AdminGuard,
     PrismaService,
+    AuditLogService,
   ],
   exports: [AdminGuard],
 })

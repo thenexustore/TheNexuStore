@@ -8,10 +8,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { RmaStatus } from '@prisma/client';
+import { StaffRole } from '@prisma/client';
 import { Request } from 'express';
+import { Roles } from '../../auth/staff-auth/roles.decorator';
 import { AdminGuard } from '../admin.guard';
 import { AuditLogService } from '../audit-log.service';
+import { UpdateRmaStatusDto } from './dto/update-rma-status.dto';
 import { RmaService } from './rma.service';
 
 @Controller('admin/rmas')
@@ -35,9 +37,10 @@ export class RmaController {
   }
 
   @Patch(':id/status')
+  @Roles(StaffRole.ADMIN)
   async updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: RmaStatus },
+    @Body() body: UpdateRmaStatusDto,
     @Req() req: Request,
   ) {
     const data = await this.rmaService.updateStatus(id, body.status);

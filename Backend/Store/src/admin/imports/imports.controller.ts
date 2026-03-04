@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -15,6 +14,7 @@ import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
 import { PrismaService } from '../../common/prisma.service';
 import { AdminGuard } from '../admin.guard';
 import { AuditLogService } from '../audit-log.service';
+import { ImportHistoryQueryDto, TriggerImportDto } from './dto/imports.dto';
 
 @Controller('admin/imports')
 @UseGuards(AdminGuard)
@@ -27,16 +27,12 @@ export class ImportsController {
   ) {}
 
   @Get('history')
-  async history(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('type') type?: string,
-  ) {
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 20;
+  async history(@Query() query: ImportHistoryQueryDto) {
+    const pageNum = query.page;
+    const limitNum = query.limit;
     const skip = (pageNum - 1) * limitNum;
 
-    const where = type ? { type } : undefined;
+    const where = query.type ? { type: query.type } : undefined;
 
     const [items, total] = await Promise.all([
       this.prisma.syncLog.findMany({
@@ -60,25 +56,19 @@ export class ImportsController {
   }
 
   @Post('run')
-  async run(
-    @Body() body: { mode: 'full' | 'stock' | 'images' },
-    @Req() req: Request,
-  ) {
-    if (!body?.mode) {
-      throw new BadRequestException('mode is required');
-    }
-
+  async run(@Body() body: TriggerImportDto, @Req() req: Request) {
     const startedAt = Date.now();
 
-    if (body.mode === 'full') {
-      await this.infortisaSync.fullSync();
-    } else if (body.mode === 'stock') {
-      await this.infortisaSync.syncStockRealTime();
-    } else if (body.mode === 'images') {
-      await this.infortisaSync.syncImages();
-    } else {
-      throw new BadRequestException('Invalid mode');
-    }
+    const modeHandlers: Record<
+      TriggerImportDto['mode'],
+      () => Promise<unknown>
+    > = {
+      full: () => this.infortisaSync.fullSync(),
+      stock: () => this.infortisaSync.syncStockRealTime(),
+      images: () => this.infortisaSync.syncImages(),
+    };
+
+    await modeHandlers[body.mode]();
 
     const durationMs = Date.now() - startedAt;
 

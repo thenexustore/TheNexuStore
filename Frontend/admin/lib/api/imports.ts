@@ -18,15 +18,16 @@ export async function fetchImportHistory(
   page = 1,
   limit = 20,
 ): Promise<ImportHistoryResponse> {
-  return fetchWithAuth(`/admin/imports/history?page=${page}&limit=${limit}`);
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  return fetchWithAuth(`/admin/imports/history?${params.toString()}`);
 }
 
 export async function triggerImport(mode: "full" | "stock" | "images") {
   return fetchWithAuth("/admin/imports/run", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({ mode }),
   });
 }

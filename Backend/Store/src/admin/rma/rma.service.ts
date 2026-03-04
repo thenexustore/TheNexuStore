@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { RmaStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 
@@ -6,8 +10,30 @@ import { PrismaService } from '../../common/prisma.service';
 export class RmaService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly allowedStatuses = new Set<RmaStatus>([
+    'REQUESTED',
+    'APPROVED',
+    'REJECTED',
+    'RECEIVED',
+    'REFUNDED',
+    'CLOSED',
+  ]);
+
   async list(status?: string) {
-    const where = status && status !== 'all' ? { status: status as RmaStatus } : undefined;
+    const normalizedStatus = status?.trim();
+
+    if (
+      normalizedStatus &&
+      normalizedStatus !== 'all' &&
+      !this.allowedStatuses.has(normalizedStatus as RmaStatus)
+    ) {
+      throw new BadRequestException('Invalid RMA status');
+    }
+
+    const where =
+      normalizedStatus && normalizedStatus !== 'all'
+        ? { status: normalizedStatus as RmaStatus }
+        : undefined;
 
     const rmas = await this.prisma.rma.findMany({
       where,

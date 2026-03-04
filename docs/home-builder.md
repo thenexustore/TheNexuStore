@@ -39,3 +39,9 @@ The homepage is now controlled by **Home Layouts** and **Sections**.
 
 ## Preview URL
 - Open `/store?previewLayoutId=<layout-id>` to preview a draft layout without publishing.
+
+## Utilities added
+- **Add starter pack**: creates a ready-to-use section set (hero, categories, deals, arrivals, brands, value props, chips).
+- **Clone layout**: duplicates layouts including section ordering.
+- **Delete layout**: removes obsolete drafts quickly.
+- **Admin options endpoint**: `GET /admin/home/options?target=products|categories|brands|banners&q=...&limit=...` to support searchable pickers.

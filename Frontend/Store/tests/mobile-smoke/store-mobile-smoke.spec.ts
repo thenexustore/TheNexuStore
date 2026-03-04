@@ -1,4 +1,4 @@
-import { expect, Page, test, TestInfo } from "@playwright/test";
+import { expect, Page, test } from "@playwright/test";
 
 const productSlug = "mock-mobile-product";
 
@@ -131,11 +131,17 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(maxScroll).toBeLessThanOrEqual(viewport + 1);
 }
 
-async function captureStep(page: Page, testInfo: TestInfo, name: string) {
-  await page.screenshot({
-    path: testInfo.outputPath(`${name}.png`),
-    fullPage: true,
-  });
+async function goToSampleProduct(page: Page) {
+  await page.goto("/es/products");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  const productHref = await page
+    .locator('a[href*="/products/"]')
+    .filter({ hasNotText: /^Products$/i })
+    .first()
+    .getAttribute("href");
+
+  await page.goto(productHref?.startsWith("/") ? productHref : `/es/products/${productSlug}`);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -145,9 +151,8 @@ test.beforeEach(async ({ page }) => {
 
   await page.route("**://localhost:4000/**", async (route) => {
     const request = route.request();
-    const url = request.url();
     const method = request.method();
-    const parsedUrl = new URL(url);
+    const parsedUrl = new URL(request.url());
 
     if (parsedUrl.pathname === "/admin/banners/active") {
       return route.fulfill({
@@ -199,12 +204,7 @@ test.beforeEach(async ({ page }) => {
                 brand: { name: "Nexu Brand", slug: "nexu-brand" },
                 skus: [
                   {
-                    prices: [
-                      {
-                        sale_price: "149.99",
-                        compare_at_price: "199.99",
-                      },
-                    ],
+                    prices: [{ sale_price: "149.99", compare_at_price: "199.99" }],
                   },
                 ],
                 media: [{ url: "/No_Image_Available.png" }],
@@ -247,10 +247,7 @@ test.beforeEach(async ({ page }) => {
       });
     }
 
-    if (
-      parsedUrl.pathname.startsWith("/cart") ||
-      parsedUrl.pathname === "/checkout/create-order"
-    ) {
+    if (parsedUrl.pathname.startsWith("/cart") || parsedUrl.pathname === "/checkout/create-order") {
       if (method === "POST" && parsedUrl.pathname === "/checkout/create-order") {
         return route.fulfill({
           status: 200,
@@ -278,43 +275,32 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("mobile smoke flow keeps layout stable and key CTAs visible", async ({ page }, testInfo) => {
+test("/es/store has no horizontal overflow", async ({ page }) => {
   await page.goto("/es/store");
   await assertNoHorizontalOverflow(page);
-  await captureStep(page, testInfo, "store-home");
+});
 
+test("/es/products has no horizontal overflow", async ({ page }) => {
   await page.goto("/es/products");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await assertNoHorizontalOverflow(page);
+});
 
-  const productHref = await page
-    .locator('a[href*="/products/"]')
-    .filter({ hasNotText: /^Products$/i })
-    .first()
-    .getAttribute("href");
-
-  const targetProductPath = productHref?.startsWith("/")
-    ? productHref
-    : `/es/products/${productSlug}`;
-
-  await page.goto(targetProductPath);
+test("sample PDP has no horizontal overflow and Add to cart visible", async ({ page }) => {
+  await goToSampleProduct(page);
   await expect(page).toHaveURL(/\/es\/products\//);
-  await expect(
-    page.getByRole("button", { name: /add to cart|añadir/i }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /add to cart|añadir/i }).first()).toBeVisible();
   await assertNoHorizontalOverflow(page);
-  await captureStep(page, testInfo, "store-pdp");
+});
 
+test("/es/cart has no horizontal overflow and checkout CTA visible", async ({ page }) => {
   await page.goto("/es/cart");
-  await expect(
-    page.getByRole("button", { name: /ir a pagar|checkout|proceed/i }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /ir a pagar|checkout|proceed/i }).first()).toBeVisible();
   await assertNoHorizontalOverflow(page);
+});
 
+test("/es/checkout has no horizontal overflow and place-order CTA visible", async ({ page }) => {
   await page.goto("/es/checkout");
-  await expect(
-    page.getByRole("button", { name: /realizar pedido|place order|order/i }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /realizar pedido|place order|order/i }).first()).toBeVisible();
   await assertNoHorizontalOverflow(page);
-  await captureStep(page, testInfo, "store-checkout");
 });

@@ -231,9 +231,9 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 text-black">
-      <div className="container mx-auto px-4 max-w-6xl">
-        <h1 className="text-3xl font-bold mb-8">{t("title")}</h1>
+    <div className="min-h-screen bg-gray-50 py-6 text-black sm:py-8">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+        <h1 className="mb-6 text-2xl font-bold sm:mb-8 sm:text-3xl">{t("title")}</h1>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
@@ -385,8 +385,8 @@ export default function CheckoutPage() {
 
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold">{t("billingAddress")}</h2>
-                  <label className="flex items-center">
+                  <h2 className="text-xl font-semibold">Billing Address</h2>
+                  <label className="flex items-start gap-2 text-sm sm:items-center">
                     <input
                       type="checkbox"
                       checked={formData.billing_address.use_same}
@@ -401,7 +401,7 @@ export default function CheckoutPage() {
                       }
                       className="mr-2 h-5 w-5"
                     />
-                    <span className="text-sm">{t("sameAsShipping")}</span>
+                    <span className="text-sm leading-5">Same as shipping address</span>
                   </label>
                 </div>
 
@@ -458,7 +458,7 @@ export default function CheckoutPage() {
               <button
                 type="submit"
                 disabled={loading || cart.summary.checkout_available === false}
-                className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#1a245a] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="hidden w-full rounded-xl bg-[#0B123A] py-4 text-lg font-bold text-white transition-all hover:bg-[#1a245a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 md:block"
               >
                 {loading ? t("processing") : t("placeOrder")}
               </button>
@@ -470,8 +470,8 @@ export default function CheckoutPage() {
           </div>
 
           <div>
-            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-8">
-              <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
+            <div className="sticky bottom-0 rounded-xl bg-white p-4 shadow-sm sm:p-6 lg:top-8">
+              <h2 className="text-xl font-bold mb-6">Order Summary</h2>
 
               <div className="space-y-4 mb-6">
                 {cart.items.map((item) => (
@@ -507,23 +507,23 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-gray-600">{t("shipping")}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 break-words">Shipping</span>
                   <span className="font-medium">
                     {cart.summary.shipping === 0
                       ? t("free")
                       : formatCurrency(cart.summary.shipping)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">{t("tax")}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-600 break-words">{cart.summary.meta?.tax_label || "Tax"}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.tax)}
                   </span>
                 </div>
                 {(cart.summary.customs_duty || 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Customs duty</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-600 break-words">Customs duty</span>
                     <span className="font-medium">
                       {formatCurrency(cart.summary.customs_duty || 0)}
                     </span>
@@ -532,8 +532,8 @@ export default function CheckoutPage() {
               </div>
 
               <div className="border-t border-gray-300 pt-4">
-                <div className="flex justify-between text-xl font-bold">
-                  <span>{t("total")}</span>
+                <div className="flex items-start justify-between gap-3 text-xl font-bold">
+                  <span>Total</span>
                   <span className="text-[#0B123A]">
                     {formatCurrency(cart.summary.total)}
                   </span>
@@ -571,7 +571,7 @@ export default function CheckoutPage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
         <button
           type="button"
-          onClick={() => checkoutFormRef.current?.requestSubmit()}
+          onClick={() => (document.querySelector("form") as HTMLFormElement | null)?.requestSubmit()}
           disabled={loading || cart.summary.checkout_available === false}
           className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >

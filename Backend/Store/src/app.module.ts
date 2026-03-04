@@ -11,6 +11,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { InfortisaModule } from './infortisa/infortisa.module';
 import { PrismaService } from './common/prisma.service';
 import { HomepageSectionsModule } from './homepage/homepage-sections.module';
+import { HomeLayoutModule } from './homepage/home-layout.module';
 import { JwtAuthModule } from './auth/jwt-auth.module';
 import { PricingModule } from './pricing/pricing.module';
 
@@ -27,6 +28,7 @@ import { PricingModule } from './pricing/pricing.module';
     UserModule,
     ChatModule,
     HomepageSectionsModule,
+    HomeLayoutModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { homeBuilderApi } from '@/lib/api/home-builder';
+import { SITE_URL } from '@/lib/constants';
 
 const SECTION_TYPES = ['HERO_CAROUSEL', 'CATEGORY_STRIP', 'PRODUCT_CAROUSEL', 'BRAND_STRIP', 'VALUE_PROPS', 'TRENDING_CHIPS'];
 
@@ -82,7 +83,10 @@ export default function HomeBuilderPage() {
         </button>
         <button
           className="rounded border px-3 py-2 text-sm"
-          onClick={() => window.open(`/store?previewLayoutId=${selectedLayoutId}`, '_blank')}
+          onClick={() => {
+            if (!selectedLayoutId) return;
+            window.open(`${SITE_URL}/store?previewLayoutId=${selectedLayoutId}`, '_blank');
+          }}
         >
           Preview in Store
         </button>

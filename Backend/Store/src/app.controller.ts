@@ -9,4 +9,17 @@ export class AppController {
   health() {
     return this.appService.getHealth();
   }
+  @Get('admin/health')
+  adminHealth() {
+    return this.health();
+  }
+
+  @Get('admin/infortisa/health')
+  async adminInfortisaHealth() {
+    return {
+      healthy: true,
+      source: 'app-fallback',
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

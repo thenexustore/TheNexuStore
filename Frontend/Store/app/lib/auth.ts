@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { API_URL } from "./env";
 
 export async function registerUser(data: {
   first_name: string;

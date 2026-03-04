@@ -167,6 +167,8 @@ enum RoundingMode {
   NONE
   X_99
   X_95
+  NEAREST_0_05
+  CEIL_1
 }
 
 enum CouponType {
@@ -174,14 +176,55 @@ enum CouponType {
   FIXED
 }
 
+enum PricingApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  PUBLISHED
+}
+
 enum StaffRole {
   ADMIN
   WAREHOUSE
 }
 
+
+enum AdminAuditStatus {
+  SUCCESS
+  FAILED
+}
+
 enum TaxMode {
   VAT
   OUTSIDE_VAT
+}
+
+enum HomepageSectionType {
+  HERO_BANNER_SLIDER
+  TOP_CATEGORIES_GRID
+  BEST_DEALS
+  NEW_ARRIVALS
+  FEATURED_PICKS
+  BRANDS_STRIP
+  TRUST_BAR
+}
+
+enum HomePageSectionType {
+  HERO_CAROUSEL
+  CATEGORY_STRIP
+  PRODUCT_CAROUSEL
+  BRAND_STRIP
+  VALUE_PROPS
+  TRENDING_CHIPS
+  CUSTOM_HTML
+}
+
+enum HomePageSectionItemType {
+  BANNER
+  CATEGORY
+  BRAND
+  PRODUCT
+  LINK
 }
 
 model Staff {
@@ -199,6 +242,29 @@ model Staff {
   @@index([role])
 }
 
+
+model AdminAuditLog {
+  id            String           @id @default(uuid())
+  actor_id      String?
+  actor_email   String?
+  actor_role    String?
+  action        String
+  resource      String
+  resource_id   String?
+  method        String?
+  path          String?
+  ip_address    String?
+  user_agent    String?
+  status        AdminAuditStatus @default(SUCCESS)
+  metadata_json Json?
+  created_at    DateTime         @default(now())
+
+  @@index([created_at])
+  @@index([actor_email])
+  @@index([resource, resource_id])
+  @@index([action, created_at])
+}
+
 model Brand {
   id            String        @id @default(uuid())
   name          String        @unique
@@ -209,6 +275,82 @@ model Brand {
   updated_at    DateTime      @updatedAt
   products      Product[]
   pricing_rules PricingRule[]
+  home_section_items HomePageSectionItem[]
+}
+
+model HomepageSection {
+  id         String              @id @default(uuid())
+  type       HomepageSectionType @unique
+  enabled    Boolean             @default(true)
+  position   Int
+  title      String?
+  config_json Json
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  @@index([enabled, position])
+  @@map("homepage_sections")
+}
+
+model HomePageLayout {
+  id         String            @id @default(uuid())
+  locale     String?
+  is_active  Boolean           @default(false)
+  name       String
+  created_at DateTime          @default(now())
+  updated_at DateTime          @updatedAt
+  sections   HomePageSection[]
+
+  @@index([locale, is_active])
+  @@map("home_page_layouts")
+}
+
+model HomePageSection {
+  id         String                 @id @default(uuid())
+  layout_id  String
+  type       HomePageSectionType
+  title      String?
+  subtitle   String?
+  position   Int
+  is_enabled Boolean                @default(true)
+  variant    String?
+  config     Json
+  created_at DateTime               @default(now())
+  updated_at DateTime               @updatedAt
+
+  layout HomePageLayout      @relation(fields: [layout_id], references: [id], onDelete: Cascade)
+  items  HomePageSectionItem[]
+
+  @@unique([layout_id, position])
+  @@index([layout_id, is_enabled, position])
+  @@map("home_page_sections")
+}
+
+model HomePageSectionItem {
+  id          String                  @id @default(uuid())
+  section_id  String
+  position    Int
+  type        HomePageSectionItemType
+  banner_id   String?
+  category_id String?
+  brand_id    String?
+  product_id  String?
+  label       String?
+  image_url   String?
+  href        String?
+  config      Json?
+  created_at  DateTime                @default(now())
+  updated_at  DateTime                @updatedAt
+
+  section  HomePageSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  banner   Banner?         @relation(fields: [banner_id], references: [id])
+  category Category?       @relation(fields: [category_id], references: [id])
+  brand    Brand?          @relation(fields: [brand_id], references: [id])
+  product  Product?        @relation(fields: [product_id], references: [id])
+
+  @@unique([section_id, position])
+  @@index([section_id, type])
+  @@map("home_page_section_items")
 }
 
 model Product {
@@ -234,6 +376,7 @@ model Product {
   media            ProductMedia[]
   reviews          ProductReview[]
   featured_product FeaturedProduct?
+  home_section_items HomePageSectionItem[]
 
   @@index([slug])
 }
@@ -324,6 +467,8 @@ model Banner {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  home_section_items HomePageSectionItem[]
 
   @@index([is_active, sort_order])
 }
@@ -449,25 +594,69 @@ model PricingRule {
   brand_id          String?          @map("brand_id")
   sku_id            String?          @map("sku_id")
   margin_pct        Decimal          @db.Decimal(5, 2)
+  discount_pct      Decimal          @default(0) @db.Decimal(5, 2)
+  min_margin_pct    Decimal?         @db.Decimal(5, 2)
   min_margin_amount Decimal?         @db.Decimal(12, 2)
   rounding_mode     RoundingMode
   is_active         Boolean          @default(true)
   priority          Int
+  approval_status   PricingApprovalStatus @default(DRAFT)
+  created_by_actor_id String?
+  submitted_by_actor_id String?
+  approved_by_actor_id  String?
+  published_by_actor_id String?
+  submitted_at      DateTime?
+  approved_at       DateTime?
+  published_at      DateTime?
+  starts_at         DateTime?
+  ends_at           DateTime?
   created_at        DateTime         @default(now())
   updated_at        DateTime         @updatedAt
   category          Category?        @relation(fields: [category_id], references: [id])
   brand             Brand?           @relation(fields: [brand_id], references: [id])
   sku               Sku?             @relation(fields: [sku_id], references: [id])
+
+  @@index([scope, priority])
+  @@index([category_id])
+  @@index([brand_id])
+  @@index([sku_id])
+  @@index([approval_status, updated_at])
 }
 
 model SkuPrice {
   sku_id           String   @id @map("sku_id")
+  cost_price       Decimal? @db.Decimal(12, 2)
   sale_price       Decimal  @db.Decimal(12, 2)
   compare_at_price Decimal? @db.Decimal(12, 2)
+  discount_pct     Int?
+  rule_id          String?
+  needs_review     Boolean  @default(false)
   currency         String   @default("EUR")
   price_source     String
   updated_at       DateTime @default(now())
   sku              Sku      @relation(fields: [sku_id], references: [id])
+
+  @@index([rule_id])
+}
+
+
+model PricingRecalculationJob {
+  id             String   @id @default(uuid())
+  status         String   @default("QUEUED")
+  scope          String
+  total          Int      @default(0)
+  processed      Int      @default(0)
+  updated_count  Int      @default(0)
+  warning_count  Int      @default(0)
+  failed_count   Int      @default(0)
+  dry_run        Boolean  @default(false)
+  filters_json   Json?
+  errors_json    Json?
+  last_error     String?
+  started_at     DateTime?
+  finished_at    DateTime?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
 }
 
 model Warehouse {
@@ -707,12 +896,13 @@ model Order {
 
 model Category {
   id         String   @id @default(uuid())
-  parent_id  String?  @map("parent_id")
-  name       String
-  slug       String   @unique
-  sort_order Int
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
+  parent_id      String?  @map("parent_id")
+  name           String
+  slug           String   @unique
+  sort_order     Int
+  is_active      Boolean  @default(true)
+  parent_locked  Boolean  @default(false) @map("parent_locked")
+  created_at     DateTime @default(now())
   updated_at DateTime @updatedAt
 
   parent   Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
@@ -722,6 +912,7 @@ model Category {
   products_main Product[]         @relation("ProductMainCategory")
 
   pricing_rules PricingRule[]
+  home_section_items HomePageSectionItem[]
 
   @@index([parent_id, sort_order])
 }

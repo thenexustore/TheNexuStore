@@ -1,7 +1,5 @@
 import { apiRequest } from "./api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
 export interface ProductFilters {
   page?: number;
   limit?: number;
@@ -31,6 +29,10 @@ export interface FilterOptions {
     name: string;
     slug: string;
     count: number;
+    parent_id?: string | null;
+    parent_name?: string | null;
+    parent_slug?: string | null;
+    display_name?: string;
   }>;
   brands: Array<{ id: string; name: string; slug: string; count: number }>;
   price_range: { min: number; max: number };
@@ -50,6 +52,67 @@ export interface Category {
   order?: number;
   product_count?: number;
   children?: Category[];
+}
+
+
+
+export interface MenuTreeParent {
+  parent_id: string;
+  parent_name: string;
+  parent_slug: string;
+  sort_order: number;
+}
+
+export interface MenuTreeChildItem {
+  parent_id: string;
+  parent_name: string;
+  parent_slug: string;
+  child_id: string;
+  child_name: string;
+  child_slug: string;
+  sort_order: number;
+  product_count?: number;
+}
+
+export interface MenuTreeGroup {
+  parent_id: string;
+  parent_name: string;
+  parent_slug: string;
+  sort_order: number;
+  children: MenuTreeChildItem[];
+}
+
+export interface MenuTreeResponse {
+  parents: MenuTreeParent[];
+  groups: MenuTreeGroup[];
+}
+
+export interface CategoryTreeNode {
+  id: string;
+  name: string;
+  slug: string;
+  depth: number;
+  children: CategoryTreeNode[];
+}
+
+export interface CategoryTreeResponse {
+  items: CategoryTreeNode[];
+  meta: {
+    maxDepth: number;
+    locale: string;
+    includeEmpty: boolean;
+    includeCounts: boolean;
+  };
+}
+
+export interface CategorySearchResult {
+  id: string;
+  name: string;
+  slug: string;
+  depth: number;
+  path: string;
+  parentIds: string[];
+  ancestors: Array<{ id: string; name: string; slug: string }>;
 }
 
 export interface Product {
@@ -259,18 +322,30 @@ class ProductAPI {
     return apiRequest(endpoint);
   }
 
-  async createReview(productId: string, reviewData: ReviewData): Promise<any> {
+  async createReview(productId: string, reviewData: ReviewData): Promise<unknown> {
     return apiRequest(`/user/products/${productId}/reviews`, {
       method: "POST",
       body: JSON.stringify(reviewData),
     });
   }
 
+  async getMenuTree(): Promise<MenuTreeResponse> {
+    return apiRequest('/user/categories/menu-tree');
+  }
+
+  async getCategoryTree(maxDepth: number = 5): Promise<CategoryTreeResponse> {
+    return apiRequest(`/user/categories/tree?maxDepth=${maxDepth}`);
+  }
+
+  async searchCategories(query: string, maxDepth: number = 5): Promise<CategorySearchResult[]> {
+    return apiRequest(`/user/categories/search?q=${encodeURIComponent(query)}&maxDepth=${maxDepth}`);
+  }
+
   async getCategories(): Promise<Category[]> {
     try {
       const response = await apiRequest("/user/products?limit=1");
       if (response.filters && response.filters.categories) {
-        return response.filters.categories.map((cat: any) => ({
+        return response.filters.categories.map((cat: FilterOptions["categories"][number]) => ({
           id: cat.id,
           name: cat.name,
           slug: cat.slug,

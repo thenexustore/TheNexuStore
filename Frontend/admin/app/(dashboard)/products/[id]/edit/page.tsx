@@ -576,11 +576,11 @@ export default function ProductEditPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Sale Price (₹) *
+                  Sale Price (€) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">
-                    ₹
+                    €
                   </span>
                   <input
                     type="number"
@@ -602,11 +602,11 @@ export default function ProductEditPage() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Compare Price (₹)
+                  Compare Price (€)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">
-                    ₹
+                    €
                   </span>
                   <input
                     type="number"
@@ -884,13 +884,13 @@ export default function ProductEditPage() {
                         </td>
                         <td className="py-3 px-4">
                           <span className="font-medium">
-                            ₹{variant.sale_price.toLocaleString()}
+                            €{variant.sale_price.toLocaleString()}
                           </span>
 
                           {variant.compare_at_price &&
                             variant.compare_at_price > 0 && (
                               <div className="text-xs text-slate-400 line-through">
-                                ₹{variant.compare_at_price.toLocaleString()}
+                                €{variant.compare_at_price.toLocaleString()}
                               </div>
                             )}
                         </td>
@@ -1027,7 +1027,7 @@ export default function ProductEditPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Variant Price (₹) *
+                      Variant Price (€) *
                     </label>
                     <input
                       type="number"
@@ -1047,7 +1047,7 @@ export default function ProductEditPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Compare Price (₹)
+                      Compare Price (€)
                     </label>
                     <input
                       type="number"

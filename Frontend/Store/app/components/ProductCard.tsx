@@ -334,7 +334,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               />
             </svg>
             <span className="text-sm font-semibold text-gray-700">
-              {buyNowLoading ? "Adding to cart..." : "Loading..."}
+              {buyNowLoading ? t("adding") : "Loading..."}
             </span>
           </div>
         </div>
@@ -375,8 +375,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           {product.discount_percentage && product.discount_percentage > 0 && (
-            <div className="absolute top-2 right-2">
-              <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+            <div className="absolute top-2 left-2 z-10">
+              <span className="rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow">
                 -{product.discount_percentage}%
               </span>
             </div>
@@ -385,7 +385,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={toggleFavorite}
             className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-            style={{ right: product.discount_percentage ? "3.5rem" : "0.5rem" }}
+            style={{ right: "0.5rem" }}
           >
             <svg
               className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
@@ -409,7 +409,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
           {cartItem && (
             <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
-              {quantity} in cart
+              {t("inCart", {count: quantity})}
             </span>
           )}
         </div>
@@ -421,7 +421,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
             {product.short_description ||
-              "Premium quality product with excellent features and performance."}
+              t("premiumDesc")}
           </p>
 
           {rating > 0 && reviewCount > 0 && (
@@ -434,7 +434,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </div>
               <span className="text-xs text-gray-500">/ 5</span>
               <span className="text-xs text-gray-400">
-                ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
+                ({reviewCount} {reviewCount === 1 ? t("review") : t("reviews")})
               </span>
             </div>
           )}
@@ -493,10 +493,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Adding...
+                {t("adding")}
               </span>
             ) : (
-              "Buy Now"
+              t("buyNow")
             )}
           </button>
 
@@ -517,7 +517,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
               }`}
             >
-              {cartLoading ? "Adding..." : t("addToCart")}
+              {cartLoading ? t("adding") : t("addToCart")}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">

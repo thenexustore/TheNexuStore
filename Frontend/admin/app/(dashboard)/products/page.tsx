@@ -18,8 +18,22 @@ import {
   fetchProducts,
   deleteProduct,
   updateProductStatus,
+  fetchImportHistory,
+  triggerImport,
+  type ImportHistoryItem,
   type Product,
 } from "@/lib/api";
+
+
+interface SavedProductView {
+  name: string;
+  search: string;
+  statusFilter: string;
+  categoryFilter: string;
+  stockFilter: string;
+}
+
+const SAVED_VIEWS_KEY = "admin_products_saved_views_v1";
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -33,67 +47,27 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [syncing, setSyncing] = useState(false);
+  const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>([]);
+  const [savedViews, setSavedViews] = useState<SavedProductView[]>([]);
+  const [viewName, setViewName] = useState("");
 
-  const runSync = async () => {
+  const loadImportHistory = async () => {
     try {
-      setSyncing(true);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) {
-        throw new Error("Sync failed");
-      }
-      const data = await res.json();
-      alert(`Synced products`);
-      loadProducts();
-    } catch (err) {
-      alert("Infortisa sync failed");
-    } finally {
-      setSyncing(false);
+      const data = await fetchImportHistory(1, 5);
+      setImportHistory(data.items);
+    } catch (error) {
+      console.error("Failed to load import history:", error);
     }
   };
 
-  const runFullSync = async () => {
+  const runImport = async (mode: "full" | "stock" | "images") => {
     try {
       setSyncing(true);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync/full`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Full sync failed");
-      const data = await res.json();
-      alert(`Full sync initiated: ${data.message}`);
-      loadProducts();
+      await triggerImport(mode);
+      alert(`${mode} import executed successfully`);
+      await Promise.all([loadProducts(), loadImportHistory()]);
     } catch (err) {
-      alert("Full sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const runStockSync = async () => {
-    try {
-      setSyncing(true);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/infortisa/sync/stock`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Stock sync failed");
-      const data = await res.json();
-      alert(`Stock sync initiated: ${data.message}`);
-      loadProducts();
-    } catch (err) {
-      alert("Stock sync failed");
+      alert(`${mode} import failed`);
     } finally {
       setSyncing(false);
     }
@@ -147,6 +121,57 @@ export default function ProductsPage() {
     loadProducts();
   }, [page, search, statusFilter, categoryFilter]);
 
+  useEffect(() => {
+    loadImportHistory();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setSavedViews(parsed as SavedProductView[]);
+      }
+    } catch (error) {
+      console.error("Failed to load saved views", error);
+    }
+  }, []);
+
+  const persistViews = (views: SavedProductView[]) => {
+    setSavedViews(views);
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
+  };
+
+  const saveCurrentView = () => {
+    const name = viewName.trim();
+    if (!name) {
+      alert("Please enter a view name");
+      return;
+    }
+
+    const next = [
+      ...savedViews.filter((v) => v.name.toLowerCase() !== name.toLowerCase()),
+      { name, search, statusFilter, categoryFilter, stockFilter },
+    ];
+
+    persistViews(next);
+    setViewName("");
+  };
+
+  const applyView = (view: SavedProductView) => {
+    setSearch(view.search);
+    setStatusFilter(view.statusFilter);
+    setCategoryFilter(view.categoryFilter);
+    setStockFilter(view.stockFilter);
+    setPage(1);
+  };
+
+  const deleteView = (name: string) => {
+    const next = savedViews.filter((v) => v.name !== name);
+    persistViews(next);
+  };
+
   const getPaginatedProducts = () => {
     const startIndex = (page - 1) * 20;
     const endIndex = startIndex + 20;
@@ -197,30 +222,27 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={runFullSync}
-              disabled={syncing}
-              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
-            >
-              Full Sync
-            </button>
-            <button
-              onClick={runStockSync}
-              disabled={syncing}
-              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
-            >
-              Stock Sync
-            </button>
-          </div>
-
           <button
-            onClick={runSync}
+            onClick={() => runImport("full")}
+            disabled={syncing}
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+          >
+            Full Import
+          </button>
+          <button
+            onClick={() => runImport("stock")}
+            disabled={syncing}
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+          >
+            Stock Sync
+          </button>
+          <button
+            onClick={() => runImport("images")}
             disabled={syncing}
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
-            Sync All
+            Image Sync
           </button>
 
           <button
@@ -231,6 +253,77 @@ export default function ProductsPage() {
             Add
           </button>
         </div>
+      </div>
+
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Supplier import history</h2>
+          <button
+            onClick={loadImportHistory}
+            className="text-xs text-gray-500 hover:text-gray-800"
+          >
+            Refresh
+          </button>
+        </div>
+        {importHistory.length === 0 ? (
+          <p className="text-xs text-gray-500">No recent imports.</p>
+        ) : (
+          <div className="space-y-2">
+            {importHistory.map((item) => (
+              <div key={item.id} className="text-xs text-gray-600 flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded px-3 py-2">
+                <span className="font-medium text-gray-800">{item.type}</span>
+                <span>{new Date(item.last_sync).toLocaleString()}</span>
+                <span className="text-gray-500">{item.details || "-"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-sm font-semibold text-gray-900">Saved views</h2>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <input
+              value={viewName}
+              onChange={(e) => setViewName(e.target.value)}
+              placeholder="View name..."
+              className="w-full sm:w-56 px-3 py-1.5 text-xs border border-gray-300 rounded"
+            />
+            <button
+              onClick={saveCurrentView}
+              className="px-3 py-1.5 text-xs rounded bg-gray-900 text-white"
+            >
+              Save view
+            </button>
+          </div>
+        </div>
+
+        {savedViews.length === 0 ? (
+          <p className="text-xs text-gray-500">No saved views yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {savedViews.map((view) => (
+              <div key={view.name} className="inline-flex items-center gap-1 border border-gray-200 rounded-full pl-3 pr-1 py-1 bg-gray-50">
+                <button
+                  onClick={() => applyView(view)}
+                  className="text-xs text-gray-700 hover:text-black"
+                >
+                  {view.name}
+                </button>
+                <button
+                  onClick={() => deleteView(view.name)}
+                  className="w-5 h-5 rounded-full text-[10px] text-gray-500 hover:bg-red-100 hover:text-red-700"
+                  title="Delete view"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2">

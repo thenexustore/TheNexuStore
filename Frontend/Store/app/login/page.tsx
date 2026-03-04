@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { API_URL } from "../lib/env";
 import Image from "next/image";
 import { Mail, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
 import { loginUser } from "../lib/auth";
@@ -137,7 +138,7 @@ flex items-center justify-center gap-2
 
           <div className="mt-6 pt-6 border-t-2 border-slate-100 flex flex-col gap-4">
             <a
-              href={`${process.env.NEXT_PUBLIC_API_URL}/auth/google`}
+              href={`${API_URL}/auth/google`}
               className="flex items-center justify-center gap-3 border-2 border-slate-200 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50 hover:border-black transition-colors"
             >
               <img

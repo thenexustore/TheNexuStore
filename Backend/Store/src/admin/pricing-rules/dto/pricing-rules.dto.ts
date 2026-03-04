@@ -13,6 +13,13 @@ export enum RoundingMode {
   X_95 = 'X_95',
 }
 
+export enum PricingApprovalStatus {
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  PUBLISHED = 'PUBLISHED',
+}
+
 export class CreatePricingRuleDto {
   @IsEnum(PricingRuleScope)
   scope!: PricingRuleScope;
@@ -109,6 +116,11 @@ export class UpdatePricingRuleDto {
 export class TogglePricingRuleDto {
   @IsBoolean()
   is_active!: boolean;
+}
+
+export class TransitionPricingRuleStatusDto {
+  @IsEnum(PricingApprovalStatus)
+  status!: PricingApprovalStatus;
 }
 
 export class PreviewPricingDto {

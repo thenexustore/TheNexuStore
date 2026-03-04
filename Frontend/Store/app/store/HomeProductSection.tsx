@@ -75,7 +75,7 @@ export default function HomeProductSection({
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="text-base font-bold text-red-600">{eur.format(product.price)}</span>
                   {hasDeal && product.compare_at_price ? (
-                    <span className="text-xs text-slate-400 line-through">
+                    <span className="text-xs text-black/70 line-through">
                       {eur.format(product.compare_at_price)}
                     </span>
                   ) : null}

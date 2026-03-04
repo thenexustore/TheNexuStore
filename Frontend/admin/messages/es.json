@@ -1,0 +1,28 @@
+{
+  "login": {
+    "title": "Portal de Admin",
+    "subtitle": "Acceso seguro a la gestión de tu tienda",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "emailPlaceholder": "nombre@empresa.com",
+    "signin": "Entrar al Panel",
+    "welcome": "¡Bienvenido de nuevo!",
+    "invalid": "Credenciales inválidas"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "products": "Productos",
+    "orders": "Pedidos",
+    "coupons": "Cupones",
+    "chat": "Chat",
+    "homeContent": "Contenido Home",
+    "banners": "Banners",
+    "homepageSections": "Control Home",
+    "featuredProducts": "Productos Destacados",
+    "pricing": "Precios / PVP",
+    "logout": "Cerrar sesión",
+    "homeBuilder": "Home Builder",
+    "imports": "Importaciones",
+    "rmas": "Devoluciones (RMA)"
+  }
+}

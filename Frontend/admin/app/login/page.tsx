@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { adminLogin } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { Loader2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -20,10 +22,10 @@ export default function LoginPage() {
       const result = await adminLogin(formData.email, formData.password);
       localStorage.setItem("admin_token", result.access_token);
       localStorage.setItem("admin_user", JSON.stringify(result.staff));
-      toast.success("Welcome back!");
+      toast.success(t("welcome"));
       router.push("/dashboard");
     } catch (err: any) {
-      toast.error(err.message || "Invalid credentials");
+      toast.error(err.message || t("invalid"));
     } finally {
       setLoading(false);
     }
@@ -50,24 +52,24 @@ export default function LoginPage() {
             <img src="./logo.png" alt="Logo" className="h-10 w-auto" />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Admin Portal
+            {t("title")}
           </h1>
           <p className="text-slate-500 mt-2 font-medium">
-            Secure access to your store management
+            {t("subtitle")}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">
-              Email Address
+              {t("email")}
             </label>
             <div className="relative group">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
               <input
                 type="email"
                 required
-                placeholder="name@company.com"
+                placeholder={t("emailPlaceholder")}
                 className="w-full pl-12 pr-4 h-13 py-3.5 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all text-slate-900 placeholder:text-slate-400"
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
@@ -78,7 +80,7 @@ export default function LoginPage() {
 
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">
-              Password
+              {t("password")}
             </label>
             <div className="relative group">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
@@ -110,7 +112,7 @@ export default function LoginPage() {
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              "Sign into Dashboard"
+              t("signin")
             )}
           </motion.button>
         </form>

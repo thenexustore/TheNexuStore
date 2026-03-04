@@ -9,6 +9,16 @@ interface SidebarFiltersProps {
   onFilterChange: (filters: ProductFilters) => void;
 }
 
+type FilterListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  count: number;
+  parent_id?: string | null;
+  parent_name?: string | null;
+  display_name?: string;
+};
+
 function SearchableCheckboxList({
   title,
   items,
@@ -17,7 +27,7 @@ function SearchableCheckboxList({
   initialVisible = 6,
 }: {
   title: string;
-  items: { id: string; name: string; slug: string; count: number }[];
+  items: FilterListItem[];
   selected: string[];
   onToggle: (slug: string) => void;
   initialVisible?: number;
@@ -28,7 +38,9 @@ function SearchableCheckboxList({
   const filtered = useMemo(
     () =>
       items.filter((item) =>
-        item.name.toLowerCase().includes(query.toLowerCase())
+        (item.display_name || item.name)
+          .toLowerCase()
+          .includes(query.toLowerCase())
       ),
     [items, query]
   );
@@ -58,7 +70,7 @@ function SearchableCheckboxList({
               className="rounded border-gray-300 text-blue-600"
             />
             <span className="ml-2 text-sm">
-              {item.name} ({item.count})
+              {item.display_name || item.name} ({item.count})
             </span>
           </label>
         ))}
@@ -74,6 +86,66 @@ function SearchableCheckboxList({
             : `Show ${filtered.length - initialVisible} more`}
         </button>
       )}
+    </div>
+  );
+}
+
+function CategoryTreeFilter({
+  items,
+  selected,
+  onToggle,
+}: {
+  items: FilterListItem[];
+  selected: string[];
+  onToggle: (slug: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const tree = useMemo(() => {
+    const byId = new Map(items.map((item) => [item.id, { ...item, children: [] as any[] }]));
+    const roots: any[] = [];
+    for (const item of byId.values()) {
+      const pid = item.parent_id as string | null | undefined;
+      if (pid && byId.has(pid)) {
+        byId.get(pid)!.children.push(item);
+      } else {
+        roots.push(item);
+      }
+    }
+    return roots;
+  }, [items]);
+
+  const renderNode = (node: any, depth: number) => {
+    const open = expanded[node.id] ?? depth < 1;
+    return (
+      <div key={node.id} className="space-y-1">
+        <div className="flex items-center" style={{ paddingLeft: `${depth * 12}px` }}>
+          {node.children.length ? (
+            <button className="mr-1 text-xs" onClick={() => setExpanded((prev) => ({ ...prev, [node.id]: !open }))}>
+              {open ? "−" : "+"}
+            </button>
+          ) : (
+            <span className="mr-3" />
+          )}
+          <label className="flex cursor-pointer items-center text-sm">
+            <input
+              type="checkbox"
+              checked={selected.includes(node.slug)}
+              onChange={() => onToggle(node.slug)}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="ml-2">{node.name} ({node.count})</span>
+          </label>
+        </div>
+        {open ? node.children.map((child: any) => renderNode(child, depth + 1)) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-medium">Categories</h4>
+      <div className="max-h-80 overflow-auto pr-1">{tree.map((node) => renderNode(node, 0))}</div>
     </div>
   );
 }
@@ -165,8 +237,7 @@ export function SidebarFilters({
       </div>
 
       {filterOptions.categories.length > 0 && (
-        <SearchableCheckboxList
-          title="Categories"
+        <CategoryTreeFilter
           items={filterOptions.categories}
           selected={categories}
           onToggle={(v) => toggleArrayValue(v, categories, setCategories)}

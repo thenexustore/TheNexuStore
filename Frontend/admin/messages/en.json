@@ -1,0 +1,28 @@
+{
+  "login": {
+    "title": "Admin Portal",
+    "subtitle": "Secure access to your store management",
+    "email": "Email Address",
+    "password": "Password",
+    "emailPlaceholder": "name@company.com",
+    "signin": "Sign into Dashboard",
+    "welcome": "Welcome back!",
+    "invalid": "Invalid credentials"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "orders": "Orders",
+    "coupons": "Coupons",
+    "chat": "Chat",
+    "homeContent": "Home Content",
+    "banners": "Banners",
+    "homepageSections": "Home Control",
+    "featuredProducts": "Featured Products",
+    "pricing": "Pricing",
+    "logout": "Logout",
+    "homeBuilder": "Home Builder",
+    "imports": "Imports",
+    "rmas": "Returns (RMA)"
+  }
+}

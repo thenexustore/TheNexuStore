@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { API_URL } from "./env";
 
 export async function initGuestSession(): Promise<void> {
   await fetch(`${API_URL}/chat/guest/init`, {

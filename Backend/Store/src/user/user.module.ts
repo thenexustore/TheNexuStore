@@ -5,6 +5,7 @@ import { CartModule } from './cart/cart.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentModule } from './payment/payment.module';
 import { CouponModule } from './coupon/coupon.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CouponModule } from './coupon/coupon.module';
     CheckoutModule,
     PaymentModule,
     CouponModule,
+    CategoriesModule,
   ],
   exports: [ProductsModule],
 })

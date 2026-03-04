@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
@@ -8,20 +8,23 @@ import { useCart } from "../../context/CartContext";
 import { createOrder } from "../lib/checkout";
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: "EUR",
   }).format(amount);
 };
 
+const CHECKOUT_FORM_ID = "checkout-form";
+
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();
   const { user, getSessionId } = useAuth();
-  const { cart, isLoading: cartLoading } = useCart();
+  const { cart, isLoading: cartLoading, refreshCartWithDestination } = useCart();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasRedirected, setHasRedirected] = useState(false);
+  const checkoutFormRef = useRef<HTMLFormElement>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -91,6 +94,25 @@ export default function CheckoutPage() {
     }
   }, [cart, cartLoading, router, hasRedirected]);
 
+
+  useEffect(() => {
+    const destination = {
+      country: formData.shipping_address.country,
+      region: formData.shipping_address.region,
+      postal_code: formData.shipping_address.postal_code,
+    };
+
+    const timer = setTimeout(() => {
+      refreshCartWithDestination(destination);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [
+    formData.shipping_address.country,
+    formData.shipping_address.region,
+    formData.shipping_address.postal_code,
+  ]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -136,17 +158,17 @@ export default function CheckoutPage() {
     try {
       const newErrors: Record<string, string> = {};
 
-      if (!formData.email) newErrors.email = "Email is required";
+      if (!formData.email) newErrors.email = t("emailRequired");
       if (!formData.shipping_address.full_name)
-        newErrors.shipping_full_name = "Full name is required";
+        newErrors.shipping_full_name = t("fullNameRequired");
       if (!formData.shipping_address.address_line1)
-        newErrors.shipping_address_line1 = "Address is required";
+        newErrors.shipping_address_line1 = t("addressRequired");
       if (!formData.shipping_address.city)
-        newErrors.shipping_city = "City is required";
+        newErrors.shipping_city = t("cityRequired");
       if (!formData.shipping_address.postal_code)
-        newErrors.shipping_postal_code = "Postal code is required";
+        newErrors.shipping_postal_code = t("postalCodeRequired");
       if (!formData.shipping_address.phone)
-        newErrors.shipping_phone = "Phone is required";
+        newErrors.shipping_phone = t("phoneRequired");
 
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
@@ -170,10 +192,14 @@ export default function CheckoutPage() {
       const trackingToken =
         response.order.tracking_token || response.order.id;
       router.push(`/order/track/${trackingToken}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Checkout error:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to create order. Please try again.";
       setErrors({
-        submit: error.message || "Failed to create order. Please try again.",
+        submit: message || t("createOrderFailed"),
       });
     } finally {
       setLoading(false);
@@ -197,7 +223,7 @@ export default function CheckoutPage() {
             onClick={() => router.push("/products")}
             className="bg-[#0B123A] text-white px-6 py-3 rounded-lg hover:bg-[#1a245a]"
           >
-            Browse Products
+            {t("browse")}
           </button>
         </div>
       </div>
@@ -211,14 +237,19 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form
+              id={CHECKOUT_FORM_ID}
+              ref={checkoutFormRef}
+              onSubmit={handleSubmit}
+              className="space-y-6"
+            >
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
                   {t("contact")}
                 </h2>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Email *
+                    {t("email")} *
                   </label>
                   <input
                     type="email"
@@ -240,7 +271,7 @@ export default function CheckoutPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Full Name *
+                      {t("fullName")} *
                     </label>
                     <input
                       type="text"
@@ -262,7 +293,7 @@ export default function CheckoutPage() {
 
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Address Line 1 *
+                      {t("addressLine1")} *
                     </label>
                     <input
                       type="text"
@@ -285,7 +316,7 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        City *
+                        {t("city")} *
                       </label>
                       <input
                         type="text"
@@ -307,7 +338,7 @@ export default function CheckoutPage() {
 
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Postal Code *
+                        {t("postalCode")} *
                       </label>
                       <input
                         type="text"
@@ -330,7 +361,7 @@ export default function CheckoutPage() {
 
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Phone *
+                      {t("phone")} *
                     </label>
                     <input
                       type="tel"
@@ -378,7 +409,7 @@ export default function CheckoutPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Full Name
+                        {t("fullName")}
                       </label>
                       <input
                         type="text"
@@ -391,7 +422,7 @@ export default function CheckoutPage() {
 
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        VAT ID (optional)
+                        {t("vatOptional")}
                       </label>
                       <input
                         type="text"
@@ -407,11 +438,11 @@ export default function CheckoutPage() {
 
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
-                  Additional Information
+                  {t("additionalInfo")}
                 </h2>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Order Notes (optional)
+                    {t("orderNotes")}
                   </label>
                   <textarea
                     name="notes"
@@ -419,7 +450,7 @@ export default function CheckoutPage() {
                     onChange={handleChange}
                     rows={4}
                     className="w-full border border-gray-300 rounded-lg px-4 py-3"
-                    placeholder="Any special instructions for your order..."
+                    placeholder={t("orderNotesPlaceholder")}
                   />
                 </div>
               </div>
@@ -451,7 +482,7 @@ export default function CheckoutPage() {
                     <div className="flex-1">
                       <p className="font-medium break-words">{item.product_title}</p>
                       <p className="text-sm text-gray-500">
-                        Qty: {item.quantity} × {formatCurrency(item.price)}
+                        {t("qty")}: {item.quantity} × {formatCurrency(item.price)}
                       </p>
                     </div>
                     <p className="font-semibold">
@@ -463,14 +494,14 @@ export default function CheckoutPage() {
 
               <div className="space-y-3 border-t border-gray-200 pt-4 mb-6">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
+                  <span className="text-gray-600">{t("subtotal")}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.subtotal)}
                   </span>
                 </div>
                 {cart.summary.discount && cart.summary.discount > 0 && (
                   <div className="flex justify-between text-green-700">
-                    <span className="text-gray-600">Discount</span>
+                    <span className="text-gray-600">{t("discount")}</span>
                     <span className="font-medium">
                       -{formatCurrency(cart.summary.discount)}
                     </span>
@@ -480,7 +511,7 @@ export default function CheckoutPage() {
                   <span className="text-gray-600 break-words">Shipping</span>
                   <span className="font-medium">
                     {cart.summary.shipping === 0
-                      ? "FREE"
+                      ? t("free")
                       : formatCurrency(cart.summary.shipping)}
                   </span>
                 </div>
@@ -508,7 +539,11 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  {cart.summary.meta?.message || "Shipping rates depend on destination"}
+                  {cart.summary.shipping === 0
+                    ? t("freeShippingApplied")
+                    : t("addForFreeShipping", {
+                        amount: Math.max(0, 100 - cart.summary.subtotal).toFixed(2),
+                      })}
                 </p>
               </div>
 
@@ -525,7 +560,7 @@ export default function CheckoutPage() {
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
-                  Secure checkout · Free returns · 30-day warranty
+                  {t("secureNote")}
                 </p>
               </div>
             </div>

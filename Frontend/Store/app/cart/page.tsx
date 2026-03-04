@@ -58,7 +58,6 @@ export default function CartPage() {
 
   const handleUpdateQty = async (
     itemId: string,
-    currentQty: number,
     newQty: number,
   ) => {
     if (newQty < 1) {
@@ -293,7 +292,6 @@ export default function CartPage() {
                                 onClick={() =>
                                   handleUpdateQty(
                                     item.id,
-                                    item.quantity,
                                     item.quantity - 1,
                                   )
                                 }
@@ -309,7 +307,6 @@ export default function CartPage() {
                                 onClick={() =>
                                   handleUpdateQty(
                                     item.id,
-                                    item.quantity,
                                     item.quantity + 1,
                                   )
                                 }

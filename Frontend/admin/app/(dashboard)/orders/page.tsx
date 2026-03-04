@@ -1,9 +1,24 @@
-// app/(dashboard)/orders/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Filter, Download, Eye, CheckCircle, XCircle, Clock } from "lucide-react";
-import { fetchOrders, type Order, type OrdersResponse } from "@/lib/api";
+import {
+  Search,
+  Download,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Clock,
+  MessageSquare,
+} from "lucide-react";
+import {
+  addOrderNote,
+  fetchOrderById,
+  fetchOrders,
+  fetchOrderTimeline,
+  type Order,
+  type OrderDetail,
+  type OrderTimelineEntry,
+} from "@/lib/api";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -13,112 +28,136 @@ const statusColors: Record<string, string> = {
   SHIPPED: "bg-purple-100 text-purple-800",
   DELIVERED: "bg-emerald-100 text-emerald-800",
   CANCELLED: "bg-red-100 text-red-800",
-  REFUNDED: "bg-zinc-100 text-zinc-800",
-  FAILED: "bg-red-100 text-red-800",
+  REFUNDED: "bg-zinc-200 text-zinc-800",
+  FAILED: "bg-rose-100 text-rose-800",
 };
 
 const statusIcons: Record<string, any> = {
-  PENDING_PAYMENT: Clock,
-  PROCESSING: Clock,
   PAID: CheckCircle,
-  SHIPPED: CheckCircle,
   DELIVERED: CheckCircle,
   CANCELLED: XCircle,
   REFUNDED: XCircle,
-  FAILED: XCircle,
 };
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(
-    amount,
-  );
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("all");
+  const [search, setSearch] = useState("");
 
-  const loadOrders = async (pageToLoad = 1) => {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
+  const [timeline, setTimeline] = useState<OrderTimelineEntry[]>([]);
+  const [note, setNote] = useState("");
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: "EUR",
+    }).format(amount);
+
+  const loadOrders = async (targetPage = page) => {
     try {
       setLoading(true);
-      const data: OrdersResponse = await fetchOrders(
-        pageToLoad,
-        10,
-        statusFilter,
-        search,
-      );
-      setOrders(data.orders);
-      setPage(data.page);
-      setTotalPages(data.totalPages);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load orders");
+      const data = await fetchOrders(targetPage, 10, status, search);
+      setOrders(data.orders || []);
+      setTotalPages(data.totalPages || 1);
+      setPage(targetPage);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load orders");
     } finally {
       setLoading(false);
     }
   };
 
+  const openOrderDetail = async (orderId: string) => {
+    try {
+      setSelectedOrderId(orderId);
+      setDetailLoading(true);
+      const [detail, timelineData] = await Promise.all([
+        fetchOrderById(orderId),
+        fetchOrderTimeline(orderId),
+      ]);
+      setOrderDetail(detail);
+      setTimeline(timelineData);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load order detail");
+      setSelectedOrderId(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const submitNote = async () => {
+    if (!selectedOrderId) return;
+    const trimmed = note.trim();
+    if (!trimmed) return;
+
+    try {
+      await addOrderNote(selectedOrderId, trimmed);
+      setNote("");
+      toast.success("Internal note added");
+      const timelineData = await fetchOrderTimeline(selectedOrderId);
+      setTimeline(timelineData);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add note");
+    }
+  };
+
   useEffect(() => {
     loadOrders(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadOrders(1);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    loadOrders(newPage);
-  };
+  }, [status]);
 
   return (
-    <div>
-      <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <form onSubmit={handleSearchSubmit} className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Orders Management</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Track order lifecycle, customer info and post-sales operations.
+        </p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="relative md:col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
-              type="text"
-              placeholder="Search by order number or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black/20 outline-none"
+              placeholder="Search by order number or email"
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
             />
-          </form>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center">
-              <Filter className="w-5 h-5 text-gray-400 mr-2" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 focus:border-black/20 outline-none"
-              >
-                <option value="all">All Status</option>
-                <option value="PENDING_PAYMENT">Pending payment</option>
-                <option value="PROCESSING">Processing</option>
-                <option value="PAID">Paid</option>
-                <option value="SHIPPED">Shipped</option>
-                <option value="DELIVERED">Delivered</option>
-                <option value="CANCELLED">Cancelled</option>
-                <option value="REFUNDED">Refunded</option>
-                <option value="FAILED">Failed</option>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => loadOrders(page)}
-              className="flex items-center px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Refresh
-            </button>
           </div>
+
+          <div>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="all">All Status</option>
+              <option value="PENDING_PAYMENT">Pending Payment</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="PAID">Paid</option>
+              <option value="SHIPPED">Shipped</option>
+              <option value="DELIVERED">Delivered</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="REFUNDED">Refunded</option>
+              <option value="FAILED">Failed</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => loadOrders(1)}
+            className="flex items-center justify-center px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -137,73 +176,49 @@ export default function OrdersPage() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Order
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Customer
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {orders.map((order) => {
                     const statusKey = order.status;
-                    const StatusIcon =
-                      statusIcons[statusKey] || Clock;
-                    const statusClass =
-                      statusColors[statusKey] ||
-                      "bg-zinc-100 text-zinc-700";
+                    const StatusIcon = statusIcons[statusKey] || Clock;
+                    const statusClass = statusColors[statusKey] || "bg-zinc-100 text-zinc-700";
 
                     return (
                       <tr key={order.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="font-medium text-blue-600">
-                              {order.orderNumber}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              #{order.id.slice(0, 8)}
-                            </span>
+                            <span className="font-medium text-blue-600">{order.orderNumber}</span>
+                            <span className="text-xs text-gray-500">#{order.id.slice(0, 8)}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="font-medium">
-                              {order.customerName || "Guest"}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {order.customer}
-                            </span>
+                            <span className="font-medium">{order.customerName || "Guest"}</span>
+                            <span className="text-xs text-gray-500">{order.customer}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-500 text-sm">
                           {new Date(order.createdAt).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 font-medium">
-                          {formatCurrency(Number(order.amount))}
-                        </td>
+                        <td className="px-6 py-4 font-medium">{formatCurrency(Number(order.amount))}</td>
                         <td className="px-6 py-4">
-                          <div
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}
-                          >
+                          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}>
                             <StatusIcon className="w-3 h-3 mr-1" />
                             {order.status.replace("_", " ")}
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <button className="flex items-center text-blue-600 hover:text-blue-800 text-sm">
+                          <button
+                            onClick={() => openOrderDetail(order.id)}
+                            className="flex items-center text-blue-600 hover:text-blue-800 text-sm"
+                          >
                             <Eye className="w-4 h-4 mr-1" />
                             View
                           </button>
@@ -216,21 +231,19 @@ export default function OrdersPage() {
             </div>
 
             <div className="px-6 py-4 border-t flex items-center justify-between text-sm">
-              <div className="text-gray-500">
-                Page {page} of {totalPages}
-              </div>
+              <div className="text-gray-500">Page {page} of {totalPages}</div>
               <div className="flex items-center space-x-2">
                 <button
                   className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
                   disabled={page <= 1}
-                  onClick={() => handlePageChange(page - 1)}
+                  onClick={() => loadOrders(page - 1)}
                 >
                   Previous
                 </button>
                 <button
                   className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
                   disabled={page >= totalPages}
-                  onClick={() => handlePageChange(page + 1)}
+                  onClick={() => loadOrders(page + 1)}
                 >
                   Next
                 </button>
@@ -239,6 +252,88 @@ export default function OrdersPage() {
           </>
         )}
       </div>
+
+      {selectedOrderId && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden border shadow-lg">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Order detail & support timeline</h2>
+              <button onClick={() => setSelectedOrderId(null)} className="text-gray-500">✕</button>
+            </div>
+
+            {detailLoading ? (
+              <div className="p-6 text-sm text-gray-500">Loading order detail...</div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+                <div className="p-4 border-r space-y-3">
+                  <h3 className="font-semibold">Order summary</h3>
+                  {orderDetail && (
+                    <>
+                      <p className="text-sm"><span className="font-medium">Order:</span> {orderDetail.order_number}</p>
+                      <p className="text-sm"><span className="font-medium">Email:</span> {orderDetail.email}</p>
+                      <p className="text-sm"><span className="font-medium">Status:</span> {orderDetail.status}</p>
+                      <p className="text-sm"><span className="font-medium">Total:</span> {formatCurrency(Number(orderDetail.total_amount))}</p>
+                      <p className="text-sm"><span className="font-medium">Created:</span> {new Date(orderDetail.created_at).toLocaleString()}</p>
+
+                      <div className="pt-2">
+                        <h4 className="text-sm font-semibold mb-2">Items</h4>
+                        <div className="space-y-2">
+                          {orderDetail.items.map((item) => (
+                            <div key={item.id} className="text-xs border rounded p-2 bg-gray-50">
+                              <p className="font-medium">{item.sku?.product?.title || "Product"}</p>
+                              <p>SKU: {item.sku?.sku_code || "-"}</p>
+                              <p>Qty: {item.qty}</p>
+                              <p>Unit: {formatCurrency(Number(item.unit_price_snapshot || 0))}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <h3 className="font-semibold">Support timeline</h3>
+
+                  <div className="flex gap-2">
+                    <input
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Add internal note..."
+                      className="flex-1 border rounded px-3 py-2 text-sm"
+                    />
+                    <button
+                      onClick={submitNote}
+                      className="px-3 py-2 rounded bg-black text-white text-sm inline-flex items-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+
+                  <div className="max-h-[56vh] overflow-auto space-y-2">
+                    {timeline.length === 0 ? (
+                      <p className="text-sm text-gray-500">No timeline events yet.</p>
+                    ) : (
+                      timeline.map((entry) => (
+                        <div key={entry.id} className="border rounded p-3 bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-gray-800">{entry.action}</p>
+                            <p className="text-xs text-gray-500">{new Date(entry.createdAt).toLocaleString()}</p>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{entry.actorEmail || "Unknown actor"}</p>
+                          {entry.metadata?.note && (
+                            <p className="text-sm text-gray-700 mt-2">{entry.metadata.note}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

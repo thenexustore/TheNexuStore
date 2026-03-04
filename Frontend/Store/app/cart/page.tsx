@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../providers/AuthProvider";
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
+const formatCurrency = (amount: number, locale: string) => {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "EUR",
   }).format(amount);
@@ -15,6 +15,7 @@ const formatCurrency = (amount: number) => {
 
 export default function CartPage() {
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations("cart");
   const { user } = useAuth();
   const {
@@ -116,26 +117,6 @@ export default function CartPage() {
     }
   };
 
-  useEffect(() => {
-    if (cart) {
-      console.log("Cart Data:", cart);
-      console.log("Cart Items:", cart.items);
-      console.log("Cart Summary:", cart.summary);
-
-      // Check for duplicate items
-      const skuMap = new Map();
-      cart.items.forEach((item, index) => {
-        if (skuMap.has(item.sku_code)) {
-          console.warn(
-            `Duplicate SKU found: ${item.sku_code} at positions ${skuMap.get(item.sku_code)} and ${index}`,
-          );
-        } else {
-          skuMap.set(item.sku_code, index);
-        }
-      });
-    }
-  }, [cart]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -151,7 +132,7 @@ export default function CartPage() {
           <div className="relative w-full aspect-square mb-8">
             <img
               src="https://www.svgrepo.com/show/17356/empty-cart.svg"
-              alt="Empty Cart"
+              alt={t("secureAlt")}
               className="w-full h-full object-cover rounded-3xl opacity-80"
             />
           </div>
@@ -180,18 +161,17 @@ export default function CartPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-yellow-800">
-                  You have items in your local cart. Sync them with your
-                  account?
+                  {t("localCartPrompt")}
                 </p>
                 <p className="text-sm text-yellow-600 mt-1">
-                  This will save your cart items across devices.
+                  {t("localCartHelp")}
                 </p>
               </div>
               <button
                 onClick={handleSyncCart}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium"
               >
-                Sync Cart
+                {t("syncCart")}
               </button>
             </div>
           </div>
@@ -202,17 +182,17 @@ export default function CartPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-blue-800">
-                  Want to save your cart? Login or create an account.
+                  {t("saveCartPrompt")}
                 </p>
                 <p className="text-sm text-blue-600 mt-1">
-                  Your cart items will be saved across devices.
+                  {t("localCartHelp")}
                 </p>
               </div>
               <button
                 onClick={() => router.push("/login")}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
               >
-                Login
+                {t("login")}
               </button>
             </div>
           </div>
@@ -223,9 +203,10 @@ export default function CartPage() {
             {t("title")}
           </h1>
           <p className="text-gray-500 mt-2">
-            {cart.summary.item_count} item
-            {cart.summary.item_count !== 1 ? "s" : ""} in your cart
-            {isLegacyCart && " (Local Storage)"}
+            {t("itemsInCart", {
+              count: cart.summary.item_count,
+              suffix: isLegacyCart ? t("localStorageSuffix") : "",
+            })}
           </p>
         </header>
 
@@ -279,10 +260,10 @@ export default function CartPage() {
                                 {item.product_title}
                               </h3>
                               <p className="text-gray-500 text-sm mb-2">
-                                SKU: {item.sku_code}
+                                {t("sku")}: {item.sku_code}
                               </p>
                               <p className="text-xl font-bold text-[#0B123A]">
-                                {formatCurrency(item.price)}
+                                {formatCurrency(item.price, locale)}
                               </p>
                             </div>
                             <button
@@ -371,14 +352,14 @@ export default function CartPage() {
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-gray-600">{t("subtotal")}</span>
                   <span className="font-medium">
-                    {formatCurrency(cart.summary.subtotal)}
+                    {formatCurrency(cart.summary.subtotal, locale)}
                   </span>
                 </div>
                 {cart.summary.discount && cart.summary.discount > 0 && (
                   <div className="flex justify-between text-green-700">
                     <span className="text-gray-600">{t("discount")}</span>
                     <span className="font-medium">
-                      -{formatCurrency(cart.summary.discount)}
+                      -{formatCurrency(cart.summary.discount, locale)}
                     </span>
                   </div>
                 )}
@@ -387,13 +368,13 @@ export default function CartPage() {
                   <span className="font-medium">
                     {cart.summary.shipping === 0
                       ? t("free")
-                      : formatCurrency(cart.summary.shipping)}
+                      : formatCurrency(cart.summary.shipping, locale)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-gray-600">{t("tax")}</span>
                   <span className="font-medium">
-                    {formatCurrency(cart.summary.tax)}
+                    {formatCurrency(cart.summary.tax, locale)}
                   </span>
                 </div>
               </div>
@@ -403,14 +384,14 @@ export default function CartPage() {
                   <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-green-800">
-                        Coupon "{cart.applied_coupon.code}" applied
+                        {t("couponApplied", {code: cart.applied_coupon.code})}
                       </p>
                       <p className="text-xs text-green-700">
-                        You saved{" "}
-                        {formatCurrency(
+                        {t("youSaved")} {formatCurrency(
                           cart.applied_coupon.discount_amount ||
                             cart.summary.discount ||
                             0,
+                          locale,
                         )}
                       </p>
                     </div>
@@ -457,21 +438,22 @@ export default function CartPage() {
                   <div className="mb-2 flex items-start justify-between gap-3">
                     <span className="text-gray-600 break-words">Customs duty</span>
                     <span className="font-medium">
-                      {formatCurrency(cart.summary.customs_duty || 0)}
+                      {formatCurrency(cart.summary.customs_duty || 0, locale)}
                     </span>
                   </div>
                 )}
                 <div className="flex items-start justify-between gap-3 text-lg font-bold">
                   <span>{t("total")}</span>
                   <span className="text-[#0B123A]">
-                    {formatCurrency(cart.summary.total)}
+                    {formatCurrency(cart.summary.total, locale)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  {cart.summary.meta?.message ||
-                    (cart.summary.shipping === 0
-                      ? "Free shipping applied"
-                      : "Shipping rates depend on destination")}
+                  {cart.summary.shipping === 0
+                    ? t("freeShippingOver100")
+                    : t("addForFreeShipping", {
+                        amount: Math.max(0, 100 - cart.summary.subtotal).toFixed(2),
+                      })}
                 </p>
               </div>
 
@@ -481,9 +463,7 @@ export default function CartPage() {
                   disabled={cart.summary.checkout_available === false}
                   className="w-full bg-[#0B123A] text-white py-4 rounded-xl font-bold hover:bg-[#1a245a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {cart.summary.checkout_available === false
-                    ? "Shipping not available"
-                    : t("proceed")}
+                  {t("proceed")}
                 </button>
 
                 <button
@@ -496,7 +476,7 @@ export default function CartPage() {
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
-                  Secure checkout · Free returns · 30-day warranty
+                  {t("secureNote")}
                 </p>
               </div>
             </div>

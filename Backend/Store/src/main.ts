@@ -9,7 +9,6 @@ import { Logger } from '@nestjs/common';
 import { config as loadEnv } from 'dotenv';
 
 function validateEnvironment() {
-  loadEnv();
   const logger = new Logger('Bootstrap');
 
   if (!process.env.DATABASE_URL) {
@@ -30,6 +29,7 @@ function validateEnvironment() {
 }
 
 async function bootstrap() {
+  loadEnv();
   validateEnvironment();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
@@ -68,6 +68,12 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.listen(process.env.PORT as any);
+  const port = Number(process.env.PORT ?? 4000);
+  const host = process.env.HOST ?? '0.0.0.0';
+
+  await app.listen(port, host);
+
+  const logger = new Logger('Bootstrap');
+  logger.log(`Backend listening on ${host}:${port}`);
 }
 bootstrap();

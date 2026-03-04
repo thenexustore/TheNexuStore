@@ -6,7 +6,7 @@ import { getMe, logoutUser, updateProfile } from "../lib/auth";
 
 export default function AccountPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState(null as any);
   const [edit, setEdit] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +28,7 @@ export default function AccountPage() {
     is_default: false,
   });
 
-  const fileToBase64 = (file: File): Promise<string> =>
+  const fileToBase64 = (file: any) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -36,10 +36,10 @@ export default function AccountPage() {
       reader.onerror = reject;
     });
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const base64 = await fileToBase64(file);
+    const base64 = String(await fileToBase64(file));
     setProfile((p) => ({ ...p, profile_image: base64 }));
   };
 

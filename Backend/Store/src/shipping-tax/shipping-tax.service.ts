@@ -52,7 +52,10 @@ export class ShippingTaxService {
 
   async ensureDefaults(): Promise<void> {
     if (!this.defaultsSeedPromise) {
-      this.defaultsSeedPromise = this.seedDefaultsIfNeeded();
+      this.defaultsSeedPromise = this.seedDefaultsIfNeeded().catch((error) => {
+        this.defaultsSeedPromise = null;
+        throw error;
+      });
     }
 
     await this.defaultsSeedPromise;

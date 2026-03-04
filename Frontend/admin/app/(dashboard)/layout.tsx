@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -14,23 +14,26 @@ import {
   LayoutTemplate,
   MessageCircle,
   Ticket,
-  Truck,
+  Tags,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Products", href: "/products", icon: Package },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
-  { name: "Coupons", href: "/coupons", icon: Ticket },
-  { name: "Shipping & Tax", href: "/shipping-tax", icon: Truck },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
+  { key: "dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { key: "products", href: "/products", icon: Package },
+  { key: "orders", href: "/orders", icon: ShoppingCart },
+  { key: "rmas", href: "/rmas", icon: Package },
+  { key: "coupons", href: "/coupons", icon: Ticket },
+  { key: "pricing", href: "/pricing", icon: Tags },
+  { key: "chat", href: "/chat", icon: MessageCircle },
   {
-    name: "Home Content",
+    key: "homeContent",
     icon: LayoutTemplate,
     children: [
-      { name: "Banners", href: "/banners" },
-      { name: "Featured Products", href: "/featured-products" },
+      { key: "banners", href: "/banners" },
+      { key: "homepageSections", href: "/homepage-sections" },
+      { key: "homeBuilder", href: "/home-builder" },
+      { key: "featuredProducts", href: "/featured-products" },
     ],
   },
 ];
@@ -42,6 +45,8 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations("nav");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
@@ -56,15 +61,15 @@ export default function DashboardLayout({
         const isParentActive = item.children?.some(
           (sub) => pathname === sub.href
         );
-        const isOpen = openMenu === item.name || isParentActive;
+        const isOpen = openMenu === item.key || isParentActive;
         const isActive = pathname === item.href;
 
         if (item.children) {
           return (
-            <div key={item.name}>
+            <div key={item.key}>
               <button
                 onClick={() =>
-                  setOpenMenu(isOpen && !isParentActive ? null : item.name)
+                  setOpenMenu(isOpen && !isParentActive ? null : item.key)
                 }
                 className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium rounded-xl transition ${
                   isParentActive
@@ -78,7 +83,7 @@ export default function DashboardLayout({
                       isParentActive ? "text-white" : "text-zinc-400"
                     }`}
                   />
-                  {item.name}
+                  {t(item.key)}
                 </div>
                 <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
                   <ChevronDown className="w-4 h-4 text-zinc-400" />
@@ -96,7 +101,7 @@ export default function DashboardLayout({
                     <div className="mt-1 ml-6 pl-4 border-l border-zinc-200 space-y-1">
                       {item.children.map((sub) => (
                         <Link
-                          key={sub.name}
+                          key={sub.key}
                           href={sub.href}
                           onClick={() => setSidebarOpen(false)}
                           className={`block px-4 py-2 text-sm rounded-lg transition ${
@@ -105,7 +110,7 @@ export default function DashboardLayout({
                               : "text-zinc-500 hover:bg-zinc-100 hover:text-black"
                           }`}
                         >
-                          {sub.name}
+                          {t(sub.key)}
                         </Link>
                       ))}
                     </div>
@@ -118,7 +123,7 @@ export default function DashboardLayout({
 
         return (
           <Link
-            key={item.name}
+            key={item.key}
             href={item.href}
             onClick={() => setSidebarOpen(false)}
             className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-xl transition ${
@@ -130,7 +135,7 @@ export default function DashboardLayout({
             <item.icon
               className={`w-5 h-5 ${isActive ? "text-white" : "text-zinc-400"}`}
             />
-            {item.name}
+            {t(item.key)}
           </Link>
         );
       })}
@@ -141,12 +146,20 @@ export default function DashboardLayout({
     <div className="h-screen bg-white flex overflow-hidden">
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-white border-b z-30">
         <img src="/logo.png" className="h-7" />
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 hover:bg-zinc-100 rounded-full"
-        >
-          <Menu className="w-6 h-6 text-zinc-700" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.replace(pathname, { locale: locale === "en" ? "es" : "en" })}
+            className="px-3 py-1 text-xs rounded-full border border-zinc-300"
+          >
+            {locale.toUpperCase()}
+          </button>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-zinc-100 rounded-full"
+          >
+            <Menu className="w-6 h-6 text-zinc-700" />
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -174,7 +187,7 @@ export default function DashboardLayout({
             className="group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
           >
             <LogOut className="w-5 h-5 text-zinc-400 group-hover:text-red-600" />
-            Logout
+            {t("logout")}
           </button>
         </div>
       </aside>
@@ -200,13 +213,13 @@ export default function DashboardLayout({
             className="group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
           >
             <LogOut className="w-5 h-5 text-zinc-400 group-hover:text-red-600" />
-            Logout
+            {t("logout")}
           </button>
         </div>
       </motion.aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden pt-16 lg:pt-0">
-        <div className="flex-1 overflow-y-auto p-8 bg-zinc-50">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-zinc-50">{children}</div>
       </main>
     </div>
   );

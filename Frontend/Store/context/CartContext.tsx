@@ -83,6 +83,7 @@ interface CartContextType {
   syncLegacyCart: () => Promise<void>;
   applyCoupon: (code: string) => Promise<void>;
   removeCoupon: () => Promise<void>;
+  refreshCartWithDestination: (destination: { country?: string; region?: string; postal_code?: string }) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -156,11 +157,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasSynced, setHasSynced] = useState(false);
 
-  const fetchBackendCart = async (): Promise<Cart | null> => {
+  const fetchBackendCart = async (destination?: { country?: string; region?: string; postal_code?: string }): Promise<Cart | null> => {
     try {
       const sessionId = getSessionId();
       if (!sessionId) return null;
-      return await getCart(sessionId);
+      return await getCart(sessionId, destination);
     } catch {
       return null;
     }
@@ -178,11 +179,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const fetchCart = async () => {
+  const fetchCart = async (destination?: { country?: string; region?: string; postal_code?: string }) => {
     try {
       setIsLoading(true);
 
-      const backendCart = await fetchBackendCart();
+      const backendCart = await fetchBackendCart(destination);
 
       if (backendCart) {
         setCart(backendCart);
@@ -308,9 +309,18 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, cart?.id, hasSynced]);
 
+  const refreshCartWithDestination = async (destination: {
+    country?: string;
+    region?: string;
+    postal_code?: string;
+  }) => {
+    await fetchCart(destination);
+  };
+
   const cartCount = cart?.summary.item_count || 0;
 
   return (
+
     <CartContext.Provider
       value={{
         cart,
@@ -321,6 +331,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         removeItem,
         clearCart,
         refreshCart: fetchCart,
+        refreshCartWithDestination,
         syncLegacyCart,
         applyCoupon,
         removeCoupon,

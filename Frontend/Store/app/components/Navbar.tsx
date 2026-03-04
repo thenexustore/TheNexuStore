@@ -9,7 +9,7 @@ import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
 import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
-import { CategoryMegaMenu } from "./CategoryMegaMenu";
+import { buildCuratedCategoryTree } from "../lib/category-navigation";
 
 type User = {
   id: string;
@@ -22,24 +22,25 @@ type User = {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
-    const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
-  const [desktopMegaOpen, setDesktopMegaOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
-  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const curatedCategoryTree = useMemo(
+    () => buildCuratedCategoryTree(categoryTree),
+    [categoryTree],
+  );
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -195,7 +196,6 @@ export default function Navbar() {
   const handleCategoryClick = (categorySlug: string) => {
     router.push(`/products?categories=${categorySlug}`);
     closeMobilePanels();
-    setDesktopMegaOpen(false);
   };
 
   const handleLogout = async () => {
@@ -232,7 +232,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 min-h-20 w-full border-b border-gray-200 bg-white text-black">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
           <button
-            onClick={() => setCategoryPanelOpen(true)}
+            onClick={() => setCategoryPanelOpen((v) => !v)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Menu size={24} />
@@ -244,19 +244,16 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <div className="relative hidden md:block" onMouseLeave={() => setDesktopMegaOpen(false)}>
+          <div className="hidden md:block">
             <button
-              ref={categoryTriggerRef}
-              onClick={() => setDesktopMegaOpen((v) => !v)}
-              onMouseEnter={() => setDesktopMegaOpen(true)}
+              onClick={() => setCategoryPanelOpen(true)}
               className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-haspopup="menu"
-              aria-expanded={desktopMegaOpen}
+              aria-haspopup="dialog"
+              aria-expanded={categoryPanelOpen}
             >
               <Menu size={18} />
               {t("allCategories")}
             </button>
-            <CategoryMegaMenu open={desktopMegaOpen} tree={categoryTree} onNavigate={handleCategoryClick} />
           </div>
 
           <div className="order-3 w-full md:order-none md:flex-1 md:px-2" ref={searchRef}>
@@ -494,7 +491,7 @@ export default function Navbar() {
       <CategoryDrawer
         open={categoryPanelOpen}
         loading={categoriesLoading}
-        tree={categoryTree}
+        tree={curatedCategoryTree}
         query={categorySearch}
         searchResults={categorySearchResults}
         searchLoading={categorySearchLoading}

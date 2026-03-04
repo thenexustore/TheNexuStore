@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Menu, Search, ShoppingCart, MessageCircle } from "lucide-react";
+import { Menu, Search, ShoppingCart, MessageCircle, X } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
@@ -26,9 +26,10 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
+  const [categoryTreeState, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopMegaOpen, setDesktopMegaOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
@@ -41,9 +42,10 @@ export default function Navbar() {
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const curatedCategoryTree = useMemo(
-    () => buildCuratedCategoryTree(categoryTree),
-    [categoryTree],
+    () => buildCuratedCategoryTree(categoryTreeState),
+    [categoryTreeState],
   );
+  const filteredCategories = curatedCategoryTree;
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -176,6 +178,7 @@ export default function Navbar() {
 
   const closeMobilePanels = () => {
     setCategoryPanelOpen(false);
+    setSidebarOpen(false);
     setShowSearchResults(false);
   };
 

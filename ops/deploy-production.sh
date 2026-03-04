@@ -151,6 +151,7 @@ NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
 npm run build
+pm2 delete nexus-frontend >/dev/null 2>&1 || true
 pm2 delete nexus-store >/dev/null 2>&1 || true
 pm2 start npm --name nexus-store --cwd "$REPO_DIR/Frontend/Store" -- start -- -p 3000
 

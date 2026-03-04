@@ -87,6 +87,33 @@ export interface MenuTreeResponse {
   groups: MenuTreeGroup[];
 }
 
+export interface CategoryTreeNode {
+  id: string;
+  name: string;
+  slug: string;
+  depth: number;
+  children: CategoryTreeNode[];
+}
+
+export interface CategoryTreeResponse {
+  items: CategoryTreeNode[];
+  meta: {
+    maxDepth: number;
+    locale: string;
+    includeEmpty: boolean;
+    includeCounts: boolean;
+  };
+}
+
+export interface CategorySearchResult {
+  id: string;
+  name: string;
+  slug: string;
+  depth: number;
+  path: string;
+  parentIds: string[];
+  ancestors: Array<{ id: string; name: string; slug: string }>;
+}
 
 export interface Product {
   id: string;
@@ -304,6 +331,14 @@ class ProductAPI {
 
   async getMenuTree(): Promise<MenuTreeResponse> {
     return apiRequest('/user/categories/menu-tree');
+  }
+
+  async getCategoryTree(maxDepth: number = 5): Promise<CategoryTreeResponse> {
+    return apiRequest(`/user/categories/tree?maxDepth=${maxDepth}`);
+  }
+
+  async searchCategories(query: string, maxDepth: number = 5): Promise<CategorySearchResult[]> {
+    return apiRequest(`/user/categories/search?q=${encodeURIComponent(query)}&maxDepth=${maxDepth}`);
   }
 
   async getCategories(): Promise<Category[]> {

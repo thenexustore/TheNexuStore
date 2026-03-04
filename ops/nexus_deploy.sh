@@ -23,7 +23,27 @@ run() {
     log "[dry-run] $*"
     return 0
   fi
+  log "$*"
   eval "$*"
+}
+
+create_repo_backup() {
+  local destination="$1"
+  local parent_dir
+  local repo_name
+
+  parent_dir="$(dirname "$REPO_DIR")"
+  repo_name="$(basename "$REPO_DIR")"
+
+  run "tar -czf '$destination' -C '$parent_dir' \
+    --exclude='$repo_name/.git' \
+    --exclude='$repo_name/**/node_modules' \
+    --exclude='$repo_name/**/.next' \
+    --exclude='$repo_name/**/dist' \
+    --exclude='$repo_name/**/coverage' \
+    --exclude='$repo_name/**/.turbo' \
+    --exclude='$repo_name/**/.cache' \
+    '$repo_name'"
 }
 
 write_backend_start_script() {
@@ -108,7 +128,7 @@ done
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
 run "mkdir -p '$BACKUP_DIR'"
-run "tar -czf '$BACKUP_DIR/repo_snapshot.tgz' -C '$(dirname "$REPO_DIR")' '$(basename "$REPO_DIR")'"
+create_repo_backup "$BACKUP_DIR/repo_snapshot.tgz"
 
 run "sed -i 's/\r$//' '$BACKEND_ENV_FILE'"
 run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"

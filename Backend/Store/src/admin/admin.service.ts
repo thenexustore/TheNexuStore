@@ -3,7 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { StaffRole } from '@prisma/client';
+import { OrderStatus, StaffRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
@@ -199,6 +199,24 @@ export class AdminService {
       console.error('Update order status error:', error);
       throw new Error('Failed to update order status');
     }
+  }
+
+  async bulkUpdateOrderStatus(ids: string[], status: OrderStatus) {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) {
+      return { affected: 0, ids: [], status };
+    }
+
+    const result = await this.prisma.order.updateMany({
+      where: { id: { in: uniqueIds } },
+      data: { status },
+    });
+
+    return {
+      affected: result.count,
+      ids: uniqueIds,
+      status,
+    };
   }
 
 

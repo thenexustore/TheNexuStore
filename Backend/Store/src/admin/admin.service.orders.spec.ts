@@ -6,6 +6,7 @@ describe('AdminService orders behavior', () => {
   const prisma = {
     order: {
       findUnique: jest.fn(),
+      updateMany: jest.fn(),
     },
     customer: {
       findUnique: jest.fn(),
@@ -35,5 +36,24 @@ describe('AdminService orders behavior', () => {
     (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
 
     await expect(service.getOrderById('missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('bulk updates order status with deduplicated ids', async () => {
+    (prisma.order.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
+
+    const result = await service.bulkUpdateOrderStatus(
+      ['o1', 'o2', 'o1'],
+      'PROCESSING' as any,
+    );
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['o1', 'o2'] } },
+      data: { status: 'PROCESSING' },
+    });
+    expect(result).toEqual({
+      affected: 2,
+      ids: ['o1', 'o2'],
+      status: 'PROCESSING',
+    });
   });
 });

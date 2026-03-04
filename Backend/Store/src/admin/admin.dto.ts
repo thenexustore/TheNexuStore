@@ -6,8 +6,12 @@ import {
   IsInt,
   Min,
   MaxLength,
+  IsArray,
+  ArrayNotEmpty,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { OrderStatus } from '@prisma/client';
 
 export class CreateBrandDto {
   @IsString()
@@ -57,4 +61,14 @@ export class AddOrderNoteDto {
   @IsString()
   @MaxLength(2000)
   note!: string;
+}
+
+export class BulkUpdateOrderStatusDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  ids!: string[];
+
+  @IsEnum(OrderStatus)
+  status!: OrderStatus;
 }

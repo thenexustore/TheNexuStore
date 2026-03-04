@@ -14,6 +14,61 @@ export interface DashboardAlert {
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
+  private buildSyncAlerts(syncLogs: Array<{ type: string; last_sync: Date; details?: string | null }>) {
+    const alerts: DashboardAlert[] = [];
+
+    if (syncLogs.length === 0) {
+      alerts.push({
+        id: 'imports-no-history',
+        severity: 'warning',
+        title: 'No import history available',
+        description:
+          'No synchronization jobs have been recorded yet. Run an initial import to validate supplier integration health.',
+        ctaLabel: 'Open imports',
+        ctaHref: '/imports',
+      });
+      return alerts;
+    }
+
+    const latestSync = [...syncLogs].sort(
+      (a, b) => b.last_sync.getTime() - a.last_sync.getTime(),
+    )[0];
+
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    if (latestSync.last_sync.getTime() < twentyFourHoursAgo) {
+      alerts.push({
+        id: 'imports-stale',
+        severity: 'warning',
+        title: 'Import sync appears stale',
+        description: `Last sync was at ${latestSync.last_sync.toISOString()}. Consider running a stock or full sync.`,
+        ctaLabel: 'Run imports',
+        ctaHref: '/imports',
+      });
+    }
+
+    const failedLog = syncLogs.find((log) => {
+      const details = String(log.details || '').toLowerCase();
+      return (
+        details.includes('fail') ||
+        details.includes('error') ||
+        details.includes('exception')
+      );
+    });
+
+    if (failedLog) {
+      alerts.push({
+        id: 'imports-failed',
+        severity: 'error',
+        title: 'Recent import issues detected',
+        description: `Import job "${failedLog.type}" reported an error in details. Review logs and rerun the job if needed.`,
+        ctaLabel: 'Review imports',
+        ctaHref: '/imports',
+      });
+    }
+
+    return alerts;
+  }
+
   async getDashboardStats() {
     try {
       const today = new Date();
@@ -27,6 +82,7 @@ export class DashboardService {
         recentOrders,
         pendingOrdersCount,
         activeProducts,
+        syncLogs,
       ] = await Promise.all([
         this.prisma.order.count({
           where: {
@@ -60,10 +116,17 @@ export class DashboardService {
         this.prisma.product.count({
           where: { status: 'ACTIVE' },
         }),
+
+        this.prisma.syncLog.findMany({
+          orderBy: { last_sync: 'desc' },
+          take: 10,
+        }),
       ]);
 
       const alerts: DashboardAlert[] = [];
       const inactiveProducts = totalProducts - activeProducts;
+
+      alerts.push(...this.buildSyncAlerts(syncLogs));
 
       if (pendingOrdersCount >= 20) {
         alerts.push({

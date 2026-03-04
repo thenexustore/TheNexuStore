@@ -8,12 +8,14 @@ import {
   Query,
   Req,
   Param,
+  Put,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
 import {
   AddOrderNoteDto,
   AdminOrdersQueryDto,
+  BulkUpdateOrderStatusDto,
   CreateBrandDto,
   CreateCategoryDto,
 } from './admin.dto';
@@ -62,6 +64,37 @@ export class AdminController {
     return {
       success: true,
       data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Put('orders/bulk/status')
+  async bulkUpdateOrderStatus(
+    @Body() body: BulkUpdateOrderStatusDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.adminService.bulkUpdateOrderStatus(body.ids, body.status);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'ORDER_BULK_STATUS_UPDATED',
+      resource: 'ORDER',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: req.get('x-request-id') || undefined,
+      metadata: {
+        ids: data.ids,
+        status: data.status,
+        affected: data.affected,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Orders status updated',
     };
   }
 

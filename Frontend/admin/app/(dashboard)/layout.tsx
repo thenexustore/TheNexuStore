@@ -32,6 +32,7 @@ const navigation = [
     children: [
       { key: "banners", href: "/banners" },
       { key: "homepageSections", href: "/homepage-sections" },
+      { key: "homeBuilder", href: "/home-builder" },
       { key: "featuredProducts", href: "/featured-products" },
     ],
   },

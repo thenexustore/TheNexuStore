@@ -14,6 +14,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { ShippingTaxAdminModule } from './shipping-tax/shipping-tax-admin.module';
 import { JwtAuthModule } from '../auth/jwt-auth.module';
 import { PricingAdminModule } from './pricing/pricing.module';
+import { CategoriesModule } from '../user/categories/categories.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PricingAdminModule } from './pricing/pricing.module';
     CouponsModule,
     ShippingTaxAdminModule,
     PricingAdminModule,
+    CategoriesModule,
   ],
   controllers: [AdminController, DashboardController, ProductsController],
   providers: [

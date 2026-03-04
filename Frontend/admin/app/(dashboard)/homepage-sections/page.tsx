@@ -46,6 +46,8 @@ const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
 
 type PresetKey = "tv" | "gaming" | "laptops" | "networking" | "cctv";
 
+type SectionType = (typeof SECTION_TYPES)[number];
+
 const PRESET_BUTTONS: Array<{ key: PresetKey; label: string; title: string; sortBy: "discount_desc" | "newest"; matcher: string[] }> = [
   { key: "tv", label: "Añadir sección TV", title: "TV", sortBy: "discount_desc", matcher: ["tv, audio y vídeo", "tv", "audio", "video", "television"] },
   { key: "gaming", label: "Añadir sección Gaming", title: "Gaming", sortBy: "discount_desc", matcher: ["gaming", "consola", "juego", "game"] },
@@ -64,6 +66,10 @@ function normalizeText(value?: string) {
 
 function supportsSource(type: string) {
   return MANUAL_TYPES.includes(type);
+}
+
+function defaultConfigFor(type: string): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG_BY_TYPE[type] || {})) as Record<string, unknown>;
 }
 
 function findPresetCategoryId(presetMatchers: string[], tree: CategoryMenuTreeNode[]): string | undefined {
@@ -99,7 +105,7 @@ export default function HomepageSectionsPage() {
   const [options, setOptions] = useState<Record<string, HomepageOption[]>>({});
   const [queryCatalogs, setQueryCatalogs] = useState<{ categories: HomepageOption[]; brands: HomepageOption[] }>({ categories: [], brands: [] });
   const [menuTree, setMenuTree] = useState<CategoryMenuTreeNode[]>([]);
-  const [newType, setNewType] = useState<(typeof SECTION_TYPES)[number]>("TOP_CATEGORIES_GRID");
+  const [newType, setNewType] = useState<SectionType>("TOP_CATEGORIES_GRID");
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -182,12 +188,28 @@ export default function HomepageSectionsPage() {
         position: sorted.length + 1,
         enabled: true,
         title: newType.replaceAll("_", " "),
-        config_json: DEFAULT_CONFIG_BY_TYPE[newType],
+        config_json: defaultConfigFor(newType),
       });
       toast.success("Sección creada");
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear la sección");
+    }
+  };
+
+  const duplicate = async (section: HomepageSection) => {
+    try {
+      await homepageSectionsApi.create({
+        type: section.type,
+        position: sorted.length + 1,
+        enabled: section.enabled,
+        title: `${section.title || section.type} (copia)`,
+        config_json: JSON.parse(JSON.stringify(section.config_json)) as Record<string, unknown>,
+      });
+      toast.success("Sección duplicada");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo duplicar la sección");
     }
   };
 
@@ -265,12 +287,12 @@ export default function HomepageSectionsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-3xl font-bold">Control Home</h1>
-        <p className="text-sm text-slate-500">Gestiona orden, visibilidad y configuración de secciones legacy de la Store.</p>
+        <p className="text-sm text-slate-500">Configura y ordena secciones legacy que se exportan a la Store.</p>
       </div>
 
-      <div className="rounded-xl border bg-white p-4 space-y-3">
+      <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
         <div className="grid gap-2 sm:grid-cols-3">
-          <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as (typeof SECTION_TYPES)[number])}>
+          <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
             {SECTION_TYPES.map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
@@ -280,7 +302,7 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white p-4">
+      <div className="rounded-2xl border bg-white p-4 shadow-sm">
         <div className="text-sm font-medium text-slate-700 mb-3">Presets rápidos</div>
         <div className="flex flex-wrap gap-2">
           {PRESET_BUTTONS.map((preset) => (
@@ -296,9 +318,11 @@ export default function HomepageSectionsPage() {
       {filtered.map((section) => {
         const source = String(section.config_json.source || "query");
         const query = (section.config_json.query || {}) as Record<string, unknown>;
+        const currentIndex = sorted.findIndex((x) => x.id === section.id);
+        const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
 
         return (
-          <div key={section.id} className="rounded-xl border bg-white p-4 space-y-3">
+          <div key={section.id} className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold">{section.title || section.type}</div>
@@ -306,8 +330,9 @@ export default function HomepageSectionsPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button className="px-2 py-1 border rounded" onClick={() => void move(sorted.findIndex((x) => x.id === section.id), -1)}>↑</button>
-                <button className="px-2 py-1 border rounded" onClick={() => void move(sorted.findIndex((x) => x.id === section.id), 1)}>↓</button>
+                <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, -1)}>↑</button>
+                <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, 1)}>↓</button>
+                <button className="px-2 py-1 border rounded" onClick={() => void duplicate(section)}>Duplicar</button>
                 <label className="text-sm flex items-center gap-1">
                   <input type="checkbox" checked={section.enabled} onChange={(e) => updateLocal(section.id, { enabled: e.target.checked })} />
                   Visible
@@ -316,7 +341,10 @@ export default function HomepageSectionsPage() {
               </div>
             </div>
 
-            <input className="border rounded-lg px-3 py-2 w-full" value={section.title || ""} onChange={(e) => updateLocal(section.id, { title: e.target.value })} placeholder="Título de sección" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="border rounded-lg px-3 py-2" value={section.title || ""} onChange={(e) => updateLocal(section.id, { title: e.target.value })} placeholder="Título de sección" />
+              <button className="border rounded-lg px-3 py-2 text-sm" onClick={() => updateLocal(section.id, { config_json: defaultConfigFor(section.type) })}>Reset config por defecto</button>
+            </div>
 
             {supportsSource(section.type) && (
               <div className="space-y-2">
@@ -326,8 +354,8 @@ export default function HomepageSectionsPage() {
                   onChange={(e) =>
                     updateConfig(section, {
                       source: e.target.value,
-                      ids: e.target.value === "manual" ? (section.config_json.ids || []) : [],
-                      query: e.target.value === "query" ? (section.config_json.query || DEFAULT_CONFIG_BY_TYPE[section.type].query) : undefined,
+                      ids: e.target.value === "manual" ? selectedIds : [],
+                      query: e.target.value === "query" ? (section.config_json.query || defaultConfigFor(section.type).query) : undefined,
                     })
                   }
                 >
@@ -357,11 +385,7 @@ export default function HomepageSectionsPage() {
                       {(options[section.id] || []).map((opt) => (
                         <button
                           key={opt.id}
-                          onClick={() =>
-                            updateConfig(section, {
-                              ids: Array.from(new Set([...(section.config_json.ids || []), opt.id])),
-                            })
-                          }
+                          onClick={() => updateConfig(section, { ids: Array.from(new Set([...selectedIds, opt.id])) })}
                           className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                         >
                           {opt.label}
@@ -370,7 +394,18 @@ export default function HomepageSectionsPage() {
                       ))}
                     </div>
 
-                    <div className="text-xs text-slate-500">IDs seleccionados: {(section.config_json.ids || []).join(", ") || "ninguno"}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedIds.map((id) => (
+                        <button
+                          key={id}
+                          className="rounded-full border px-2 py-1 text-xs"
+                          onClick={() => updateConfig(section, { ids: selectedIds.filter((value) => value !== id) })}
+                        >
+                          {id} ✕
+                        </button>
+                      ))}
+                      {!selectedIds.length ? <div className="text-xs text-slate-500">Sin IDs seleccionados</div> : null}
+                    </div>
                   </div>
                 )}
 

@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
+import { CategoriesService } from '../user/categories/categories.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class AdminService {
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
+    private readonly categoriesService: CategoriesService,
   ) {}
 
   validateAdmin(email: string, password: string): boolean {
@@ -261,6 +263,8 @@ export class AdminService {
           is_active: true,
         },
       });
+
+      this.categoriesService.invalidateTreeCache();
 
       return category;
     } catch (error: any) {

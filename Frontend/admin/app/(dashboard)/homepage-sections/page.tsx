@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   CategoryMenuTreeNode,
@@ -19,16 +19,16 @@ const SECTION_TYPES = [
   "FEATURED_PICKS",
   "BRANDS_STRIP",
   "TRUST_BAR",
-];
+] as const;
 
 const SORT_OPTIONS = [
-  { value: "newest", label: "Newest" },
-  { value: "price_asc", label: "Price: Low to High" },
-  { value: "price_desc", label: "Price: High to Low" },
-  { value: "discount_desc", label: "Biggest Discount" },
+  { value: "newest", label: "Más recientes" },
+  { value: "price_asc", label: "Precio: menor a mayor" },
+  { value: "price_desc", label: "Precio: mayor a menor" },
+  { value: "discount_desc", label: "Mayor descuento" },
 ];
 
-const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, any>> = {
+const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
   HERO_BANNER_SLIDER: { items_per_carousel: 1 },
   TOP_CATEGORIES_GRID: { source: "query", query: { type: "categories", limit: 10 } },
   BEST_DEALS: { source: "query", query: { type: "products", sortBy: "discount_desc", inStockOnly: true, limit: 12 } },
@@ -37,56 +37,21 @@ const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, any>> = {
   BRANDS_STRIP: { source: "query", query: { type: "brands", limit: 12 } },
   TRUST_BAR: {
     items: [
-      { icon: "truck", text: "Fast delivery" },
-      { icon: "shield", text: "Secure payments" },
-      { icon: "refresh-ccw", text: "Easy returns" },
+      { icon: "truck", text: "Envío rápido" },
+      { icon: "shield", text: "Pago seguro" },
+      { icon: "refresh-ccw", text: "Devoluciones fáciles" },
     ],
   },
 };
 
-function supportsSource(type: string) {
-  return MANUAL_TYPES.includes(type);
-}
-
-
 type PresetKey = "tv" | "gaming" | "laptops" | "networking" | "cctv";
 
 const PRESET_BUTTONS: Array<{ key: PresetKey; label: string; title: string; sortBy: "discount_desc" | "newest"; matcher: string[] }> = [
-  {
-    key: "tv",
-    label: "Add TV Section",
-    title: "TV",
-    sortBy: "discount_desc",
-    matcher: ["tv, audio y vídeo", "tv", "audio", "video", "television"],
-  },
-  {
-    key: "gaming",
-    label: "Add Gaming Section",
-    title: "Gaming",
-    sortBy: "discount_desc",
-    matcher: ["gaming", "consola", "juego", "game"],
-  },
-  {
-    key: "laptops",
-    label: "Add Laptops Section",
-    title: "Laptops",
-    sortBy: "newest",
-    matcher: ["portátil", "portatiles", "laptop", "notebook"],
-  },
-  {
-    key: "networking",
-    label: "Add Networking Section",
-    title: "Networking",
-    sortBy: "newest",
-    matcher: ["network", "redes", "router", "switch", "wifi"],
-  },
-  {
-    key: "cctv",
-    label: "Add CCTV Section",
-    title: "CCTV",
-    sortBy: "discount_desc",
-    matcher: ["cctv", "videovigilancia", "vigilancia", "seguridad", "camara", "cámara"],
-  },
+  { key: "tv", label: "Añadir sección TV", title: "TV", sortBy: "discount_desc", matcher: ["tv, audio y vídeo", "tv", "audio", "video", "television"] },
+  { key: "gaming", label: "Añadir sección Gaming", title: "Gaming", sortBy: "discount_desc", matcher: ["gaming", "consola", "juego", "game"] },
+  { key: "laptops", label: "Añadir sección Laptops", title: "Laptops", sortBy: "newest", matcher: ["portátil", "portatiles", "laptop", "notebook"] },
+  { key: "networking", label: "Añadir sección Networking", title: "Networking", sortBy: "newest", matcher: ["network", "redes", "router", "switch", "wifi"] },
+  { key: "cctv", label: "Añadir sección CCTV", title: "CCTV", sortBy: "discount_desc", matcher: ["cctv", "videovigilancia", "vigilancia", "seguridad", "camara", "cámara"] },
 ];
 
 function normalizeText(value?: string) {
@@ -95,6 +60,10 @@ function normalizeText(value?: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
+}
+
+function supportsSource(type: string) {
+  return MANUAL_TYPES.includes(type);
 }
 
 function findPresetCategoryId(presetMatchers: string[], tree: CategoryMenuTreeNode[]): string | undefined {
@@ -128,28 +97,33 @@ export default function HomepageSectionsPage() {
   const [sections, setSections] = useState<HomepageSection[]>([]);
   const [search, setSearch] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, HomepageOption[]>>({});
-  const [queryCatalogs, setQueryCatalogs] = useState<{
-    categories: HomepageOption[];
-    brands: HomepageOption[];
-  }>({ categories: [], brands: [] });
+  const [queryCatalogs, setQueryCatalogs] = useState<{ categories: HomepageOption[]; brands: HomepageOption[] }>({ categories: [], brands: [] });
   const [menuTree, setMenuTree] = useState<CategoryMenuTreeNode[]>([]);
-  const [newType, setNewType] = useState("TOP_CATEGORIES_GRID");
+  const [newType, setNewType] = useState<(typeof SECTION_TYPES)[number]>("TOP_CATEGORIES_GRID");
+  const [isLoading, setIsLoading] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
-  const sorted = useMemo(
-    () => [...sections].sort((a, b) => a.position - b.position),
-    [sections],
-  );
+  const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((section) => (section.title || "").toLowerCase().includes(q) || section.type.toLowerCase().includes(q));
+  }, [sorted, filter]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    setIsLoading(true);
     try {
       setSections(await homepageSectionsApi.list());
-    } catch (e: any) {
-      toast.error(e.message || "Failed to load homepage sections");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron cargar las secciones");
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    load();
+    void load();
     (async () => {
       try {
         const [categories, brands, menuTreeResponse] = await Promise.all([
@@ -160,43 +134,44 @@ export default function HomepageSectionsPage() {
         setQueryCatalogs({ categories, brands });
         setMenuTree(menuTreeResponse.tree || []);
       } catch {
-        // silent
+        // optional preload
       }
     })();
-  }, []);
+  }, [load]);
 
   const updateLocal = (id: string, patch: Partial<HomepageSection>) => {
     setSections((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   };
 
-  const updateConfig = (section: HomepageSection, patch: Record<string, any>) => {
+  const updateConfig = (section: HomepageSection, patch: Record<string, unknown>) => {
     updateLocal(section.id, { config_json: { ...section.config_json, ...patch } });
   };
 
-  const updateQueryConfig = (section: HomepageSection, patch: Record<string, any>) => {
+  const updateQueryConfig = (section: HomepageSection, patch: Record<string, unknown>) => {
+    const query = (section.config_json.query || {}) as Record<string, unknown>;
     updateLocal(section.id, {
       config_json: {
         ...section.config_json,
         source: "query",
-        query: {
-          ...(section.config_json.query || {}),
-          ...patch,
-        },
+        query: { ...query, ...patch },
       },
     });
   };
 
   const save = async (section: HomepageSection) => {
+    setSavingId(section.id);
     try {
       await homepageSectionsApi.update(section.id, {
         enabled: section.enabled,
         title: section.title,
         config_json: section.config_json,
       });
-      toast.success(`${section.type} saved`);
+      toast.success(`Sección ${section.type} guardada`);
       await load();
-    } catch (e: any) {
-      toast.error(e.message || "Save failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar la sección");
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -209,10 +184,10 @@ export default function HomepageSectionsPage() {
         title: newType.replaceAll("_", " "),
         config_json: DEFAULT_CONFIG_BY_TYPE[newType],
       });
-      toast.success("Section created");
+      toast.success("Sección creada");
       await load();
-    } catch (e: any) {
-      toast.error(e.message || "Create failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear la sección");
     }
   };
 
@@ -238,21 +213,21 @@ export default function HomepageSectionsPage() {
           },
         },
       });
-      toast.success(`${preset.title} section added`);
+      toast.success(`Sección preset ${preset.title} añadida`);
       await load();
-    } catch (e: any) {
-      toast.error(e.message || `Failed to create ${preset.title} preset`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `No se pudo crear el preset ${preset.title}`);
     }
   };
 
   const remove = async (section: HomepageSection) => {
-    if (!confirm(`Delete ${section.type}?`)) return;
+    if (!confirm(`¿Eliminar ${section.type}?`)) return;
     try {
       await homepageSectionsApi.remove(section.id);
-      toast.success("Section deleted");
+      toast.success("Sección eliminada");
       await load();
-    } catch (e: any) {
-      toast.error(e.message || "Delete failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar la sección");
     }
   };
 
@@ -265,105 +240,83 @@ export default function HomepageSectionsPage() {
     arr.splice(next, 0, item);
     const payload = arr.map((x, i) => ({ id: x.id, position: i + 1 }));
 
-    setSections((prev) =>
-      prev.map((x) => ({ ...x, position: payload.find((p) => p.id === x.id)?.position || x.position })),
-    );
+    setSections((prev) => prev.map((x) => ({ ...x, position: payload.find((p) => p.id === x.id)?.position || x.position })));
 
     try {
       await homepageSectionsApi.reorder(payload);
-      toast.success("Sections reordered");
+      toast.success("Orden actualizado");
       await load();
-    } catch (e: any) {
-      toast.error(e.message || "Reorder failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar");
     }
   };
 
-  const loadOptions = async (
-    section: HomepageSection,
-    q: string,
-    target: "products" | "categories" | "brands" = "products",
-  ) => {
+  const loadOptions = async (section: HomepageSection, q: string, target: "products" | "categories" | "brands") => {
     if (!supportsSource(section.type)) return;
     try {
       const data = await homepageSectionsApi.options(section.type, q, 10, target);
       setOptions((prev) => ({ ...prev, [section.id]: data }));
-    } catch (e: any) {
-      toast.error(e.message || "Search failed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Búsqueda fallida");
     }
   };
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Homepage Sections</h1>
-        <p className="text-sm text-slate-500">Manage ordering, visibility and section-specific merchandising settings.</p>
+        <h1 className="text-3xl font-bold">Control Home</h1>
+        <p className="text-sm text-slate-500">Gestiona orden, visibilidad y configuración de secciones legacy de la Store.</p>
       </div>
 
-      <div className="rounded-xl border bg-white p-4 flex flex-wrap items-center gap-2">
-        <select
-          className="border rounded-lg px-3 py-2"
-          value={newType}
-          onChange={(e) => setNewType(e.target.value)}
-        >
-          {SECTION_TYPES.map((type) => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
-        <button onClick={create} className="px-3 py-2 rounded-lg bg-black text-white text-sm">
-          Add Section
-        </button>
+      <div className="rounded-xl border bg-white p-4 space-y-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as (typeof SECTION_TYPES)[number])}>
+            {SECTION_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+          <input className="border rounded-lg px-3 py-2" placeholder="Filtrar secciones por título/tipo" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <button onClick={() => void create()} className="px-3 py-2 rounded-lg bg-black text-white text-sm">Añadir sección</button>
+        </div>
       </div>
 
       <div className="rounded-xl border bg-white p-4">
-        <div className="text-sm font-medium text-slate-700 mb-3">Add Preset</div>
+        <div className="text-sm font-medium text-slate-700 mb-3">Presets rápidos</div>
         <div className="flex flex-wrap gap-2">
           {PRESET_BUTTONS.map((preset) => (
-            <button
-              key={preset.key}
-              onClick={() => createPresetSection(preset.key)}
-              className="px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-sm hover:bg-slate-100"
-            >
+            <button key={preset.key} onClick={() => void createPresetSection(preset.key)} className="px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-sm hover:bg-slate-100">
               {preset.label}
             </button>
           ))}
         </div>
       </div>
 
-      {sorted.map((section, index) => {
-        const source = section.config_json.source || "query";
-        const query = section.config_json.query || {};
+      {isLoading ? <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">Cargando secciones...</div> : null}
+
+      {filtered.map((section) => {
+        const source = String(section.config_json.source || "query");
+        const query = (section.config_json.query || {}) as Record<string, unknown>;
 
         return (
           <div key={section.id} className="rounded-xl border bg-white p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold">{section.type}</div>
-                <div className="text-xs text-slate-500">Position #{section.position}</div>
+                <div className="font-semibold">{section.title || section.type}</div>
+                <div className="text-xs text-slate-500">{section.type} · Posición #{section.position}</div>
               </div>
 
               <div className="flex items-center gap-2">
-                <button className="px-2 py-1 border rounded" onClick={() => move(index, -1)}>↑</button>
-                <button className="px-2 py-1 border rounded" onClick={() => move(index, 1)}>↓</button>
+                <button className="px-2 py-1 border rounded" onClick={() => void move(sorted.findIndex((x) => x.id === section.id), -1)}>↑</button>
+                <button className="px-2 py-1 border rounded" onClick={() => void move(sorted.findIndex((x) => x.id === section.id), 1)}>↓</button>
                 <label className="text-sm flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={section.enabled}
-                    onChange={(e) => updateLocal(section.id, { enabled: e.target.checked })}
-                  />
-                  Enabled
+                  <input type="checkbox" checked={section.enabled} onChange={(e) => updateLocal(section.id, { enabled: e.target.checked })} />
+                  Visible
                 </label>
-                <button className="px-2 py-1 border rounded text-red-600" onClick={() => remove(section)}>Delete</button>
+                <button className="px-2 py-1 border rounded text-red-600" onClick={() => void remove(section)}>Eliminar</button>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-3">
-              <input
-                className="border rounded-lg px-3 py-2"
-                value={section.title || ""}
-                onChange={(e) => updateLocal(section.id, { title: e.target.value })}
-                placeholder="Section title"
-              />
-            </div>
+            <input className="border rounded-lg px-3 py-2 w-full" value={section.title || ""} onChange={(e) => updateLocal(section.id, { title: e.target.value })} placeholder="Título de sección" />
 
             {supportsSource(section.type) && (
               <div className="space-y-2">
@@ -373,46 +326,34 @@ export default function HomepageSectionsPage() {
                   onChange={(e) =>
                     updateConfig(section, {
                       source: e.target.value,
-                      ids: e.target.value === "manual" ? section.config_json.ids || [] : [],
-                      query:
-                        e.target.value === "query"
-                          ? section.config_json.query || DEFAULT_CONFIG_BY_TYPE[section.type].query
-                          : undefined,
+                      ids: e.target.value === "manual" ? (section.config_json.ids || []) : [],
+                      query: e.target.value === "query" ? (section.config_json.query || DEFAULT_CONFIG_BY_TYPE[section.type].query) : undefined,
                     })
                   }
                 >
-                  <option value="query">Query</option>
+                  <option value="query">Por consulta</option>
                   <option value="manual">Manual</option>
                 </select>
 
                 {source === "manual" && (
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <input
-                        className="border rounded-lg px-3 py-2 flex-1"
-                        value={search[section.id] || ""}
-                        onChange={(e) => setSearch((prev) => ({ ...prev, [section.id]: e.target.value }))}
-                        placeholder="Search item"
-                      />
+                      <input className="border rounded-lg px-3 py-2 flex-1" value={search[section.id] || ""} onChange={(e) => setSearch((prev) => ({ ...prev, [section.id]: e.target.value }))} placeholder="Buscar item" />
                       <button
                         className="px-3 py-2 border rounded-lg"
                         onClick={() =>
-                          loadOptions(
+                          void loadOptions(
                             section,
                             search[section.id] || "",
-                            section.type === "TOP_CATEGORIES_GRID"
-                              ? "categories"
-                              : section.type === "BRANDS_STRIP"
-                                ? "brands"
-                                : "products",
+                            section.type === "TOP_CATEGORIES_GRID" ? "categories" : section.type === "BRANDS_STRIP" ? "brands" : "products",
                           )
                         }
                       >
-                        Search
+                        Buscar
                       </button>
                     </div>
 
-                    <div className="max-h-32 overflow-auto border rounded-lg">
+                    <div className="max-h-36 overflow-auto border rounded-lg">
                       {(options[section.id] || []).map((opt) => (
                         <button
                           key={opt.id}
@@ -429,112 +370,49 @@ export default function HomepageSectionsPage() {
                       ))}
                     </div>
 
-                    <div className="text-xs text-slate-500">Selected IDs: {(section.config_json.ids || []).join(", ") || "none"}</div>
+                    <div className="text-xs text-slate-500">IDs seleccionados: {(section.config_json.ids || []).join(", ") || "ninguno"}</div>
                   </div>
                 )}
 
                 {source === "query" && (
                   <div className="grid md:grid-cols-2 gap-3">
-                    <input
-                      type="number"
-                      min={1}
-                      max={24}
-                      className="border rounded-lg px-3 py-2"
-                      value={query.limit || 12}
-                      onChange={(e) => updateQueryConfig(section, { limit: Number(e.target.value) || 12 })}
-                      placeholder="limit"
-                    />
+                    <input type="number" min={1} max={24} className="border rounded-lg px-3 py-2" value={Number(query.limit || 12)} onChange={(e) => updateQueryConfig(section, { limit: Number(e.target.value) || 12 })} placeholder="Límite" />
 
                     {PRODUCT_QUERY_TYPES.includes(section.type) ? (
                       <>
-                        <select
-                          className="border rounded-lg px-3 py-2"
-                          value={query.categoryId || ""}
-                          onChange={(e) => updateQueryConfig(section, { type: "products", categoryId: e.target.value || undefined })}
-                        >
-                          <option value="">All categories</option>
+                        <select className="border rounded-lg px-3 py-2" value={String(query.categoryId || "")} onChange={(e) => updateQueryConfig(section, { type: "products", categoryId: e.target.value || undefined })}>
+                          <option value="">Todas las categorías</option>
                           {queryCatalogs.categories.map((cat) => (
                             <option key={cat.id} value={cat.id}>{cat.label}</option>
                           ))}
                         </select>
 
-                        <select
-                          className="border rounded-lg px-3 py-2"
-                          value={query.brandId || ""}
-                          onChange={(e) => updateQueryConfig(section, { type: "products", brandId: e.target.value || undefined })}
-                        >
-                          <option value="">All brands</option>
+                        <select className="border rounded-lg px-3 py-2" value={String(query.brandId || "")} onChange={(e) => updateQueryConfig(section, { type: "products", brandId: e.target.value || undefined })}>
+                          <option value="">Todas las marcas</option>
                           {queryCatalogs.brands.map((brand) => (
                             <option key={brand.id} value={brand.id}>{brand.label}</option>
                           ))}
                         </select>
 
-                        <select
-                          className="border rounded-lg px-3 py-2"
-                          value={query.sortBy || "newest"}
-                          onChange={(e) => updateQueryConfig(section, { type: "products", sortBy: e.target.value })}
-                        >
+                        <select className="border rounded-lg px-3 py-2" value={String(query.sortBy || "newest")} onChange={(e) => updateQueryConfig(section, { type: "products", sortBy: e.target.value })}>
                           {SORT_OPTIONS.map((sort) => (
                             <option key={sort.value} value={sort.value}>{sort.label}</option>
                           ))}
                         </select>
 
                         <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={query.inStockOnly ?? true}
-                            onChange={(e) => updateQueryConfig(section, { type: "products", inStockOnly: e.target.checked })}
-                          />
-                          In stock only
+                          <input type="checkbox" checked={Boolean(query.inStockOnly ?? true)} onChange={(e) => updateQueryConfig(section, { type: "products", inStockOnly: e.target.checked })} />
+                          Solo con stock
                         </label>
 
-                        <input
-                          type="number"
-                          min={0}
-                          className="border rounded-lg px-3 py-2"
-                          value={query.priceMin ?? ""}
-                          onChange={(e) => updateQueryConfig(section, { type: "products", priceMin: e.target.value ? Number(e.target.value) : undefined })}
-                          placeholder="Price min"
-                        />
-
-                        <input
-                          type="number"
-                          min={0}
-                          className="border rounded-lg px-3 py-2"
-                          value={query.priceMax ?? ""}
-                          onChange={(e) => updateQueryConfig(section, { type: "products", priceMax: e.target.value ? Number(e.target.value) : undefined })}
-                          placeholder="Price max"
-                        />
+                        <input type="number" min={0} className="border rounded-lg px-3 py-2" value={typeof query.priceMin === "number" ? query.priceMin : ""} onChange={(e) => updateQueryConfig(section, { type: "products", priceMin: e.target.value ? Number(e.target.value) : undefined })} placeholder="Precio mínimo" />
+                        <input type="number" min={0} className="border rounded-lg px-3 py-2" value={typeof query.priceMax === "number" ? query.priceMax : ""} onChange={(e) => updateQueryConfig(section, { type: "products", priceMax: e.target.value ? Number(e.target.value) : undefined })} placeholder="Precio máximo" />
                       </>
                     ) : (
-                      <div className="text-xs text-slate-500 md:col-span-2">
-                        Query preset for this section is handled automatically ({section.type === "TOP_CATEGORIES_GRID" ? "categories" : "brands"}).
-                      </div>
+                      <div className="text-xs text-slate-500 md:col-span-2">Esta sección usa consulta automática de categorías/marcas.</div>
                     )}
                   </div>
                 )}
-              </div>
-            )}
-
-            {!supportsSource(section.type) && section.type !== "TRUST_BAR" && section.type !== "HERO_BANNER_SLIDER" && (
-              <div className="grid md:grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  className="border rounded-lg px-3 py-2"
-                  value={query.limit || section.config_json.limit || 12}
-                  onChange={(e) =>
-                    updateConfig(section, {
-                      source: "query",
-                      query: {
-                        ...(section.config_json.query || { type: "products" }),
-                        limit: Number(e.target.value) || 12,
-                      },
-                    })
-                  }
-                  placeholder="limit"
-                />
               </div>
             )}
 
@@ -544,20 +422,24 @@ export default function HomepageSectionsPage() {
                 value={JSON.stringify(section.config_json.items || [], null, 2)}
                 onChange={(e) => {
                   try {
-                    updateConfig(section, { items: JSON.parse(e.target.value) });
+                    updateConfig(section, { items: JSON.parse(e.target.value) as unknown[] });
                   } catch {
-                    // ignore partial json
+                    // skip partial JSON
                   }
                 }}
               />
             )}
 
-            <button className="px-3 py-2 rounded-lg bg-black text-white text-sm" onClick={() => save(section)}>
-              Save changes
+            <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void save(section)}>
+              {savingId === section.id ? "Guardando..." : "Guardar cambios"}
             </button>
           </div>
         );
       })}
+
+      {!isLoading && filtered.length === 0 ? (
+        <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">No hay secciones para el filtro actual.</div>
+      ) : null}
     </div>
   );
 }

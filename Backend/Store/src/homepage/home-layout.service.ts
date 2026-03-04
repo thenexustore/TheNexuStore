@@ -27,6 +27,34 @@ export class HomeLayoutService {
     this.homeCache.clear();
   }
 
+  private clampLimit(value: unknown, fallback: number) {
+    const n = Number(value || fallback);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(1, Math.min(24, Math.floor(n)));
+  }
+
+  private normalizeSectionConfig(type: HomeSectionType, config: Record<string, any>) {
+    const next = { ...(config || {}) };
+
+    if (type === HomeSectionType.PRODUCT_CAROUSEL) {
+      next.source = next.source || 'NEW_ARRIVALS';
+      next.limit = this.clampLimit(next.limit, 12);
+      next.inStockOnly = next.inStockOnly ?? true;
+      next.mode = next.mode || 'rule';
+    }
+
+    if (type === HomeSectionType.CATEGORY_STRIP || type === HomeSectionType.BRAND_STRIP) {
+      next.limit = this.clampLimit(next.limit, 12);
+      next.mode = next.mode || 'auto';
+    }
+
+    if (type === HomeSectionType.VALUE_PROPS || type === HomeSectionType.TRENDING_CHIPS) {
+      next.items = Array.isArray(next.items) ? next.items : [];
+    }
+
+    return next;
+  }
+
   private async getActiveLayout(locale?: string) {
     const layout = await this.prisma.homePageLayout.findFirst({
       where: { is_active: true, locale: locale || null },
@@ -123,6 +151,7 @@ export class HomeLayoutService {
       }
     }
 
+    this.invalidateCache();
     return clone;
   }
 
@@ -142,13 +171,27 @@ export class HomeLayoutService {
   }
 
   async createSection(layoutId: string, dto: CreateSectionDto) {
-    const section = await this.prisma.homePageSection.create({ data: { layout_id: layoutId, ...dto, config: dto.config } });
+    const config = this.normalizeSectionConfig(dto.type, dto.config || {});
+    const section = await this.prisma.homePageSection.create({
+      data: { layout_id: layoutId, ...dto, config },
+    });
     this.invalidateCache();
     return section;
   }
 
   async updateSection(id: string, dto: UpdateSectionDto) {
-    const section = await this.prisma.homePageSection.update({ where: { id }, data: dto });
+    const existing = await this.prisma.homePageSection.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Section not found');
+
+    const section = await this.prisma.homePageSection.update({
+      where: { id },
+      data: {
+        ...dto,
+        config: dto.config
+          ? this.normalizeSectionConfig(existing.type as unknown as HomeSectionType, dto.config)
+          : undefined,
+      },
+    });
     this.invalidateCache();
     return section;
   }
@@ -158,7 +201,7 @@ export class HomeLayoutService {
     if (!section) throw new NotFoundException('Section not found');
     const sections = await this.listSections(section.layout_id);
     const reordered = sections.filter((x) => x.id !== id);
-    reordered.splice(dto.position - 1, 0, section);
+    reordered.splice(Math.max(0, Math.min(dto.position - 1, reordered.length)), 0, section);
 
     await this.prisma.$transaction(
       reordered.map((x, idx) => this.prisma.homePageSection.update({ where: { id: x.id }, data: { position: idx + 1 } })),
@@ -203,10 +246,54 @@ export class HomeLayoutService {
     return { success: true };
   }
 
+  async searchOptions(target: 'products' | 'categories' | 'brands' | 'banners', q = '', limit = 12) {
+    const take = this.clampLimit(limit, 12);
+    if (target === 'products') {
+      const data = await this.prisma.product.findMany({
+        where: { status: 'ACTIVE', title: { contains: q, mode: 'insensitive' } },
+        select: { id: true, title: true, slug: true },
+        take,
+        orderBy: { created_at: 'desc' },
+      });
+      return data.map((x) => ({ id: x.id, label: x.title, subtitle: x.slug }));
+    }
+
+    if (target === 'categories') {
+      const data = await this.prisma.category.findMany({
+        where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
+        select: { id: true, name: true, slug: true },
+        take,
+        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+      });
+      return data.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug }));
+    }
+
+    if (target === 'brands') {
+      const data = await this.prisma.brand.findMany({
+        where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
+        select: { id: true, name: true, slug: true },
+        take,
+        orderBy: { name: 'asc' },
+      });
+      return data.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug }));
+    }
+
+    const data = await this.prisma.banner.findMany({
+      where: { title_text: { contains: q, mode: 'insensitive' } },
+      select: { id: true, title_text: true, button_text: true },
+      take,
+      orderBy: { sort_order: 'asc' },
+    });
+    return data.map((x) => ({ id: x.id, label: x.title_text, subtitle: x.button_text || '' }));
+  }
+
   private async resolveProductSection(section: any) {
-    const config = (section.config || {}) as Record<string, any>;
+    const config = this.normalizeSectionConfig(
+      HomeSectionType.PRODUCT_CAROUSEL,
+      (section.config || {}) as Record<string, any>,
+    );
     const source = config.source || 'NEW_ARRIVALS';
-    const limit = Number(config.limit || 12);
+    const limit = this.clampLimit(config.limit, 12);
     const inStockOnly = config.inStockOnly ?? true;
 
     if (config.mode === 'curated') {
@@ -215,40 +302,55 @@ export class HomeLayoutService {
       if (!ids.length) return [];
       const products = await this.prisma.product.findMany({
         where: { id: { in: ids }, status: 'ACTIVE' },
-        include: { brand: true, media: { where: { sku_id: null }, take: 1 }, skus: { where: { name: null }, include: { prices: true, inventory: true }, take: 1 } },
+        include: {
+          brand: true,
+          media: { where: { sku_id: null }, take: 1 },
+          skus: { where: { name: null }, include: { prices: true, inventory: true }, take: 1 },
+        },
       });
       const order = new Map(ids.map((id, idx) => [id, idx]));
-      return products.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)).map((p) => {
-        const sku = p.skus[0];
-        const price = sku?.prices?.[0];
-        const compare = price?.compare_at_price ? Number(price.compare_at_price) : undefined;
-        const sale = Number(price?.sale_price || 0);
-        return {
-          id: p.id,
-          title: p.title,
-          slug: p.slug,
-          brand_name: p.brand.name,
-          price: sale,
-          compare_at_price: compare,
-          discount_percentage: compare && compare > sale ? Math.round(((compare - sale) / compare) * 100) : 0,
-          stock_quantity: sku?.inventory?.[0]?.qty_on_hand || 0,
-          thumbnail: p.media[0]?.url || '/No_Image_Available.png',
-        };
-      });
+      return products
+        .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
+        .map((p) => {
+          const sku = p.skus[0];
+          const price = sku?.prices?.[0];
+          const compare = price?.compare_at_price ? Number(price.compare_at_price) : undefined;
+          const sale = Number(price?.sale_price || 0);
+          return {
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            brand_name: p.brand.name,
+            price: sale,
+            compare_at_price: compare,
+            discount_percentage: compare && compare > sale ? Math.round(((compare - sale) / compare) * 100) : 0,
+            stock_quantity: sku?.inventory?.[0]?.qty_on_hand || 0,
+            thumbnail: p.media[0]?.url || '/No_Image_Available.png',
+          };
+        });
     }
 
     if (source === 'BEST_DEALS') {
       return this.productsService.getDealsProducts(limit, inStockOnly);
     }
 
-    const result = await this.productsService.getProducts({ page: 1, limit, in_stock_only: inStockOnly, sort_by: source === 'NEW_ARRIVALS' ? 'newest' as any : 'newest' as any });
+    const result = await this.productsService.getProducts({
+      page: 1,
+      limit,
+      in_stock_only: inStockOnly,
+      sort_by: 'newest' as any,
+    });
     return result.products;
   }
 
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const items = await this.prisma.homePageSectionItem.findMany({ where: { section_id: section.id }, orderBy: { position: 'asc' }, include: { banner: true } });
+      const items = await this.prisma.homePageSectionItem.findMany({
+        where: { section_id: section.id },
+        orderBy: { position: 'asc' },
+        include: { banner: true },
+      });
       return items.map((x) => ({ ...x, banner: x.banner }));
     }
 
@@ -257,7 +359,7 @@ export class HomeLayoutService {
         const items = await this.prisma.homePageSectionItem.findMany({ where: { section_id: section.id }, orderBy: { position: 'asc' }, include: { category: true } });
         return items.map((x) => x.category).filter(Boolean);
       }
-      return this.prisma.category.findMany({ where: { is_active: true, parent_id: null }, take: config.limit || 10, orderBy: [{ sort_order: 'asc' }] });
+      return this.prisma.category.findMany({ where: { is_active: true, parent_id: null }, take: this.clampLimit(config.limit, 10), orderBy: [{ sort_order: 'asc' }] });
     }
 
     if (section.type === HomeSectionType.BRAND_STRIP) {
@@ -265,7 +367,7 @@ export class HomeLayoutService {
         const items = await this.prisma.homePageSectionItem.findMany({ where: { section_id: section.id }, orderBy: { position: 'asc' }, include: { brand: true } });
         return items.map((x) => x.brand).filter(Boolean);
       }
-      return this.prisma.brand.findMany({ where: { is_active: true }, take: config.limit || 12, orderBy: { name: 'asc' } });
+      return this.prisma.brand.findMany({ where: { is_active: true }, take: this.clampLimit(config.limit, 12), orderBy: { name: 'asc' } });
     }
 
     if (section.type === HomeSectionType.PRODUCT_CAROUSEL) {
@@ -273,7 +375,7 @@ export class HomeLayoutService {
     }
 
     if (section.type === HomeSectionType.VALUE_PROPS || section.type === HomeSectionType.TRENDING_CHIPS) {
-      return config.items || [];
+      return Array.isArray(config.items) ? config.items : [];
     }
 
     return [];

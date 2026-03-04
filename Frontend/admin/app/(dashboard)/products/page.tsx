@@ -14,11 +14,13 @@ import {
   Hash,
   RefreshCw,
 } from "lucide-react";
-import { API_URL } from "@/lib/constants";
 import {
   fetchProducts,
   deleteProduct,
   updateProductStatus,
+  fetchImportHistory,
+  triggerImport,
+  type ImportHistoryItem,
   type Product,
 } from "@/lib/api";
 
@@ -34,67 +36,25 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [syncing, setSyncing] = useState(false);
+  const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>([]);
 
-  const runSync = async () => {
+  const loadImportHistory = async () => {
     try {
-      setSyncing(true);
-      const res = await fetch(
-        `${API_URL}/admin/infortisa/sync`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) {
-        throw new Error("Sync failed");
-      }
-      const data = await res.json();
-      alert(`Synced products`);
-      loadProducts();
-    } catch (err) {
-      alert("Infortisa sync failed");
-    } finally {
-      setSyncing(false);
+      const data = await fetchImportHistory(1, 5);
+      setImportHistory(data.items);
+    } catch (error) {
+      console.error("Failed to load import history:", error);
     }
   };
 
-  const runFullSync = async () => {
+  const runImport = async (mode: "full" | "stock" | "images") => {
     try {
       setSyncing(true);
-      const res = await fetch(
-        `${API_URL}/admin/infortisa/sync/full`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Full sync failed");
-      const data = await res.json();
-      alert(`Full sync initiated: ${data.message}`);
-      loadProducts();
+      await triggerImport(mode);
+      alert(`${mode} import executed successfully`);
+      await Promise.all([loadProducts(), loadImportHistory()]);
     } catch (err) {
-      alert("Full sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const runStockSync = async () => {
-    try {
-      setSyncing(true);
-      const res = await fetch(
-        `${API_URL}/admin/infortisa/sync/stock`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Stock sync failed");
-      const data = await res.json();
-      alert(`Stock sync initiated: ${data.message}`);
-      loadProducts();
-    } catch (err) {
-      alert("Stock sync failed");
+      alert(`${mode} import failed`);
     } finally {
       setSyncing(false);
     }
@@ -148,6 +108,10 @@ export default function ProductsPage() {
     loadProducts();
   }, [page, search, statusFilter, categoryFilter]);
 
+  useEffect(() => {
+    loadImportHistory();
+  }, []);
+
   const getPaginatedProducts = () => {
     const startIndex = (page - 1) * 20;
     const endIndex = startIndex + 20;
@@ -198,30 +162,27 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={runFullSync}
-              disabled={syncing}
-              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
-            >
-              Full Sync
-            </button>
-            <button
-              onClick={runStockSync}
-              disabled={syncing}
-              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
-            >
-              Stock Sync
-            </button>
-          </div>
-
           <button
-            onClick={runSync}
+            onClick={() => runImport("full")}
+            disabled={syncing}
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+          >
+            Full Import
+          </button>
+          <button
+            onClick={() => runImport("stock")}
+            disabled={syncing}
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
+          >
+            Stock Sync
+          </button>
+          <button
+            onClick={() => runImport("images")}
             disabled={syncing}
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
-            Sync All
+            Image Sync
           </button>
 
           <button
@@ -232,6 +193,32 @@ export default function ProductsPage() {
             Add
           </button>
         </div>
+      </div>
+
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Supplier import history</h2>
+          <button
+            onClick={loadImportHistory}
+            className="text-xs text-gray-500 hover:text-gray-800"
+          >
+            Refresh
+          </button>
+        </div>
+        {importHistory.length === 0 ? (
+          <p className="text-xs text-gray-500">No recent imports.</p>
+        ) : (
+          <div className="space-y-2">
+            {importHistory.map((item) => (
+              <div key={item.id} className="text-xs text-gray-600 flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded px-3 py-2">
+                <span className="font-medium text-gray-800">{item.type}</span>
+                <span>{new Date(item.last_sync).toLocaleString()}</span>
+                <span className="text-gray-500">{item.details || "-"}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2">

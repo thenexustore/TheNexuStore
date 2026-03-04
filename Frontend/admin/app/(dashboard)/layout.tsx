@@ -14,6 +14,7 @@ import {
   LayoutTemplate,
   MessageCircle,
   Ticket,
+  Tags,
   Truck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +24,7 @@ const navigation = [
   { key: "products", href: "/products", icon: Package },
   { key: "orders", href: "/orders", icon: ShoppingCart },
   { key: "coupons", href: "/coupons", icon: Ticket },
+  { key: "pricing", href: "/pricing", icon: Tags },
   { key: "chat", href: "/chat", icon: MessageCircle },
   {
     key: "homeContent",

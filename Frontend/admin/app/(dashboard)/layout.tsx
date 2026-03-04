@@ -15,7 +15,6 @@ import {
   MessageCircle,
   Ticket,
   Tags,
-  Truck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 

@@ -168,6 +168,42 @@ export class AdminService {
     }
   }
 
+
+
+  async getOrderTimeline(orderId: string) {
+    const logs = await this.prisma.adminAuditLog.findMany({
+      where: {
+        resource: 'ORDER',
+        resource_id: orderId,
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      actorEmail: log.actor_email,
+      actorRole: log.actor_role,
+      status: log.status,
+      metadata: log.metadata_json,
+      createdAt: log.created_at,
+    }));
+  }
+
+  async addOrderNote(orderId: string, note: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    return {
+      success: true,
+      orderId,
+      note,
+    };
+  }
+
   async getBrands() {
     try {
       const brands = await this.prisma.brand.findMany({

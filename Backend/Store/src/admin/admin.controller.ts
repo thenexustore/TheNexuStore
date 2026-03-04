@@ -1,11 +1,25 @@
-import { Controller, Get, Post, Body, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Query,
+  Req,
+  Param,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminGuard } from './admin.guard';
 import { CreateBrandDto, CreateCategoryDto } from './admin.dto';
+import { AuditLogService } from './audit-log.service';
+import { Request } from 'express';
 
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @Post('login')
   async adminLogin(@Body() body: { email: string; password: string }) {
@@ -63,6 +77,63 @@ export class AdminController {
   }
 
   @UseGuards(AdminGuard)
+  @Get('orders/:id')
+  async getOrderById(@Param('id') id: string) {
+    const data = await this.adminService.getOrderById(id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('orders/:id/timeline')
+  async getOrderTimeline(@Param('id') id: string) {
+    const data = await this.adminService.getOrderTimeline(id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('orders/:id/notes')
+  async addOrderNote(
+    @Param('id') id: string,
+    @Body() body: { note: string },
+    @Req() req: Request,
+  ) {
+    const note = (body.note || '').trim();
+    if (!note) {
+      return {
+        success: false,
+        message: 'Note is required',
+      };
+    }
+
+    const data = await this.adminService.addOrderNote(id, note);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'ORDER_NOTE_ADDED',
+      resource: 'ORDER',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: {
+        note,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
   @Get('brands')
   async getBrands() {
     const brands = await this.adminService.getBrands();
@@ -74,8 +145,20 @@ export class AdminController {
 
   @UseGuards(AdminGuard)
   @Post('brands')
-  async createBrand(@Body() body: CreateBrandDto) {
+  async createBrand(@Body() body: CreateBrandDto, @Req() req: Request) {
     const brand = await this.adminService.createBrand(body);
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'BRAND_CREATED',
+      resource: 'BRAND',
+      resourceId: brand.id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: { name: brand.name },
+    });
+
     return {
       success: true,
       data: brand,
@@ -95,8 +178,20 @@ export class AdminController {
 
   @UseGuards(AdminGuard)
   @Post('categories')
-  async createCategory(@Body() body: CreateCategoryDto) {
+  async createCategory(@Body() body: CreateCategoryDto, @Req() req: Request) {
     const category = await this.adminService.createCategory(body);
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'CATEGORY_CREATED',
+      resource: 'CATEGORY',
+      resourceId: category.id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      metadata: { name: category.name },
+    });
+
     return {
       success: true,
       data: category,

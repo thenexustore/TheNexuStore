@@ -176,9 +176,22 @@ enum CouponType {
   FIXED
 }
 
+enum PricingApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  PUBLISHED
+}
+
 enum StaffRole {
   ADMIN
   WAREHOUSE
+}
+
+
+enum AdminAuditStatus {
+  SUCCESS
+  FAILED
 }
 
 enum TaxMode {
@@ -227,6 +240,29 @@ model Staff {
   warehouse Warehouse? @relation(fields: [warehouse_id], references: [id])
 
   @@index([role])
+}
+
+
+model AdminAuditLog {
+  id            String           @id @default(uuid())
+  actor_id      String?
+  actor_email   String?
+  actor_role    String?
+  action        String
+  resource      String
+  resource_id   String?
+  method        String?
+  path          String?
+  ip_address    String?
+  user_agent    String?
+  status        AdminAuditStatus @default(SUCCESS)
+  metadata_json Json?
+  created_at    DateTime         @default(now())
+
+  @@index([created_at])
+  @@index([actor_email])
+  @@index([resource, resource_id])
+  @@index([action, created_at])
 }
 
 model Brand {
@@ -564,6 +600,14 @@ model PricingRule {
   rounding_mode     RoundingMode
   is_active         Boolean          @default(true)
   priority          Int
+  approval_status   PricingApprovalStatus @default(DRAFT)
+  created_by_actor_id String?
+  submitted_by_actor_id String?
+  approved_by_actor_id  String?
+  published_by_actor_id String?
+  submitted_at      DateTime?
+  approved_at       DateTime?
+  published_at      DateTime?
   starts_at         DateTime?
   ends_at           DateTime?
   created_at        DateTime         @default(now())
@@ -576,6 +620,7 @@ model PricingRule {
   @@index([category_id])
   @@index([brand_id])
   @@index([sku_id])
+  @@index([approval_status, updated_at])
 }
 
 model SkuPrice {

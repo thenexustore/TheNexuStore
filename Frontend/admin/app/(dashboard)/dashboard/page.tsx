@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchDashboardStats } from "@/lib/api";
+import { fetchDashboardStats, type DashboardStats } from "@/lib/api";
+import { Link } from "@/i18n/navigation";
 import {
   ShoppingCart,
   Euro,
@@ -10,26 +11,10 @@ import {
   AlertCircle,
   TrendingUp,
   Clock,
+  ArrowRight,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-
-interface DashboardStats {
-  todayOrders: number;
-  todayRevenue: number;
-  totalProducts: number;
-  totalCustomers: number;
-  pendingOrders: number;
-  activeProducts: number;
-  recentOrders: Array<{
-    id: string;
-    orderNumber: string;
-    customer: string;
-    amount: number;
-    status: string;
-    date: string;
-  }>;
-}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -103,6 +88,12 @@ export default function DashboardPage() {
     },
   ];
 
+  const severityStyles = {
+    error: "border-red-200 bg-red-50 text-red-800",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
+    info: "border-blue-200 bg-blue-50 text-blue-800",
+  } as const;
+
   return (
     <div>
       <div className="mb-8">
@@ -111,6 +102,29 @@ export default function DashboardPage() {
           Welcome to your store management dashboard
         </p>
       </div>
+
+      {!!stats?.alerts?.length && (
+        <div className="space-y-3 mb-8">
+          {stats.alerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={`border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${severityStyles[alert.severity]}`}
+            >
+              <div>
+                <p className="font-semibold">{alert.title}</p>
+                <p className="text-sm opacity-90 mt-1">{alert.description}</p>
+              </div>
+              <Link
+                href={alert.ctaHref}
+                className="inline-flex items-center gap-2 text-sm font-semibold hover:opacity-80"
+              >
+                {alert.ctaLabel}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {statCards.map((stat, index) => (

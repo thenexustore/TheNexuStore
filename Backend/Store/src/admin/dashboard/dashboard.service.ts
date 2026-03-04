@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 
+export interface DashboardAlert {
+  id: string;
+  severity: 'error' | 'warning' | 'info';
+  title: string;
+  description: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
@@ -53,6 +62,43 @@ export class DashboardService {
         }),
       ]);
 
+      const alerts: DashboardAlert[] = [];
+      const inactiveProducts = totalProducts - activeProducts;
+
+      if (pendingOrdersCount >= 20) {
+        alerts.push({
+          id: 'pending-orders-high',
+          severity: 'error',
+          title: 'High pending payments',
+          description: `${pendingOrdersCount} orders are pending payment. Review payment issues and customer checkout flow.`,
+          ctaLabel: 'Review orders',
+          ctaHref: '/orders?status=PENDING_PAYMENT',
+        });
+      }
+
+      if (inactiveProducts >= 50) {
+        alerts.push({
+          id: 'inactive-products-high',
+          severity: 'warning',
+          title: 'Many inactive products',
+          description: `${inactiveProducts} products are not active and may impact catalog coverage.`,
+          ctaLabel: 'Open products',
+          ctaHref: '/products?status=ARCHIVED',
+        });
+      }
+
+      if (todayOrders === 0) {
+        alerts.push({
+          id: 'no-orders-today',
+          severity: 'info',
+          title: 'No paid orders today',
+          description:
+            'No paid orders were registered today yet. Consider checking traffic, checkout and payment provider health.',
+          ctaLabel: 'Open dashboard',
+          ctaHref: '/dashboard',
+        });
+      }
+
       return {
         todayOrders,
         todayRevenue: revenueData._sum.total_amount || 0,
@@ -60,6 +106,7 @@ export class DashboardService {
         totalCustomers,
         pendingOrders: pendingOrdersCount,
         activeProducts,
+        alerts,
         recentOrders: recentOrders.map((order) => ({
           id: order.id,
           orderNumber: order.order_number || `ORD-${order.id}`,

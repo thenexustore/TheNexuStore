@@ -181,6 +181,12 @@ enum StaffRole {
   WAREHOUSE
 }
 
+
+enum AdminAuditStatus {
+  SUCCESS
+  FAILED
+}
+
 enum TaxMode {
   VAT
   OUTSIDE_VAT
@@ -227,6 +233,29 @@ model Staff {
   warehouse Warehouse? @relation(fields: [warehouse_id], references: [id])
 
   @@index([role])
+}
+
+
+model AdminAuditLog {
+  id            String           @id @default(uuid())
+  actor_id      String?
+  actor_email   String?
+  actor_role    String?
+  action        String
+  resource      String
+  resource_id   String?
+  method        String?
+  path          String?
+  ip_address    String?
+  user_agent    String?
+  status        AdminAuditStatus @default(SUCCESS)
+  metadata_json Json?
+  created_at    DateTime         @default(now())
+
+  @@index([created_at])
+  @@index([actor_email])
+  @@index([resource, resource_id])
+  @@index([action, created_at])
 }
 
 model Brand {

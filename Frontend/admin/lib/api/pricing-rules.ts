@@ -2,6 +2,7 @@ import { fetchWithAuth } from "../utils";
 
 export type PricingRuleScope = "GLOBAL" | "CATEGORY" | "BRAND" | "SKU";
 export type RoundingMode = "NONE" | "X_99" | "X_95";
+export type PricingApprovalStatus = "DRAFT" | "PENDING" | "APPROVED" | "PUBLISHED";
 
 export interface PricingRule {
   id: string;
@@ -14,6 +15,14 @@ export interface PricingRule {
   rounding_mode: RoundingMode;
   is_active: boolean;
   priority: number;
+  approval_status: PricingApprovalStatus;
+  created_by_actor_id?: string | null;
+  submitted_by_actor_id?: string | null;
+  approved_by_actor_id?: string | null;
+  published_by_actor_id?: string | null;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  published_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -32,6 +41,13 @@ export async function updatePricingRule(id: string, payload: any): Promise<Prici
 
 export async function togglePricingRuleStatus(id: string, is_active: boolean): Promise<PricingRule> {
   return fetchWithAuth(`/admin/pricing-rules/${id}/toggle-status`, { method: "PATCH", body: JSON.stringify({ is_active }) });
+}
+
+export async function transitionPricingRuleStatus(id: string, status: PricingApprovalStatus): Promise<PricingRule> {
+  return fetchWithAuth(`/admin/pricing-rules/${id}/workflow`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function previewPricingRule(sku_code: string): Promise<any> {

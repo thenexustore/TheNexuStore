@@ -1,6 +1,8 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { OrderStatus, StaffRole } from '@prisma/client';
@@ -11,11 +13,88 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
+  private getDefaultAdminCredentials() {
+    return {
+      email: (process.env.ADMIN_DEFAULT_EMAIL ?? 'admin@thenexusstore.com')
+        .trim()
+        .toLowerCase(),
+      password: process.env.ADMIN_DEFAULT_PASSWORD ?? 'Suraj@123',
+      forcePasswordSync:
+        (process.env.ADMIN_DEFAULT_FORCE_PASSWORD_SYNC ?? 'true').toLowerCase() !==
+        'false',
+    };
+  }
+
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
     private readonly categoriesService: CategoriesService,
   ) {}
+
+  async onModuleInit() {
+    await this.ensureDefaultAdminAccount();
+  }
+
+  private async ensureDefaultAdminAccount() {
+    const {
+      email: defaultEmail,
+      password: defaultPassword,
+      forcePasswordSync,
+    } = this.getDefaultAdminCredentials();
+
+    if (!defaultEmail || !defaultPassword) {
+      return;
+    }
+
+    const existingAdmin = await this.prisma.staff.findUnique({
+      where: { email: defaultEmail },
+    });
+
+    if (existingAdmin) {
+      const updates: {
+        is_active?: boolean;
+        role?: StaffRole;
+        password_hash?: string;
+      } = {};
+
+      if (!existingAdmin.is_active) {
+        updates.is_active = true;
+      }
+
+      if (existingAdmin.role !== StaffRole.ADMIN) {
+        updates.role = StaffRole.ADMIN;
+      }
+
+      if (forcePasswordSync) {
+        updates.password_hash = await bcrypt.hash(defaultPassword, 10);
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await this.prisma.staff.update({
+          where: { id: existingAdmin.id },
+          data: updates,
+        });
+        this.logger.log(`Default admin account synchronized for ${defaultEmail}`);
+      }
+
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+    await this.prisma.staff.create({
+      data: {
+        email: defaultEmail,
+        password_hash: passwordHash,
+        role: StaffRole.ADMIN,
+        is_active: true,
+      },
+    });
+
+    this.logger.log(`Default admin account restored for ${defaultEmail}`);
+  }
 
   private getPermissionsForRole(role: StaffRole): string[] {
     if (role === StaffRole.ADMIN) {
@@ -32,9 +111,20 @@ export class AdminService {
   async login(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const staff = await this.prisma.staff.findUnique({
+    let staff = await this.prisma.staff.findUnique({
       where: { email: normalizedEmail },
     });
+
+    const defaultAdmin = this.getDefaultAdminCredentials();
+    const shouldSelfHealDefaultAdminLogin =
+      normalizedEmail === defaultAdmin.email && password === defaultAdmin.password;
+
+    if (shouldSelfHealDefaultAdminLogin) {
+      await this.ensureDefaultAdminAccount();
+      staff = await this.prisma.staff.findUnique({
+        where: { email: normalizedEmail },
+      });
+    }
 
     if (!staff || !staff.is_active) {
       throw new UnauthorizedException('Invalid credentials');

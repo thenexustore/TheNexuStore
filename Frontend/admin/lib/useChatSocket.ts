@@ -30,7 +30,10 @@ export function useAdminChatSocket({
   const socketRef = useRef<Socket | null>(null);
 
   const onNewMessageRef = useRef(onNewMessage);
-  onNewMessageRef.current = onNewMessage;
+
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -53,7 +56,6 @@ export function useAdminChatSocket({
     });
 
     return () => {
-      socket.emit("leave_conversation", { conversationId });
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);

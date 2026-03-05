@@ -31,11 +31,22 @@ body {
   max-width: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 img,
 video,
 canvas,
 svg {
   max-width: 100%;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
 }
 
 /* Smooth scrolling */

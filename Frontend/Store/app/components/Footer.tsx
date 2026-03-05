@@ -49,8 +49,8 @@ export default function Footer() {
 
   return (
     <footer className="w-full bg-black text-white">
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
+      <div className="max-w-7xl mx-auto px-4 py-10 sm:px-6 sm:py-12">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-10 items-start">
           <div>
             <h3 className="text-lg font-semibold mb-4">{t("title")}</h3>
             <form
@@ -74,11 +74,11 @@ export default function Footer() {
             </form>
           </div>
 
-          <div className="md:justify-self-end w-full md:max-w-sm">
+          <div className="w-full md:justify-self-end md:max-w-sm">
             <h3 className="text-lg font-semibold mb-4">{t("contact")}</h3>
             <div className="space-y-3 text-sm text-white/70">
-              <div className="flex items-start gap-3"><LocationOnIcon sx={{ fontSize: 16 }} /><span>Paseo de las Palmeras, 3, Local B, 51001 Ceuta</span></div>
-              <div className="flex items-center gap-3"><MailIcon sx={{ fontSize: 16 }} /><span>administracion@nexusssolutions.com</span></div>
+              <div className="flex items-start gap-3"><LocationOnIcon sx={{ fontSize: 16 }} /><span className="break-words">Paseo de las Palmeras, 3, Local B, 51001 Ceuta</span></div>
+              <div className="flex items-start gap-3"><MailIcon sx={{ fontSize: 16 }} /><span className="break-all">administracion@nexusssolutions.com</span></div>
               <div className="flex items-center gap-3"><PhoneIcon sx={{ fontSize: 16 }} /><span>+34 656 806 899</span></div>
             </div>
             <div className="flex gap-5 pt-5 text-white/80">{socialLinks.map(({ Icon, url }, i) => <Icon key={i} sx={{ fontSize: 18 }} className="cursor-pointer hover:text-white transition" onClick={() => window.open(url, "_blank", "noopener,noreferrer")} />)}</div>
@@ -86,7 +86,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/60 text-center md:text-left">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/60 text-center md:text-left">
           <p>
             © {new Date().getFullYear()} Sánchez Peinado Solutions SL —{" "}
             <span className="font-semibold text-white">NEXUS SP Solutions</span>

@@ -11,7 +11,8 @@ import { PaymentProvider, PaymentStatus, OrderStatus } from '@prisma/client';
 export interface CreatePaymentDto {
   orderId: string;
   provider: PaymentProvider;
-  returnUrl?: string;
+  successUrl?: string;
+  failureUrl?: string;
 }
 
 export interface PaymentResult {
@@ -55,7 +56,7 @@ export class PaymentService {
       case 'COD':
         return this.processCOD(order.id, amount);
       case 'REDSYS':
-        return this.processRedsys(order.id, amount, dto.returnUrl);
+        return this.processRedsys(order.id, amount, dto.successUrl, dto.failureUrl);
       default:
         throw new BadRequestException(`Payment provider ${dto.provider} not supported`);
     }
@@ -94,11 +95,14 @@ export class PaymentService {
   private async processRedsys(
     orderId: string,
     amount: number,
-    returnUrl?: string,
+    successUrl?: string,
+    failureUrl?: string,
   ): Promise<PaymentResult> {
     const merchantUrl = `${this.BASE_URL}/api/payment/redsys/notification`;
-    const urlOk = returnUrl || `${this.FRONTEND_URL}/checkout/success?orderId=${orderId}`;
-    const urlKo = returnUrl || `${this.FRONTEND_URL}/checkout/failed?orderId=${orderId}`;
+    const urlOk =
+      successUrl || `${this.FRONTEND_URL}/checkout/success?orderId=${orderId}`;
+    const urlKo =
+      failureUrl || `${this.FRONTEND_URL}/checkout/failed?orderId=${orderId}`;
 
     const formData = this.redsysService.createPaymentForm(
       orderId,

@@ -14,9 +14,11 @@ describe('AppController', () => {
           useValue: {
             getHealth: jest.fn().mockResolvedValue({
               app: 'ok',
+              timestamp: '2026-03-05T00:00:00.000Z',
+              uptimeSeconds: 120,
               db: 'ok',
-              redis: 'fail',
-              rabbit: 'fail',
+              redis: 'disabled',
+              rabbit: 'disabled',
             }),
           },
         },
@@ -29,17 +31,21 @@ describe('AppController', () => {
   it('returns health status', async () => {
     await expect(controller.health()).resolves.toEqual({
       app: 'ok',
+      timestamp: '2026-03-05T00:00:00.000Z',
+      uptimeSeconds: 120,
       db: 'ok',
-      redis: 'fail',
-      rabbit: 'fail',
+      redis: 'disabled',
+      rabbit: 'disabled',
     });
   });
   it('returns admin health alias', async () => {
     await expect(controller.adminHealth()).resolves.toEqual({
       app: 'ok',
+      timestamp: '2026-03-05T00:00:00.000Z',
+      uptimeSeconds: 120,
       db: 'ok',
-      redis: 'fail',
-      rabbit: 'fail',
+      redis: 'disabled',
+      rabbit: 'disabled',
     });
   });
 

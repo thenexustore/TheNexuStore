@@ -7,6 +7,8 @@ if [[ "${1:-}" == "--dry-run" || "${1:-}" == "-n" ]]; then
 fi
 
 REPO_DIR="${REPO_DIR:-/opt/TheNexuStore}"
+REPO_URL="${REPO_URL:-}"
+FALLBACK_LOCAL_REPO="${FALLBACK_LOCAL_REPO:-}"
 BRANCH="${BRANCH:-}"
 BACKUP_ROOT="${BACKUP_ROOT:-/root/nexus_backups}"
 BACKEND_DIR="$REPO_DIR/Backend/Store"
@@ -71,6 +73,27 @@ require_cmd() {
     echo "[ERROR] Missing command: $1" >&2
     exit 1
   }
+}
+
+ensure_repo() {
+  if [[ -d "$REPO_DIR/.git" ]]; then
+    return 0
+  fi
+
+  if [[ -n "$REPO_URL" ]]; then
+    run "mkdir -p '$(dirname "$REPO_DIR")'"
+    run "git clone '$REPO_URL' '$REPO_DIR'"
+    return 0
+  fi
+
+  if [[ -n "$FALLBACK_LOCAL_REPO" && -d "$FALLBACK_LOCAL_REPO/.git" ]]; then
+    run "mkdir -p '$(dirname "$REPO_DIR")'"
+    run "git clone '$FALLBACK_LOCAL_REPO' '$REPO_DIR'"
+    return 0
+  fi
+
+  echo "[ERROR] Missing git repo at $REPO_DIR and no REPO_URL/FALLBACK_LOCAL_REPO provided" >&2
+  exit 1
 }
 
 detect_branch() {
@@ -164,8 +187,7 @@ for cmd in git npm npx sed curl tar; do
 done
 
 ensure_pm2
-
-[[ -d "$REPO_DIR/.git" ]] || { echo "[ERROR] Missing git repo at $REPO_DIR" >&2; exit 1; }
+ensure_repo
 [[ -f "$BACKEND_ENV_FILE" ]] || { echo "[ERROR] Missing backend env file: $BACKEND_ENV_FILE" >&2; exit 1; }
 
 detect_branch
@@ -178,9 +200,14 @@ create_repo_backup "$BACKUP_DIR/repo_snapshot.tgz"
 run "sed -i 's/\r$//' '$BACKEND_ENV_FILE'"
 
 run "cd '$REPO_DIR' && git fetch --all --prune"
-run "cd '$REPO_DIR' && git checkout '$BRANCH'"
-run "cd '$REPO_DIR' && git reset --hard 'origin/$BRANCH'"
-run "cd '$REPO_DIR' && git clean -fd"
+if git -C "$REPO_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+  run "cd '$REPO_DIR' && git checkout '$BRANCH'"
+  run "cd '$REPO_DIR' && git reset --hard 'origin/$BRANCH'"
+  run "cd '$REPO_DIR' && git clean -fd"
+else
+  log "WARN: origin/$BRANCH not found. Using local branch state without hard reset."
+  run "cd '$REPO_DIR' && git checkout '$BRANCH'"
+fi
 
 set -a
 # shellcheck disable=SC1090
@@ -194,6 +221,8 @@ fi
 
 DEPLOY_API_URL="${API_DOMAIN:-${BASE_URL:-}}"
 DEPLOY_SITE_URL="${SITE_DOMAIN:-${FRONTEND_URL:-}}"
+DEPLOY_ADMIN_URL="${ADMIN_DOMAIN:-${ADMIN_URL:-}}"
+
 if [[ -z "$DEPLOY_API_URL" ]]; then
   DEPLOY_API_URL="https://api.thenexustore.com"
   log "WARN: API_DOMAIN/BASE_URL missing. Falling back to $DEPLOY_API_URL"
@@ -204,15 +233,25 @@ if [[ -z "$DEPLOY_SITE_URL" ]]; then
   log "WARN: SITE_DOMAIN/FRONTEND_URL missing. Falling back to $DEPLOY_SITE_URL"
 fi
 
+if [[ -z "$DEPLOY_ADMIN_URL" ]]; then
+  DEPLOY_ADMIN_URL="$DEPLOY_SITE_URL"
+  log "WARN: ADMIN_DOMAIN/ADMIN_URL missing. Falling back to $DEPLOY_ADMIN_URL"
+fi
 
 if [[ "$SYNC_FRONTEND_ENV" == "1" ]]; then
-  run "cat > '$STORE_ENV_FILE' <<ENV\nNEXT_PUBLIC_API_URL=$DEPLOY_API_URL\nNEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL\nENV"
-  run "cat > '$ADMIN_ENV_FILE' <<ENV\nNEXT_PUBLIC_API_URL=$DEPLOY_API_URL\nNEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL\nENV"
+  run "mkdir -p '$(dirname "$STORE_ENV_FILE")' '$(dirname "$ADMIN_ENV_FILE")'"
+  run "cat > '$STORE_ENV_FILE' <<ENV
+NEXT_PUBLIC_API_URL=$DEPLOY_API_URL
+NEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL
+ENV"
+  run "cat > '$ADMIN_ENV_FILE' <<ENV
+NEXT_PUBLIC_API_URL=$DEPLOY_API_URL
+NEXT_PUBLIC_SITE_URL=$DEPLOY_ADMIN_URL
+ENV"
+  run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
 else
   log "Skipping frontend env sync because SYNC_FRONTEND_ENV=$SYNC_FRONTEND_ENV"
 fi
-
-run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
 
 log "Building backend"
 install_deps "$BACKEND_DIR"
@@ -250,6 +289,8 @@ if [[ "$DRY_RUN" == "0" ]]; then
 
   if [[ "$SKIP_EXTERNAL_HEALTHCHECKS" != "1" ]]; then
     wait_for_url "$DEPLOY_API_URL/admin/health"
+    wait_for_url "$DEPLOY_SITE_URL"
+    wait_for_url "$DEPLOY_ADMIN_URL"
   fi
 fi
 

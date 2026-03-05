@@ -41,7 +41,9 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedSnapshot, setSavedSnapshot] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [credentialsSaving, setCredentialsSaving] = useState(false);
+  const [currentAdminEmail, setCurrentAdminEmail] = useState("");
   const [credentials, setCredentials] = useState({
     email: "",
     currentPassword: "",
@@ -56,7 +58,13 @@ export default function SettingsPage() {
 
   const hasValidLightLogo = settings.brandLogoUrl.trim().length > 0;
   const hasValidDarkLogo = settings.brandLogoDarkUrl.trim().length > 0;
-  const isSupportEmailValid = settings.supportEmail.includes("@");
+  const isSupportEmailValid = isValidEmail(settings.supportEmail);
+
+  const normalizedCredentialEmail = credentials.email.trim().toLowerCase();
+  const normalizedCurrentAdminEmail = currentAdminEmail.trim().toLowerCase();
+  const hasCredentialEmailChange =
+    normalizedCredentialEmail.length > 0 && normalizedCredentialEmail !== normalizedCurrentAdminEmail;
+  const hasCredentialPasswordChange = credentials.newPassword.trim().length > 0;
 
   const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
@@ -70,7 +78,9 @@ export default function SettingsPage() {
     try {
       const adminUser = JSON.parse(adminUserRaw) as { email?: string };
       if (adminUser.email) {
-        setCredentials((prev) => ({ ...prev, email: String(adminUser.email) }));
+        const normalized = String(adminUser.email).trim().toLowerCase();
+        setCredentials((prev) => ({ ...prev, email: normalized }));
+        setCurrentAdminEmail(normalized);
       }
     } catch {
       // noop
@@ -83,17 +93,22 @@ export default function SettingsPage() {
       return;
     }
 
-    if (!credentials.email.trim() && !credentials.newPassword.trim()) {
-      toast.error("Indica nuevo usuario (email) o nueva contraseña");
+    if (!hasCredentialEmailChange && !hasCredentialPasswordChange) {
+      toast.error("No hay cambios en usuario o contraseña para guardar");
       return;
     }
 
-    if (credentials.newPassword && credentials.newPassword.length < 8) {
+    if (hasCredentialEmailChange && !isValidEmail(normalizedCredentialEmail)) {
+      toast.error("El usuario admin debe ser un email válido");
+      return;
+    }
+
+    if (hasCredentialPasswordChange && credentials.newPassword.trim().length < 8) {
       toast.error("La nueva contraseña debe tener al menos 8 caracteres");
       return;
     }
 
-    if (credentials.newPassword !== credentials.confirmNewPassword) {
+    if (hasCredentialPasswordChange && credentials.newPassword !== credentials.confirmNewPassword) {
       toast.error("La confirmación de contraseña no coincide");
       return;
     }
@@ -101,8 +116,8 @@ export default function SettingsPage() {
     setCredentialsSaving(true);
     try {
       const updated = await updateAdminCredentials({
-        email: credentials.email.trim() || undefined,
-        password: credentials.newPassword.trim() || undefined,
+        email: hasCredentialEmailChange ? normalizedCredentialEmail : undefined,
+        password: hasCredentialPasswordChange ? credentials.newPassword.trim() : undefined,
         currentPassword: credentials.currentPassword,
       });
 
@@ -126,6 +141,7 @@ export default function SettingsPage() {
         newPassword: "",
         confirmNewPassword: "",
       }));
+      setCurrentAdminEmail(updated.email);
 
       toast.success("Credenciales de admin actualizadas");
     } catch (err: unknown) {
@@ -137,6 +153,7 @@ export default function SettingsPage() {
   }
 
   function onSave() {
+    if (settingsSaving) return;
     if (!isSupportEmailValid) {
       toast.error("El email de soporte no tiene formato válido");
       return;
@@ -161,24 +178,39 @@ export default function SettingsPage() {
       ? { ...settings, brandLogoVersion: settings.brandLogoVersion + 1 }
       : settings;
 
-    saveAdminSettings(nextSettings);
-    setSettings(nextSettings);
-    setSavedSnapshot(nextSettings);
-    setSavedAt(new Date());
-    applyLocaleIfNeeded(nextSettings.adminLanguage);
-    toast.success("Ajustes guardados y aplicados");
+    setSettingsSaving(true);
+    try {
+      saveAdminSettings(nextSettings);
+      setSettings(nextSettings);
+      setSavedSnapshot(nextSettings);
+      setSavedAt(new Date());
+      applyLocaleIfNeeded(nextSettings.adminLanguage);
+      toast.success("Ajustes guardados y aplicados");
+    } finally {
+      setSettingsSaving(false);
+    }
   }
 
   useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         if (hasChanges) onSave();
       }
     };
+    window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [hasChanges, settings]);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [hasChanges, settings, settingsSaving]);
 
   function onReset() {
     setSettings(defaultAdminSettings);
@@ -222,14 +254,18 @@ export default function SettingsPage() {
       return;
     }
 
-    const dataUrl = await fileToDataUrl(file);
-    update("brandLogoMode", "custom");
-    if (variant === "dark") {
-      update("brandLogoDarkUrl", dataUrl);
-    } else {
-      update("brandLogoUrl", dataUrl);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      update("brandLogoMode", "custom");
+      if (variant === "dark") {
+        update("brandLogoDarkUrl", dataUrl);
+      } else {
+        update("brandLogoUrl", dataUrl);
+      }
+      toast.success(`Logo ${variant === "dark" ? "oscuro" : "principal"} cargado. Guarda para aplicar.`);
+    } catch {
+      toast.error("No se pudo leer el archivo de logo");
     }
-    toast.success(`Logo ${variant === "dark" ? "oscuro" : "principal"} cargado. Guarda para aplicar.`);
   }
 
   return (
@@ -246,7 +282,7 @@ export default function SettingsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={onDiscard} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Descartar</button>
             <button type="button" onClick={onReset} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"><Undo2 className="h-4 w-4" />Restaurar por defecto</button>
-            <button type="button" disabled={!hasChanges} onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"><Save className="h-4 w-4" />Guardar ajustes</button>
+            <button type="button" disabled={!hasChanges || settingsSaving} onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"><Save className="h-4 w-4" />{settingsSaving ? "Guardando..." : "Guardar ajustes"}</button>
           </div>
         </div>
         <div className="mt-3 text-xs text-zinc-500 flex items-center gap-2">
@@ -258,6 +294,7 @@ export default function SettingsPage() {
 
       <div className="rounded-xl border border-zinc-200 bg-white p-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => scrollToSection("branding-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><CircleDot className="h-3.5 w-3.5" />Branding</button>
+        <button type="button" onClick={() => scrollToSection("security-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Building2 className="h-3.5 w-3.5" />Seguridad</button>
         <button type="button" onClick={() => scrollToSection("operations-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Gauge className="h-3.5 w-3.5" />Operaciones</button>
         <button type="button" onClick={() => scrollToSection("experience-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Sparkles className="h-3.5 w-3.5" />Experiencia</button>
         <button type="button" onClick={() => scrollToSection("integration-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><MousePointerClick className="h-3.5 w-3.5" />Integración</button>
@@ -300,27 +337,32 @@ export default function SettingsPage() {
             </div>
 
             <NumberField label="Altura del logo (px)" value={settings.brandLogoHeight} min={20} max={64} onChange={(value) => update("brandLogoHeight", value)} />
-            <NumberField label="Brillo del logo (%)" value={settings.brandLogoBrightness} min={60} max={140} onChange={(value) => update("brandLogoBrightness", value)} />
-            <NumberField label="Saturación del logo (%)" value={settings.brandLogoSaturation} min={60} max={140} onChange={(value) => update("brandLogoSaturation", value)} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <NumberField label="Brillo del logo (%)" value={settings.brandLogoBrightness} min={60} max={140} onChange={(value) => update("brandLogoBrightness", value)} />
+              <NumberField label="Saturación del logo (%)" value={settings.brandLogoSaturation} min={60} max={140} onChange={(value) => update("brandLogoSaturation", value)} />
+            </div>
+            <button type="button" onClick={() => { update("brandLogoBrightness", 100); update("brandLogoSaturation", 100); }} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-50">
+              Restaurar tono y brillo recomendados
+            </button>
 
             <label className="block text-sm text-zinc-700">
               URL logo principal
-              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
+              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
             </label>
 
             <label className="block text-sm text-zinc-700">
               URL logo para fondo oscuro (login)
-              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
+              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-zinc-700">
                 Subir logo principal (máx 2MB)
-                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
+                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
               </label>
               <label className="block text-sm text-zinc-700">
                 Subir logo oscuro (máx 2MB)
-                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
+                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
               </label>
             </div>
 
@@ -384,7 +426,7 @@ export default function SettingsPage() {
               <input type="password" value={credentials.confirmNewPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, confirmNewPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
             </label>
           </div>
-          <button type="button" onClick={onSaveCredentials} disabled={credentialsSaving} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60">
+          <button type="button" onClick={onSaveCredentials} disabled={credentialsSaving || (!hasCredentialEmailChange && !hasCredentialPasswordChange)} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60">
             <Save className="h-4 w-4" />{credentialsSaving ? "Guardando credenciales..." : "Actualizar usuario/contraseña"}
           </button>
         </div>
@@ -432,7 +474,7 @@ export default function SettingsPage() {
             <p className="text-xs text-zinc-600">Tienes cambios sin guardar en Ajustes.</p>
             <div className="flex items-center gap-2">
               <button type="button" onClick={onDiscard} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Descartar</button>
-              <button type="button" onClick={onSave} className="text-xs rounded-md bg-zinc-900 text-white px-2.5 py-1.5 hover:bg-zinc-800">Guardar ahora</button>
+              <button type="button" disabled={settingsSaving} onClick={onSave} className="text-xs rounded-md bg-zinc-900 text-white px-2.5 py-1.5 hover:bg-zinc-800 disabled:opacity-60">{settingsSaving ? "Guardando..." : "Guardar ahora"}</button>
             </div>
           </div>
         </div>
@@ -446,7 +488,15 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
   return (
     <label className="block text-sm text-zinc-700">
       {label}
-      <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value || min))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        inputMode="numeric"
+        onChange={(e) => onChange(clampNumberInput(e.target.value, min, max))}
+        className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
+      />
     </label>
   );
 }
@@ -472,6 +522,16 @@ function QuickLink({ href, label, description }: { href: string; label: string; 
       <p className="text-xs text-zinc-600">{description}</p>
     </Link>
   );
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function clampNumberInput(value: string, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return min;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function fileToDataUrl(file: File): Promise<string> {

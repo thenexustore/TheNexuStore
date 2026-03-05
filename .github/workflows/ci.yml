@@ -32,6 +32,9 @@ jobs:
       - name: Prisma generate
         run: npm run prisma:generate
 
+      - name: Config smoke matrix
+        run: npm run config:smoke
+
       - name: Typecheck
         run: npx tsc --noEmit
 

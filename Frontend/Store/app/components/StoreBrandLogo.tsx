@@ -1,28 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  resolveAdminLogoCandidates,
-  type AdminLogoFit,
-  type AdminSettings,
-} from "@/lib/admin-settings";
+import { loadStoreBranding, type StoreBranding } from "@/app/lib/admin-branding";
 
-export default function AdminBrandLogo({
-  settings,
+export default function StoreBrandLogo({
+  branding,
   variant = "light",
-  className,
   alt = "Logo",
-  fit,
+  className,
   height,
 }: {
-  settings: AdminSettings;
+  branding?: StoreBranding;
   variant?: "light" | "dark";
-  className?: string;
   alt?: string;
-  fit?: AdminLogoFit;
+  className?: string;
   height?: number;
 }) {
-  const candidates = useMemo(() => resolveAdminLogoCandidates(settings, variant), [settings, variant]);
+  const fallbackBranding = useMemo(() => loadStoreBranding(), []);
+  const resolved = branding ?? fallbackBranding;
+  const candidates = variant === "dark" ? resolved.darkSrcCandidates : resolved.srcCandidates;
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
@@ -40,12 +36,12 @@ export default function AdminBrandLogo({
       onLoad={() => setLoaded(true)}
       onError={() => {
         setLoaded(false);
-        setIndex((current) => (current < candidates.length - 1 ? current + 1 : current));
+        setIndex((i) => (i < candidates.length - 1 ? i + 1 : i));
       }}
       className={className}
       style={{
-        height: `${height ?? settings.brandLogoHeight}px`,
-        objectFit: fit ?? settings.brandLogoFit,
+        height: `${height ?? resolved.height}px`,
+        objectFit: resolved.fit,
         opacity: loaded ? 1 : 0.7,
         transition: "opacity 120ms ease",
       }}

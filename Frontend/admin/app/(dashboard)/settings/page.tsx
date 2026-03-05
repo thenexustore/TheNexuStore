@@ -44,6 +44,10 @@ export default function SettingsPage() {
     [savedSnapshot, settings],
   );
 
+  const isCustomLogo = settings.brandLogoMode === "custom";
+  const hasValidLightLogo = !isCustomLogo || settings.brandLogoUrl.trim().length > 0;
+  const hasValidDarkLogo = !isCustomLogo || settings.brandLogoDarkUrl.trim().length > 0;
+
   const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
       router.replace(pathname, { locale: nextLanguage });
@@ -51,6 +55,11 @@ export default function SettingsPage() {
   };
 
   function onSave() {
+    if (!hasValidLightLogo) {
+      toast.error("Añade URL o sube un logo principal para modo personalizado");
+      return;
+    }
+
     const logoFieldsChanged = [
       settings.brandLogoMode !== savedSnapshot.brandLogoMode,
       settings.brandLogoUrl !== savedSnapshot.brandLogoUrl,
@@ -129,7 +138,7 @@ export default function SettingsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={onDiscard} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Descartar</button>
             <button type="button" onClick={onReset} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"><Undo2 className="h-4 w-4" />Restaurar por defecto</button>
-            <button type="button" onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800"><Save className="h-4 w-4" />Guardar ajustes</button>
+            <button type="button" disabled={!hasChanges} onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"><Save className="h-4 w-4" />Guardar ajustes</button>
           </div>
         </div>
         <div className="mt-3 text-xs text-zinc-500">
@@ -178,30 +187,39 @@ export default function SettingsPage() {
               </label>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => update("brandLogoMode", "default")} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Preset: estándar</button>
+              <button type="button" onClick={() => update("brandLogoMode", "favicon")} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Preset: minimal favicon</button>
+              <button type="button" onClick={() => { update("brandLogoMode", "custom"); update("brandLogoFit", "contain"); }} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Preset: custom CDN</button>
+            </div>
+
             <NumberField label="Altura del logo (px)" value={settings.brandLogoHeight} min={20} max={64} onChange={(value) => update("brandLogoHeight", value)} />
 
             <label className="block text-sm text-zinc-700">
               URL logo principal
-              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} disabled={!isCustomLogo} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
             </label>
 
             <label className="block text-sm text-zinc-700">
               URL logo para fondo oscuro (login)
-              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} disabled={!isCustomLogo} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-zinc-700">
                 Subir logo principal (máx 2MB)
-                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+                <input type="file" accept="image/*" disabled={!isCustomLogo} onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
               <label className="block text-sm text-zinc-700">
                 Subir logo oscuro (máx 2MB)
-                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+                <input type="file" accept="image/*" disabled={!isCustomLogo} onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
             </div>
 
             <p className="text-xs text-zinc-500">Versión de cache actual: {settings.brandLogoVersion}. Se incrementa automáticamente cuando cambias branding y guardas.</p>
+            {isCustomLogo && (!hasValidLightLogo || !hasValidDarkLogo) && (
+              <p className="text-xs text-amber-600">Para una UX completa en light/dark, define ambos logos personalizados.</p>
+            )}
           </div>
 
           <label className="block text-sm text-zinc-700">

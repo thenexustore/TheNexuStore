@@ -15,6 +15,8 @@ import {
   Hash,
 } from "lucide-react";
 import { registerUser, verifyOtp } from "../lib/auth";
+import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
+import StoreBrandLogo from "../components/StoreBrandLogo";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -24,12 +26,15 @@ export default function RegisterPage() {
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState(null as any);
   const [otp, setOtp] = useState("");
+  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
     email: "",
     password: "",
   });
+
+  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
   useEffect(() => {
     if (!image) return;
@@ -104,13 +109,12 @@ export default function RegisterPage() {
             <>
               <form onSubmit={onRegister} className="space-y-5">
                 <div className="text-center mb-8">
-                  <Image
-                    src="/logo.png"
+                  <StoreBrandLogo
+                    branding={storeBranding}
+                    variant="dark"
                     alt="Secure Gate"
-                    width={160}
+                    className="mx-auto w-auto"
                     height={40}
-                    priority
-                    className="mx-auto"
                   />
                 </div>
 

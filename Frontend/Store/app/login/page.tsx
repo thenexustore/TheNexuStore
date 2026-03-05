@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_URL } from "../lib/env";
-import Image from "next/image";
 import { Mail, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
 import { loginUser } from "../lib/auth";
+import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
+import StoreBrandLogo from "../components/StoreBrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +16,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
+
+  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,13 +40,12 @@ export default function LoginPage() {
       <div className="w-full max-w-[400px]">
         <div className="bg-white border-[3px] border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
           <div className="mb-6 text-center">
-            <Image
-              src="/logo.png"
+            <StoreBrandLogo
+              branding={storeBranding}
+              variant="dark"
               alt="Secure Gate"
-              width={160}
+              className="mx-auto w-auto"
               height={40}
-              priority
-              className="mx-auto"
             />
             <h1 className="sr-only">Secure Gate</h1>
             <p className="sr-only">Identity Verification</p>

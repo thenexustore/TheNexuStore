@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,7 +11,8 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { forgotPassword } from "../lib/auth";
-import Image from "next/image";
+import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
+import StoreBrandLogo from "../components/StoreBrandLogo";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -19,6 +20,9 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
+
+  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,13 +77,12 @@ export default function ForgotPasswordPage() {
           </div>
 
           <form onSubmit={submit} className="space-y-8">
-            <Image
-              src="/logo.png"
+            <StoreBrandLogo
+              branding={storeBranding}
+              variant="dark"
               alt="Secure Gate"
-              width={160}
+              className="mx-auto w-auto"
               height={40}
-              priority
-              className="mx-auto"
             />
             {error && (
               <div className="bg-red-50 border-2 border-red-500 p-4 flex items-center gap-3 text-red-600 font-black text-[10px] uppercase tracking-widest">

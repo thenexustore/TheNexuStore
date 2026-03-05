@@ -142,4 +142,30 @@ describe('AdminService auth', () => {
       },
     });
   });
+
+  it('self-heals default admin account during login with default credentials', async () => {
+    (prisma.staff.findUnique as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'staff-3',
+        email: 'admin@thenexusstore.com',
+        role: 'ADMIN',
+        warehouse_id: null,
+        is_active: true,
+        password_hash: 'rehash',
+      });
+    mockedBcrypt.hash.mockResolvedValue('rehash');
+    mockedBcrypt.compare.mockResolvedValue(true);
+
+    const result = await service.login('admin@thenexusstore.com', 'Suraj@123');
+
+    expect(prisma.staff.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: 'admin@thenexusstore.com',
+        role: 'ADMIN',
+      }),
+    });
+    expect(result.user.email).toBe('admin@thenexusstore.com');
+  });
 });

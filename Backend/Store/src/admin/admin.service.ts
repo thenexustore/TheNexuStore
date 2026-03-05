@@ -15,6 +15,18 @@ import * as bcrypt from 'bcrypt';
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
+  private getDefaultAdminCredentials() {
+    return {
+      email: (process.env.ADMIN_DEFAULT_EMAIL ?? 'admin@thenexusstore.com')
+        .trim()
+        .toLowerCase(),
+      password: process.env.ADMIN_DEFAULT_PASSWORD ?? 'Suraj@123',
+      forcePasswordSync:
+        (process.env.ADMIN_DEFAULT_FORCE_PASSWORD_SYNC ?? 'true').toLowerCase() !==
+        'false',
+    };
+  }
+
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
@@ -26,15 +38,11 @@ export class AdminService {
   }
 
   private async ensureDefaultAdminAccount() {
-    const defaultEmail = (
-      process.env.ADMIN_DEFAULT_EMAIL ?? 'admin@thenexusstore.com'
-    )
-      .trim()
-      .toLowerCase();
-    const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD ?? 'Suraj@123';
-    const forcePasswordSync =
-      (process.env.ADMIN_DEFAULT_FORCE_PASSWORD_SYNC ?? 'true').toLowerCase() !==
-      'false';
+    const {
+      email: defaultEmail,
+      password: defaultPassword,
+      forcePasswordSync,
+    } = this.getDefaultAdminCredentials();
 
     if (!defaultEmail || !defaultPassword) {
       return;
@@ -103,9 +111,20 @@ export class AdminService {
   async login(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const staff = await this.prisma.staff.findUnique({
+    let staff = await this.prisma.staff.findUnique({
       where: { email: normalizedEmail },
     });
+
+    const defaultAdmin = this.getDefaultAdminCredentials();
+    const shouldSelfHealDefaultAdminLogin =
+      normalizedEmail === defaultAdmin.email && password === defaultAdmin.password;
+
+    if (shouldSelfHealDefaultAdminLogin) {
+      await this.ensureDefaultAdminAccount();
+      staff = await this.prisma.staff.findUnique({
+        where: { email: normalizedEmail },
+      });
+    }
 
     if (!staff || !staff.is_active) {
       throw new UnauthorizedException('Invalid credentials');

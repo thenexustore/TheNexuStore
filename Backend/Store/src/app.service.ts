@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from './common/prisma.service';
 import { Socket, connect } from 'node:net';
 
+type HealthState = 'ok' | 'fail' | 'disabled';
+
 @Injectable()
 export class AppService {
   constructor(private readonly prisma: PrismaService) {}
@@ -11,15 +13,20 @@ export class AppService {
     const redis = await this.checkService(process.env.REDIS_URL, 6379);
     const rabbit = await this.checkService(process.env.RABBITMQ_URL, 5672);
 
+    const hasRequiredFailure = db === 'fail';
+    const hasOptionalFailure = [redis, rabbit].includes('fail');
+
     return {
-      app: 'ok',
+      app: hasRequiredFailure || hasOptionalFailure ? 'degraded' : 'ok',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.round(process.uptime()),
       db,
       redis,
       rabbit,
     };
   }
 
-  private async checkDb(): Promise<'ok' | 'fail'> {
+  private async checkDb(): Promise<Exclude<HealthState, 'disabled'>> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       return 'ok';
@@ -31,9 +38,9 @@ export class AppService {
   private async checkService(
     url: string | undefined,
     defaultPort: number,
-  ): Promise<'ok' | 'fail'> {
+  ): Promise<HealthState> {
     if (!url) {
-      return 'fail';
+      return 'disabled';
     }
 
     try {

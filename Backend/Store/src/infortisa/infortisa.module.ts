@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { InfortisaService } from './infortisa.service';
 import { InfortisaController } from './infortisa.controller';
@@ -7,7 +8,7 @@ import { PrismaService } from '../common/prisma.service';
 import { ProductsService } from '../user/products/products.service';
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ConfigModule, ScheduleModule.forRoot()],
   controllers: [InfortisaController],
   providers: [
     InfortisaService,

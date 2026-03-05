@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { adminLogin } from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Loader2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 
@@ -24,8 +24,9 @@ export default function LoginPage() {
       localStorage.setItem("admin_user", JSON.stringify(result.staff));
       toast.success(t("welcome"));
       router.push("/dashboard");
-    } catch (err: any) {
-      toast.error(err.message || t("invalid"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t("invalid");
+      toast.error(message || t("invalid"));
     } finally {
       setLoading(false);
     }

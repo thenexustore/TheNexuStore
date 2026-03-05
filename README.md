@@ -33,64 +33,122 @@ Frontend/
   Store/           # Customer-facing store (Next.js)
   admin/           # Admin panel (Next.js)
 docker-compose.yml # Infrastructure services
-docs/              # Additional documentation
 ```
 
-## Prerequisites
+## Requisitos para VPS
 
-- Node.js 18+
+- Ubuntu/Debian con acceso sudo
+- Node.js 20+
 - npm
-- Docker
-- Docker Compose
+- Docker + Docker Compose plugin
 
-## Quick Start
+## Despliegue en VPS (paso a paso)
 
-### 1) Start infrastructure
+### 1) Clonar repo
 
 ```bash
-docker-compose up -d
+git clone <tu-repo> /var/www/TheNexuStore
+cd /var/www/TheNexuStore
 ```
 
-Exposed services:
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
-- RabbitMQ: `localhost:5672`
-- RabbitMQ UI: `http://localhost:15672`
+### 2) Levantar infraestructura (Postgres/Redis/RabbitMQ)
 
-### 2) Backend
+```bash
+docker compose up -d
+```
+
+### 3) Configurar backend
 
 ```bash
 cd Backend/Store
+cp .env.example .env
+```
+
+Revisa `.env` y ajusta dominios/IP de tu VPS:
+
+- `DATABASE_URL=postgresql://nexu:nexu_pass@localhost:5432/nexustore`
+- `FRONTEND_URL=http://<IP_O_DOMINIO_VPS>:3000`
+- `ADMIN_URL=http://<IP_O_DOMINIO_VPS>:3001`
+- `CORS_ORIGINS=http://<IP_O_DOMINIO_VPS>:3000,http://<IP_O_DOMINIO_VPS>:3001`
+- `JWT_SECRET=<un-valor-fuerte>`
+
+Instalar dependencias, generar Prisma y migrar DB:
+
+```bash
 npm install
 npx prisma generate
 npx prisma migrate deploy
-npm run start:dev
+npm run build
+npm run start:prod
 ```
 
-API URL: `http://localhost:4000`
+Backend esperado en `http://<IP_O_DOMINIO_VPS>:4000`.
 
-### 3) Store Frontend
+### 4) Configurar Store frontend
 
 ```bash
-cd Frontend/Store
-npm install
-npm run dev
+cd /var/www/TheNexuStore/Frontend/Store
+cp .env.example .env.production
 ```
 
-Store URL: `http://localhost:3000`
+Editar `.env.production`:
 
-### 4) Admin Frontend
+```env
+NEXT_PUBLIC_API_URL=http://<IP_O_DOMINIO_VPS>:4000
+NEXT_PUBLIC_SITE_URL=http://<IP_O_DOMINIO_VPS>:3000
+```
+
+Ejecutar:
 
 ```bash
-cd Frontend/admin
 npm install
-PORT=3001 npm run dev
+npm run build
+npm run start -- -p 3000
 ```
 
-Admin URL: `http://localhost:3001`
+### 5) Configurar Admin frontend
 
-## Notes
+```bash
+cd /var/www/TheNexuStore/Frontend/admin
+cp .env.example .env.production
+```
 
-- Docker is used for shared infrastructure services.
-- Backend and frontend apps run locally with Node.js.
-- If you do not set `PORT` for admin, Next.js uses the default port (`3000`).
+Editar `.env.production`:
+
+```env
+NEXT_PUBLIC_API_URL=http://<IP_O_DOMINIO_VPS>:4000
+NEXT_PUBLIC_SITE_URL=http://<IP_O_DOMINIO_VPS>:3001
+```
+
+Ejecutar:
+
+```bash
+npm install
+npm run build
+npm run start -- -p 3001
+```
+
+## Verificaciones rápidas
+
+- API health:
+  ```bash
+  curl -i http://127.0.0.1:4000
+  ```
+- Store abre en navegador:
+  - `http://<IP_O_DOMINIO_VPS>:3000`
+- Admin abre en navegador:
+  - `http://<IP_O_DOMINIO_VPS>:3001`
+
+## Errores comunes que rompen todo
+
+- No crear `Backend/Store/.env` (el backend no arranca sin `DATABASE_URL`).
+- `DATABASE_URL` con credenciales distintas a las de `docker-compose.yml`.
+- No correr `npx prisma migrate deploy`.
+- Build frontend con `NEXT_PUBLIC_API_URL` mal apuntando a localhost equivocado.
+- CORS sin incluir dominio/IP reales del Store/Admin.
+
+## Producción recomendada
+
+- Usar **Nginx** como reverse proxy para 3000/3001/4000.
+- Correr procesos con **pm2** o systemd.
+- Abrir puertos 80/443 y no exponer 5432/6379/5672 públicamente.

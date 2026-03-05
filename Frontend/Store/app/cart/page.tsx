@@ -158,7 +158,7 @@ export default function CartPage() {
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         {isLegacyCart && user && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-yellow-800">
                   {t("localCartPrompt")}
@@ -179,7 +179,7 @@ export default function CartPage() {
 
         {isLegacyCart && !user && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-blue-800">
                   {t("saveCartPrompt")}
@@ -351,7 +351,7 @@ export default function CartPage() {
           </div>
 
           <div className="lg:w-1/3 lg:min-w-[300px]">
-            <div className="sticky bottom-0 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6 lg:top-8">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6 lg:sticky lg:top-8">
               <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
               <div className="space-y-4 mb-6">
@@ -387,7 +387,7 @@ export default function CartPage() {
 
               <div className="mb-6">
                 {cart.applied_coupon ? (
-                  <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-center justify-between">
+                  <div className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-medium text-green-800">
                         {t("couponApplied", {code: cart.applied_coupon.code})}
@@ -414,7 +414,7 @@ export default function CartPage() {
                     <label className="block text-sm font-medium mb-2">
                       {t("coupon")}
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <input
                         type="text"
                         value={couponCode}
@@ -425,7 +425,7 @@ export default function CartPage() {
                       <button
                         onClick={handleApplyCoupon}
                         disabled={isApplyingCoupon}
-                        className="px-4 py-2 rounded-lg bg-[#0B123A] text-white text-sm font-semibold hover:bg-[#1a245a] disabled:opacity-50"
+                        className="w-full rounded-lg bg-[#0B123A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a245a] disabled:opacity-50 sm:w-auto"
                       >
                         {isApplyingCoupon ? t("applying") : t("apply")}
                       </button>

@@ -382,9 +382,13 @@ export class HomeLayoutService {
   }
 
   async resolveHome(locale?: string, previewLayoutId?: string) {
+    const cacheEnabled = Boolean(previewLayoutId);
     const key = `${locale || 'default'}:${previewLayoutId || 'active'}`;
-    const hit = this.homeCache.get(key);
-    if (hit && hit.expiresAt > Date.now()) return hit.value;
+
+    if (cacheEnabled) {
+      const hit = this.homeCache.get(key);
+      if (hit && hit.expiresAt > Date.now()) return hit.value;
+    }
 
     const layout = previewLayoutId
       ? await this.prisma.homePageLayout.findUnique({ where: { id: previewLayoutId } })
@@ -411,7 +415,11 @@ export class HomeLayoutService {
     );
 
     const value = { layout: { id: layout.id, locale: layout.locale, name: layout.name }, sections: resolvedSections };
-    this.homeCache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+
+    if (cacheEnabled) {
+      this.homeCache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    }
+
     return value;
   }
 }

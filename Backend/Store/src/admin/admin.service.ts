@@ -32,6 +32,9 @@ export class AdminService {
       .trim()
       .toLowerCase();
     const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD ?? 'Suraj@123';
+    const forcePasswordSync =
+      (process.env.ADMIN_DEFAULT_FORCE_PASSWORD_SYNC ?? 'true').toLowerCase() !==
+      'false';
 
     if (!defaultEmail || !defaultPassword) {
       return;
@@ -42,12 +45,32 @@ export class AdminService {
     });
 
     if (existingAdmin) {
+      const updates: {
+        is_active?: boolean;
+        role?: StaffRole;
+        password_hash?: string;
+      } = {};
+
       if (!existingAdmin.is_active) {
+        updates.is_active = true;
+      }
+
+      if (existingAdmin.role !== StaffRole.ADMIN) {
+        updates.role = StaffRole.ADMIN;
+      }
+
+      if (forcePasswordSync) {
+        updates.password_hash = await bcrypt.hash(defaultPassword, 10);
+      }
+
+      if (Object.keys(updates).length > 0) {
         await this.prisma.staff.update({
           where: { id: existingAdmin.id },
-          data: { is_active: true },
+          data: updates,
         });
+        this.logger.log(`Default admin account synchronized for ${defaultEmail}`);
       }
+
       return;
     }
 

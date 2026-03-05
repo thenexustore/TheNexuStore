@@ -106,15 +106,40 @@ describe('AdminService auth', () => {
     (prisma.staff.findUnique as jest.Mock).mockResolvedValue({
       id: 'staff-1',
       email: 'admin@thenexusstore.com',
+      role: 'ADMIN',
       is_active: false,
     });
+    mockedBcrypt.hash.mockResolvedValue('rehashed-default-password');
 
     await service.onModuleInit();
 
     expect(prisma.staff.update).toHaveBeenCalledWith({
       where: { id: 'staff-1' },
-      data: { is_active: true },
+      data: {
+        is_active: true,
+        password_hash: 'rehashed-default-password',
+      },
     });
     expect(prisma.staff.create).not.toHaveBeenCalled();
+  });
+
+  it('synchronizes role and password when default admin exists', async () => {
+    (prisma.staff.findUnique as jest.Mock).mockResolvedValue({
+      id: 'staff-2',
+      email: 'admin@thenexusstore.com',
+      role: 'WAREHOUSE',
+      is_active: true,
+    });
+    mockedBcrypt.hash.mockResolvedValue('updated-default-password');
+
+    await service.onModuleInit();
+
+    expect(prisma.staff.update).toHaveBeenCalledWith({
+      where: { id: 'staff-2' },
+      data: {
+        role: 'ADMIN',
+        password_hash: 'updated-default-password',
+      },
+    });
   });
 });

@@ -1,6 +1,8 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { OrderStatus, StaffRole } from '@prisma/client';
@@ -11,11 +13,57 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
     private readonly categoriesService: CategoriesService,
   ) {}
+
+  async onModuleInit() {
+    await this.ensureDefaultAdminAccount();
+  }
+
+  private async ensureDefaultAdminAccount() {
+    const defaultEmail = (
+      process.env.ADMIN_DEFAULT_EMAIL ?? 'admin@thenexusstore.com'
+    )
+      .trim()
+      .toLowerCase();
+    const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD ?? 'Suraj@123';
+
+    if (!defaultEmail || !defaultPassword) {
+      return;
+    }
+
+    const existingAdmin = await this.prisma.staff.findUnique({
+      where: { email: defaultEmail },
+    });
+
+    if (existingAdmin) {
+      if (!existingAdmin.is_active) {
+        await this.prisma.staff.update({
+          where: { id: existingAdmin.id },
+          data: { is_active: true },
+        });
+      }
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+    await this.prisma.staff.create({
+      data: {
+        email: defaultEmail,
+        password_hash: passwordHash,
+        role: StaffRole.ADMIN,
+        is_active: true,
+      },
+    });
+
+    this.logger.log(`Default admin account restored for ${defaultEmail}`);
+  }
 
   private getPermissionsForRole(role: StaffRole): string[] {
     if (role === StaffRole.ADMIN) {

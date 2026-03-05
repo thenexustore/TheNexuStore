@@ -4,14 +4,20 @@ import { AdminService } from './admin.service';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
+  hash: jest.fn(),
 }));
 
-const mockedBcrypt = jest.requireMock('bcrypt') as { compare: jest.Mock };
+const mockedBcrypt = jest.requireMock('bcrypt') as {
+  compare: jest.Mock;
+  hash: jest.Mock;
+};
 
 describe('AdminService auth', () => {
   const prisma = {
     staff: {
       findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
     },
     order: {
       findMany: jest.fn(),
@@ -78,5 +84,37 @@ describe('AdminService auth', () => {
     await expect(service.login('missing@test.com', 'secret')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it('creates default admin if missing on module init', async () => {
+    (prisma.staff.findUnique as jest.Mock).mockResolvedValue(null);
+    mockedBcrypt.hash.mockResolvedValue('hashed-default-password');
+
+    await service.onModuleInit();
+
+    expect(prisma.staff.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: 'admin@thenexusstore.com',
+        password_hash: 'hashed-default-password',
+        role: 'ADMIN',
+        is_active: true,
+      }),
+    });
+  });
+
+  it('reactivates existing default admin when inactive', async () => {
+    (prisma.staff.findUnique as jest.Mock).mockResolvedValue({
+      id: 'staff-1',
+      email: 'admin@thenexusstore.com',
+      is_active: false,
+    });
+
+    await service.onModuleInit();
+
+    expect(prisma.staff.update).toHaveBeenCalledWith({
+      where: { id: 'staff-1' },
+      data: { is_active: true },
+    });
+    expect(prisma.staff.create).not.toHaveBeenCalled();
   });
 });

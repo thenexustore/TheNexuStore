@@ -25,7 +25,7 @@ async function getHome(previewLayoutId?: string) {
   const endpoint = `${API_URL}/home${query.toString() ? `?${query.toString()}` : ''}`;
 
   try {
-    const res = await fetch(endpoint, { next: { revalidate: 300 } });
+    const res = await fetch(endpoint, { cache: 'no-store' });
     if (!res.ok) return fallbackData;
     const json = await res.json();
     return json.data || fallbackData;

@@ -16,7 +16,8 @@ import { AuthGuard } from '../../auth/auth.guard';
 class InitiatePaymentDto {
   order_id: string = '';
   provider: 'REDSYS' | 'COD' = 'REDSYS';
-  return_url?: string;
+  success_url?: string;
+  failure_url?: string;
 }
 
 @Controller('payment')
@@ -29,7 +30,8 @@ export class PaymentController {
     return this.paymentService.createPayment({
       orderId: dto.order_id,
       provider: dto.provider,
-      returnUrl: dto.return_url,
+      successUrl: dto.success_url,
+      failureUrl: dto.failure_url,
     });
   }
 

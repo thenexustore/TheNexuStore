@@ -6,10 +6,10 @@ export function adminLogout() {
   window.location.href = "/login";
 }
 
-export async function fetchWithAuth(
+export async function fetchWithAuth<T = any>(
   endpoint: string,
   options: RequestInit = {}
-) {
+): Promise<T> {
   const token = localStorage.getItem("admin_token");
 
   if (!token) {
@@ -25,16 +25,27 @@ export async function fetchWithAuth(
     },
   });
 
-  const data = await response.json();
-
   if (response.status === 401) {
     adminLogout();
     throw new Error("Session expired");
   }
 
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "API request failed");
+  const contentType = response.headers.get("content-type") || "";
+  const isJsonResponse = contentType.includes("application/json");
+  const payload = isJsonResponse ? await response.json() : null;
+
+  if (!response.ok) {
+    const message = payload?.message || `API request failed (${response.status})`;
+    throw new Error(message);
   }
 
-  return data.data;
+  if (payload && typeof payload === "object" && "success" in payload) {
+    if (!payload.success) {
+      throw new Error(payload.message || "API request failed");
+    }
+
+    return payload.data as T;
+  }
+
+  return payload as T;
 }

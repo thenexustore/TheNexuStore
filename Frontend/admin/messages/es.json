@@ -23,6 +23,7 @@
     "logout": "Cerrar sesión",
     "homeBuilder": "Home Builder",
     "imports": "Importaciones",
-    "rmas": "Devoluciones (RMA)"
+    "rmas": "Devoluciones (RMA)",
+    "settings": "Ajustes"
   }
 }

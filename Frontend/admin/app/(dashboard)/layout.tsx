@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -16,9 +16,16 @@ import {
   Ticket,
   Tags,
   Truck,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  loadAdminSettings,
+  subscribeAdminSettings,
+  type AdminSettings,
+} from "@/lib/admin-settings";
+import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 
 type NavChild = {
   key: string;
@@ -53,6 +60,7 @@ const navigation: NavItem[] = [
   { key: "coupons", href: "/coupons", icon: Ticket, requiredPermissions: ["full_access"] },
   { key: "pricing", href: "/pricing", icon: Tags, requiredPermissions: ["full_access"] },
   { key: "chat", href: "/chat", icon: MessageCircle, requiredPermissions: ["full_access"] },
+  { key: "settings", href: "/settings", icon: Settings, requiredPermissions: ["full_access"] },
   {
     key: "homeContent",
     icon: LayoutTemplate,
@@ -76,6 +84,15 @@ export default function DashboardLayout({
   const t = useTranslations("nav");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [dashboardSettings, setDashboardSettings] = useState<AdminSettings>(() => loadAdminSettings());
+
+  useEffect(() => subscribeAdminSettings(setDashboardSettings), []);
+
+  useEffect(() => {
+    if (dashboardSettings.adminLanguage !== locale) {
+      router.replace(pathname, { locale: dashboardSettings.adminLanguage });
+    }
+  }, [dashboardSettings.adminLanguage, locale, pathname, router]);
   const userPermissions = (() => {
     try {
       const rawUser = localStorage.getItem("admin_user");
@@ -222,7 +239,7 @@ export default function DashboardLayout({
   return (
     <div className="h-screen bg-white flex overflow-hidden">
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-white border-b z-30">
-        <img src="/logo.png" className="h-7" />
+        <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={28} />
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.replace(pathname, { locale: locale === "en" ? "es" : "en" })}
@@ -251,9 +268,11 @@ export default function DashboardLayout({
         )}
       </AnimatePresence>
 
-      <aside className="hidden lg:flex w-72 bg-white border-r border-zinc-200 flex-col">
-        <div className="h-20 flex items-center px-8">
-          <img src="/logo.png" className="h-8" />
+      <aside
+        className={`hidden lg:flex ${dashboardSettings.compactSidebar ? "w-64" : "w-72"} bg-white border-r border-zinc-200 flex-col`}
+      >
+        <div className="h-20 flex items-center px-8 gap-3">
+          <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={32} />
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
           <NavItems />
@@ -276,7 +295,7 @@ export default function DashboardLayout({
         className="fixed inset-y-0 left-0 w-72 bg-white border-r border-zinc-200 z-50 flex flex-col lg:hidden"
       >
         <div className="h-20 flex items-center px-8">
-          <img src="/logo.png" className="h-8" />
+          <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={32} />
           <button className="ml-auto" onClick={() => setSidebarOpen(false)}>
             <X className="w-5 h-5 text-zinc-500" />
           </button>

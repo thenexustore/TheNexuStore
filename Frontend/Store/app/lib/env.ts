@@ -1,6 +1,12 @@
+const isDevelopment = process.env.NODE_ENV !== "production";
+
 const DEFAULT_PUBLIC_ENV = {
-  NEXT_PUBLIC_API_URL: "https://api.thenexustore.com",
-  NEXT_PUBLIC_SITE_URL: "https://www.thenexustore.com",
+  NEXT_PUBLIC_API_URL: isDevelopment
+    ? "http://localhost:4000"
+    : "https://api.thenexustore.com",
+  NEXT_PUBLIC_SITE_URL: isDevelopment
+    ? "http://localhost:3000"
+    : "https://www.thenexustore.com",
 } as const;
 
 type PublicEnvName = keyof typeof DEFAULT_PUBLIC_ENV;

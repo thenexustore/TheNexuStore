@@ -1,0 +1,69 @@
+import { Logger } from '@nestjs/common';
+
+const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET'] as const;
+
+function assertValidUrl(name: string, value: string) {
+  try {
+    new URL(value);
+  } catch {
+    throw new Error(
+      `Invalid environment variable: ${name} must be a valid URL. Received "${value}".`,
+    );
+  }
+}
+
+export function validateEnvironment(env = process.env) {
+  const logger = new Logger('Bootstrap');
+
+  for (const key of REQUIRED_ENV_VARS) {
+    if (!env[key]) {
+      throw new Error(
+        `Missing required environment variable: ${key}. Please set ${key} before starting the backend.`,
+      );
+    }
+  }
+
+  if (env.DATABASE_URL) {
+    assertValidUrl('DATABASE_URL', env.DATABASE_URL);
+  }
+
+  if (env.REDIS_URL) {
+    assertValidUrl('REDIS_URL', env.REDIS_URL);
+  } else {
+    logger.warn('REDIS_URL is not configured. Redis-backed features are disabled.');
+  }
+
+  if (env.RABBITMQ_URL) {
+    assertValidUrl('RABBITMQ_URL', env.RABBITMQ_URL);
+  } else {
+    logger.warn(
+      'RABBITMQ_URL is not configured. RabbitMQ-backed features are disabled.',
+    );
+  }
+
+  const hasGoogleClientId = Boolean(env.GOOGLE_CLIENT_ID);
+  const hasGoogleClientSecret = Boolean(env.GOOGLE_CLIENT_SECRET);
+
+  if (hasGoogleClientId !== hasGoogleClientSecret) {
+    throw new Error(
+      'Google OAuth misconfiguration: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be provided together or left empty to disable Google auth.',
+    );
+  }
+
+  const googleEnabled = hasGoogleClientId && hasGoogleClientSecret;
+
+  if (!googleEnabled) {
+    logger.warn(
+      'Google OAuth is disabled because GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are not configured.',
+    );
+    return;
+  }
+
+  if (!env.GOOGLE_CALLBACK_URL) {
+    throw new Error(
+      'Missing required environment variable: GOOGLE_CALLBACK_URL. Set it when Google OAuth is enabled.',
+    );
+  }
+
+  assertValidUrl('GOOGLE_CALLBACK_URL', env.GOOGLE_CALLBACK_URL);
+}

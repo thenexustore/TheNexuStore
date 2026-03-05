@@ -1,15 +1,18 @@
 "use client";
 
-import { type ChangeEvent, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Building2,
+  CheckCircle2,
+  CircleDot,
   Clock3,
   Gauge,
   Globe,
   ImageIcon,
   Mail,
   MessageSquare,
+  MousePointerClick,
   Save,
   Settings2,
   Sparkles,
@@ -47,6 +50,7 @@ export default function SettingsPage() {
   const isCustomLogo = settings.brandLogoMode === "custom";
   const hasValidLightLogo = !isCustomLogo || settings.brandLogoUrl.trim().length > 0;
   const hasValidDarkLogo = !isCustomLogo || settings.brandLogoDarkUrl.trim().length > 0;
+  const isSupportEmailValid = settings.supportEmail.includes("@");
 
   const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
@@ -55,6 +59,11 @@ export default function SettingsPage() {
   };
 
   function onSave() {
+    if (!isSupportEmailValid) {
+      toast.error("El email de soporte no tiene formato válido");
+      return;
+    }
+
     if (!hasValidLightLogo) {
       toast.error("Añade URL o sube un logo principal para modo personalizado");
       return;
@@ -80,6 +89,17 @@ export default function SettingsPage() {
     toast.success("Ajustes guardados y aplicados");
   }
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (hasChanges) onSave();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [hasChanges, settings]);
+
   function onReset() {
     setSettings(defaultAdminSettings);
     saveAdminSettings(defaultAdminSettings);
@@ -99,6 +119,13 @@ export default function SettingsPage() {
 
   function update<K extends keyof AdminSettings>(key: K, value: AdminSettings[K]) {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function scrollToSection(id: string) {
+    const target = document.getElementById(id);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   async function onLogoFileChange(event: ChangeEvent<HTMLInputElement>, variant: "light" | "dark") {
@@ -126,7 +153,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -134,6 +161,7 @@ export default function SettingsPage() {
             <p className="mt-1 text-sm text-zinc-600">
               Configura idioma, branding y preferencias operativas con enfoque eCommerce profesional.
             </p>
+            <p className="mt-2 text-xs text-zinc-500">Tip: usa Ctrl/Cmd + S para guardar rápido.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={onDiscard} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Descartar</button>
@@ -141,13 +169,22 @@ export default function SettingsPage() {
             <button type="button" disabled={!hasChanges} onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"><Save className="h-4 w-4" />Guardar ajustes</button>
           </div>
         </div>
-        <div className="mt-3 text-xs text-zinc-500">
-          {savedAt ? `Último guardado: ${savedAt.toLocaleTimeString()}` : "Aún no guardado en esta sesión"}
+        <div className="mt-3 text-xs text-zinc-500 flex items-center gap-2">
+          {hasChanges ? <span className="text-amber-600 font-medium">Cambios pendientes</span> : <span className="text-emerald-600 font-medium inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />Sincronizado</span>}
+          <span>·</span>
+          <span>{savedAt ? `Último guardado: ${savedAt.toLocaleTimeString()}` : "Aún no guardado en esta sesión"}</span>
         </div>
       </div>
 
+      <div className="rounded-xl border border-zinc-200 bg-white p-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => scrollToSection("branding-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><CircleDot className="h-3.5 w-3.5" />Branding</button>
+        <button type="button" onClick={() => scrollToSection("operations-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Gauge className="h-3.5 w-3.5" />Operaciones</button>
+        <button type="button" onClick={() => scrollToSection("experience-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Sparkles className="h-3.5 w-3.5" />Experiencia</button>
+        <button type="button" onClick={() => scrollToSection("integration-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><MousePointerClick className="h-3.5 w-3.5" />Integración</button>
+      </div>
+
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="branding-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Branding e identidad</h2>
 
           <div className="rounded-xl border border-zinc-200 p-4 space-y-3">
@@ -224,7 +261,8 @@ export default function SettingsPage() {
 
           <label className="block text-sm text-zinc-700">
             Email soporte
-            <input type="email" value={settings.supportEmail} onChange={(e) => update("supportEmail", e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+            <input type="email" value={settings.supportEmail} onChange={(e) => update("supportEmail", e.target.value)} className={`mt-1 w-full rounded-lg border px-3 py-2 ${isSupportEmailValid ? "border-zinc-200" : "border-red-300 bg-red-50"}`} />
+            {!isSupportEmailValid && <span className="text-xs text-red-600">Revisa el email de soporte.</span>}
           </label>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -254,7 +292,7 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="operations-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Gauge className="h-5 w-5" />Rendimiento y listados</h2>
           <NumberField label="Refresco automático de pedidos (segundos)" value={settings.ordersRefreshSeconds} min={10} max={300} onChange={(value) => update("ordersRefreshSeconds", value)} />
           <NumberField label="Filas por página en pedidos" value={settings.ordersPageSize} min={5} max={100} onChange={(value) => update("ordersPageSize", value)} />
@@ -264,7 +302,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="experience-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Bell className="h-5 w-5" />Alertas y experiencia</h2>
           <ToggleRow icon={<Mail className="h-4 w-4" />} label="Notificaciones por email" description="Avisos de incidencias, importaciones y tareas críticas" value={settings.emailNotifications} onChange={(value) => update("emailNotifications", value)} />
           <ToggleRow icon={<MessageSquare className="h-4 w-4" />} label="Sonido en chat" description="Reproducir aviso al llegar nuevos mensajes" value={settings.chatSoundEnabled} onChange={(value) => update("chatSoundEnabled", value)} />
@@ -272,7 +310,7 @@ export default function SettingsPage() {
           <ToggleRow icon={<Settings2 className="h-4 w-4" />} label="Sidebar compacta" description="Navegación más ajustada para pantallas pequeñas" value={settings.compactSidebar} onChange={(value) => update("compactSidebar", value)} />
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+        <div id="integration-section" className="rounded-2xl border border-zinc-200 bg-white p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Clock3 className="h-5 w-5" />Integración rápida con módulos</h2>
           <p className="mt-2 text-sm text-zinc-600">Los ajustes se aplican al instante en módulos conectados y se mantienen por navegador.</p>
           <div className="mt-4 grid gap-2">
@@ -290,6 +328,19 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {hasChanges && (
+        <div className="fixed bottom-4 right-4 left-4 lg:left-auto lg:w-[520px] rounded-xl border border-zinc-200 bg-white/95 backdrop-blur p-3 shadow-xl z-40">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-zinc-600">Tienes cambios sin guardar en Ajustes.</p>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onDiscard} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Descartar</button>
+              <button type="button" onClick={onSave} className="text-xs rounded-md bg-zinc-900 text-white px-2.5 py-1.5 hover:bg-zinc-800">Guardar ahora</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

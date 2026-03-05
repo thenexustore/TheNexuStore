@@ -18,12 +18,14 @@ import {
 import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 import {
   defaultAdminSettings,
   loadAdminSettings,
   resolveAdminLogoSrc,
   saveAdminSettings,
   type AdminLanguage,
+  type AdminLogoFit,
   type AdminLogoMode,
   type AdminSettings,
 } from "@/lib/admin-settings";
@@ -42,8 +44,6 @@ export default function SettingsPage() {
     [savedSnapshot, settings],
   );
 
-  const logoPreview = resolveAdminLogoSrc(settings);
-
   const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
       router.replace(pathname, { locale: nextLanguage });
@@ -51,10 +51,23 @@ export default function SettingsPage() {
   };
 
   function onSave() {
-    saveAdminSettings(settings);
-    setSavedSnapshot(settings);
+    const logoFieldsChanged = [
+      settings.brandLogoMode !== savedSnapshot.brandLogoMode,
+      settings.brandLogoUrl !== savedSnapshot.brandLogoUrl,
+      settings.brandLogoDarkUrl !== savedSnapshot.brandLogoDarkUrl,
+      settings.brandLogoFit !== savedSnapshot.brandLogoFit,
+      settings.brandLogoHeight !== savedSnapshot.brandLogoHeight,
+    ].some(Boolean);
+
+    const nextSettings = logoFieldsChanged
+      ? { ...settings, brandLogoVersion: settings.brandLogoVersion + 1 }
+      : settings;
+
+    saveAdminSettings(nextSettings);
+    setSettings(nextSettings);
+    setSavedSnapshot(nextSettings);
     setSavedAt(new Date());
-    applyLocaleIfNeeded(settings.adminLanguage);
+    applyLocaleIfNeeded(nextSettings.adminLanguage);
     toast.success("Ajustes guardados y aplicados");
   }
 
@@ -79,7 +92,7 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function onLogoFileChange(event: ChangeEvent<HTMLInputElement>) {
+  async function onLogoFileChange(event: ChangeEvent<HTMLInputElement>, variant: "light" | "dark") {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -95,8 +108,12 @@ export default function SettingsPage() {
 
     const dataUrl = await fileToDataUrl(file);
     update("brandLogoMode", "custom");
-    update("brandLogoUrl", dataUrl);
-    toast.success("Logo cargado. Guarda para aplicarlo en todo el panel");
+    if (variant === "dark") {
+      update("brandLogoDarkUrl", dataUrl);
+    } else {
+      update("brandLogoUrl", dataUrl);
+    }
+    toast.success(`Logo ${variant === "dark" ? "oscuro" : "principal"} cargado. Guarda para aplicar.`);
   }
 
   return (
@@ -124,20 +141,26 @@ export default function SettingsPage() {
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Branding e identidad</h2>
 
-          <div className="rounded-xl border border-zinc-200 p-4">
-            <p className="text-sm font-medium text-zinc-900">Logo del panel</p>
-            <p className="text-xs text-zinc-500 mt-1">Recomendado: versión horizontal transparente (PNG/SVG). Tamaño ideal: 220x64.</p>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="h-12 w-44 rounded-lg border border-zinc-200 bg-zinc-50 flex items-center justify-center p-2">
-                <img src={logoPreview} alt="Vista previa logo" className="max-h-full w-auto object-contain" />
+          <div className="rounded-xl border border-zinc-200 p-4 space-y-3">
+            <p className="text-sm font-medium text-zinc-900">Sistema de logo enterprise</p>
+            <p className="text-xs text-zinc-500">Configura logo principal y alternativo para fondos oscuros con fallback automático y cache busting.</p>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-xs font-medium text-zinc-700 mb-2">Preview claro</p>
+                <div className="h-12 rounded bg-white border border-zinc-200 flex items-center justify-center">
+                  <AdminBrandLogo settings={settings} variant="light" className="w-auto" />
+                </div>
               </div>
-              <div className="text-xs text-zinc-600">
-                <p>Se aplica en login + sidebar del admin.</p>
-                <p>Opciones: logo actual, favicon o URL/archivo propio.</p>
+              <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3">
+                <p className="text-xs font-medium text-zinc-200 mb-2">Preview oscuro</p>
+                <div className="h-12 rounded bg-zinc-950 border border-zinc-700 flex items-center justify-center">
+                  <AdminBrandLogo settings={settings} variant="dark" className="w-auto" />
+                </div>
               </div>
             </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-zinc-700">
                 Modo de logo
                 <select value={settings.brandLogoMode} onChange={(e) => update("brandLogoMode", e.target.value as AdminLogoMode)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
@@ -147,20 +170,38 @@ export default function SettingsPage() {
                 </select>
               </label>
               <label className="block text-sm text-zinc-700">
-                Subir imagen (máx 2MB)
-                <input type="file" accept="image/*" onChange={onLogoFileChange} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+                Ajuste de imagen
+                <select value={settings.brandLogoFit} onChange={(e) => update("brandLogoFit", e.target.value as AdminLogoFit)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+                  <option value="contain">Contain</option>
+                  <option value="cover">Cover</option>
+                </select>
               </label>
             </div>
 
-            <label className="mt-3 block text-sm text-zinc-700">
-              URL personalizada del logo
-              <input
-                value={settings.brandLogoUrl}
-                onChange={(e) => update("brandLogoUrl", e.target.value)}
-                placeholder="https://cdn.tu-dominio.com/brand/logo-admin.svg"
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-              />
+            <NumberField label="Altura del logo (px)" value={settings.brandLogoHeight} min={20} max={64} onChange={(value) => update("brandLogoHeight", value)} />
+
+            <label className="block text-sm text-zinc-700">
+              URL logo principal
+              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
             </label>
+
+            <label className="block text-sm text-zinc-700">
+              URL logo para fondo oscuro (login)
+              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm text-zinc-700">
+                Subir logo principal (máx 2MB)
+                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+              </label>
+              <label className="block text-sm text-zinc-700">
+                Subir logo oscuro (máx 2MB)
+                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+              </label>
+            </div>
+
+            <p className="text-xs text-zinc-500">Versión de cache actual: {settings.brandLogoVersion}. Se incrementa automáticamente cuando cambias branding y guardas.</p>
           </div>
 
           <label className="block text-sm text-zinc-700">
@@ -227,7 +268,7 @@ export default function SettingsPage() {
           </div>
           <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600">
             <p className="flex items-center gap-2 font-medium text-zinc-700"><Globe className="h-4 w-4" />Idioma actual: {locale.toUpperCase()}</p>
-            <p className="mt-1 flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5" />Logo activo: {settings.brandLogoMode === "default" ? "Logo actual" : settings.brandLogoMode === "favicon" ? "Favicon" : "Personalizado"}.</p>
+            <p className="mt-1 flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5" />Logo activo: {resolveAdminLogoSrc(settings)}</p>
           </div>
         </div>
       </section>

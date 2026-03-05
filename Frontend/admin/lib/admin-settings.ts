@@ -1,5 +1,6 @@
 export type AdminLanguage = "es" | "en";
 export type AdminLogoMode = "default" | "favicon" | "custom";
+export type AdminLogoFit = "contain" | "cover";
 
 export type AdminSettings = {
   supportEmail: string;
@@ -8,6 +9,10 @@ export type AdminSettings = {
   dateFormat: "es-ES" | "en-GB" | "en-US";
   brandLogoMode: AdminLogoMode;
   brandLogoUrl: string;
+  brandLogoDarkUrl: string;
+  brandLogoFit: AdminLogoFit;
+  brandLogoHeight: number;
+  brandLogoVersion: number;
   ordersRefreshSeconds: number;
   ordersPageSize: number;
   productsPageSize: number;
@@ -28,6 +33,10 @@ export const defaultAdminSettings: AdminSettings = {
   dateFormat: "es-ES",
   brandLogoMode: "default",
   brandLogoUrl: "",
+  brandLogoDarkUrl: "",
+  brandLogoFit: "contain",
+  brandLogoHeight: 32,
+  brandLogoVersion: 1,
   ordersRefreshSeconds: 30,
   ordersPageSize: 10,
   productsPageSize: 25,
@@ -49,6 +58,12 @@ function normalizeLogoUrl(value: unknown): string {
   return value.trim();
 }
 
+function applyVersion(src: string, version: number): string {
+  if (!src || src.startsWith("data:")) return src;
+  const separator = src.includes("?") ? "&" : "?";
+  return `${src}${separator}v=${version}`;
+}
+
 function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
   const language = input.adminLanguage === "en" ? "en" : "es";
   const logoMode: AdminLogoMode =
@@ -65,6 +80,10 @@ function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
         : defaultAdminSettings.dateFormat,
     brandLogoMode: logoMode,
     brandLogoUrl: normalizeLogoUrl(input.brandLogoUrl),
+    brandLogoDarkUrl: normalizeLogoUrl(input.brandLogoDarkUrl),
+    brandLogoFit: input.brandLogoFit === "cover" ? "cover" : "contain",
+    brandLogoHeight: clampNumber(input.brandLogoHeight, defaultAdminSettings.brandLogoHeight, 20, 64),
+    brandLogoVersion: clampNumber(input.brandLogoVersion, defaultAdminSettings.brandLogoVersion, 1, 999999),
     ordersRefreshSeconds: clampNumber(input.ordersRefreshSeconds, defaultAdminSettings.ordersRefreshSeconds, 10, 300),
     ordersPageSize: clampNumber(input.ordersPageSize, defaultAdminSettings.ordersPageSize, 5, 100),
     productsPageSize: clampNumber(input.productsPageSize, defaultAdminSettings.productsPageSize, 10, 200),
@@ -76,10 +95,21 @@ function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
   };
 }
 
+export function resolveAdminLogoCandidates(settings: AdminSettings, variant: "light" | "dark" = "light"): string[] {
+  const list: string[] = [];
+  if (settings.brandLogoMode === "custom") {
+    if (variant === "dark" && settings.brandLogoDarkUrl) list.push(settings.brandLogoDarkUrl);
+    if (settings.brandLogoUrl) list.push(settings.brandLogoUrl);
+  }
+  if (settings.brandLogoMode === "favicon") list.push("/favicon.ico");
+  list.push("/logo.png", "/favicon.ico");
+
+  const unique = Array.from(new Set(list.filter(Boolean)));
+  return unique.map((src) => applyVersion(src, settings.brandLogoVersion));
+}
+
 export function resolveAdminLogoSrc(settings: AdminSettings): string {
-  if (settings.brandLogoMode === "favicon") return "/favicon.ico";
-  if (settings.brandLogoMode === "custom" && settings.brandLogoUrl) return settings.brandLogoUrl;
-  return "/logo.png";
+  return resolveAdminLogoCandidates(settings)[0] || "/logo.png";
 }
 
 export function parseAdminSettings(value: string | null): AdminSettings {

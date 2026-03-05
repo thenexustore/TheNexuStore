@@ -9,10 +9,10 @@ import { toast } from "sonner";
 import { Loader2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import {
   loadAdminSettings,
-  resolveAdminLogoSrc,
   subscribeAdminSettings,
   type AdminSettings,
 } from "@/lib/admin-settings";
+import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function LoginPage() {
             animate={{ scale: 1 }}
             className="inline-flex items-center justify-center mb-6"
           >
-            <img src={resolveAdminLogoSrc(adminSettings)} alt="Logo" className="h-10 w-auto object-contain" />
+            <AdminBrandLogo settings={adminSettings} variant="dark" alt="Logo" className="w-auto" height={40} />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
             {t("title")}

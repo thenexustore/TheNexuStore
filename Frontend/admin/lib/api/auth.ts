@@ -1,4 +1,5 @@
 import { API_URL } from "../constants";
+import { fetchWithAuth } from "../utils";
 
 export interface LoginResponse {
   access_token: string;
@@ -27,4 +28,15 @@ export async function adminLogin(email: string, password: string): Promise<Login
     access_token: data.data.access_token,
     staff: data.data.user,
   };
+}
+
+export async function updateAdminCredentials(input: {
+  email?: string;
+  password?: string;
+  currentPassword: string;
+}): Promise<{ id: string; email: string; role: string }> {
+  return fetchWithAuth("/admin/account/credentials", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }

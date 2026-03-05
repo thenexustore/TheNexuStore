@@ -48,6 +48,7 @@ export default function AdminBrandLogo({
         objectFit: fit ?? settings.brandLogoFit,
         opacity: loaded ? 1 : 0.7,
         transition: "opacity 120ms ease",
+        filter: `brightness(${settings.brandLogoBrightness}%) saturate(${settings.brandLogoSaturation}%)`,
       }}
     />
   );

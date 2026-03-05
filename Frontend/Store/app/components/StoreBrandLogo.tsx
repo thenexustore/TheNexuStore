@@ -44,6 +44,7 @@ export default function StoreBrandLogo({
         objectFit: resolved.fit,
         opacity: loaded ? 1 : 0.7,
         transition: "opacity 120ms ease",
+        filter: `brightness(${resolved.brightness}%) saturate(${resolved.saturation}%)`,
       }}
     />
   );

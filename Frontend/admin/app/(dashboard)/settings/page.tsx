@@ -21,6 +21,7 @@ import {
 import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { updateAdminCredentials } from "@/lib/api";
 import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 import {
   defaultAdminSettings,
@@ -29,7 +30,6 @@ import {
   saveAdminSettings,
   type AdminLanguage,
   type AdminLogoFit,
-  type AdminLogoMode,
   type AdminSettings,
 } from "@/lib/admin-settings";
 
@@ -41,15 +41,21 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedSnapshot, setSavedSnapshot] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [credentialsSaving, setCredentialsSaving] = useState(false);
+  const [credentials, setCredentials] = useState({
+    email: "",
+    currentPassword: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
 
   const hasChanges = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(savedSnapshot),
     [savedSnapshot, settings],
   );
 
-  const isCustomLogo = settings.brandLogoMode === "custom";
-  const hasValidLightLogo = !isCustomLogo || settings.brandLogoUrl.trim().length > 0;
-  const hasValidDarkLogo = !isCustomLogo || settings.brandLogoDarkUrl.trim().length > 0;
+  const hasValidLightLogo = settings.brandLogoUrl.trim().length > 0;
+  const hasValidDarkLogo = settings.brandLogoDarkUrl.trim().length > 0;
   const isSupportEmailValid = settings.supportEmail.includes("@");
 
   const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
@@ -58,6 +64,78 @@ export default function SettingsPage() {
     }
   };
 
+  useEffect(() => {
+    const adminUserRaw = localStorage.getItem("admin_user");
+    if (!adminUserRaw) return;
+    try {
+      const adminUser = JSON.parse(adminUserRaw) as { email?: string };
+      if (adminUser.email) {
+        setCredentials((prev) => ({ ...prev, email: String(adminUser.email) }));
+      }
+    } catch {
+      // noop
+    }
+  }, []);
+
+  async function onSaveCredentials() {
+    if (!credentials.currentPassword) {
+      toast.error("Debes indicar la contraseña actual");
+      return;
+    }
+
+    if (!credentials.email.trim() && !credentials.newPassword.trim()) {
+      toast.error("Indica nuevo usuario (email) o nueva contraseña");
+      return;
+    }
+
+    if (credentials.newPassword && credentials.newPassword.length < 8) {
+      toast.error("La nueva contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    if (credentials.newPassword !== credentials.confirmNewPassword) {
+      toast.error("La confirmación de contraseña no coincide");
+      return;
+    }
+
+    setCredentialsSaving(true);
+    try {
+      const updated = await updateAdminCredentials({
+        email: credentials.email.trim() || undefined,
+        password: credentials.newPassword.trim() || undefined,
+        currentPassword: credentials.currentPassword,
+      });
+
+      const currentUserRaw = localStorage.getItem("admin_user");
+      if (currentUserRaw) {
+        try {
+          const currentUser = JSON.parse(currentUserRaw) as Record<string, unknown>;
+          localStorage.setItem(
+            "admin_user",
+            JSON.stringify({ ...currentUser, email: updated.email, name: updated.email }),
+          );
+        } catch {
+          // noop
+        }
+      }
+
+      setCredentials((prev) => ({
+        ...prev,
+        email: updated.email,
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
+      }));
+
+      toast.success("Credenciales de admin actualizadas");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudieron actualizar las credenciales";
+      toast.error(message);
+    } finally {
+      setCredentialsSaving(false);
+    }
+  }
+
   function onSave() {
     if (!isSupportEmailValid) {
       toast.error("El email de soporte no tiene formato válido");
@@ -65,7 +143,7 @@ export default function SettingsPage() {
     }
 
     if (!hasValidLightLogo) {
-      toast.error("Añade URL o sube un logo principal para modo personalizado");
+      toast.error("Añade o sube un logo principal personalizado");
       return;
     }
 
@@ -75,6 +153,8 @@ export default function SettingsPage() {
       settings.brandLogoDarkUrl !== savedSnapshot.brandLogoDarkUrl,
       settings.brandLogoFit !== savedSnapshot.brandLogoFit,
       settings.brandLogoHeight !== savedSnapshot.brandLogoHeight,
+      settings.brandLogoBrightness !== savedSnapshot.brandLogoBrightness,
+      settings.brandLogoSaturation !== savedSnapshot.brandLogoSaturation,
     ].some(Boolean);
 
     const nextSettings = logoFieldsChanged
@@ -207,14 +287,9 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm text-zinc-700">
-                Modo de logo
-                <select value={settings.brandLogoMode} onChange={(e) => update("brandLogoMode", e.target.value as AdminLogoMode)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
-                  <option value="default">Logo actual (/logo.png)</option>
-                  <option value="favicon">Favicon (/favicon.ico)</option>
-                  <option value="custom">Imagen personalizada</option>
-                </select>
-              </label>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+                Branding profesional activo: trabajamos con logo personalizado (sin presets prefabricados).
+              </div>
               <label className="block text-sm text-zinc-700">
                 Ajuste de imagen
                 <select value={settings.brandLogoFit} onChange={(e) => update("brandLogoFit", e.target.value as AdminLogoFit)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
@@ -224,38 +299,34 @@ export default function SettingsPage() {
               </label>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => update("brandLogoMode", "default")} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Preset: estándar</button>
-              <button type="button" onClick={() => update("brandLogoMode", "favicon")} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Preset: minimal favicon</button>
-              <button type="button" onClick={() => { update("brandLogoMode", "custom"); update("brandLogoFit", "contain"); }} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Preset: custom CDN</button>
-            </div>
-
             <NumberField label="Altura del logo (px)" value={settings.brandLogoHeight} min={20} max={64} onChange={(value) => update("brandLogoHeight", value)} />
+            <NumberField label="Brillo del logo (%)" value={settings.brandLogoBrightness} min={60} max={140} onChange={(value) => update("brandLogoBrightness", value)} />
+            <NumberField label="Saturación del logo (%)" value={settings.brandLogoSaturation} min={60} max={140} onChange={(value) => update("brandLogoSaturation", value)} />
 
             <label className="block text-sm text-zinc-700">
               URL logo principal
-              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} disabled={!isCustomLogo} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
+              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
             </label>
 
             <label className="block text-sm text-zinc-700">
               URL logo para fondo oscuro (login)
-              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} disabled={!isCustomLogo} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
+              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 disabled:bg-zinc-100 disabled:text-zinc-400" />
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-zinc-700">
                 Subir logo principal (máx 2MB)
-                <input type="file" accept="image/*" disabled={!isCustomLogo} onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
+                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "light")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
               <label className="block text-sm text-zinc-700">
                 Subir logo oscuro (máx 2MB)
-                <input type="file" accept="image/*" disabled={!isCustomLogo} onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
+                <input type="file" accept="image/*" onChange={(e) => onLogoFileChange(e, "dark")} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
             </div>
 
             <p className="text-xs text-zinc-500">Versión de cache actual: {settings.brandLogoVersion}. Se incrementa automáticamente cuando cambias branding y guardas.</p>
-            {isCustomLogo && (!hasValidLightLogo || !hasValidDarkLogo) && (
-              <p className="text-xs text-amber-600">Para una UX completa en light/dark, define ambos logos personalizados.</p>
+            {(!hasValidLightLogo || !hasValidDarkLogo) && (
+              <p className="text-xs text-amber-600">Recomendación profesional: define logo claro y oscuro para mantener contraste en todos los fondos.</p>
             )}
           </div>
 
@@ -290,6 +361,32 @@ export default function SettingsPage() {
               <option value="en-US">USA (mm/dd/yyyy)</option>
             </select>
           </label>
+        </div>
+
+        <div id="security-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Cuenta de administrador</h2>
+          <p className="text-sm text-zinc-600">Cambia el usuario (email) y contraseña del admin de forma segura usando tu contraseña actual.</p>
+          <label className="block text-sm text-zinc-700">
+            Usuario admin (email)
+            <input type="email" value={credentials.email} onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" placeholder="admin@tu-dominio.com" />
+          </label>
+          <label className="block text-sm text-zinc-700">
+            Contraseña actual
+            <input type="password" value={credentials.currentPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, currentPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+          </label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block text-sm text-zinc-700">
+              Nueva contraseña
+              <input type="password" value={credentials.newPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, newPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" placeholder="Mínimo 8 caracteres" />
+            </label>
+            <label className="block text-sm text-zinc-700">
+              Confirmar nueva contraseña
+              <input type="password" value={credentials.confirmNewPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, confirmNewPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+            </label>
+          </div>
+          <button type="button" onClick={onSaveCredentials} disabled={credentialsSaving} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60">
+            <Save className="h-4 w-4" />{credentialsSaving ? "Guardando credenciales..." : "Actualizar usuario/contraseña"}
+          </button>
         </div>
 
         <div id="operations-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">

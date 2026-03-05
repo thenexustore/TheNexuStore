@@ -1,5 +1,5 @@
 export type AdminLanguage = "es" | "en";
-export type AdminLogoMode = "default" | "favicon" | "custom";
+export type AdminLogoMode = "custom";
 export type AdminLogoFit = "contain" | "cover";
 
 export type AdminSettings = {
@@ -13,6 +13,8 @@ export type AdminSettings = {
   brandLogoFit: AdminLogoFit;
   brandLogoHeight: number;
   brandLogoVersion: number;
+  brandLogoBrightness: number;
+  brandLogoSaturation: number;
   ordersRefreshSeconds: number;
   ordersPageSize: number;
   productsPageSize: number;
@@ -25,18 +27,21 @@ export type AdminSettings = {
 
 export const ADMIN_SETTINGS_KEY = "admin_settings";
 export const ADMIN_SETTINGS_EVENT = "admin-settings-updated";
+export const BRANDING_COOKIE_KEY = "tns_branding";
 
 export const defaultAdminSettings: AdminSettings = {
   supportEmail: "support@thenexustore.com",
   adminLanguage: "es",
   defaultCurrency: "EUR",
   dateFormat: "es-ES",
-  brandLogoMode: "default",
+  brandLogoMode: "custom",
   brandLogoUrl: "",
   brandLogoDarkUrl: "",
   brandLogoFit: "contain",
   brandLogoHeight: 32,
   brandLogoVersion: 1,
+  brandLogoBrightness: 100,
+  brandLogoSaturation: 100,
   ordersRefreshSeconds: 30,
   ordersPageSize: 10,
   productsPageSize: 25,
@@ -64,10 +69,41 @@ function applyVersion(src: string, version: number): string {
   return `${src}${separator}v=${version}`;
 }
 
+
+function getCookieDomain(hostname: string): string | null {
+  if (hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return null;
+  }
+  const parts = hostname.split(".");
+  if (parts.length < 2) return null;
+  return `.${parts.slice(-2).join(".")}`;
+}
+
+function toBrandingCookiePayload(settings: AdminSettings): string {
+  const payload = {
+    brandLogoMode: settings.brandLogoMode,
+    brandLogoUrl: settings.brandLogoUrl,
+    brandLogoDarkUrl: settings.brandLogoDarkUrl,
+    brandLogoFit: settings.brandLogoFit,
+    brandLogoHeight: settings.brandLogoHeight,
+    brandLogoVersion: settings.brandLogoVersion,
+    brandLogoBrightness: settings.brandLogoBrightness,
+    brandLogoSaturation: settings.brandLogoSaturation,
+  };
+  return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+}
+
+function writeBrandingCookie(settings: AdminSettings): void {
+  if (typeof document === "undefined") return;
+  const domain = getCookieDomain(window.location.hostname);
+  const maxAge = 60 * 60 * 24 * 365;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  const domainPart = domain ? `; Domain=${domain}` : "";
+  document.cookie = `${BRANDING_COOKIE_KEY}=${toBrandingCookiePayload(settings)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${domainPart}${secure}`;
+}
 function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
   const language = input.adminLanguage === "en" ? "en" : "es";
-  const logoMode: AdminLogoMode =
-    input.brandLogoMode === "custom" || input.brandLogoMode === "favicon" ? input.brandLogoMode : "default";
+  const logoMode: AdminLogoMode = "custom";
 
   return {
     supportEmail:
@@ -84,6 +120,8 @@ function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
     brandLogoFit: input.brandLogoFit === "cover" ? "cover" : "contain",
     brandLogoHeight: clampNumber(input.brandLogoHeight, defaultAdminSettings.brandLogoHeight, 20, 64),
     brandLogoVersion: clampNumber(input.brandLogoVersion, defaultAdminSettings.brandLogoVersion, 1, 999999),
+    brandLogoBrightness: clampNumber(input.brandLogoBrightness, defaultAdminSettings.brandLogoBrightness, 60, 140),
+    brandLogoSaturation: clampNumber(input.brandLogoSaturation, defaultAdminSettings.brandLogoSaturation, 60, 140),
     ordersRefreshSeconds: clampNumber(input.ordersRefreshSeconds, defaultAdminSettings.ordersRefreshSeconds, 10, 300),
     ordersPageSize: clampNumber(input.ordersPageSize, defaultAdminSettings.ordersPageSize, 5, 100),
     productsPageSize: clampNumber(input.productsPageSize, defaultAdminSettings.productsPageSize, 10, 200),
@@ -97,11 +135,8 @@ function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
 
 export function resolveAdminLogoCandidates(settings: AdminSettings, variant: "light" | "dark" = "light"): string[] {
   const list: string[] = [];
-  if (settings.brandLogoMode === "custom") {
-    if (variant === "dark" && settings.brandLogoDarkUrl) list.push(settings.brandLogoDarkUrl);
-    if (settings.brandLogoUrl) list.push(settings.brandLogoUrl);
-  }
-  if (settings.brandLogoMode === "favicon") list.push("/favicon.ico");
+  if (variant === "dark" && settings.brandLogoDarkUrl) list.push(settings.brandLogoDarkUrl);
+  if (settings.brandLogoUrl) list.push(settings.brandLogoUrl);
   list.push("/logo.png", "/favicon.ico");
 
   const unique = Array.from(new Set(list.filter(Boolean)));
@@ -140,6 +175,7 @@ export function saveAdminSettings(settings: AdminSettings): void {
 
   const normalized = normalizeAdminSettings(settings);
   localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(normalized));
+  writeBrandingCookie(normalized);
   window.dispatchEvent(new CustomEvent(ADMIN_SETTINGS_EVENT, { detail: normalized }));
 }
 

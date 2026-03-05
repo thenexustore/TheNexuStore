@@ -20,7 +20,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { loadAdminSettings, type AdminSettings } from "@/lib/admin-settings";
+import {
+  loadAdminSettings,
+  subscribeAdminSettings,
+  type AdminSettings,
+} from "@/lib/admin-settings";
 
 type NavChild = {
   key: string;
@@ -81,12 +85,7 @@ export default function DashboardLayout({
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [dashboardSettings, setDashboardSettings] = useState<AdminSettings>(() => loadAdminSettings());
 
-  useEffect(() => {
-    const syncSettings = () => setDashboardSettings(loadAdminSettings());
-    syncSettings();
-    window.addEventListener("storage", syncSettings);
-    return () => window.removeEventListener("storage", syncSettings);
-  }, []);
+  useEffect(() => subscribeAdminSettings(setDashboardSettings), []);
   const userPermissions = (() => {
     try {
       const rawUser = localStorage.getItem("admin_user");

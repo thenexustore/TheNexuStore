@@ -14,6 +14,7 @@ import {
   Sparkles,
   Undo2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   defaultAdminSettings,
   loadAdminSettings,
@@ -23,20 +24,34 @@ import {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AdminSettings>(() => loadAdminSettings());
+  const [savedSnapshot, setSavedSnapshot] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const hasChanges = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(loadAdminSettings()),
-    [settings],
+    () => JSON.stringify(settings) !== JSON.stringify(savedSnapshot),
+    [savedSnapshot, settings],
   );
 
   function onSave() {
     saveAdminSettings(settings);
+    setSavedSnapshot(settings);
     setSavedAt(new Date());
+    toast.success("Ajustes guardados y aplicados");
   }
 
   function onReset() {
     setSettings(defaultAdminSettings);
+    saveAdminSettings(defaultAdminSettings);
+    setSavedSnapshot(defaultAdminSettings);
+    setSavedAt(new Date());
+    toast.success("Ajustes restaurados");
+  }
+
+  function onDiscard() {
+    const latest = loadAdminSettings();
+    setSettings(latest);
+    setSavedSnapshot(latest);
+    toast.info("Cambios descartados");
   }
 
   function update<K extends keyof AdminSettings>(key: K, value: AdminSettings[K]) {
@@ -53,7 +68,14 @@ export default function SettingsPage() {
               Centro de configuración para comportamiento del panel, operaciones y notificaciones.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onDiscard}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+            >
+              Descartar
+            </button>
             <button
               type="button"
               onClick={onReset}
@@ -144,7 +166,18 @@ export default function SettingsPage() {
             />
           </label>
           <label className="block text-sm text-zinc-700">
-            Tamaño de página en productos
+            Filas por página en pedidos
+            <input
+              type="number"
+              min={5}
+              max={100}
+              value={settings.ordersPageSize}
+              onChange={(e) => update("ordersPageSize", Number(e.target.value || 10))}
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm text-zinc-700">
+            Filas por página en productos
             <input
               type="number"
               min={10}
@@ -174,34 +207,10 @@ export default function SettingsPage() {
             <Bell className="h-5 w-5" />
             Alertas y experiencia
           </h2>
-          <ToggleRow
-            icon={<Mail className="h-4 w-4" />}
-            label="Notificaciones por email"
-            description="Avisos de incidencias, importaciones y tareas críticas"
-            value={settings.emailNotifications}
-            onChange={(value) => update("emailNotifications", value)}
-          />
-          <ToggleRow
-            icon={<MessageSquare className="h-4 w-4" />}
-            label="Sonido en chat"
-            description="Reproducir aviso al llegar nuevos mensajes"
-            value={settings.chatSoundEnabled}
-            onChange={(value) => update("chatSoundEnabled", value)}
-          />
-          <ToggleRow
-            icon={<Sparkles className="h-4 w-4" />}
-            label="Métricas avanzadas"
-            description="Mostrar KPIs extendidos en el dashboard"
-            value={settings.showAdvancedMetrics}
-            onChange={(value) => update("showAdvancedMetrics", value)}
-          />
-          <ToggleRow
-            icon={<Settings2 className="h-4 w-4" />}
-            label="Sidebar compacta"
-            description="Navegación más ajustada para pantallas pequeñas"
-            value={settings.compactSidebar}
-            onChange={(value) => update("compactSidebar", value)}
-          />
+          <ToggleRow icon={<Mail className="h-4 w-4" />} label="Notificaciones por email" description="Avisos de incidencias, importaciones y tareas críticas" value={settings.emailNotifications} onChange={(value) => update("emailNotifications", value)} />
+          <ToggleRow icon={<MessageSquare className="h-4 w-4" />} label="Sonido en chat" description="Reproducir aviso al llegar nuevos mensajes" value={settings.chatSoundEnabled} onChange={(value) => update("chatSoundEnabled", value)} />
+          <ToggleRow icon={<Sparkles className="h-4 w-4" />} label="Métricas avanzadas" description="Mostrar KPIs extendidos en el dashboard" value={settings.showAdvancedMetrics} onChange={(value) => update("showAdvancedMetrics", value)} />
+          <ToggleRow icon={<Settings2 className="h-4 w-4" />} label="Sidebar compacta" description="Navegación más ajustada para pantallas pequeñas" value={settings.compactSidebar} onChange={(value) => update("compactSidebar", value)} />
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6">
@@ -209,18 +218,16 @@ export default function SettingsPage() {
             <Clock3 className="h-5 w-5" />
             Integración rápida con módulos
           </h2>
-          <p className="mt-2 text-sm text-zinc-600">
-            Desde esta pestaña puedes saltar a las áreas más relacionadas con cada ajuste.
-          </p>
+          <p className="mt-2 text-sm text-zinc-600">Desde esta pestaña puedes saltar a las áreas más relacionadas con cada ajuste.</p>
           <div className="mt-4 grid gap-2">
             <QuickLink href="/dashboard" label="Dashboard" description="Comprobar métricas y actividad diaria" />
-            <QuickLink href="/orders" label="Pedidos" description="Aplicar política de refresco y supervisión" />
-            <QuickLink href="/products" label="Productos" description="Validar paginación y control de stock" />
+            <QuickLink href="/orders" label="Pedidos" description="Aplicar política de refresco, locale y filas" />
+            <QuickLink href="/products" label="Productos" description="Validar paginación, divisa y control de bajo stock" />
             <QuickLink href="/chat" label="Chat" description="Revisar notificaciones y avisos sonoros" />
           </div>
           <div className="mt-5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs text-zinc-600">
             {hasChanges
-              ? "Tienes cambios sin guardar. Guarda para mantener estos ajustes en el navegador actual."
+              ? "Tienes cambios sin guardar. Guarda para aplicar y persistirlos en el navegador actual."
               : "Sin cambios pendientes. Tu configuración está sincronizada en este navegador."}
           </div>
         </div>
@@ -229,40 +236,15 @@ export default function SettingsPage() {
   );
 }
 
-function ToggleRow({
-  icon,
-  label,
-  description,
-  value,
-  onChange,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) {
+function ToggleRow({ icon, label, description, value, onChange }: { icon: React.ReactNode; label: string; description: string; value: boolean; onChange: (value: boolean) => void; }) {
   return (
     <div className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 p-3">
       <div>
-        <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
-          {icon}
-          {label}
-        </p>
+        <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">{icon}{label}</p>
         <p className="mt-1 text-xs text-zinc-600">{description}</p>
       </div>
-      <button
-        type="button"
-        onClick={() => onChange(!value)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-          value ? "bg-zinc-900" : "bg-zinc-300"
-        }`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-            value ? "translate-x-6" : "translate-x-1"
-          }`}
-        />
+      <button type="button" onClick={() => onChange(!value)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${value ? "bg-zinc-900" : "bg-zinc-300"}`}>
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${value ? "translate-x-6" : "translate-x-1"}`} />
       </button>
     </div>
   );
@@ -270,10 +252,7 @@ function ToggleRow({
 
 function QuickLink({ href, label, description }: { href: string; label: string; description: string }) {
   return (
-    <Link
-      href={href}
-      className="rounded-lg border border-zinc-200 bg-white px-3 py-2 transition hover:border-zinc-300 hover:bg-zinc-50"
-    >
+    <Link href={href} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 transition hover:border-zinc-300 hover:bg-zinc-50">
       <p className="text-sm font-medium text-zinc-900">{label}</p>
       <p className="text-xs text-zinc-600">{description}</p>
     </Link>

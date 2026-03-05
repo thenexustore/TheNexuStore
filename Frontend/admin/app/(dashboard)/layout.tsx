@@ -86,6 +86,12 @@ export default function DashboardLayout({
   const [dashboardSettings, setDashboardSettings] = useState<AdminSettings>(() => loadAdminSettings());
 
   useEffect(() => subscribeAdminSettings(setDashboardSettings), []);
+
+  useEffect(() => {
+    if (dashboardSettings.adminLanguage !== locale) {
+      router.replace(pathname, { locale: dashboardSettings.adminLanguage });
+    }
+  }, [dashboardSettings.adminLanguage, locale, pathname, router]);
   const userPermissions = (() => {
     try {
       const rawUser = localStorage.getItem("admin_user");

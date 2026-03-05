@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Bell,
   Building2,
   Clock3,
   Gauge,
+  Globe,
   Mail,
   MessageSquare,
   Save,
@@ -14,15 +14,22 @@ import {
   Sparkles,
   Undo2,
 } from "lucide-react";
+import { useLocale } from "next-intl";
 import { toast } from "sonner";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import {
   defaultAdminSettings,
   loadAdminSettings,
   saveAdminSettings,
+  type AdminLanguage,
   type AdminSettings,
 } from "@/lib/admin-settings";
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
+
   const [settings, setSettings] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedSnapshot, setSavedSnapshot] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -32,10 +39,17 @@ export default function SettingsPage() {
     [savedSnapshot, settings],
   );
 
+  const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
+    if (locale !== nextLanguage) {
+      router.replace(pathname, { locale: nextLanguage });
+    }
+  };
+
   function onSave() {
     saveAdminSettings(settings);
     setSavedSnapshot(settings);
     setSavedAt(new Date());
+    applyLocaleIfNeeded(settings.adminLanguage);
     toast.success("Ajustes guardados y aplicados");
   }
 
@@ -44,6 +58,7 @@ export default function SettingsPage() {
     saveAdminSettings(defaultAdminSettings);
     setSavedSnapshot(defaultAdminSettings);
     setSavedAt(new Date());
+    applyLocaleIfNeeded(defaultAdminSettings.adminLanguage);
     toast.success("Ajustes restaurados");
   }
 
@@ -51,6 +66,7 @@ export default function SettingsPage() {
     const latest = loadAdminSettings();
     setSettings(latest);
     setSavedSnapshot(latest);
+    applyLocaleIfNeeded(latest.adminLanguage);
     toast.info("Cambios descartados");
   }
 
@@ -65,33 +81,13 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">Ajustes del panel</h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Centro de configuración para comportamiento del panel, operaciones y notificaciones.
+              Configura idioma, comportamiento y preferencias operativas del admin desde un solo sitio.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={onDiscard}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-            >
-              Descartar
-            </button>
-            <button
-              type="button"
-              onClick={onReset}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-            >
-              <Undo2 className="h-4 w-4" />
-              Restaurar por defecto
-            </button>
-            <button
-              type="button"
-              onClick={onSave}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800"
-            >
-              <Save className="h-4 w-4" />
-              Guardar ajustes
-            </button>
+            <button type="button" onClick={onDiscard} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Descartar</button>
+            <button type="button" onClick={onReset} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"><Undo2 className="h-4 w-4" />Restaurar por defecto</button>
+            <button type="button" onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800"><Save className="h-4 w-4" />Guardar ajustes</button>
           </div>
         </div>
         <div className="mt-3 text-xs text-zinc-500">
@@ -101,112 +97,53 @@ export default function SettingsPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
-            <Building2 className="h-5 w-5" />
-            Identidad y operación
-          </h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Identidad y operación</h2>
           <label className="block text-sm text-zinc-700">
             Marca visible
-            <input
-              value={settings.brandName}
-              onChange={(e) => update("brandName", e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-            />
+            <input value={settings.brandName} onChange={(e) => update("brandName", e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
           </label>
           <label className="block text-sm text-zinc-700">
             Email soporte
-            <input
-              type="email"
-              value={settings.supportEmail}
-              onChange={(e) => update("supportEmail", e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-            />
+            <input type="email" value={settings.supportEmail} onChange={(e) => update("supportEmail", e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
           </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm text-zinc-700">
+              Idioma del panel
+              <select value={settings.adminLanguage} onChange={(e) => update("adminLanguage", e.target.value as AdminLanguage)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+                <option value="es">Español</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label className="block text-sm text-zinc-700">
               Divisa por defecto
-              <select
-                value={settings.defaultCurrency}
-                onChange={(e) => update("defaultCurrency", e.target.value as AdminSettings["defaultCurrency"])}
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-              >
+              <select value={settings.defaultCurrency} onChange={(e) => update("defaultCurrency", e.target.value as AdminSettings["defaultCurrency"])} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
                 <option value="EUR">EUR (€)</option>
                 <option value="USD">USD ($)</option>
               </select>
             </label>
-            <label className="block text-sm text-zinc-700">
-              Formato de fecha
-              <select
-                value={settings.dateFormat}
-                onChange={(e) => update("dateFormat", e.target.value as AdminSettings["dateFormat"])}
-                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-              >
-                <option value="es-ES">España (dd/mm/yyyy)</option>
-                <option value="en-GB">Reino Unido (dd/mm/yyyy)</option>
-                <option value="en-US">USA (mm/dd/yyyy)</option>
-              </select>
-            </label>
           </div>
+          <label className="block text-sm text-zinc-700">
+            Formato de fecha
+            <select value={settings.dateFormat} onChange={(e) => update("dateFormat", e.target.value as AdminSettings["dateFormat"])} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+              <option value="es-ES">España (dd/mm/yyyy)</option>
+              <option value="en-GB">Reino Unido (dd/mm/yyyy)</option>
+              <option value="en-US">USA (mm/dd/yyyy)</option>
+            </select>
+          </label>
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
-            <Gauge className="h-5 w-5" />
-            Rendimiento y listados
-          </h2>
-          <label className="block text-sm text-zinc-700">
-            Refresco automático de pedidos (segundos)
-            <input
-              type="number"
-              min={10}
-              max={300}
-              value={settings.ordersRefreshSeconds}
-              onChange={(e) => update("ordersRefreshSeconds", Number(e.target.value || 30))}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm text-zinc-700">
-            Filas por página en pedidos
-            <input
-              type="number"
-              min={5}
-              max={100}
-              value={settings.ordersPageSize}
-              onChange={(e) => update("ordersPageSize", Number(e.target.value || 10))}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm text-zinc-700">
-            Filas por página en productos
-            <input
-              type="number"
-              min={10}
-              max={200}
-              value={settings.productsPageSize}
-              onChange={(e) => update("productsPageSize", Number(e.target.value || 25))}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm text-zinc-700">
-            Umbral de bajo stock
-            <input
-              type="number"
-              min={0}
-              max={500}
-              value={settings.lowStockThreshold}
-              onChange={(e) => update("lowStockThreshold", Number(e.target.value || 5))}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-            />
-          </label>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Gauge className="h-5 w-5" />Rendimiento y listados</h2>
+          <NumberField label="Refresco automático de pedidos (segundos)" value={settings.ordersRefreshSeconds} min={10} max={300} onChange={(value) => update("ordersRefreshSeconds", value)} />
+          <NumberField label="Filas por página en pedidos" value={settings.ordersPageSize} min={5} max={100} onChange={(value) => update("ordersPageSize", value)} />
+          <NumberField label="Filas por página en productos" value={settings.productsPageSize} min={10} max={200} onChange={(value) => update("productsPageSize", value)} />
+          <NumberField label="Umbral de bajo stock" value={settings.lowStockThreshold} min={0} max={500} onChange={(value) => update("lowStockThreshold", value)} />
         </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
-            <Bell className="h-5 w-5" />
-            Alertas y experiencia
-          </h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Bell className="h-5 w-5" />Alertas y experiencia</h2>
           <ToggleRow icon={<Mail className="h-4 w-4" />} label="Notificaciones por email" description="Avisos de incidencias, importaciones y tareas críticas" value={settings.emailNotifications} onChange={(value) => update("emailNotifications", value)} />
           <ToggleRow icon={<MessageSquare className="h-4 w-4" />} label="Sonido en chat" description="Reproducir aviso al llegar nuevos mensajes" value={settings.chatSoundEnabled} onChange={(value) => update("chatSoundEnabled", value)} />
           <ToggleRow icon={<Sparkles className="h-4 w-4" />} label="Métricas avanzadas" description="Mostrar KPIs extendidos en el dashboard" value={settings.showAdvancedMetrics} onChange={(value) => update("showAdvancedMetrics", value)} />
@@ -214,25 +151,40 @@ export default function SettingsPage() {
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
-            <Clock3 className="h-5 w-5" />
-            Integración rápida con módulos
-          </h2>
-          <p className="mt-2 text-sm text-zinc-600">Desde esta pestaña puedes saltar a las áreas más relacionadas con cada ajuste.</p>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Clock3 className="h-5 w-5" />Integración rápida con módulos</h2>
+          <p className="mt-2 text-sm text-zinc-600">Los ajustes se aplican al instante en módulos conectados y se mantienen por navegador.</p>
           <div className="mt-4 grid gap-2">
-            <QuickLink href="/dashboard" label="Dashboard" description="Comprobar métricas y actividad diaria" />
-            <QuickLink href="/orders" label="Pedidos" description="Aplicar política de refresco, locale y filas" />
-            <QuickLink href="/products" label="Productos" description="Validar paginación, divisa y control de bajo stock" />
-            <QuickLink href="/chat" label="Chat" description="Revisar notificaciones y avisos sonoros" />
+            <QuickLink href="/dashboard" label="Dashboard" description="Validar métricas avanzadas y vista general" />
+            <QuickLink href="/orders" label="Pedidos" description="Aplicar idioma, divisa, refresco y filas" />
+            <QuickLink href="/products" label="Productos" description="Validar paginación, divisa y umbral de stock" />
+            <QuickLink href="/chat" label="Chat" description="Comprobar notificaciones y sonido" />
           </div>
           <div className="mt-5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs text-zinc-600">
-            {hasChanges
-              ? "Tienes cambios sin guardar. Guarda para aplicar y persistirlos en el navegador actual."
-              : "Sin cambios pendientes. Tu configuración está sincronizada en este navegador."}
+            {hasChanges ? "Tienes cambios sin guardar. Guarda para aplicarlos y persistirlos." : "Sin cambios pendientes. Configuración sincronizada."}
+          </div>
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600">
+            <p className="flex items-center gap-2 font-medium text-zinc-700"><Globe className="h-4 w-4" />Idioma actual de navegación: {locale.toUpperCase()}</p>
+            <p className="mt-1">Idioma configurado en ajustes: {settings.adminLanguage.toUpperCase()} (se aplica al guardar).</p>
           </div>
         </div>
       </section>
     </div>
+  );
+}
+
+function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (next: number) => void; }) {
+  return (
+    <label className="block text-sm text-zinc-700">
+      {label}
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value || min))}
+        className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
+      />
+    </label>
   );
 }
 

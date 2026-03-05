@@ -245,7 +245,7 @@ export default function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-50 min-h-20 w-full border-b border-gray-200 bg-white text-black">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-2 py-2 sm:gap-3 sm:px-4">
           <button
             onClick={() => setCategoryPanelOpen((v) => !v)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -254,7 +254,7 @@ export default function Navbar() {
           </button>
 
           <Link href="/" className="min-w-0 flex-shrink-0">
-            <div className="flex h-10 w-24 items-center justify-center rounded-lg sm:w-32">
+            <div className="flex h-10 w-20 items-center justify-center rounded-lg sm:w-32">
               <StoreBrandLogo branding={storeBranding} alt="logo" className="h-8 w-auto" height={32} />
             </div>
           </Link>
@@ -282,7 +282,7 @@ export default function Navbar() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => search.length >= 2 && setShowSearchResults(true)}
                 placeholder={t("searchPlaceholder")}
-                className="w-full rounded-lg bg-gray-50 border border-gray-300 px-5 py-3 pr-12 text-sm outline-none focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/20 transition-all"
+                className="w-full rounded-lg bg-gray-50 border border-gray-300 px-4 py-2.5 pr-12 text-sm outline-none focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/20 transition-all sm:px-5 sm:py-3"
               />
               <button
                 type="submit"
@@ -433,14 +433,14 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5 shrink-0 sm:gap-2">
+          <div className="ml-auto flex items-center gap-1 shrink-0 sm:gap-2">
             <Link
               href="/chat"
               onClick={closeMobilePanels}
-              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
+              className="rounded-lg p-1.5 transition-colors hover:bg-gray-100 sm:p-2"
               title={t("supportChat")}
             >
-              <MessageCircle className="w-5 h-5 text-gray-700" />
+              <MessageCircle className="h-5 w-5 text-gray-700" />
             </Link>
             {!user ? (
               <div className="hidden items-center gap-3 md:flex">
@@ -504,9 +504,9 @@ export default function Navbar() {
             <Link
               href="/cart"
               onClick={closeMobilePanels}
-              className="relative rounded-lg p-2 transition-colors hover:bg-gray-100"
+              className="relative rounded-lg p-1.5 transition-colors hover:bg-gray-100 sm:p-2"
             >
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
+              <ShoppingCart className="h-5 w-5 text-gray-700 sm:h-6 sm:w-6" />
               {displayCartCount > 0 && (
                 <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
                   {displayCartCount > 9 ? "9+" : displayCartCount}

@@ -128,6 +128,26 @@ npm run build
 npm run start -- -p 3001
 ```
 
+## Script de despliegue automatizado
+
+También puedes usar `ops/nexus_deploy.sh` para automatizar todo (pull del repo, build, migraciones Prisma, PM2 y healthchecks):
+
+```bash
+BACKEND_ENV_FILE=/root/nexus-backend.env REPO_DIR=/opt/TheNexuStore BRANCH=main bash ops/nexus_deploy.sh
+```
+
+Modo simulación (no ejecuta cambios):
+
+```bash
+BACKEND_ENV_FILE=/root/nexus-backend.env bash ops/nexus_deploy.sh --dry-run
+```
+
+Variables útiles del script:
+- `REPO_URL` y `FALLBACK_LOCAL_REPO`: para clonar si `REPO_DIR` no existe aún.
+- `SITE_DOMAIN`, `ADMIN_DOMAIN`, `API_DOMAIN`: URLs públicas para generar `.env.production`.
+- `SYNC_FRONTEND_ENV=0`: evita sobreescribir los `.env.production` de Store/Admin.
+- `SKIP_EXTERNAL_HEALTHCHECKS=0`: activa checks externos además de localhost.
+
 ## Verificaciones rápidas
 
 - API health:

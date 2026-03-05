@@ -1,4 +1,4 @@
-export { adminLogin, type LoginResponse } from "./auth";
+export { adminLogin, updateAdminCredentials, type LoginResponse } from "./auth";
 
 export {
   fetchProducts,

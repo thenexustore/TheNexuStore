@@ -10,6 +10,8 @@ import { getMe } from "../lib/auth";
 import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
 import { buildCuratedCategoryTree } from "../lib/category-navigation";
+import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
+import StoreBrandLogo from "./StoreBrandLogo";
 
 type User = {
   id: string;
@@ -39,6 +41,7 @@ export default function Navbar() {
   const [categorySearch, setCategorySearch] = useState("");
   const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
+  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
@@ -92,6 +95,8 @@ export default function Navbar() {
     window.addEventListener("cart-update", handleCartUpdate);
     return () => window.removeEventListener("cart-update", handleCartUpdate);
   }, []);
+
+  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
   useEffect(() => {
     if (authUser) {
@@ -250,7 +255,7 @@ export default function Navbar() {
 
           <Link href="/" className="min-w-0 flex-shrink-0">
             <div className="flex h-10 w-24 items-center justify-center rounded-lg sm:w-32">
-              <img src="/logo.png" alt="logo" />
+              <StoreBrandLogo branding={storeBranding} alt="logo" className="h-8 w-auto" height={32} />
             </div>
           </Link>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Search,
   Download,
@@ -20,6 +20,7 @@ import {
   type OrderTimelineEntry,
 } from "@/lib/api";
 import { toast } from "sonner";
+import { loadAdminSettings, subscribeAdminSettings } from "@/lib/admin-settings";
 
 const statusColors: Record<string, string> = {
   PENDING_PAYMENT: "bg-blue-100 text-blue-800",
@@ -52,17 +53,22 @@ export default function OrdersPage() {
   const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
   const [timeline, setTimeline] = useState<OrderTimelineEntry[]>([]);
   const [note, setNote] = useState("");
+  const [adminSettings, setAdminSettings] = useState(() => loadAdminSettings());
+
+  useEffect(() => subscribeAdminSettings(setAdminSettings), []);
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("es-ES", {
+    new Intl.NumberFormat(adminSettings.dateFormat, {
       style: "currency",
-      currency: "EUR",
+      currency: adminSettings.defaultCurrency,
     }).format(amount);
 
-  const loadOrders = async (targetPage = page) => {
+  const formatDate = (date: string) => new Date(date).toLocaleString(adminSettings.dateFormat);
+
+  const loadOrders = useCallback(async (targetPage = page) => {
     try {
       setLoading(true);
-      const data = await fetchOrders(targetPage, 10, status, search);
+      const data = await fetchOrders(targetPage, adminSettings.ordersPageSize, status, search);
       setOrders(data.orders || []);
       setTotalPages(data.totalPages || 1);
       setPage(targetPage);
@@ -71,7 +77,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminSettings.ordersPageSize, page, search, status]);
 
   const openOrderDetail = async (orderId: string) => {
     try {
@@ -109,7 +115,15 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders(1);
-  }, [status]);
+  }, [loadOrders]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadOrders(page);
+    }, Math.max(10, adminSettings.ordersRefreshSeconds) * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [adminSettings.ordersRefreshSeconds, loadOrders, page]);
 
   return (
     <div className="space-y-6">
@@ -117,6 +131,9 @@ export default function OrdersPage() {
         <h1 className="text-2xl font-bold">Orders Management</h1>
         <p className="text-gray-500 text-sm mt-1">
           Track order lifecycle, customer info and post-sales operations.
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Auto-refresh cada {adminSettings.ordersRefreshSeconds}s · {adminSettings.ordersPageSize} filas por página
         </p>
       </div>
 
@@ -205,7 +222,7 @@ export default function OrdersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-500 text-sm">
-                          {new Date(order.createdAt).toLocaleString()}
+                          {formatDate(order.createdAt)}
                         </td>
                         <td className="px-6 py-4 font-medium">{formatCurrency(Number(order.amount))}</td>
                         <td className="px-6 py-4">

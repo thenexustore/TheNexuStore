@@ -154,8 +154,8 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-6 text-black sm:py-8">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+    <div className="min-h-screen bg-white py-6 pb-28 text-black sm:py-8 sm:pb-8">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6">
         {isLegacyCart && user && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center justify-between">
@@ -351,7 +351,7 @@ export default function CartPage() {
           </div>
 
           <div className="lg:w-1/3 lg:min-w-[300px]">
-            <div className="sticky bottom-0 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6 lg:top-8">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6 lg:sticky lg:top-8">
               <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
               <div className="space-y-4 mb-6">
@@ -463,7 +463,7 @@ export default function CartPage() {
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="hidden space-y-4 lg:block">
                 <button
                   onClick={() => router.push("/checkout")}
                   disabled={cart.summary.checkout_available === false}
@@ -489,6 +489,16 @@ export default function CartPage() {
           </div>
         </div>
       </div>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur lg:hidden">
+        <button
+          onClick={() => router.push("/checkout")}
+          disabled={cart.summary.checkout_available === false}
+          className="w-full rounded-xl bg-[#0B123A] py-3 font-bold text-white transition-all hover:bg-[#1a245a] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("proceed")} · {formatCurrency(cart.summary.total, locale)}
+        </button>
+      </div>
+
     </div>
   );
 }

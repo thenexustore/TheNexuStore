@@ -31,11 +31,34 @@ body {
   max-width: 100%;
 }
 
+* {
+  min-width: 0;
+}
+
 img,
 video,
 canvas,
 svg {
   max-width: 100%;
+}
+
+table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.prose {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
 }
 
 /* Smooth scrolling */

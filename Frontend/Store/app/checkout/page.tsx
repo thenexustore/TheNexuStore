@@ -231,11 +231,11 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 text-black sm:py-8">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+    <div className="min-h-screen bg-gray-50 py-6 pb-28 text-black sm:py-8 sm:pb-8">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6">
         <h1 className="mb-6 text-2xl font-bold sm:mb-8 sm:text-3xl">{t("title")}</h1>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-8">
           <div>
             <form
               id={CHECKOUT_FORM_ID}
@@ -313,7 +313,7 @@ export default function CheckoutPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         {t("city")} *
@@ -568,16 +568,17 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur lg:hidden">
         <button
-          type="button"
-          onClick={() => (document.querySelector("form") as HTMLFormElement | null)?.requestSubmit()}
+          type="submit"
+          form={CHECKOUT_FORM_ID}
           disabled={loading || cart.summary.checkout_available === false}
-          className="w-full rounded-xl bg-[#0B123A] py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-xl bg-[#0B123A] py-3 font-bold text-white transition-all hover:bg-[#1a245a] disabled:opacity-50"
         >
-          {loading ? t("processing") : t("placeOrder")}
+          {loading ? t("processing") : `${t("placeOrder")} · ${formatCurrency(cart.summary.total)}`}
         </button>
       </div>
+
     </div>
   );
 }

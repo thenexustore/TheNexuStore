@@ -141,7 +141,7 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 pb-24 pt-6 text-black sm:px-6 sm:pb-6">
       <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
         <Link href="/" className="hover:underline">
           {t("home")}
@@ -331,7 +331,7 @@ export default function ProductPage() {
             </div>
           )}
 
-          <div className="mb-8">
+          <div className="mb-8 md:mb-4">
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <div className="flex w-fit items-center rounded border border-gray-300">
                 <button
@@ -365,7 +365,7 @@ export default function ProductPage() {
                       ),
                     )
                   }
-                  className="w-16 text-center"
+                  className="w-14 bg-transparent text-center sm:w-16"
                   disabled={isOutOfStock}
                 />
                 <button
@@ -390,7 +390,7 @@ export default function ProductPage() {
               <button
                 onClick={handleAddToCart}
                 disabled={isOutOfStock || addingToCart}
-                className={`w-full rounded px-6 py-3 font-medium transition-all sm:flex-1 ${
+                className={`hidden w-full rounded px-6 py-3 font-medium transition-all md:block md:flex-1 ${
                   isOutOfStock || addingToCart
                     ? "cursor-not-allowed bg-gray-300 text-gray-500"
                     : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
@@ -464,7 +464,7 @@ export default function ProductPage() {
               : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
-          {addingToCart ? "Adding..." : isOutOfStock ? "Out of Stock" : "Add to Cart"}
+          {addingToCart ? t("adding") : isOutOfStock ? t("outOfStock") : t("addToCart")}
         </button>
       </div>
 

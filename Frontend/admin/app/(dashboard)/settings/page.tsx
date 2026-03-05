@@ -269,8 +269,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-24">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6">
+    <div className="relative space-y-6 pb-24">
+      <div className="rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-white via-white to-zinc-50 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">Ajustes del panel</h1>
@@ -292,7 +292,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white p-3 flex flex-wrap gap-2">
+      <div className="sticky top-2 z-20 rounded-xl border border-zinc-200/80 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 flex flex-wrap gap-2 shadow-sm">
         <button type="button" onClick={() => scrollToSection("branding-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><CircleDot className="h-3.5 w-3.5" />Branding</button>
         <button type="button" onClick={() => scrollToSection("security-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Building2 className="h-3.5 w-3.5" />Seguridad</button>
         <button type="button" onClick={() => scrollToSection("operations-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Gauge className="h-3.5 w-3.5" />Operaciones</button>
@@ -301,10 +301,10 @@ export default function SettingsPage() {
       </div>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div id="branding-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="branding-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Branding e identidad</h2>
 
-          <div className="rounded-xl border border-zinc-200 p-4 space-y-3">
+          <div className="rounded-xl border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-4 space-y-3">
             <p className="text-sm font-medium text-zinc-900">Sistema de logo enterprise</p>
             <p className="text-xs text-zinc-500">Configura logo principal y alternativo para fondos oscuros con fallback automático y cache busting.</p>
 
@@ -329,7 +329,7 @@ export default function SettingsPage() {
               </div>
               <label className="block text-sm text-zinc-700">
                 Ajuste de imagen
-                <select value={settings.brandLogoFit} onChange={(e) => update("brandLogoFit", e.target.value as AdminLogoFit)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+                <select value={settings.brandLogoFit} onChange={(e) => update("brandLogoFit", e.target.value as AdminLogoFit)} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
                   <option value="contain">Contain</option>
                   <option value="cover">Cover</option>
                 </select>
@@ -347,12 +347,12 @@ export default function SettingsPage() {
 
             <label className="block text-sm text-zinc-700">
               URL logo principal
-              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
             </label>
 
             <label className="block text-sm text-zinc-700">
               URL logo para fondo oscuro (login)
-              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -381,14 +381,14 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm text-zinc-700">
               Idioma del panel
-              <select value={settings.adminLanguage} onChange={(e) => update("adminLanguage", e.target.value as AdminLanguage)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+              <select value={settings.adminLanguage} onChange={(e) => update("adminLanguage", e.target.value as AdminLanguage)} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
                 <option value="es">Español</option>
                 <option value="en">English</option>
               </select>
             </label>
             <label className="block text-sm text-zinc-700">
               Divisa por defecto
-              <select value={settings.defaultCurrency} onChange={(e) => update("defaultCurrency", e.target.value as AdminSettings["defaultCurrency"])} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+              <select value={settings.defaultCurrency} onChange={(e) => update("defaultCurrency", e.target.value as AdminSettings["defaultCurrency"])} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
                 <option value="EUR">EUR (€)</option>
                 <option value="USD">USD ($)</option>
               </select>
@@ -397,7 +397,7 @@ export default function SettingsPage() {
 
           <label className="block text-sm text-zinc-700">
             Formato de fecha
-            <select value={settings.dateFormat} onChange={(e) => update("dateFormat", e.target.value as AdminSettings["dateFormat"])} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+            <select value={settings.dateFormat} onChange={(e) => update("dateFormat", e.target.value as AdminSettings["dateFormat"])} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
               <option value="es-ES">España (dd/mm/yyyy)</option>
               <option value="en-GB">Reino Unido (dd/mm/yyyy)</option>
               <option value="en-US">USA (mm/dd/yyyy)</option>
@@ -405,25 +405,25 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div id="security-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="security-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Cuenta de administrador</h2>
           <p className="text-sm text-zinc-600">Cambia el usuario (email) y contraseña del admin de forma segura usando tu contraseña actual.</p>
           <label className="block text-sm text-zinc-700">
             Usuario admin (email)
-            <input type="email" value={credentials.email} onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" placeholder="admin@tu-dominio.com" />
+            <input type="email" value={credentials.email} onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" placeholder="admin@tu-dominio.com" />
           </label>
           <label className="block text-sm text-zinc-700">
             Contraseña actual
-            <input type="password" value={credentials.currentPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, currentPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+            <input type="password" value={credentials.currentPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, currentPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
           </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm text-zinc-700">
               Nueva contraseña
-              <input type="password" value={credentials.newPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, newPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" placeholder="Mínimo 8 caracteres" />
+              <input type="password" value={credentials.newPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, newPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" placeholder="Mínimo 8 caracteres" />
             </label>
             <label className="block text-sm text-zinc-700">
               Confirmar nueva contraseña
-              <input type="password" value={credentials.confirmNewPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, confirmNewPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
+              <input type="password" value={credentials.confirmNewPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, confirmNewPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
             </label>
           </div>
           <button type="button" onClick={onSaveCredentials} disabled={credentialsSaving || (!hasCredentialEmailChange && !hasCredentialPasswordChange)} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60">
@@ -431,7 +431,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div id="operations-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="operations-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Gauge className="h-5 w-5" />Rendimiento y listados</h2>
           <NumberField label="Refresco automático de pedidos (segundos)" value={settings.ordersRefreshSeconds} min={10} max={300} onChange={(value) => update("ordersRefreshSeconds", value)} />
           <NumberField label="Filas por página en pedidos" value={settings.ordersPageSize} min={5} max={100} onChange={(value) => update("ordersPageSize", value)} />
@@ -441,7 +441,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div id="experience-section" className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div id="experience-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Bell className="h-5 w-5" />Alertas y experiencia</h2>
           <ToggleRow icon={<Mail className="h-4 w-4" />} label="Notificaciones por email" description="Avisos de incidencias, importaciones y tareas críticas" value={settings.emailNotifications} onChange={(value) => update("emailNotifications", value)} />
           <ToggleRow icon={<MessageSquare className="h-4 w-4" />} label="Sonido en chat" description="Reproducir aviso al llegar nuevos mensajes" value={settings.chatSoundEnabled} onChange={(value) => update("chatSoundEnabled", value)} />
@@ -449,7 +449,7 @@ export default function SettingsPage() {
           <ToggleRow icon={<Settings2 className="h-4 w-4" />} label="Sidebar compacta" description="Navegación más ajustada para pantallas pequeñas" value={settings.compactSidebar} onChange={(value) => update("compactSidebar", value)} />
         </div>
 
-        <div id="integration-section" className="rounded-2xl border border-zinc-200 bg-white p-6">
+        <div id="integration-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Clock3 className="h-5 w-5" />Integración rápida con módulos</h2>
           <p className="mt-2 text-sm text-zinc-600">Los ajustes se aplican al instante en módulos conectados y se mantienen por navegador.</p>
           <div className="mt-4 grid gap-2">
@@ -469,7 +469,7 @@ export default function SettingsPage() {
       </section>
 
       {hasChanges && (
-        <div className="fixed bottom-4 right-4 left-4 lg:left-auto lg:w-[520px] rounded-xl border border-zinc-200 bg-white/95 backdrop-blur p-3 shadow-xl z-40">
+        <div className="fixed bottom-4 right-4 left-4 lg:left-auto lg:w-[520px] rounded-xl border border-zinc-200 bg-white/95 backdrop-blur p-3 shadow-2xl z-40">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-zinc-600">Tienes cambios sin guardar en Ajustes.</p>
             <div className="flex items-center gap-2">
@@ -495,7 +495,7 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
         value={value}
         inputMode="numeric"
         onChange={(e) => onChange(clampNumberInput(e.target.value, min, max))}
-        className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
+        className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
       />
     </label>
   );
@@ -503,7 +503,7 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
 
 function ToggleRow({ icon, label, description, value, onChange }: { icon: React.ReactNode; label: string; description: string; value: boolean; onChange: (value: boolean) => void; }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 p-3">
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200/90 bg-gradient-to-r from-white to-zinc-50 p-3">
       <div>
         <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">{icon}{label}</p>
         <p className="mt-1 text-xs text-zinc-600">{description}</p>
@@ -517,7 +517,7 @@ function ToggleRow({ icon, label, description, value, onChange }: { icon: React.
 
 function QuickLink({ href, label, description }: { href: string; label: string; description: string }) {
   return (
-    <Link href={href} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 transition hover:border-zinc-300 hover:bg-zinc-50">
+    <Link href={href} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-sm">
       <p className="text-sm font-medium text-zinc-900">{label}</p>
       <p className="text-xs text-zinc-600">{description}</p>
     </Link>

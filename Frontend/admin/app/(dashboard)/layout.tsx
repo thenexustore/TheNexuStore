@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import {
   loadAdminSettings,
+  resolveAdminLogoSrc,
   subscribeAdminSettings,
   type AdminSettings,
 } from "@/lib/admin-settings";
@@ -238,7 +239,7 @@ export default function DashboardLayout({
   return (
     <div className="h-screen bg-white flex overflow-hidden">
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-white border-b z-30">
-        <img src="/logo.png" className="h-7" />
+        <img src={resolveAdminLogoSrc(dashboardSettings)} className="h-7 w-auto object-contain" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.replace(pathname, { locale: locale === "en" ? "es" : "en" })}
@@ -271,8 +272,7 @@ export default function DashboardLayout({
         className={`hidden lg:flex ${dashboardSettings.compactSidebar ? "w-64" : "w-72"} bg-white border-r border-zinc-200 flex-col`}
       >
         <div className="h-20 flex items-center px-8 gap-3">
-          <img src="/logo.png" className="h-8" />
-          <span className="text-sm font-semibold text-zinc-700 truncate">{dashboardSettings.brandName}</span>
+          <img src={resolveAdminLogoSrc(dashboardSettings)} className="h-8 w-auto object-contain" />
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
           <NavItems />
@@ -295,7 +295,7 @@ export default function DashboardLayout({
         className="fixed inset-y-0 left-0 w-72 bg-white border-r border-zinc-200 z-50 flex flex-col lg:hidden"
       >
         <div className="h-20 flex items-center px-8">
-          <img src="/logo.png" className="h-8" />
+          <img src={resolveAdminLogoSrc(dashboardSettings)} className="h-8 w-auto object-contain" />
           <button className="ml-auto" onClick={() => setSidebarOpen(false)}>
             <X className="w-5 h-5 text-zinc-500" />
           </button>

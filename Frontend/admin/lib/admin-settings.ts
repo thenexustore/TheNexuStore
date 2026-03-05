@@ -1,11 +1,13 @@
 export type AdminLanguage = "es" | "en";
+export type AdminLogoMode = "default" | "favicon" | "custom";
 
 export type AdminSettings = {
-  brandName: string;
   supportEmail: string;
   adminLanguage: AdminLanguage;
   defaultCurrency: "EUR" | "USD";
   dateFormat: "es-ES" | "en-GB" | "en-US";
+  brandLogoMode: AdminLogoMode;
+  brandLogoUrl: string;
   ordersRefreshSeconds: number;
   ordersPageSize: number;
   productsPageSize: number;
@@ -20,11 +22,12 @@ export const ADMIN_SETTINGS_KEY = "admin_settings";
 export const ADMIN_SETTINGS_EVENT = "admin-settings-updated";
 
 export const defaultAdminSettings: AdminSettings = {
-  brandName: "The Nexu Store",
   supportEmail: "support@thenexustore.com",
   adminLanguage: "es",
   defaultCurrency: "EUR",
   dateFormat: "es-ES",
+  brandLogoMode: "default",
+  brandLogoUrl: "",
   ordersRefreshSeconds: 30,
   ordersPageSize: 10,
   productsPageSize: 25,
@@ -41,11 +44,17 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
   return Math.max(min, Math.min(max, parsed));
 }
 
+function normalizeLogoUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
 function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
   const language = input.adminLanguage === "en" ? "en" : "es";
+  const logoMode: AdminLogoMode =
+    input.brandLogoMode === "custom" || input.brandLogoMode === "favicon" ? input.brandLogoMode : "default";
 
   return {
-    brandName: typeof input.brandName === "string" && input.brandName.trim() ? input.brandName.trim() : defaultAdminSettings.brandName,
     supportEmail:
       typeof input.supportEmail === "string" && input.supportEmail.trim() ? input.supportEmail.trim() : defaultAdminSettings.supportEmail,
     adminLanguage: language,
@@ -54,6 +63,8 @@ function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
       input.dateFormat === "en-GB" || input.dateFormat === "en-US" || input.dateFormat === "es-ES"
         ? input.dateFormat
         : defaultAdminSettings.dateFormat,
+    brandLogoMode: logoMode,
+    brandLogoUrl: normalizeLogoUrl(input.brandLogoUrl),
     ordersRefreshSeconds: clampNumber(input.ordersRefreshSeconds, defaultAdminSettings.ordersRefreshSeconds, 10, 300),
     ordersPageSize: clampNumber(input.ordersPageSize, defaultAdminSettings.ordersPageSize, 5, 100),
     productsPageSize: clampNumber(input.productsPageSize, defaultAdminSettings.productsPageSize, 10, 200),
@@ -63,6 +74,12 @@ function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
     chatSoundEnabled: Boolean(input.chatSoundEnabled),
     showAdvancedMetrics: Boolean(input.showAdvancedMetrics),
   };
+}
+
+export function resolveAdminLogoSrc(settings: AdminSettings): string {
+  if (settings.brandLogoMode === "favicon") return "/favicon.ico";
+  if (settings.brandLogoMode === "custom" && settings.brandLogoUrl) return settings.brandLogoUrl;
+  return "/logo.png";
 }
 
 export function parseAdminSettings(value: string | null): AdminSettings {

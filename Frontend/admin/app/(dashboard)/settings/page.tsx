@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ChangeEvent, useMemo, useState } from "react";
 import {
   Bell,
   Building2,
   Clock3,
   Gauge,
   Globe,
+  ImageIcon,
   Mail,
   MessageSquare,
   Save,
@@ -20,8 +21,10 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import {
   defaultAdminSettings,
   loadAdminSettings,
+  resolveAdminLogoSrc,
   saveAdminSettings,
   type AdminLanguage,
+  type AdminLogoMode,
   type AdminSettings,
 } from "@/lib/admin-settings";
 
@@ -38,6 +41,8 @@ export default function SettingsPage() {
     () => JSON.stringify(settings) !== JSON.stringify(savedSnapshot),
     [savedSnapshot, settings],
   );
+
+  const logoPreview = resolveAdminLogoSrc(settings);
 
   const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
@@ -74,6 +79,26 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function onLogoFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecciona un archivo de imagen válido");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("La imagen no debe superar 2MB");
+      return;
+    }
+
+    const dataUrl = await fileToDataUrl(file);
+    update("brandLogoMode", "custom");
+    update("brandLogoUrl", dataUrl);
+    toast.success("Logo cargado. Guarda para aplicarlo en todo el panel");
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">
@@ -81,7 +106,7 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">Ajustes del panel</h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Configura idioma, comportamiento y preferencias operativas del admin desde un solo sitio.
+              Configura idioma, branding y preferencias operativas con enfoque eCommerce profesional.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -97,15 +122,52 @@ export default function SettingsPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Identidad y operación</h2>
-          <label className="block text-sm text-zinc-700">
-            Marca visible
-            <input value={settings.brandName} onChange={(e) => update("brandName", e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
-          </label>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Branding e identidad</h2>
+
+          <div className="rounded-xl border border-zinc-200 p-4">
+            <p className="text-sm font-medium text-zinc-900">Logo del panel</p>
+            <p className="text-xs text-zinc-500 mt-1">Recomendado: versión horizontal transparente (PNG/SVG). Tamaño ideal: 220x64.</p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="h-12 w-44 rounded-lg border border-zinc-200 bg-zinc-50 flex items-center justify-center p-2">
+                <img src={logoPreview} alt="Vista previa logo" className="max-h-full w-auto object-contain" />
+              </div>
+              <div className="text-xs text-zinc-600">
+                <p>Se aplica en login + sidebar del admin.</p>
+                <p>Opciones: logo actual, favicon o URL/archivo propio.</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm text-zinc-700">
+                Modo de logo
+                <select value={settings.brandLogoMode} onChange={(e) => update("brandLogoMode", e.target.value as AdminLogoMode)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
+                  <option value="default">Logo actual (/logo.png)</option>
+                  <option value="favicon">Favicon (/favicon.ico)</option>
+                  <option value="custom">Imagen personalizada</option>
+                </select>
+              </label>
+              <label className="block text-sm text-zinc-700">
+                Subir imagen (máx 2MB)
+                <input type="file" accept="image/*" onChange={onLogoFileChange} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+              </label>
+            </div>
+
+            <label className="mt-3 block text-sm text-zinc-700">
+              URL personalizada del logo
+              <input
+                value={settings.brandLogoUrl}
+                onChange={(e) => update("brandLogoUrl", e.target.value)}
+                placeholder="https://cdn.tu-dominio.com/brand/logo-admin.svg"
+                className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
+              />
+            </label>
+          </div>
+
           <label className="block text-sm text-zinc-700">
             Email soporte
             <input type="email" value={settings.supportEmail} onChange={(e) => update("supportEmail", e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
           </label>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm text-zinc-700">
               Idioma del panel
@@ -122,6 +184,7 @@ export default function SettingsPage() {
               </select>
             </label>
           </div>
+
           <label className="block text-sm text-zinc-700">
             Formato de fecha
             <select value={settings.dateFormat} onChange={(e) => update("dateFormat", e.target.value as AdminSettings["dateFormat"])} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2">
@@ -163,8 +226,8 @@ export default function SettingsPage() {
             {hasChanges ? "Tienes cambios sin guardar. Guarda para aplicarlos y persistirlos." : "Sin cambios pendientes. Configuración sincronizada."}
           </div>
           <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600">
-            <p className="flex items-center gap-2 font-medium text-zinc-700"><Globe className="h-4 w-4" />Idioma actual de navegación: {locale.toUpperCase()}</p>
-            <p className="mt-1">Idioma configurado en ajustes: {settings.adminLanguage.toUpperCase()} (se aplica al guardar).</p>
+            <p className="flex items-center gap-2 font-medium text-zinc-700"><Globe className="h-4 w-4" />Idioma actual: {locale.toUpperCase()}</p>
+            <p className="mt-1 flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5" />Logo activo: {settings.brandLogoMode === "default" ? "Logo actual" : settings.brandLogoMode === "favicon" ? "Favicon" : "Personalizado"}.</p>
           </div>
         </div>
       </section>
@@ -176,14 +239,7 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
   return (
     <label className="block text-sm text-zinc-700">
       {label}
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value || min))}
-        className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2"
-      />
+      <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value || min))} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2" />
     </label>
   );
 }
@@ -209,4 +265,13 @@ function QuickLink({ href, label, description }: { href: string; label: string; 
       <p className="text-xs text-zinc-600">{description}</p>
     </Link>
   );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
 }

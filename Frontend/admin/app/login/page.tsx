@@ -49,7 +49,7 @@ export default function LoginPage() {
             animate={{ scale: 1 }}
             className="inline-flex items-center justify-center mb-6"
           >
-            <img src="./logo.png" alt="Logo" className="h-10 w-auto" />
+            <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
             {t("title")}

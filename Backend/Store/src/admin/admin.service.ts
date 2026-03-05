@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -152,6 +153,82 @@ export class AdminService {
         name: staff.email,
         permissions: this.getPermissionsForRole(staff.role),
       },
+    };
+  }
+
+
+  async updateOwnCredentials(
+    staffId: string,
+    input: { email?: string; password?: string; currentPassword?: string },
+  ) {
+    if (!staffId) {
+      throw new UnauthorizedException('Invalid staff identity');
+    }
+
+    const currentPassword = String(input.currentPassword || '');
+    if (!currentPassword) {
+      throw new BadRequestException('Current password is required');
+    }
+
+    const staff = await this.prisma.staff.findUnique({ where: { id: staffId } });
+
+    if (!staff || !staff.is_active) {
+      throw new UnauthorizedException('Invalid staff account');
+    }
+
+    const passwordMatch = await bcrypt.compare(currentPassword, staff.password_hash);
+    if (!passwordMatch) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const nextEmail = (input.email || '').trim().toLowerCase();
+    const nextPassword = String(input.password || '').trim();
+
+    if (!nextEmail && !nextPassword) {
+      throw new BadRequestException('Provide a new email or password');
+    }
+
+    if (nextEmail && !nextEmail.includes('@')) {
+      throw new BadRequestException('Email format is invalid');
+    }
+
+    if (nextPassword && nextPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+
+    if (nextEmail && nextEmail !== staff.email) {
+      const emailInUse = await this.prisma.staff.findUnique({
+        where: { email: nextEmail },
+      });
+
+      if (emailInUse && emailInUse.id !== staff.id) {
+        throw new BadRequestException('Email already in use by another account');
+      }
+    }
+
+    const data: { email?: string; password_hash?: string } = {};
+
+    if (nextEmail && nextEmail !== staff.email) {
+      data.email = nextEmail;
+    }
+
+    if (nextPassword) {
+      data.password_hash = await bcrypt.hash(nextPassword, 10);
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No credential changes detected');
+    }
+
+    const updated = await this.prisma.staff.update({
+      where: { id: staff.id },
+      data,
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
     };
   }
 

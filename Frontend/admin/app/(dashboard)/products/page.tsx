@@ -23,6 +23,7 @@ import {
   type ImportHistoryItem,
   type Product,
 } from "@/lib/api";
+import { loadAdminSettings, subscribeAdminSettings } from "@/lib/admin-settings";
 
 
 interface SavedProductView {
@@ -50,6 +51,15 @@ export default function ProductsPage() {
   const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>([]);
   const [savedViews, setSavedViews] = useState<SavedProductView[]>([]);
   const [viewName, setViewName] = useState("");
+  const [adminSettings, setAdminSettings] = useState(() => loadAdminSettings());
+
+  useEffect(() => subscribeAdminSettings(setAdminSettings), []);
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat(adminSettings.dateFormat, {
+      style: "currency",
+      currency: adminSettings.defaultCurrency,
+    }).format(Number(amount || 0));
 
   const loadImportHistory = async () => {
     try {
@@ -110,12 +120,12 @@ export default function ProductsPage() {
     }
 
     setFilteredProducts(filtered);
-    setTotalPages(Math.ceil(filtered.length / 20));
+    setTotalPages(Math.max(1, Math.ceil(filtered.length / adminSettings.productsPageSize)));
   };
 
   useEffect(() => {
     filterProducts();
-  }, [stockFilter, allProducts]);
+  }, [adminSettings.productsPageSize, stockFilter, allProducts]);
 
   useEffect(() => {
     loadProducts();
@@ -173,8 +183,8 @@ export default function ProductsPage() {
   };
 
   const getPaginatedProducts = () => {
-    const startIndex = (page - 1) * 20;
-    const endIndex = startIndex + 20;
+    const startIndex = (page - 1) * adminSettings.productsPageSize;
+    const endIndex = startIndex + adminSettings.productsPageSize;
     return filteredProducts.slice(startIndex, endIndex);
   };
 
@@ -436,9 +446,12 @@ export default function ProductsPage() {
                             >
                               {product.stock_status}
                             </span>
-                            <span className="text-gray-900">
-                              {product.stock_quantity}
-                            </span>
+                            <span className="text-gray-900">{product.stock_quantity}</span>
+                            {Number(product.stock_quantity || 0) <= adminSettings.lowStockThreshold && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                                ≤ {adminSettings.lowStockThreshold}
+                              </span>
+                            )}
                           </div>
                           {product.variants.length > 0 && (
                             <div className="flex items-center gap-1 text-xs text-gray-400">
@@ -494,11 +507,11 @@ export default function ProductsPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-medium text-gray-900">
-                            €{product.price.toLocaleString()}
+                            {formatCurrency(product.price)}
                           </span>
                           {product.discount_price && (
                             <span className="text-xs text-gray-400 line-through">
-                              €{product.discount_price.toLocaleString()}
+                              {formatCurrency(product.discount_price)}
                             </span>
                           )}
                         </div>

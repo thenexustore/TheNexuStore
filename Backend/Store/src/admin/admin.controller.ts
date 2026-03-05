@@ -50,6 +50,25 @@ export class AdminController {
   }
 
   @UseGuards(AdminGuard)
+  @Put('account/credentials')
+  async updateMyCredentials(
+    @Body()
+    body: { email?: string; password?: string; currentPassword?: string },
+    @Req() req: Request,
+  ) {
+    const data = await this.adminService.updateOwnCredentials(
+      String((req.user as any)?.sub || ''),
+      body,
+    );
+
+    return {
+      success: true,
+      data,
+      message: 'Credentials updated successfully',
+    };
+  }
+
+  @UseGuards(AdminGuard)
   @Get('orders')
   async getOrders(@Query() query: AdminOrdersQueryDto) {
     const pageNum = query.page;

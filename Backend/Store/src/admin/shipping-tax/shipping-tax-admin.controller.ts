@@ -23,41 +23,68 @@ export class ShippingTaxAdminController {
   constructor(private readonly service: ShippingTaxAdminService) {}
 
   @Get('shipping/zones')
-  getShippingZones() {
-    return this.service.getShippingZones();
+  async getShippingZones() {
+    const zones = await this.service.getShippingZones();
+    return {
+      success: true,
+      data: zones,
+    };
   }
 
   @Put('shipping/zones')
-  putShippingZones(
+  async putShippingZones(
     @Body(new ParseArrayPipe({ items: UpsertShippingZoneDto }))
     zones: UpsertShippingZoneDto[],
   ) {
-    return this.service.upsertShippingZones(zones);
+    const updated = await this.service.upsertShippingZones(zones);
+    return {
+      success: true,
+      data: updated,
+      message: 'Shipping zones updated successfully',
+    };
   }
 
   @Get('shipping/rules')
-  getShippingRules() {
-    return this.service.getShippingRules();
+  async getShippingRules() {
+    const rules = await this.service.getShippingRules();
+    return {
+      success: true,
+      data: rules,
+    };
   }
 
   @Put('shipping/rules')
-  putShippingRules(
+  async putShippingRules(
     @Body(new ParseArrayPipe({ items: ReplaceShippingRuleDto }))
     rules: ReplaceShippingRuleDto[],
   ) {
-    return this.service.replaceShippingRules(rules);
+    const updated = await this.service.replaceShippingRules(rules);
+    return {
+      success: true,
+      data: updated,
+      message: 'Shipping rules updated successfully',
+    };
   }
 
   @Get('tax/zones')
-  getTaxZones() {
-    return this.service.getTaxZones();
+  async getTaxZones() {
+    const zones = await this.service.getTaxZones();
+    return {
+      success: true,
+      data: zones,
+    };
   }
 
   @Put('tax/zones')
-  putTaxZones(
+  async putTaxZones(
     @Body(new ParseArrayPipe({ items: UpsertTaxZoneDto }))
     zones: UpsertTaxZoneDto[],
   ) {
-    return this.service.upsertTaxZones(zones);
+    const updated = await this.service.upsertTaxZones(zones);
+    return {
+      success: true,
+      data: updated,
+      message: 'Tax zones updated successfully',
+    };
   }
 }

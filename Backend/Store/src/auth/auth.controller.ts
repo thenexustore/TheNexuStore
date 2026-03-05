@@ -10,7 +10,7 @@ import {
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
-import { AuthGuard as PassportGuard } from '@nestjs/passport';
+import { GoogleAuthGuard } from './google-verfication/google-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -76,11 +76,11 @@ export class AuthController {
   }
 
   @Get('google')
-  @UseGuards(PassportGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   googleLogin() {}
 
   @Get('google/callback')
-  @UseGuards(PassportGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const user = (req as any).user;
     const token = await this.auth.googleLogin(user);

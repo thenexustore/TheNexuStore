@@ -6,6 +6,7 @@ import { PrismaService } from '../common/prisma.service';
 import { MailModule } from './mail/mail.module';
 import { GoogleStrategy } from './google-verfication/google.strategy';
 import { AuthGuard } from './auth.guard';
+import { GoogleAuthGuard } from './google-verfication/google-auth.guard';
 import { JwtAuthModule } from './jwt-auth.module';
 
 const googleStrategyProviders =
@@ -20,7 +21,13 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 @Module({
   imports: [ConfigModule, JwtAuthModule, MailModule],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, AuthGuard, ...googleStrategyProviders],
+  providers: [
+    AuthService,
+    PrismaService,
+    AuthGuard,
+    GoogleAuthGuard,
+    ...googleStrategyProviders,
+  ],
   exports: [JwtAuthModule, AuthService, AuthGuard],
 })
 export class AuthModule {}

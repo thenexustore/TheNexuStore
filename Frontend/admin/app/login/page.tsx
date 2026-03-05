@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { adminLogin } from "@/lib/api";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Loader2, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import {
+  loadAdminSettings,
+  subscribeAdminSettings,
+  type AdminSettings,
+} from "@/lib/admin-settings";
+import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +20,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>(() => loadAdminSettings());
+
+  useEffect(() => subscribeAdminSettings(setAdminSettings), []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +59,7 @@ export default function LoginPage() {
             animate={{ scale: 1 }}
             className="inline-flex items-center justify-center mb-6"
           >
-            <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
+            <AdminBrandLogo settings={adminSettings} variant="dark" alt="Logo" className="w-auto" height={40} />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
             {t("title")}

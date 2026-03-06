@@ -250,8 +250,8 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 min-h-20 w-full border-b border-gray-200 bg-white text-black">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white text-black">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 md:min-h-[74px] md:flex-nowrap md:gap-4">
           <button
             onClick={() => setCategoryPanelOpen((v) => !v)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -260,15 +260,15 @@ export default function Navbar() {
           </button>
 
           <Link href="/" className="min-w-0 flex-shrink-0">
-            <div className="flex h-10 w-24 items-center justify-center rounded-lg sm:w-32">
+            <div className="flex h-11 w-24 items-center justify-center rounded-lg sm:w-32">
               <StoreBrandLogo branding={storeBranding} alt="logo" className="h-8 w-auto" height={32} />
             </div>
           </Link>
 
-          <div className="hidden md:block">
+          <div className="hidden shrink-0 md:block">
             <button
               onClick={() => setCategoryPanelOpen(true)}
-              className="hidden md:flex items-center gap-2 text-sm font-medium whitespace-nowrap cursor-pointer px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="hidden h-11 min-w-max shrink-0 md:flex items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-medium transition-colors hover:bg-gray-100"
               aria-haspopup="dialog"
               aria-expanded={categoryPanelOpen}
             >
@@ -277,7 +277,7 @@ export default function Navbar() {
             </button>
           </div>
 
-          <div className="order-3 w-full basis-full md:order-none md:basis-auto md:flex-1 md:px-2" ref={searchRef}>
+          <div className="order-3 w-full basis-full md:order-none md:basis-auto md:flex-1 md:min-w-0 md:px-1" ref={searchRef}>
             <form
               onSubmit={handleSearchSubmit}
               className="relative w-full md:mx-auto md:max-w-xl"
@@ -288,11 +288,11 @@ export default function Navbar() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => search.length >= 2 && setShowSearchResults(true)}
                 placeholder={t("searchPlaceholder")}
-                className="w-full rounded-lg bg-gray-50 border border-gray-300 px-5 py-3 pr-12 text-sm outline-none focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/20 transition-all"
+                className="h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-5 py-0 pr-12 text-sm outline-none transition-all focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/20"
               />
               <button
                 type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-[#0B123A] p-2 text-white hover:bg-[#1a245a] transition-colors"
+                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg bg-[#0B123A] text-white transition-colors hover:bg-[#1a245a]"
               >
                 <Search size={18} />
               </button>
@@ -439,11 +439,11 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="ml-auto flex max-w-full items-center gap-1.5 shrink-0 sm:gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 self-center sm:gap-2">
             <Link
               href="/chat"
               onClick={closeMobilePanels}
-              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
+              className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
               title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
@@ -453,14 +453,14 @@ export default function Navbar() {
                 <Link
                   href="/login"
                   onClick={closeMobilePanels}
-                  className="text-sm font-medium whitespace-nowrap text-gray-700 hover:text-[#0B123A] transition-colors"
+                  className="whitespace-nowrap text-sm font-medium text-gray-700 transition-colors hover:text-[#0B123A]"
                 >
                   {t("signIn")}
                 </Link>
                 <Link
                   href="/register"
                   onClick={closeMobilePanels}
-                  className="rounded-lg bg-[#0B123A] px-3 py-2 text-sm font-medium whitespace-nowrap text-white hover:bg-[#1a245a] transition-colors sm:px-4"
+                  className="flex h-11 items-center rounded-lg bg-[#0B123A] px-3 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-[#1a245a] sm:px-4"
                 >
                   {t("signUp")}
                 </Link>
@@ -510,7 +510,7 @@ export default function Navbar() {
             <Link
               href="/cart"
               onClick={closeMobilePanels}
-              className="relative rounded-lg p-2 transition-colors hover:bg-gray-100"
+              className="relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
             >
               <ShoppingCart className="h-5 w-5 text-gray-700 sm:h-6 sm:w-6" />
               {displayCartCount > 0 && (

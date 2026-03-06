@@ -9,6 +9,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { config as loadEnv } from 'dotenv';
 import { validateEnvironment } from './config/env.validation';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { buildRequestLogLine } from './common/request-log.util';
 
 async function bootstrap() {
@@ -57,6 +58,7 @@ async function bootstrap() {
   });
 
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalInterceptors(new ApiResponseInterceptor());
 
   app.useGlobalPipes(
     new ValidationPipe({

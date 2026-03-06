@@ -128,6 +128,13 @@ npm run build
 npm run start -- -p 3001
 ```
 
+## Sincronización por fases (recomendado)
+
+- ✅ Fase conectividad: contrato de envs + validación CI.
+- ✅ Fase resiliencia: filtro global de errores + `x-request-id`.
+- ✅ Fase operación: smoke HTTP en deploy.
+- ✅ Fase API: interceptor global de respuesta para estandarizar payloads de éxito sin doble-wrap.
+
 ## Script de despliegue automatizado
 
 También puedes usar `ops/nexus_deploy.sh` para automatizar todo (pull del repo, build, migraciones Prisma, PM2 y healthchecks):

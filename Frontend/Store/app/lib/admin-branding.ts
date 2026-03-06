@@ -58,8 +58,8 @@ function decodeCookieBranding(documentCookie: string): BrandingSettings {
 export function loadStoreBranding(): StoreBranding {
   if (typeof window === "undefined") {
     return {
-      srcCandidates: ["/logo.png", "/favicon.ico"],
-      darkSrcCandidates: ["/logo.png", "/favicon.ico"],
+      srcCandidates: ["/logo.png?v=1", "/favicon.ico?v=1"],
+      darkSrcCandidates: ["/logo.png?v=1", "/favicon.ico?v=1"],
       fit: "contain",
       height: 32,
       brightness: 100,

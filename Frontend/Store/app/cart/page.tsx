@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useCart } from "../../context/CartContext";
@@ -34,6 +34,11 @@ export default function CartPage() {
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+
+  const freeShippingRemaining = useMemo(
+    () => Math.max(0, 100 - (cart?.summary.subtotal || 0)),
+    [cart?.summary.subtotal],
+  );
 
   useEffect(() => {
     const handleLegacyUpdate = () => {
@@ -127,7 +132,7 @@ export default function CartPage() {
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
         <div className="w-full max-w-sm text-center">
           <div className="relative w-full aspect-square mb-8">
             <img
@@ -154,7 +159,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-6 pb-28 text-black sm:py-8 sm:pb-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-white py-6 pb-28 text-black sm:py-8 sm:pb-8">
       <div className="mx-auto w-full max-w-6xl px-3 sm:px-6">
         {isLegacyCart && user && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -198,11 +203,11 @@ export default function CartPage() {
           </div>
         )}
 
-        <header className="mb-8">
-          <h1 className="text-3xl font-black tracking-tighter sm:text-4xl">
+        <header className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h1 className="text-3xl font-black tracking-tighter text-slate-900 sm:text-4xl">
             {t("title")}
           </h1>
-          <p className="text-gray-500 mt-2">
+          <p className="mt-2 text-gray-600">
             {t("itemsInCart", {
               count: cart.summary.item_count,
               suffix: isLegacyCart ? t("localStorageSuffix") : "",
@@ -354,6 +359,19 @@ export default function CartPage() {
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6 lg:sticky lg:top-8">
               <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
+              <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:p-4">
+                <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                  <span>Free shipping progress</span>
+                  <span>{freeShippingRemaining === 0 ? "Unlocked" : `${formatCurrency(freeShippingRemaining, locale)} left`}</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+                  <div
+                    className="h-full rounded-full bg-indigo-600 transition-all"
+                    style={{ width: `${Math.min(100, (((cart?.summary.subtotal || 0) / 100) * 100))}%` }}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-4 mb-6">
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-gray-600">{t("subtotal")}</span>
@@ -458,7 +476,7 @@ export default function CartPage() {
                   {cart.summary.shipping === 0
                     ? t("freeShippingOver100")
                     : t("addForFreeShipping", {
-                        amount: Math.max(0, 100 - cart.summary.subtotal).toFixed(2),
+                        amount: freeShippingRemaining.toFixed(2),
                       })}
                 </p>
               </div>

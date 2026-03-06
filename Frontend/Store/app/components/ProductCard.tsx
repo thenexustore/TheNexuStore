@@ -306,7 +306,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div
-      className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg ${
+      className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm card-hover ${
         isLoading ? "pointer-events-none" : ""
       } ${className}`}
     >
@@ -340,7 +340,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       )}
 
-      <Link href={`/products/${product.slug}`} className="block p-4">
+      <Link href={`/products/${product.slug}`} className="block p-4 focus-ring">
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-50 mb-4">
           <img
             src={imageSrc}
@@ -384,7 +384,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           <button
             onClick={toggleFavorite}
-            className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
+            className="absolute top-2 right-2 z-10 rounded-full bg-white/90 p-2 shadow-md transition-colors hover:bg-white focus-ring"
             style={{ right: "0.5rem" }}
           >
             <svg
@@ -465,7 +465,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`w-full py-3 text-xs font-bold text-white rounded-lg transition-all duration-200 sm:text-sm ${
+            className={`focus-ring w-full rounded-xl py-3 text-xs font-bold text-white transition-all duration-200 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -511,7 +511,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`w-full py-3 text-xs font-semibold text-white rounded-lg transition-colors duration-200 active:scale-95 sm:text-sm ${
+              className={`focus-ring w-full rounded-xl py-3 text-xs font-semibold text-white transition-colors duration-200 active:scale-95 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"

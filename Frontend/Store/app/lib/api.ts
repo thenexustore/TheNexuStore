@@ -1,5 +1,21 @@
 import { API_URL } from "./env";
 
+type ApiEnvelope<T> = {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+};
+
+function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "success" in value &&
+    typeof (value as ApiEnvelope<unknown>).success === "boolean"
+  );
+}
+
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const url = `${API_URL}${endpoint}`;
 
@@ -12,12 +28,34 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     credentials: "include",
   });
 
+  const payload = await response.json().catch(() => null);
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `API error: ${response.statusText}`);
+    if (isApiEnvelope(payload)) {
+      throw new Error(
+        payload.message || payload.error || `API error: ${response.statusText}`,
+      );
+    }
+
+    if (payload && typeof payload === "object" && "message" in payload) {
+      throw new Error(
+        String((payload as { message?: string }).message) ||
+          `API error: ${response.statusText}`,
+      );
+    }
+
+    throw new Error(`API error: ${response.statusText}`);
   }
 
-  return response.json();
+  if (isApiEnvelope(payload)) {
+    if (!payload.success) {
+      throw new Error(payload.message || payload.error || "Unknown API error");
+    }
+
+    return payload.data;
+  }
+
+  return payload;
 }
 
 export async function apiRequestWithSession(

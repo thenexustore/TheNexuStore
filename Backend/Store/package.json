@@ -24,7 +24,8 @@
     "prebuild": "npm run prisma:generate",
     "prestart": "npm run prisma:generate",
     "prestart:prod": "npm run prisma:generate",
-    "config:smoke": "node scripts/config-smoke.cjs"
+    "config:smoke": "node scripts/config-smoke.cjs",
+    "smoke:http": "node scripts/http-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

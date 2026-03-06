@@ -37,6 +37,13 @@ export class HomepageSectionsController {
   }
 
   @UseGuards(AdminGuard)
+  @Get(['admin/homepage/sections/diagnostics', 'admin/homepage-sections/diagnostics'])
+  async getAdminDiagnostics() {
+    const data = await this.homepageSectionsService.getAdminDiagnostics();
+    return { success: true, data };
+  }
+
+  @UseGuards(AdminGuard)
   @Get([
     'admin/homepage/sections/options',
     'admin/homepage-sections/options',

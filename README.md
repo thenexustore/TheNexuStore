@@ -156,6 +156,13 @@ Variables útiles del script:
 - `SKIP_EXTERNAL_HEALTHCHECKS=0`: activa checks externos además de localhost.
 - El deploy ejecuta además `npm run smoke:http` en backend para validar payload + `x-request-id` en `/health`, `/admin/health` y `/admin/infortisa/health`.
 
+
+## Mejora propuesta para operación ecommerce
+
+Se agregó un plan técnico-práctico para cerrar brechas de operación real (pagos, estados de pedido, reconciliación e inventario):
+
+- `docs/MEJORA_ECOMMERCE.md`
+
 ## Verificaciones rápidas
 
 - API health:

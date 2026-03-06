@@ -66,10 +66,10 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 py-6 text-black sm:px-6">
-      <div className="mb-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6">
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-800 p-5 text-white shadow-sm sm:p-8">
         <h1 className="break-words text-2xl font-bold sm:text-3xl">{t("all")}</h1>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-2 text-sm text-indigo-100 sm:text-base">
           {t("found", {count: productsResponse?.total || 0})}
         </p>
       </div>
@@ -86,7 +86,10 @@ export default function ProductsPage() {
         )}
 
         <div className="flex-1">
-          <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+            <p className="hidden text-sm font-medium text-slate-600 sm:block">
+              {t("found", {count: productsResponse?.total || 0})}
+            </p>
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
               {filterOptions && (
                 <MobileFilters
@@ -101,7 +104,7 @@ export default function ProductsPage() {
               <select
                 value={filters.sort_by}
                 onChange={(e) => handleSortChange(e.target.value)}
-                className="w-full min-w-0 rounded-full border border-gray-300 bg-gray-100 px-4 py-2 text-sm text-black outline-none sm:w-auto"
+                className="w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-black outline-none ring-indigo-500 transition focus:ring-2 sm:w-auto"
               >
                 <option value="newest">{t("newest")}</option>
                 <option value="name_a_to_z">{t("nameAZ")}</option>
@@ -111,11 +114,11 @@ export default function ProductsPage() {
           </div>
 
           {error ? (
-            <div className="text-center text-red-500">{error}</div>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-600">{error}</div>
           ) : loading ? (
             <ProductGridSkeleton />
           ) : productsResponse?.products.length === 0 ? (
-            <div className="py-12 text-center">
+            <div className="rounded-xl border border-slate-200 bg-white py-12 text-center">
               <h3 className="text-xl font-semibold">{t("noProducts")}</h3>
               <p className="mt-2 text-gray-600">
                 {t("adjustFilters")}

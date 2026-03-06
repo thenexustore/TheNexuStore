@@ -6,8 +6,20 @@ import {
   CategoryMenuTreeNode,
   HomepageOption,
   HomepageSection,
+  HomepageSectionsDiagnostics,
   homepageSectionsApi,
 } from "@/lib/api/homepage-sections";
+import { API_URL, SITE_URL } from "@/lib/constants";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleOff,
+  Copy,
+  Eye,
+  Layers3,
+  RotateCw,
+  ServerCrash,
+} from "lucide-react";
 
 const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
 const PRODUCT_QUERY_TYPES = ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
@@ -109,8 +121,17 @@ export default function HomepageSectionsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
+  const duplicateTypeSummary = useMemo(() => {
+    const countByType = new Map<string, number>();
+    for (const section of sections) {
+      countByType.set(section.type, (countByType.get(section.type) || 0) + 1);
+    }
+    return Array.from(countByType.entries()).filter(([, count]) => count > 1);
+  }, [sections]);
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return sorted;
@@ -119,12 +140,19 @@ export default function HomepageSectionsPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    setDiagnosticsLoading(true);
     try {
-      setSections(await homepageSectionsApi.list());
+      const [sectionsData, diagnosticsData] = await Promise.all([
+        homepageSectionsApi.list(),
+        homepageSectionsApi.diagnostics(),
+      ]);
+      setSections(sectionsData);
+      setDiagnostics(diagnosticsData);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar las secciones");
     } finally {
       setIsLoading(false);
+      setDiagnosticsLoading(false);
     }
   }, []);
 
@@ -310,8 +338,104 @@ export default function HomepageSectionsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Control Home</h1>
-        <p className="text-sm text-slate-500">Configura y ordena secciones legacy que se exportan a la Store.</p>
+        <h1 className="text-3xl font-bold">Página Principal</h1>
+        <p className="text-sm text-slate-500">Configura y ordena las secciones que se exportan a la tienda.</p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Secciones</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.total ?? sections.length}</div>
+            <Layers3 className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Total configuradas en admin</div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Visibilidad</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.enabled ?? sections.filter((x) => x.enabled).length}</div>
+            <Eye className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {diagnostics?.totals.disabled ?? sections.filter((x) => !x.enabled).length} ocultas
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Duplicadas</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.duplicatedTypes ?? duplicateTypeSummary.length}</div>
+            <Copy className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Tipos que aparecen más de una vez</div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Store payload</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.failedPublicSections ?? 0}</div>
+            {diagnostics?.checks.storePayloadOk ?? true ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <ServerCrash className="h-4 w-4 text-red-500" />
+            )}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Secciones públicas con error al resolver</div>
+        </div>
+      </div>
+
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.hasVisibleSections ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <CircleOff className="h-4 w-4 mt-0.5" />
+          No hay secciones visibles. La Store no mostrará contenido de Página Principal hasta activar alguna sección.
+        </div>
+      ) : null}
+
+      {!diagnosticsLoading && diagnostics && diagnostics.totals.failedPublicSections > 0 ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          Hay {diagnostics.totals.failedPublicSections} secciones con fallo en el endpoint público. Revisa su configuración y vuelve a guardar.
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
+        <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
+        <p className="text-xs text-slate-600">
+          Esta pantalla alimenta <code>/homepage/sections</code>. Usa <code>forceDynamic=1</code> para previsualizar estas secciones en Store aunque exista un layout activo en <code>/home</code>.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a
+            className="px-3 py-2 rounded-lg border text-sm"
+            href={`${SITE_URL}/store?forceDynamic=1`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir Store
+          </a>
+          <a
+            className="px-3 py-2 rounded-lg border text-sm"
+            href={`${API_URL}/homepage/sections`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ver JSON público de secciones
+          </a>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-2"
+            onClick={() => void load()}
+            disabled={diagnosticsLoading || isLoading}
+          >
+            <RotateCw className={`h-4 w-4 ${(diagnosticsLoading || isLoading) ? "animate-spin" : ""}`} />
+            Recargar diagnóstico
+          </button>
+        </div>
+        {duplicateTypeSummary.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Tipos duplicados detectados: {duplicateTypeSummary.map(([type, count]) => `${type} (${count})`).join(", ")}. Esto puede ser válido, pero revisa que no sea contenido repetido.
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
@@ -358,7 +482,15 @@ export default function HomepageSectionsPage() {
                 <div className="text-xs text-slate-500">{section.type} · Posición #{section.position}</div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <a
+                  className="px-2 py-1 border rounded text-xs"
+                  href={`${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(section.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Ver en Store
+                </a>
                 <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, -1)}>↑</button>
                 <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, 1)}>↓</button>
                 <button className="px-2 py-1 border rounded" onClick={() => void duplicate(section)}>Duplicar</button>
@@ -502,7 +634,12 @@ export default function HomepageSectionsPage() {
       })}
 
       {!isLoading && filtered.length === 0 ? (
-        <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">No hay secciones para el filtro actual.</div>
+        <div className="rounded-lg border bg-white p-4 text-sm text-slate-500 flex flex-wrap items-center justify-between gap-3">
+          <span>No hay secciones para el filtro actual.</span>
+          {filter ? (
+            <button className="px-3 py-1.5 border rounded-lg text-xs" onClick={() => setFilter("")}>Limpiar filtro</button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import NextLink from "next/link";
 import React, { useEffect, useState } from "react";
 import ProductCard from "../components/ProductCard";
 import { productAPI, Product } from "../lib/products";
@@ -34,9 +35,9 @@ const StoreExplore: React.FC = () => {
     return (
       <section>
         <div className="mx-4">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8">
-            Explore
-          </h2>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
+          </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="animate-pulse">
@@ -58,9 +59,9 @@ const StoreExplore: React.FC = () => {
     return (
       <section>
         <div className="container mx-4">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8">
-            Explore
-          </h2>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
+          </div>
           <div className="text-center text-red-500">{error}</div>
         </div>
       </section>
@@ -75,15 +76,13 @@ const StoreExplore: React.FC = () => {
     <section>
       <div className="container mx-4">
         <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8">
-            Explore
-          </h2>
-          <a
+          <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
+          <NextLink
             href="/products?sort_by=newest"
             className="text-blue-600 hover:underline"
           >
             View All
-          </a>
+          </NextLink>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">

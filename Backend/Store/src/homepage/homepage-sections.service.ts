@@ -166,6 +166,51 @@ export class HomepageSectionsService {
     return this.prisma.homepageSection.findMany({ orderBy: { position: 'asc' } });
   }
 
+
+  async getAdminDiagnostics() {
+    await this.ensureDefaultSections();
+
+    const sections = await this.prisma.homepageSection.findMany({
+      orderBy: { position: 'asc' },
+    });
+
+    const total = sections.length;
+    const enabled = sections.filter((section) => section.enabled).length;
+    const disabled = total - enabled;
+
+    const byType = new Map<string, number>();
+    for (const section of sections) {
+      byType.set(section.type, (byType.get(section.type) || 0) + 1);
+    }
+
+    const duplicatedTypes = Array.from(byType.entries())
+      .filter(([, count]) => count > 1)
+      .map(([type, count]) => ({ type, count }));
+
+    const publicSections = await this.getPublicSections();
+    const failedPublicSections = publicSections.filter((section) => (section as any).failed === true).length;
+    const emptyPublicSections = publicSections.filter((section) => {
+      const data = (section as any).data;
+      return Array.isArray(data) ? data.length === 0 : !data;
+    }).length;
+
+    return {
+      totals: {
+        total,
+        enabled,
+        disabled,
+        duplicatedTypes: duplicatedTypes.length,
+        failedPublicSections,
+        emptyPublicSections,
+      },
+      duplicatedTypes,
+      checks: {
+        hasVisibleSections: enabled > 0,
+        storePayloadOk: failedPublicSections === 0,
+      },
+    };
+  }
+
   async getPublicSections() {
     await this.ensureDefaultSections();
     const sections = await this.prisma.homepageSection.findMany({

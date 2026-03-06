@@ -67,7 +67,6 @@ const navigation: NavItem[] = [
     children: [
       { key: "banners", href: "/banners", requiredPermissions: ["full_access"] },
       { key: "homepageSections", href: "/homepage-sections", requiredPermissions: ["full_access"] },
-      { key: "homeBuilder", href: "/home-builder", requiredPermissions: ["full_access"] },
       { key: "featuredProducts", href: "/featured-products", requiredPermissions: ["full_access"] },
     ],
   },

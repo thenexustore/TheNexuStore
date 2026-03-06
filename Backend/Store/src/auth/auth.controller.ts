@@ -7,27 +7,52 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { GoogleAuthGuard } from './google-verfication/google-auth.guard';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  UpdateProfileDto,
+  VerifyOtpDto,
+} from './dto/auth-requests.dto';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
+import { CsrfGuard } from '../common/guards/csrf.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private auth: AuthService) {}
 
+  @Get('csrf-token')
+  csrfToken(@Res({ passthrough: true }) res: Response) {
+    const token = randomUUID();
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('csrf_token', token, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    });
+    return { csrfToken: token };
+  }
+
   @Post('register')
-  register(@Body() body: any) {
+  @UseGuards(RateLimitGuard)
+  register(@Body() body: RegisterDto) {
     return this.auth.register(body);
   }
 
   @Post('verify-otp')
-  verifyOtp(@Body() body: { email: string; otp: string }) {
+  verifyOtp(@Body() body: VerifyOtpDto) {
     return this.auth.verifyOtp(body.email, body.otp);
   }
 
   @Post('login')
-  async login(@Body() body: any, @Res({ passthrough: true }) res: Response) {
+  @UseGuards(RateLimitGuard)
+  async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response) {
     const token = await this.auth.login(body);
     const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access_token', token.accessToken, {
@@ -45,19 +70,12 @@ export class AuthController {
   }
 
   @Post('forgot-password')
-  forgot(@Body() body: { email: string }) {
+  forgot(@Body() body: ForgotPasswordDto) {
     return this.auth.forgotPassword(body.email);
   }
 
   @Post('reset-password')
-  reset(
-    @Body()
-    body: {
-      email: string;
-      otp: string;
-      password: string;
-    },
-  ) {
+  reset(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.email, body.otp, body.password);
   }
 
@@ -69,8 +87,8 @@ export class AuthController {
   }
 
   @Post('profile')
-  @UseGuards(AuthGuard)
-  updateProfile(@Req() req: Request, @Body() body: any) {
+  @UseGuards(AuthGuard, CsrfGuard)
+  updateProfile(@Req() req: Request, @Body() body: UpdateProfileDto) {
     const user = (req as any).user;
     return this.auth.updateProfile(user?.id, body);
   }

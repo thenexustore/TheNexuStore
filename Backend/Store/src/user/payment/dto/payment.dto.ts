@@ -1,18 +1,15 @@
-import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
-export enum PaymentProviderEnum {
-  REDSYS = 'REDSYS',
-  STRIPE = 'STRIPE',
-  PAYPAL = 'PAYPAL',
-  COD = 'COD',
-}
+const SUPPORTED_PAYMENT_PROVIDERS = ['REDSYS', 'COD'] as const;
+export type SupportedPaymentProvider =
+  (typeof SUPPORTED_PAYMENT_PROVIDERS)[number];
 
 export class InitiatePaymentDto {
-  @IsString()
+  @IsUUID()
   order_id: string = '';
 
-  @IsEnum(PaymentProviderEnum)
-  provider: PaymentProviderEnum = PaymentProviderEnum.REDSYS;
+  @IsIn(SUPPORTED_PAYMENT_PROVIDERS)
+  provider: SupportedPaymentProvider = 'REDSYS';
 
   @IsOptional()
   @IsString()

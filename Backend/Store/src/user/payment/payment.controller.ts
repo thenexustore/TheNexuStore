@@ -4,27 +4,23 @@ import {
   Get,
   Body,
   Param,
-  Request,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { PaymentService, CreatePaymentDto } from './payment.service';
+import { PaymentService } from './payment.service';
 import { RedsysNotification } from './redsys.service';
 import { AuthGuard } from '../../auth/auth.guard';
-
-class InitiatePaymentDto {
-  order_id: string = '';
-  provider: 'REDSYS' | 'COD' = 'REDSYS';
-  return_url?: string;
-}
+import { InitiatePaymentDto } from './dto/payment.dto';
+import { CsrfGuard } from '../../common/guards/csrf.guard';
+import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 
 @Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post('initiate')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, CsrfGuard, RateLimitGuard)
   async initiatePayment(@Body() dto: InitiatePaymentDto) {
     return this.paymentService.createPayment({
       orderId: dto.order_id,
@@ -41,7 +37,7 @@ export class PaymentController {
   }
 
   @Post('cod/confirm/:orderId')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, CsrfGuard)
   async confirmCODPayment(@Param('orderId') orderId: string) {
     await this.paymentService.confirmCODDelivery(orderId);
     return { success: true, message: 'COD payment confirmed' };

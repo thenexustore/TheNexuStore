@@ -9,7 +9,8 @@ import { CartService } from '../cart/cart.service';
 import { CouponService } from '../coupon/coupon.service';
 import { BillingAddressDto, CreateOrderDto, ShippingAddressDto } from './dto/checkout.dto';
 import { OrderResponseDto, PaymentIntentDto } from './dto/checkout-response.dto';
-import { PaymentProvider } from '@prisma/client';
+import { PaymentProvider, Prisma } from '@prisma/client';
+import { AppLogger } from '../../common/app-logger.service';
 import { MailService } from '../../auth/mail/mail.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
 
@@ -21,6 +22,7 @@ export class CheckoutService {
     private couponService: CouponService,
     private mailService: MailService,
     private shippingTaxService: ShippingTaxService,
+    private readonly logger: AppLogger,
   ) {}
 
   private readonly FRONTEND_URL =
@@ -32,9 +34,9 @@ export class CheckoutService {
     return `ORD-${timestamp}-${random.toString().padStart(3, '0')}`;
   }
 
-  private async validateCartStock(cartItems: any[]): Promise<boolean> {
+  private async validateCartStock(cartItems: any[], tx: Prisma.TransactionClient = this.prisma): Promise<boolean> {
     for (const item of cartItems) {
-      const inventory = await this.prisma.inventoryLevel.aggregate({
+      const inventory = await tx.inventoryLevel.aggregate({
         where: { sku_id: item.sku_id },
         _sum: {
           qty_on_hand: true,
@@ -54,9 +56,9 @@ export class CheckoutService {
     return true;
   }
 
-  private async reserveStock(orderId: string, cartItems: any[]) {
+  private async reserveStock(orderId: string, cartItems: any[], tx: Prisma.TransactionClient = this.prisma) {
     for (const item of cartItems) {
-      const warehouses = await this.prisma.inventoryLevel.findMany({
+      const warehouses = await tx.inventoryLevel.findMany({
         where: { sku_id: item.sku_id, qty_on_hand: { gt: 0 } },
         orderBy: { qty_on_hand: 'desc' },
       });
@@ -72,7 +74,7 @@ export class CheckoutService {
         );
 
         if (reserveQty > 0) {
-          await this.prisma.inventoryLevel.update({
+          await tx.inventoryLevel.update({
             where: {
               warehouse_id_sku_id: {
                 warehouse_id: warehouse.warehouse_id,
@@ -107,13 +109,6 @@ export class CheckoutService {
       throw new BadRequestException('Cart is empty');
     }
 
-    await this.validateCartStock(
-      await this.prisma.cartItem.findMany({
-        where: { cart_id: cart.id },
-        include: { sku: { include: { product: true } } },
-      }),
-    );
-
     const subtotal = cart.summary.subtotal;
     const discountAmount = cart.summary.discount || 0;
 
@@ -136,106 +131,103 @@ export class CheckoutService {
     const total = totals.total;
 
     const billingAddressJson = JSON.parse(JSON.stringify(dto.billing_address));
-    const shippingAddressJson = JSON.parse(
-      JSON.stringify(dto.shipping_address),
-    );
-
+    const shippingAddressJson = JSON.parse(JSON.stringify(dto.shipping_address));
     const paymentMethod = dto.payment_method || 'REDSYS';
-
     const trackingToken = await this.generateTrackingToken();
 
-    const order = await this.prisma.order.create({
-      data: {
-        order_number: this.generateOrderNumber(),
-        tracking_token: trackingToken,
-        customer_id: customerId,
-        email: dto.email,
-        status: 'PENDING_PAYMENT',
-        currency: 'EUR',
-        subtotal_amount: subtotal,
-        shipping_amount: shippingAmount,
-        discount_amount: discountAmount,
-        tax_amount: tax,
-        total_amount: total,
-        billing_address_json: billingAddressJson,
-        shipping_address_json: shippingAddressJson,
-      },
-    });
+    const result = await this.prisma.$transaction(async (tx) => {
+      const cartItemsForStock = await tx.cartItem.findMany({
+        where: { cart_id: cart.id },
+        include: { sku: { include: { product: true, prices: true } } },
+      });
 
-    if (cart.applied_coupon && discountAmount > 0) {
-      const coupon = await this.couponService.getCouponByCode(cart.applied_coupon.code);
-      if (coupon) {
-        await this.prisma.orderDiscount.create({
+      await this.validateCartStock(cartItemsForStock, tx);
+
+      const order = await tx.order.create({
+        data: {
+          order_number: this.generateOrderNumber(),
+          tracking_token: trackingToken,
+          customer_id: customerId,
+          email: dto.email,
+          status: 'PENDING_PAYMENT',
+          currency: 'EUR',
+          subtotal_amount: subtotal,
+          shipping_amount: shippingAmount,
+          discount_amount: discountAmount,
+          tax_amount: tax,
+          total_amount: total,
+          billing_address_json: billingAddressJson,
+          shipping_address_json: shippingAddressJson,
+        },
+      });
+
+      if (cart.applied_coupon && discountAmount > 0) {
+        const coupon = await this.couponService.getCouponByCode(cart.applied_coupon.code);
+        if (coupon) {
+          await tx.orderDiscount.create({
+            data: {
+              order_id: order.id,
+              coupon_id: coupon.id,
+              amount: discountAmount,
+            },
+          });
+        }
+      }
+
+      for (const cartItem of cartItemsForStock) {
+        const price = cartItem.sku.prices[0];
+
+        await tx.orderItem.create({
           data: {
             order_id: order.id,
-            coupon_id: coupon.id,
-            amount: discountAmount,
+            sku_id: cartItem.sku_id,
+            title_snapshot: cartItem.sku.product.title,
+            unit_price: Number(price.sale_price),
+            qty: cartItem.qty,
+            line_subtotal: Number(price.sale_price) * cartItem.qty,
+            tax_amount: Number(price.sale_price) * cartItem.qty * totals.tax_rate,
+            line_total: Number(price.sale_price) * cartItem.qty * (1 + totals.tax_rate),
+            fulfillment_type: 'INTERNAL',
           },
         });
       }
-    }
 
-    const cartItems = await this.prisma.cartItem.findMany({
-      where: { cart_id: cart.id },
-      include: {
-        sku: {
-          include: {
-            product: true,
-            prices: true,
-          },
-        },
-      },
-    });
+      await this.reserveStock(order.id, cartItemsForStock, tx);
 
-    for (const cartItem of cartItems) {
-      const price = cartItem.sku.prices[0];
-
-      await this.prisma.orderItem.create({
-        data: {
-          order_id: order.id,
-          sku_id: cartItem.sku_id,
-          title_snapshot: cartItem.sku.product.title,
-          unit_price: Number(price.sale_price),
-          qty: cartItem.qty,
-          line_subtotal: Number(price.sale_price) * cartItem.qty,
-          tax_amount: Number(price.sale_price) * cartItem.qty * totals.tax_rate,
-          line_total:
-            Number(price.sale_price) * cartItem.qty * (1 + totals.tax_rate),
-          fulfillment_type: 'INTERNAL',
-        },
+      await tx.cart.update({
+        where: { id: cart.id },
+        data: { status: 'CONVERTED', coupon_id: null },
       });
-    }
 
-    await this.reserveStock(order.id, cartItems);
+      const paymentIntent = await this.createPaymentIntent(
+        order.id,
+        total,
+        paymentMethod as PaymentProvider,
+        tx,
+      );
 
-    await this.prisma.cart.update({
-      where: { id: cart.id },
-      data: { status: 'CONVERTED', coupon_id: null },
+      return { order, paymentIntent };
     });
 
-    const paymentIntent = await this.createPaymentIntent(
-      order.id,
-      total,
-      paymentMethod as PaymentProvider,
-    );
+    const trackingUrl = `${this.FRONTEND_URL}/order/track/${result.order.tracking_token}`;
+    await this.mailService.sendOrderConfirmation(dto.email, result.order.order_number, trackingUrl);
 
-    const trackingUrl = `${this.FRONTEND_URL}/order/track/${order.tracking_token}`;
-    await this.mailService.sendOrderConfirmation(
-      dto.email,
-      order.order_number,
-      trackingUrl,
-    );
+    this.logger.log('Checkout transaction completed', 'CheckoutService', {
+      orderId: result.order.id,
+      paymentProvider: paymentMethod,
+      total,
+    });
 
     return {
       order: {
-        id: order.id,
-        order_number: order.order_number,
-        status: order.status,
-        total_amount: Number(order.total_amount),
-        currency: order.currency,
-        created_at: order.created_at,
+        id: result.order.id,
+        order_number: result.order.order_number,
+        status: result.order.status,
+        total_amount: Number(result.order.total_amount),
+        currency: result.order.currency,
+        created_at: result.order.created_at,
       },
-      payment_intent: paymentIntent,
+      payment_intent: result.paymentIntent,
     };
   }
 
@@ -243,6 +235,7 @@ export class CheckoutService {
     orderId: string,
     amount: number,
     provider: PaymentProvider = 'REDSYS',
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<PaymentIntentDto> {
     let status = 'requires_payment_method';
     let paymentStatus: 'INITIATED' | 'AUTHORIZED' = 'INITIATED';
@@ -263,7 +256,7 @@ export class CheckoutService {
       provider,
     };
 
-    await this.prisma.payment.create({
+    await tx.payment.create({
       data: {
         order_id: orderId,
         provider,
@@ -275,19 +268,19 @@ export class CheckoutService {
     });
 
     if (provider === 'COD') {
-      await this.prisma.order.update({
+      await tx.order.update({
         where: { id: orderId },
         data: { status: 'PROCESSING' },
       });
 
-      const order = await this.prisma.order.findUnique({
+      const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { discounts: true },
       });
 
       if (order && order.discounts.length > 0) {
         for (const discount of order.discounts) {
-          await this.couponService.incrementUsage(discount.coupon_id);
+          await tx.coupon.update({ where: { id: discount.coupon_id }, data: { usage_count: { increment: 1 } } });
         }
       }
     }

@@ -147,6 +147,7 @@ Variables útiles del script:
 - `SITE_DOMAIN`, `ADMIN_DOMAIN`, `API_DOMAIN`: URLs públicas para generar `.env.production`.
 - `SYNC_FRONTEND_ENV=0`: evita sobreescribir los `.env.production` de Store/Admin.
 - `SKIP_EXTERNAL_HEALTHCHECKS=0`: activa checks externos además de localhost.
+- El deploy ejecuta además `npm run smoke:http` en backend para validar payload + `x-request-id` en `/health`, `/admin/health` y `/admin/infortisa/health`.
 
 ## Verificaciones rápidas
 

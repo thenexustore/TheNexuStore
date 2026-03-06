@@ -48,6 +48,9 @@ jobs:
       - name: Config smoke matrix
         run: npm run config:smoke
 
+      - name: Backend merge-marker guard
+        run: npm run check:merge-markers
+
       - name: Typecheck
         run: npx tsc --noEmit
 

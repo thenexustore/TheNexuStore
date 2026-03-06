@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 
 interface AuditActor {
@@ -29,12 +29,15 @@ interface ListAuditLogsInput {
   actorEmail?: string;
   action?: string;
   resource?: string;
+  requestId?: string;
   from?: Date;
   to?: Date;
 }
 
 @Injectable()
 export class AuditLogService {
+  private readonly logger = new Logger(AuditLogService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   static createShallowDiff(
@@ -90,12 +93,13 @@ export class AuditLogService {
           path: input.path,
           ip_address: input.ipAddress,
           user_agent: input.userAgent,
+          request_id: input.requestId,
           status: input.status ?? 'SUCCESS',
           metadata_json: this.buildMetadata(input) as any,
         },
       });
     } catch (error) {
-      console.error('Failed to write admin audit log', error);
+      this.logger.error('Failed to write admin audit log', (error as Error)?.stack);
     }
   }
 
@@ -117,6 +121,10 @@ export class AuditLogService {
 
     if (input.resource) {
       where.resource = input.resource;
+    }
+
+    if (input.requestId) {
+      where.request_id = input.requestId;
     }
 
     if (input.from || input.to) {

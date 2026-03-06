@@ -149,6 +149,10 @@ Para evitar desajustes entre backend/store/admin, usa `ops/env.sync.example` com
 - Centralizar logs/auditoría.
 - ✅ Validación automatizada de sincronización de variables (`ops/validate-env-sync.mjs`) en CI.
 
+### Fase 4 (observabilidad operativa)
+- ✅ Auditoría admin indexada por `request_id` para correlación rápida de incidentes.
+- ✅ Filtro de logs de auditoría por `requestId` en endpoint `GET /admin/audit-logs`.
+
 ## Script de despliegue automatizado
 
 También puedes usar `ops/nexus_deploy.sh` para automatizar todo (pull del repo, build, migraciones Prisma, PM2 y healthchecks):

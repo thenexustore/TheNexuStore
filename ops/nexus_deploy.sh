@@ -292,6 +292,9 @@ if [[ "$DRY_RUN" == "0" ]]; then
     wait_for_url "$DEPLOY_SITE_URL"
     wait_for_url "$DEPLOY_ADMIN_URL"
   fi
+
+  log "Running backend HTTP smoke checks"
+  run "cd '$BACKEND_DIR' && BASE_URL='http://127.0.0.1:4000' npm run smoke:http"
 fi
 
 log "Deploy finished. Backup created at: $BACKUP_DIR"

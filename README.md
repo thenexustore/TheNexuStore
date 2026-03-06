@@ -128,6 +128,13 @@ npm run build
 npm run start -- -p 3001
 ```
 
+## Sincronización por fases (recomendado)
+
+- ✅ Fase conectividad: contrato de envs + validación CI.
+- ✅ Fase resiliencia: filtro global de errores + `x-request-id`.
+- ✅ Fase operación: smoke HTTP en deploy.
+- ✅ Fase API: interceptor global de respuesta para estandarizar payloads de éxito sin doble-wrap.
+
 ## Script de despliegue automatizado
 
 También puedes usar `ops/nexus_deploy.sh` para automatizar todo (pull del repo, build, migraciones Prisma, PM2 y healthchecks):
@@ -147,6 +154,7 @@ Variables útiles del script:
 - `SITE_DOMAIN`, `ADMIN_DOMAIN`, `API_DOMAIN`: URLs públicas para generar `.env.production`.
 - `SYNC_FRONTEND_ENV=0`: evita sobreescribir los `.env.production` de Store/Admin.
 - `SKIP_EXTERNAL_HEALTHCHECKS=0`: activa checks externos además de localhost.
+- El deploy ejecuta además `npm run smoke:http` en backend para validar payload + `x-request-id` en `/health`, `/admin/health` y `/admin/infortisa/health`.
 
 ## Verificaciones rápidas
 

@@ -5,6 +5,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from "react";
 import { useAuth } from "../app/providers/AuthProvider";
@@ -157,7 +158,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasSynced, setHasSynced] = useState(false);
 
-  const fetchBackendCart = async (destination?: { country?: string; region?: string; postal_code?: string }): Promise<Cart | null> => {
+  const fetchBackendCart = useCallback(async (destination?: { country?: string; region?: string; postal_code?: string }): Promise<Cart | null> => {
     try {
       const sessionId = getSessionId();
       if (!sessionId) return null;
@@ -165,9 +166,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       return null;
     }
-  };
+  }, [getSessionId]);
 
-  const loadLegacyCart = (): Cart | null => {
+  const loadLegacyCart = useCallback((): Cart | null => {
     try {
       const stored = localStorage.getItem("cart");
       if (!stored) return null;
@@ -177,9 +178,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       return null;
     }
-  };
+  }, []);
 
-  const fetchCart = async (destination?: { country?: string; region?: string; postal_code?: string }) => {
+  const fetchCart = useCallback(async (destination?: { country?: string; region?: string; postal_code?: string }) => {
     try {
       setIsLoading(true);
 
@@ -197,12 +198,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchBackendCart, loadLegacyCart]);
 
   useEffect(() => {
     fetchCart();
     setHasSynced(false);
-  }, [user]);
+  }, [user, fetchCart]);
 
   const addItem = async (skuCode: string, quantity: number) => {
     try {
@@ -249,7 +250,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setCart(null);
   };
 
-  const syncLegacyCart = async () => {
+  const syncLegacyCart = useCallback(async () => {
     const legacyCart = loadLegacyCart();
     if (!legacyCart) return;
 
@@ -278,7 +279,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     localStorage.removeItem("cart");
     await fetchCart();
-  };
+  }, [fetchBackendCart, fetchCart, getSessionId, loadLegacyCart]);
 
   const applyCoupon = async (code: string) => {
     try {
@@ -307,15 +308,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       setHasSynced(true);
       syncLegacyCart();
     }
-  }, [user, cart?.id, hasSynced]);
+  }, [user, cart?.id, hasSynced, syncLegacyCart]);
 
-  const refreshCartWithDestination = async (destination: {
+  const refreshCartWithDestination = useCallback(async (destination: {
     country?: string;
     region?: string;
     postal_code?: string;
   }) => {
     await fetchCart(destination);
-  };
+  }, [fetchCart]);
 
   const cartCount = cart?.summary.item_count || 0;
 

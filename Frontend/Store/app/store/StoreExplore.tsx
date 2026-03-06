@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import { Link } from "@/i18n/navigation";
 import ProductCard from "../components/ProductCard";
 import { productAPI, Product } from "../lib/products";
 
@@ -79,7 +80,7 @@ const StoreExplore: React.FC = () => {
           <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
           <Link
             href="/products?sort_by=newest"
-            className="text-blue-600 hover:underline"
+            className="rounded-md px-2 py-1 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 hover:underline"
           >
             View All
           </Link>

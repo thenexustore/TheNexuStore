@@ -111,6 +111,7 @@ export default function CheckoutPage() {
     formData.shipping_address.country,
     formData.shipping_address.region,
     formData.shipping_address.postal_code,
+    refreshCartWithDestination,
   ]);
 
   const handleChange = (

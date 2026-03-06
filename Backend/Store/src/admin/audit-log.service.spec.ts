@@ -44,6 +44,20 @@ describe('AuditLogService', () => {
     expect(result.items).toEqual([{ id: '1' }]);
   });
 
+
+  it('filters logs by requestId when provided', async () => {
+    (prisma.adminAuditLog.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.adminAuditLog.count as jest.Mock).mockResolvedValue(0);
+
+    await service.list({ page: 1, limit: 20, requestId: 'req-42' });
+
+    expect(prisma.adminAuditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ request_id: 'req-42' }),
+      }),
+    );
+  });
+
   it('adds requestId and shallow diff metadata when before/after provided', async () => {
     await service.logAction({
       action: 'PRICING_RULE_STATUS_CHANGED',
@@ -57,6 +71,7 @@ describe('AuditLogService', () => {
     expect(prisma.adminAuditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: 'PRICING_RULE_STATUS_CHANGED',
+        request_id: 'req-123',
         metadata_json: expect.objectContaining({
           requestId: 'req-123',
           diff: {

@@ -48,6 +48,7 @@ export class PricingRulesController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { scope: data.scope, approval_status: data.approval_status },
     });
 
@@ -71,6 +72,7 @@ export class PricingRulesController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
 
     return { success: true, data };
@@ -105,7 +107,7 @@ export class PricingRulesController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId: req.get('x-request-id') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         from_status: previous.approval_status,
         to_status: data.approval_status,

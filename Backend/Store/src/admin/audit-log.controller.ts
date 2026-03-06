@@ -26,6 +26,7 @@ export class AuditLogController {
       actorEmail: query.actorEmail,
       action: query.action,
       resource: query.resource,
+      requestId: query.requestId,
       from: query.from,
       to: query.to,
     });
@@ -38,9 +39,11 @@ export class AuditLogController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         page: pageNum,
         limit: limitNum,
+        requestId: query.requestId,
       },
     });
 

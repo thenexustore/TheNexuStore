@@ -255,10 +255,12 @@ model AdminAuditLog {
   path          String?
   ip_address    String?
   user_agent    String?
+  request_id    String?
   status        AdminAuditStatus @default(SUCCESS)
   metadata_json Json?
   created_at    DateTime         @default(now())
 
+  @@index([request_id])
   @@index([created_at])
   @@index([actor_email])
   @@index([resource, resource_id])

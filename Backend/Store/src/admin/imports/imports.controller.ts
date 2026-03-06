@@ -81,6 +81,7 @@ export class ImportsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         mode: body.mode,
         durationMs,

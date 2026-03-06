@@ -104,7 +104,7 @@ export class AdminController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId: req.get('x-request-id') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         ids: data.ids,
         status: data.status,
@@ -162,6 +162,7 @@ export class AdminController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         note,
       },
@@ -196,6 +197,7 @@ export class AdminController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { name: brand.name },
     });
 
@@ -229,6 +231,7 @@ export class AdminController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { name: category.name },
     });
 

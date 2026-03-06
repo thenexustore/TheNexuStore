@@ -523,6 +523,7 @@ export default function Navbar() {
       </header>
 
       <CategoryDrawer
+        key={categoryPanelOpen ? "category-drawer-open" : "category-drawer-closed"}
         open={categoryPanelOpen}
         loading={categoriesLoading}
         tree={curatedCategoryTree}

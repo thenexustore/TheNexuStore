@@ -49,12 +49,6 @@ export function CategoryDrawer({
 
   useEffect(() => {
     if (!open) return;
-    setActiveParentId(firstParentWithChildren?.id ?? null);
-    setActiveChildId(firstParentWithChildren?.children[0]?.id ?? null);
-  }, [open, firstParentWithChildren]);
-
-  useEffect(() => {
-    if (!open) return;
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();

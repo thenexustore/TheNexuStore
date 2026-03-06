@@ -37,7 +37,6 @@ export default function Navbar() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [desktopMegaOpen, setDesktopMegaOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
@@ -63,9 +62,13 @@ export default function Navbar() {
 
   useEffect(() => {
     // Load user from API
-    getMe().then((res: User | null) => {
-      if (res) setUser(res);
-    });
+    getMe()
+      .then((res: User | null) => {
+        if (res) setUser(res);
+      })
+      .catch((error) => {
+        console.warn("Failed to load user:", error);
+      });
 
     loadCategoryTree();
 
@@ -232,6 +235,9 @@ export default function Navbar() {
       try {
         const results = await productAPI.searchCategories(categorySearch, 5);
         setCategorySearchResults(results);
+      } catch (error) {
+        console.warn("Failed to search categories:", error);
+        setCategorySearchResults([]);
       } finally {
         setCategorySearchLoading(false);
       }

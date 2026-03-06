@@ -9,10 +9,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { config as loadEnv } from 'dotenv';
 import { validateEnvironment } from './config/env.validation';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-<<<<<<< codex/implementar-mejoras-en-integracion-htamy2
 import { buildRequestLogLine } from './common/request-log.util';
-=======
->>>>>>> main
 
 async function bootstrap() {
   loadEnv();
@@ -25,12 +22,10 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  const logger = new Logger('Bootstrap');
 
   app.use((req, res, next) => {
-<<<<<<< codex/implementar-mejoras-en-integracion-htamy2
     const startedAt = process.hrtime.bigint();
-=======
->>>>>>> main
     const incomingRequestId = req.headers['x-request-id'];
     const requestId =
       typeof incomingRequestId === 'string' && incomingRequestId.trim()
@@ -39,7 +34,6 @@ async function bootstrap() {
 
     req.requestId = requestId;
     res.setHeader('x-request-id', requestId);
-<<<<<<< codex/implementar-mejoras-en-integracion-htamy2
 
     res.on('finish', () => {
       const elapsedNanoseconds = process.hrtime.bigint() - startedAt;
@@ -59,18 +53,11 @@ async function bootstrap() {
       );
     });
 
-=======
->>>>>>> main
     next();
   });
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-<<<<<<< codex/implementar-mejoras-en-integracion-htamy2
-  const logger = new Logger('Bootstrap');
-
-=======
->>>>>>> main
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

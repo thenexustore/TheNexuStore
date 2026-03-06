@@ -106,7 +106,11 @@
     "saveCartPrompt": "¿Quieres guardar tu carrito? Inicia sesión o crea una cuenta.",
     "login": "Iniciar sesión",
     "sku": "SKU",
-    "secureAlt": "Carrito vacío"
+    "secureAlt": "Carrito vacío",
+    "freeShippingProgress": "Progreso de envío gratis",
+    "freeShippingUnlocked": "Desbloqueado",
+    "freeShippingLeft": "Faltan {amount}",
+    "customsDuty": "Arancel aduanero"
   },
   "checkout": {
     "title": "Finalizar compra",
@@ -145,6 +149,11 @@
     "phone": "Teléfono",
     "vatOptional": "NIF/CIF (opcional)",
     "email": "Email",
-    "qty": "Cant."
+    "qty": "Cant.",
+    "freeShippingProgress": "Progreso de envío gratis",
+    "freeShippingUnlocked": "Desbloqueado",
+    "freeShippingLeft": "Faltan {amount}",
+    "customsDuty": "Arancel aduanero",
+    "shippingUnavailable": "Envío no disponible para este destino. Contacta con soporte."
   }
 }

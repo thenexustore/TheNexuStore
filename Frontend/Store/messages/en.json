@@ -106,7 +106,11 @@
     "saveCartPrompt": "Want to save your cart? Login or create an account.",
     "login": "Login",
     "sku": "SKU",
-    "secureAlt": "Empty Cart"
+    "secureAlt": "Empty Cart",
+    "freeShippingProgress": "Free shipping progress",
+    "freeShippingUnlocked": "Unlocked",
+    "freeShippingLeft": "{amount} left",
+    "customsDuty": "Customs duty"
   },
   "checkout": {
     "title": "Checkout",
@@ -145,6 +149,11 @@
     "phone": "Phone",
     "vatOptional": "VAT ID (optional)",
     "email": "Email",
-    "qty": "Qty"
+    "qty": "Qty",
+    "freeShippingProgress": "Free shipping progress",
+    "freeShippingUnlocked": "Unlocked",
+    "freeShippingLeft": "{amount} left",
+    "customsDuty": "Customs duty",
+    "shippingUnavailable": "Shipping not available for this destination. Contact support."
   }
 }

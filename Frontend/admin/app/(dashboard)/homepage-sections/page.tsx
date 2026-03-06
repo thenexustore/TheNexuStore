@@ -403,12 +403,12 @@ export default function HomepageSectionsPage() {
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
         <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
         <p className="text-xs text-slate-600">
-          Esta pantalla alimenta <code>/homepage/sections</code>. La Store usa estas secciones automáticamente cuando no hay un layout activo en <code>/home</code>.
+          Esta pantalla alimenta <code>/homepage/sections</code>. Usa <code>forceDynamic=1</code> para previsualizar estas secciones en Store aunque exista un layout activo en <code>/home</code>.
         </p>
         <div className="flex flex-wrap gap-2">
           <a
             className="px-3 py-2 rounded-lg border text-sm"
-            href={`${SITE_URL}/store`}
+            href={`${SITE_URL}/store?forceDynamic=1`}
             target="_blank"
             rel="noreferrer"
           >
@@ -485,7 +485,7 @@ export default function HomepageSectionsPage() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <a
                   className="px-2 py-1 border rounded text-xs"
-                  href={`${SITE_URL}/store?highlightSection=${encodeURIComponent(section.id)}`}
+                  href={`${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(section.id)}`}
                   target="_blank"
                   rel="noreferrer"
                 >

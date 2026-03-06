@@ -35,15 +35,20 @@ async function getHome(previewLayoutId?: string) {
   }
 }
 
-export default async function StorePage({ searchParams }: { searchParams?: Promise<{ previewLayoutId?: string }> }) {
+export default async function StorePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ previewLayoutId?: string; forceDynamic?: string }>;
+}) {
   const sp = (await searchParams) || {};
   const data = await getHome(sp.previewLayoutId);
+  const forceDynamic = sp.forceDynamic === "1";
   const hasLayoutSections = Boolean(data?.layout) && Array.isArray(data?.sections) && data.sections.length > 0;
 
   return (
     <main className="min-h-screen bg-slate-50 pb-10">
       <div className="mx-auto flex w-full flex-col items-center gap-8">
-        {hasLayoutSections ? <HomeRenderer payload={data} /> : <HomeDynamicSections />}
+        {!forceDynamic && hasLayoutSections ? <HomeRenderer payload={data} /> : <HomeDynamicSections />}
       </div>
     </main>
   );

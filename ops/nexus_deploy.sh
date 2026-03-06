@@ -63,7 +63,10 @@ write_backend_start_script() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 cd "$BACKEND_DIR"
+[[ -f "$BACKEND_ENV_FILE" ]] || { echo "[ERROR] Missing backend env file: $BACKEND_ENV_FILE" >&2; exit 1; }
+set -a
 source "$BACKEND_ENV_FILE"
+set +a
 exec node dist/src/main.js
 SCRIPT
 }

@@ -144,6 +144,19 @@ export default function HomepageSectionsPage() {
     }
     return Array.from(countByType.entries()).filter(([, count]) => count > 1);
   }, [sections]);
+
+  const sectionTypeStats = useMemo(() => {
+    const countByType = new Map<string, number>();
+    for (const type of SECTION_TYPES) countByType.set(type, 0);
+    for (const section of sections) {
+      countByType.set(section.type, (countByType.get(section.type) || 0) + 1);
+    }
+
+    return SECTION_TYPES.map((type) => ({
+      type,
+      count: countByType.get(type) || 0,
+    }));
+  }, [sections]);
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return sorted;
@@ -254,6 +267,47 @@ export default function HomepageSectionsPage() {
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear la sección");
+    }
+  };
+
+  const createOfType = async (type: SectionType) => {
+    try {
+      await homepageSectionsApi.create({
+        type,
+        position: sorted.length + 1,
+        enabled: true,
+        title: type.replaceAll("_", " "),
+        config_json: defaultConfigFor(type),
+      });
+      toast.success(`Sección ${type} creada`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `No se pudo crear ${type}`);
+    }
+  };
+
+  const createMissingBaseSections = async () => {
+    const missing = sectionTypeStats.filter((item) => item.count === 0).map((item) => item.type);
+    if (!missing.length) {
+      toast.message("No faltan tipos base de sección");
+      return;
+    }
+
+    try {
+      const startPosition = sorted.length;
+      for (const [index, type] of missing.entries()) {
+        await homepageSectionsApi.create({
+          type,
+          position: startPosition + index + 1,
+          enabled: true,
+          title: type.replaceAll("_", " "),
+          config_json: defaultConfigFor(type),
+        });
+      }
+      toast.success(`Se añadieron ${missing.length} tipo(s) faltantes`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron crear los faltantes");
     }
   };
 
@@ -516,6 +570,30 @@ export default function HomepageSectionsPage() {
           </select>
           <input className="border rounded-lg px-3 py-2" placeholder="Filtrar secciones por título/tipo" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <button onClick={() => void create()} className="px-3 py-2 rounded-lg bg-black text-white text-sm">Añadir sección</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm font-medium text-slate-700">Cobertura de tipos de sección</div>
+          <button
+            className="px-3 py-2 rounded-lg border text-xs"
+            onClick={() => void createMissingBaseSections()}
+          >
+            Añadir tipos faltantes
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {sectionTypeStats.map((item) => (
+            <button
+              key={item.type}
+              className={`rounded-full border px-3 py-1.5 text-xs ${item.count === 0 ? "border-red-300 bg-red-50 text-red-700" : item.count > 1 ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-300 bg-emerald-50 text-emerald-700"}`}
+              onClick={() => item.count === 0 ? void createOfType(item.type) : setFilter(item.type)}
+              title={item.count === 0 ? "Crear este tipo" : "Filtrar por este tipo"}
+            >
+              {item.type} · {item.count}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -75,6 +75,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         ids: body.ids,
         status: body.status,
@@ -104,6 +105,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         ids: body.ids,
         affected: data.affected,
@@ -139,6 +141,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         title: product.title,
       },
@@ -169,7 +172,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId: req.get('x-request-id') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         changedFields: Object.keys(body || {}),
       },
@@ -203,6 +206,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
 
     return {
@@ -231,6 +235,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         status: body.status,
       },
@@ -256,6 +261,7 @@ export class ProductsController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
 
     return {

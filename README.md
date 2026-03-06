@@ -128,6 +128,34 @@ npm run build
 npm run start -- -p 3001
 ```
 
+## Sincronización por fases (recomendado)
+
+Para evitar desajustes entre backend/store/admin, usa `ops/env.sync.example` como contrato único y después reparte los valores en cada servicio.
+
+### Fase 1 (base de conectividad)
+1. Copia `ops/env.sync.example` como guía.
+2. Actualiza:
+   - `Backend/Store/.env`
+   - `Frontend/Store/.env.production`
+   - `Frontend/admin/.env.production`
+3. Asegura que `API_URL`, `FRONTEND_URL`, `ADMIN_URL`, `CORS_ORIGINS` y ambos `NEXT_PUBLIC_API_URL` apunten al mismo backend.
+4. Ejecuta health checks (`curl http://127.0.0.1:4000/health`).
+
+### Fase 2 (resiliencia)
+- ✅ Backend con filtro global de excepciones y `x-request-id` para trazabilidad entre logs y respuestas.
+- Añadir checks de smoke end-to-end Store/Admin contra API.
+
+### Fase 3 (operación)
+- Centralizar logs/auditoría.
+- ✅ Validación automatizada de sincronización de variables (`ops/validate-env-sync.mjs`) en CI.
+
+### Fase 4 (observabilidad operativa)
+- ✅ Auditoría admin indexada por `request_id` para correlación rápida de incidentes.
+- ✅ Filtro de logs de auditoría por `requestId` en endpoint `GET /admin/audit-logs`.
+
+### Fase 5 (trazabilidad de acceso)
+- ✅ Logging estructurado por request en backend (`event=http_request`) con `requestId`, latencia y status.
+
 ## Script de despliegue automatizado
 
 También puedes usar `ops/nexus_deploy.sh` para automatizar todo (pull del repo, build, migraciones Prisma, PM2 y healthchecks):

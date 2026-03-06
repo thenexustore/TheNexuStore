@@ -27,9 +27,14 @@ export class AuditLogsQueryDto {
   resource?: string;
 
   @IsOptional()
+  @IsString()
+  requestId?: string;
+
+  @IsOptional()
   @Type(() => Date)
   @IsDate()
   from?: Date;
+
 
   @IsOptional()
   @Type(() => Date)

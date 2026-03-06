@@ -8,6 +8,7 @@ import {
   HomepageSection,
   homepageSectionsApi,
 } from "@/lib/api/homepage-sections";
+import { API_URL, SITE_URL } from "@/lib/constants";
 
 const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
 const PRODUCT_QUERY_TYPES = ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
@@ -111,6 +112,13 @@ export default function HomepageSectionsPage() {
   const [filter, setFilter] = useState("");
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
+  const duplicateTypeSummary = useMemo(() => {
+    const countByType = new Map<string, number>();
+    for (const section of sections) {
+      countByType.set(section.type, (countByType.get(section.type) || 0) + 1);
+    }
+    return Array.from(countByType.entries()).filter(([, count]) => count > 1);
+  }, [sections]);
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return sorted;
@@ -310,8 +318,38 @@ export default function HomepageSectionsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Control Home</h1>
-        <p className="text-sm text-slate-500">Configura y ordena secciones legacy que se exportan a la Store.</p>
+        <h1 className="text-3xl font-bold">Página Principal</h1>
+        <p className="text-sm text-slate-500">Configura y ordena las secciones que se exportan a la tienda.</p>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
+        <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
+        <p className="text-xs text-slate-600">
+          Esta pantalla alimenta <code>/homepage/sections</code>. La Store usa estas secciones automáticamente cuando no hay un layout activo en <code>/home</code>.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a
+            className="px-3 py-2 rounded-lg border text-sm"
+            href={`${SITE_URL}/store`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir Store
+          </a>
+          <a
+            className="px-3 py-2 rounded-lg border text-sm"
+            href={`${API_URL}/homepage/sections`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ver JSON público de secciones
+          </a>
+        </div>
+        {duplicateTypeSummary.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Tipos duplicados detectados: {duplicateTypeSummary.map(([type, count]) => `${type} (${count})`).join(", ")}. Esto puede ser válido, pero revisa que no sea contenido repetido.
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">

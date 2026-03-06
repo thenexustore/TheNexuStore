@@ -142,7 +142,7 @@ Para evitar desajustes entre backend/store/admin, usa `ops/env.sync.example` com
 4. Ejecuta health checks (`curl http://127.0.0.1:4000/health`).
 
 ### Fase 2 (resiliencia)
-- Endurecer manejo de errores global y observabilidad.
+- ✅ Backend con filtro global de excepciones y `x-request-id` para trazabilidad entre logs y respuestas.
 - Añadir checks de smoke end-to-end Store/Admin contra API.
 
 ### Fase 3 (operación)

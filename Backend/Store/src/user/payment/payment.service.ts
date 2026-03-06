@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { RedsysService, RedsysFormData, RedsysNotification } from './redsys.service';
-import { CouponService } from '../coupon/coupon.service';
 import { PaymentProvider, PaymentStatus, OrderStatus } from '@prisma/client';
+import { AppLogger } from '../../common/app-logger.service';
+import { RetryService } from '../../common/retry.service';
 
 export interface CreatePaymentDto {
   orderId: string;
@@ -32,7 +33,8 @@ export class PaymentService {
   constructor(
     private prisma: PrismaService,
     private redsysService: RedsysService,
-    private couponService: CouponService,
+    private readonly logger: AppLogger,
+    private readonly retryService: RetryService,
   ) {}
 
   async createPayment(dto: CreatePaymentDto): Promise<PaymentResult> {
@@ -62,25 +64,37 @@ export class PaymentService {
   }
 
   private async processCOD(orderId: string, amount: number): Promise<PaymentResult> {
-    const payment = await this.prisma.payment.create({
-      data: {
-        order_id: orderId,
-        provider: 'COD',
-        status: 'AUTHORIZED',
-        amount,
-        currency: 'EUR',
-        provider_payment_id: `COD_${Date.now()}`,
-      },
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.payment.create({
+        data: {
+          order_id: orderId,
+          provider: 'COD',
+          status: 'AUTHORIZED',
+          amount,
+          currency: 'EUR',
+          provider_payment_id: `COD_${Date.now()}`,
+        },
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'PROCESSING',
+        },
+      });
+
+      const discounts = await tx.orderDiscount.findMany({ where: { order_id: orderId } });
+      for (const discount of discounts) {
+        await tx.coupon.update({
+          where: { id: discount.coupon_id },
+          data: { usage_count: { increment: 1 } },
+        });
+      }
+
+      return created;
     });
 
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: 'PROCESSING',
-      },
-    });
-
-    await this.finalizeOrderCoupon(orderId);
+    this.logger.log('COD payment transaction completed', 'PaymentService', { orderId, paymentId: payment.id });
 
     return {
       success: true,
@@ -130,7 +144,11 @@ export class PaymentService {
   }
 
   async handleRedsysNotification(notification: RedsysNotification): Promise<void> {
-    const result = await this.redsysService.processNotification(notification);
+    const result = await this.retryService.execute(
+      () => this.redsysService.processNotification(notification),
+      3,
+      300,
+    );
 
     const payment = await this.prisma.payment.findFirst({
       where: {
@@ -144,7 +162,7 @@ export class PaymentService {
     });
 
     if (!payment) {
-      console.error(`Payment not found for REDSYS order: ${result.orderId}`);
+      this.logger.warn('Payment not found for REDSYS order', 'PaymentService', { orderId: result.orderId });
       return;
     }
 
@@ -166,9 +184,24 @@ export class PaymentService {
             paid_at: new Date(),
           },
         });
+
+        const discounts = await tx.orderDiscount.findMany({
+          where: { order_id: payment.order_id },
+        });
+
+        for (const discount of discounts) {
+          await tx.coupon.update({
+            where: { id: discount.coupon_id },
+            data: { usage_count: { increment: 1 } },
+          });
+        }
       });
 
-      await this.finalizeOrderCoupon(payment.order_id);
+      this.logger.log(
+        'REDSYS notification success processed',
+        'PaymentService',
+        { orderId: payment.order_id, authCode: result.authCode },
+      );
     } else {
       await this.prisma.$transaction(async (tx) => {
         await tx.payment.update({
@@ -185,6 +218,10 @@ export class PaymentService {
             status: 'FAILED',
           },
         });
+      });
+
+      this.logger.warn('REDSYS notification failed', 'PaymentService', {
+        orderId: payment.order_id,
       });
     }
   }
@@ -218,19 +255,6 @@ export class PaymentService {
         },
       });
     });
-  }
-
-  private async finalizeOrderCoupon(orderId: string): Promise<void> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { discounts: true },
-    });
-
-    if (order && order.discounts.length > 0) {
-      for (const discount of order.discounts) {
-        await this.couponService.incrementUsage(discount.coupon_id);
-      }
-    }
   }
 
   async getPaymentStatus(orderId: string): Promise<{

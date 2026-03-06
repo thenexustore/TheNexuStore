@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsObject,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -64,6 +65,6 @@ export class CreateOrderDto {
   notes?: string = '';
 
   @IsOptional()
-  @IsString()
+  @IsIn(['REDSYS', 'COD', 'STRIPE', 'PAYPAL'])
   payment_method?: 'REDSYS' | 'COD' | 'STRIPE' | 'PAYPAL' = 'REDSYS';
 }

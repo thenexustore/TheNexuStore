@@ -7,6 +7,9 @@ import { PrismaService } from '../common/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { MailService } from './mail/mail.service';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/auth-requests.dto';
 
 @Injectable()
 export class AuthService {
@@ -20,7 +23,7 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async register(data: any) {
+  async register(data: RegisterDto) {
     const exists = await this.prisma.customer.findUnique({
       where: { email: data.email },
     });
@@ -71,7 +74,7 @@ export class AuthService {
     return { success: true };
   }
 
-  async login(data: any) {
+  async login(data: LoginDto) {
     const user = await this.prisma.customer.findUnique({
       where: { email: data.email },
     });
@@ -157,7 +160,7 @@ export class AuthService {
     };
   }
 
-  async updateProfile(customerId: string, body: any) {
+  async updateProfile(customerId: string, body: UpdateProfileDto) {
     const { profile, address } = body;
 
     let customer;

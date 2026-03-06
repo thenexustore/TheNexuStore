@@ -3,6 +3,7 @@ import {
   IsString,
   MinLength,
   MaxLength,
+  IsOptional,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -22,4 +23,8 @@ export class RegisterDto {
   @MinLength(2)
   @MaxLength(50)
   last_name!: string;
+
+  @IsOptional()
+  @IsString()
+  profile_image?: string;
 }

@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import * as bodyParser from 'body-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -10,7 +10,9 @@ import { config as loadEnv } from 'dotenv';
 import { validateEnvironment } from './config/env.validation';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
-import { buildRequestLogLine } from './common/request-log.util';
+import { AppLogger } from './common/app-logger.service';
+import { RequestContextService } from './common/request-context.service';
+import { RequestMetricsService } from './common/request-metrics.service';
 
 async function bootstrap() {
   loadEnv();
@@ -23,7 +25,10 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  const logger = new Logger('Bootstrap');
+  const logger = app.get(AppLogger);
+  const requestContext = app.get(RequestContextService);
+  const requestMetrics = app.get(RequestMetricsService);
+  app.useLogger(logger);
 
   app.use((req, res, next) => {
     const startedAt = process.hrtime.bigint();
@@ -36,28 +41,33 @@ async function bootstrap() {
     req.requestId = requestId;
     res.setHeader('x-request-id', requestId);
 
-    res.on('finish', () => {
-      const elapsedNanoseconds = process.hrtime.bigint() - startedAt;
-      const durationMs = Number(elapsedNanoseconds / BigInt(1_000_000));
-      const path = req.originalUrl || req.url;
+    requestContext.run({ requestId }, () => {
+      res.on('finish', () => {
+        const elapsedNanoseconds = process.hrtime.bigint() - startedAt;
+        const durationMs = Number(elapsedNanoseconds / BigInt(1_000_000));
+        const path = req.route?.path || req.originalUrl || req.url;
+        const metric = requestMetrics.record(req.method, path, res.statusCode, durationMs);
 
-      logger.log(
-        buildRequestLogLine({
-          requestId,
+        logger.log('HTTP request completed', 'HTTP', {
           method: req.method,
           path,
           statusCode: res.statusCode,
           durationMs,
           ip: req.ip,
           userAgent: req.get('user-agent') || undefined,
-        }),
-      );
-    });
+          metrics: {
+            count: metric.count,
+            errors: metric.errors,
+            avgDurationMs: Number((metric.totalDurationMs / metric.count).toFixed(2)),
+          },
+        });
+      });
 
-    next();
+      next();
+    });
   });
 
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(logger));
   app.useGlobalInterceptors(new ApiResponseInterceptor());
 
   app.useGlobalPipes(
@@ -103,6 +113,6 @@ async function bootstrap() {
 
   await app.listen(port, host);
 
-  logger.log(`Backend listening on ${host}:${port}`);
+  logger.log(`Backend listening on ${host}:${port}`, 'Bootstrap');
 }
 bootstrap();

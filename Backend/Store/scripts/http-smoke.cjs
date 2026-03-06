@@ -2,32 +2,58 @@
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4000').replace(/\/$/, '');
 
+function getPayload(json) {
+  if (
+    json &&
+    typeof json === 'object' &&
+    Object.prototype.hasOwnProperty.call(json, 'success')
+  ) {
+    return json.data;
+  }
+
+  return json;
+}
+
 const checks = [
   {
     name: 'health',
     path: '/health',
-    validate: (json) =>
-      typeof json === 'object' &&
-      json !== null &&
-      ['ok', 'degraded'].includes(json.app) &&
-      typeof json.timestamp === 'string',
+    validate: (json) => {
+      const payload = getPayload(json);
+      return (
+        typeof json === 'object' &&
+        json !== null &&
+        typeof payload === 'object' &&
+        payload !== null &&
+        ['ok', 'degraded'].includes(payload.app) &&
+        typeof payload.timestamp === 'string'
+      );
+    },
   },
   {
     name: 'admin-health',
     path: '/admin/health',
-    validate: (json) =>
-      typeof json === 'object' &&
-      json !== null &&
-      ['ok', 'degraded'].includes(json.app),
+    validate: (json) => {
+      const payload = getPayload(json);
+      return (
+        typeof payload === 'object' &&
+        payload !== null &&
+        ['ok', 'degraded'].includes(payload.app)
+      );
+    },
   },
   {
     name: 'admin-infortisa-health',
     path: '/admin/infortisa/health',
-    validate: (json) =>
-      typeof json === 'object' &&
-      json !== null &&
-      json.healthy === true &&
-      typeof json.timestamp === 'string',
+    validate: (json) => {
+      const payload = getPayload(json);
+      return (
+        typeof payload === 'object' &&
+        payload !== null &&
+        payload.healthy === true &&
+        typeof payload.timestamp === 'string'
+      );
+    },
   },
 ];
 

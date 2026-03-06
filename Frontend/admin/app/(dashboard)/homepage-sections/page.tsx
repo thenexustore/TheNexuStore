@@ -310,8 +310,8 @@ export default function HomepageSectionsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Control Home</h1>
-        <p className="text-sm text-slate-500">Configura y ordena secciones legacy que se exportan a la Store.</p>
+        <h1 className="text-3xl font-bold">Página Principal</h1>
+        <p className="text-sm text-slate-500">Configura y ordena las secciones que se exportan a la tienda.</p>
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">

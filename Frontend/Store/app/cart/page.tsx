@@ -20,7 +20,6 @@ export default function CartPage() {
   const { user } = useAuth();
   const {
     cart,
-    cartCount,
     isLoading,
     updateItem,
     removeItem,
@@ -361,8 +360,8 @@ export default function CartPage() {
 
               <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:p-4">
                 <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                  <span>Free shipping progress</span>
-                  <span>{freeShippingRemaining === 0 ? "Unlocked" : `${formatCurrency(freeShippingRemaining, locale)} left`}</span>
+                  <span>{t("freeShippingProgress")}</span>
+                  <span>{freeShippingRemaining === 0 ? t("freeShippingUnlocked") : t("freeShippingLeft", {amount: formatCurrency(freeShippingRemaining, locale)})}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
                   <div
@@ -396,7 +395,7 @@ export default function CartPage() {
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-gray-600">{t("tax")}</span>
+                  <span className="text-gray-600">{cart.summary.meta?.tax_label || t("tax")}</span>
                   <span className="font-medium">
                     {formatCurrency(cart.summary.tax, locale)}
                   </span>
@@ -424,7 +423,7 @@ export default function CartPage() {
                       disabled={isApplyingCoupon}
                       className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
                     >
-                      Remove
+                      {t("remove")}
                     </button>
                   </div>
                 ) : (
@@ -460,7 +459,7 @@ export default function CartPage() {
               <div className="border-t border-gray-300 pt-4 mb-6">
                 {(cart.summary.customs_duty || 0) > 0 && (
                   <div className="mb-2 flex items-start justify-between gap-3">
-                    <span className="text-gray-600 break-words">Customs duty</span>
+                    <span className="text-gray-600 break-words">{t("customsDuty")}</span>
                     <span className="font-medium">
                       {formatCurrency(cart.summary.customs_duty || 0, locale)}
                     </span>

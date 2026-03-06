@@ -484,8 +484,8 @@ export default function CheckoutPage() {
 
               <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:p-4">
                 <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                  <span>Free shipping progress</span>
-                  <span>{freeShippingRemaining === 0 ? "Unlocked" : `${formatCurrency(freeShippingRemaining)} left`}</span>
+                  <span>{t("freeShippingProgress")}</span>
+                  <span>{freeShippingRemaining === 0 ? t("freeShippingUnlocked") : t("freeShippingLeft", {amount: formatCurrency(freeShippingRemaining)})}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
                   <div
@@ -545,7 +545,7 @@ export default function CheckoutPage() {
                 </div>
                 {(cart.summary.customs_duty || 0) > 0 && (
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-600 break-words">Customs duty</span>
+                    <span className="text-gray-600 break-words">{t("customsDuty")}</span>
                     <span className="font-medium">
                       {formatCurrency(cart.summary.customs_duty || 0)}
                     </span>
@@ -571,12 +571,7 @@ export default function CheckoutPage() {
 
               {cart.summary.checkout_available === false && (
                 <p className="text-sm text-red-600 mb-3">
-                  {cart.summary.meta?.message || "Shipping not available for this destination. Contact support."}
-                </p>
-              )}
-              {cart.summary.meta?.message && (
-                <p className="text-sm text-amber-700 mb-3">
-                  {cart.summary.meta.message}
+                  {cart.summary.meta?.message || t("shippingUnavailable")}
                 </p>
               )}
 

@@ -123,8 +123,20 @@ export default function HomepageSectionsPage() {
   const [filter, setFilter] = useState("");
   const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
+
+  const sectionSignature = useCallback((section: HomepageSection) => {
+    return JSON.stringify({
+      enabled: section.enabled,
+      title: section.title || "",
+      config_json: section.config_json || {},
+      position: section.position,
+      type: section.type,
+    });
+  }, []);
+
   const duplicateTypeSummary = useMemo(() => {
     const countByType = new Map<string, number>();
     for (const section of sections) {
@@ -138,6 +150,25 @@ export default function HomepageSectionsPage() {
     return sorted.filter((section) => (section.title || "").toLowerCase().includes(q) || section.type.toLowerCase().includes(q));
   }, [sorted, filter]);
 
+  const dirtySectionIds = useMemo(() => {
+    const originalById = new Map(originalSections.map((section) => [section.id, section]));
+    const dirty = new Set<string>();
+
+    for (const section of sections) {
+      const original = originalById.get(section.id);
+      if (!original) {
+        dirty.add(section.id);
+        continue;
+      }
+
+      if (sectionSignature(section) !== sectionSignature(original)) {
+        dirty.add(section.id);
+      }
+    }
+
+    return dirty;
+  }, [originalSections, sectionSignature, sections]);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setDiagnosticsLoading(true);
@@ -147,6 +178,7 @@ export default function HomepageSectionsPage() {
         homepageSectionsApi.diagnostics(),
       ]);
       setSections(sectionsData);
+      setOriginalSections(sectionsData);
       setDiagnostics(diagnosticsData);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar las secciones");
@@ -308,9 +340,16 @@ export default function HomepageSectionsPage() {
 
   const saveAll = async () => {
     if (!sections.length) return;
+
+    const pending = sections.filter((section) => dirtySectionIds.has(section.id));
+    if (!pending.length) {
+      toast.message("No hay cambios pendientes por guardar");
+      return;
+    }
+
     try {
       await Promise.all(
-        sections.map((section) =>
+        pending.map((section) =>
           homepageSectionsApi.update(section.id, {
             enabled: section.enabled,
             title: section.title,
@@ -318,11 +357,16 @@ export default function HomepageSectionsPage() {
           }),
         ),
       );
-      toast.success('Todos los cambios guardados');
+      toast.success(`${pending.length} sección(es) guardadas`);
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar todo');
     }
+  };
+
+  const discardLocalChanges = () => {
+    setSections(originalSections);
+    toast.message("Cambios locales descartados");
   };
 
   const loadOptions = async (section: HomepageSection, q: string, target: "products" | "categories" | "brands") => {
@@ -439,11 +483,31 @@ export default function HomepageSectionsPage() {
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-slate-700">
+            Cambios pendientes: <span className="font-semibold">{dirtySectionIds.size}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50"
+              disabled={!dirtySectionIds.size}
+              onClick={discardLocalChanges}
+            >
+              Descartar cambios locales
+            </button>
+            <button
+              className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
+              disabled={!dirtySectionIds.size}
+              onClick={() => void saveAll()}
+            >
+              Guardar cambios pendientes
+            </button>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
-          <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={!sections.length} onClick={() => void saveAll()}>Guardar todo</button>
-        </div>
+                  </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
             {SECTION_TYPES.map((type) => (
@@ -480,6 +544,11 @@ export default function HomepageSectionsPage() {
               <div>
                 <div className="font-semibold">{section.title || section.type}</div>
                 <div className="text-xs text-slate-500">{section.type} · Posición #{section.position}</div>
+                {dirtySectionIds.has(section.id) ? (
+                  <div className="mt-1 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                    Sin guardar
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap justify-end">

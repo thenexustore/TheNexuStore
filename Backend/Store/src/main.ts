@@ -2,12 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import * as bodyParser from 'body-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { config as loadEnv } from 'dotenv';
 import { validateEnvironment } from './config/env.validation';
-import { registerObservability } from './common/bootstrap-observability';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { buildRequestLogLine } from './common/request-log.util';
 
 async function bootstrap() {
   loadEnv();
@@ -22,7 +24,39 @@ async function bootstrap() {
 
   const logger = new Logger('Bootstrap');
 
-  registerObservability(app, logger);
+  app.use((req, res, next) => {
+    const startedAt = process.hrtime.bigint();
+    const incomingRequestId = req.headers['x-request-id'];
+    const requestId =
+      typeof incomingRequestId === 'string' && incomingRequestId.trim()
+        ? incomingRequestId
+        : randomUUID();
+
+    req.requestId = requestId;
+    res.setHeader('x-request-id', requestId);
+
+    res.on('finish', () => {
+      const elapsedNanoseconds = process.hrtime.bigint() - startedAt;
+      const durationMs = Number(elapsedNanoseconds / BigInt(1_000_000));
+      const path = req.originalUrl || req.url;
+
+      logger.log(
+        buildRequestLogLine({
+          requestId,
+          method: req.method,
+          path,
+          statusCode: res.statusCode,
+          durationMs,
+          ip: req.ip,
+          userAgent: req.get('user-agent') || undefined,
+        }),
+      );
+    });
+
+    next();
+  });
+
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.useGlobalPipes(
     new ValidationPipe({

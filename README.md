@@ -147,7 +147,7 @@ Para evitar desajustes entre backend/store/admin, usa `ops/env.sync.example` com
 
 ### Fase 3 (operación)
 - Centralizar logs/auditoría.
-- Automatizar validaciones de configuración en CI/CD.
+- ✅ Validación automatizada de sincronización de variables (`ops/validate-env-sync.mjs`) en CI.
 
 ## Script de despliegue automatizado
 

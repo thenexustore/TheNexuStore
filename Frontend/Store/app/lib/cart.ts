@@ -60,6 +60,44 @@ export interface CartResponse {
   applied_coupon?: AppliedCoupon;
 }
 
+const EMPTY_SUMMARY: CartSummary = {
+  subtotal: 0,
+  discount: 0,
+  shipping: 0,
+  tax: 0,
+  customs_duty: 0,
+  total: 0,
+  item_count: 0,
+  currency: "EUR",
+  checkout_available: true,
+};
+
+const normalizeCartResponse = (payload: unknown): CartResponse => {
+  const cart = (payload || {}) as Partial<CartResponse>;
+  const items = Array.isArray(cart.items) ? cart.items : [];
+  const summary = cart.summary || EMPTY_SUMMARY;
+
+  const itemCountFromItems = items.reduce(
+    (sum, item) => sum + (Number(item?.quantity) || 0),
+    0,
+  );
+
+  return {
+    id: cart.id || "guest-cart",
+    items,
+    summary: {
+      ...EMPTY_SUMMARY,
+      ...summary,
+      item_count:
+        typeof summary.item_count === "number"
+          ? summary.item_count
+          : itemCountFromItems,
+      currency: summary.currency || EMPTY_SUMMARY.currency,
+    },
+    applied_coupon: cart.applied_coupon || undefined,
+  };
+};
+
 export const getCart = async (
   sessionId?: string,
   destination?: DestinationQuoteInput,
@@ -69,7 +107,8 @@ export const getCart = async (
   if (destination?.region) params.set("region", destination.region);
   if (destination?.postal_code) params.set("postal_code", destination.postal_code);
   const path = params.toString() ? `/cart?${params.toString()}` : "/cart";
-  return apiRequestWithSession(path, { method: "GET" }, sessionId);
+  const response = await apiRequestWithSession(path, { method: "GET" }, sessionId);
+  return normalizeCartResponse(response);
 };
 
 export const addToCart = async (
@@ -77,7 +116,7 @@ export const addToCart = async (
   quantity: number,
   sessionId?: string,
 ): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     "/cart/add",
     {
       method: "POST",
@@ -85,6 +124,7 @@ export const addToCart = async (
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };
 
 export const updateCartItem = async (
@@ -92,7 +132,7 @@ export const updateCartItem = async (
   data: { quantity: number },
   sessionId?: string,
 ): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     `/cart/item/${itemId}`,
     {
       method: "PUT",
@@ -100,36 +140,39 @@ export const updateCartItem = async (
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };
 
 export const removeCartItem = async (
   itemId: string,
   sessionId?: string,
 ): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     `/cart/item/${itemId}`,
     {
       method: "DELETE",
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };
 
 export const clearCart = async (sessionId?: string): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     "/cart/clear",
     {
       method: "DELETE",
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };
 
 export const applyCoupon = async (
   couponCode: string,
   sessionId?: string,
 ): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     "/cart/coupon/apply",
     {
       method: "POST",
@@ -137,25 +180,27 @@ export const applyCoupon = async (
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };
 
 export const removeCoupon = async (
   sessionId?: string,
 ): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     "/cart/coupon",
     {
       method: "DELETE",
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };
 
 export const mergeCarts = async (
   sessionCartId: string,
   sessionId?: string,
 ): Promise<CartResponse> => {
-  return apiRequestWithSession(
+  const response = await apiRequestWithSession(
     "/cart/merge",
     {
       method: "POST",
@@ -163,4 +208,5 @@ export const mergeCarts = async (
     },
     sessionId,
   );
+  return normalizeCartResponse(response);
 };

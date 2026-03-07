@@ -43,11 +43,15 @@ export interface HomepageSectionsDiagnostics {
     duplicatedTypes: number;
     failedPublicSections: number;
     emptyPublicSections: number;
+    activeBanners: number;
+    heroSections: number;
+    heroEnabledSections: number;
   };
   duplicatedTypes: Array<{ type: string; count: number }>;
   checks: {
     hasVisibleSections: boolean;
     storePayloadOk: boolean;
+    bannersLinkedToHome: boolean;
   };
 }
 

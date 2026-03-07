@@ -144,10 +144,25 @@ export class HomepageSectionsService {
 
     const sectionByType = new Map(existingSections.map((section) => [section.type, section]));
 
+    let nextPosition = existingSections.length
+      ? Math.max(...existingSections.map((item) => item.position || 0))
+      : 0;
+
     for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
       const existing = sectionByType.get(section.type as any);
 
       if (!existing) {
+        nextPosition += 1;
+        const created = await this.prisma.homepageSection.create({
+          data: {
+            type: section.type as any,
+            enabled: true,
+            position: nextPosition,
+            title: section.title,
+            config_json: section.config_json,
+          },
+        });
+        sectionByType.set(section.type as any, created);
         continue;
       }
 
@@ -194,6 +209,10 @@ export class HomepageSectionsService {
       return Array.isArray(data) ? data.length === 0 : !data;
     }).length;
 
+    const activeBanners = await this.prisma.banner.count({ where: { is_active: true } });
+    const heroSections = sections.filter((section) => section.type === HomepageSectionType.HERO_BANNER_SLIDER);
+    const heroEnabledSections = heroSections.filter((section) => section.enabled).length;
+
     return {
       totals: {
         total,
@@ -202,11 +221,15 @@ export class HomepageSectionsService {
         duplicatedTypes: duplicatedTypes.length,
         failedPublicSections,
         emptyPublicSections,
+        activeBanners,
+        heroSections: heroSections.length,
+        heroEnabledSections,
       },
       duplicatedTypes,
       checks: {
         hasVisibleSections: enabled > 0,
         storePayloadOk: failedPublicSections === 0,
+        bannersLinkedToHome: activeBanners === 0 || heroEnabledSections > 0,
       },
     };
   }

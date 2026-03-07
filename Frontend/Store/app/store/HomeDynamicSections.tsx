@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import HomeProductSection from "./HomeProductSection";
@@ -36,12 +35,15 @@ function BannerSection({ banners }: { banners: any[] }) {
   return (
     <section className="w-full max-w-7xl px-4 pt-4 sm:px-6">
       <div className="relative h-52 overflow-hidden rounded-2xl sm:h-72 lg:h-80">
-        <Image
-          src={banner.image}
+        <img
+          src={String(banner.image || "/No_Image_Available.png")}
           alt={banner.title_text || "Banner"}
-          fill
-          priority
-          className="object-cover"
+          className="h-full w-full object-cover"
+          loading="eager"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = "/No_Image_Available.png";
+          }}
         />
         <div className="absolute inset-0" style={{ background: banner.overlay }} />
         <div className="absolute inset-0 flex flex-col justify-end gap-2 p-5 text-white sm:p-8">

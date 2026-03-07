@@ -501,7 +501,14 @@ export default function HomepageSectionsPage() {
       {!diagnosticsLoading && diagnostics && !diagnostics.checks.bannersLinkedToHome ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
-          Hay {diagnostics.totals.activeBanners} banner(s) activos pero no hay una sección HERO_BANNER_SLIDER visible en Página Principal. Crea/activa la sección HERO para que se muestren en la Store.
+          <div>
+            Hay {diagnostics.totals.activeBanners} banner(s) activos pero no hay una sección HERO_BANNER_SLIDER visible en Página Principal. Crea/activa la sección HERO para que se muestren en la Store.
+            <div className="mt-2">
+              <a className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" href="/banners">
+                Ir a Banners
+              </a>
+            </div>
+          </div>
         </div>
       ) : null}
 

@@ -18,6 +18,10 @@ type Section = {
   failed?: boolean;
 };
 
+const PRIORITY_BRANDS = [
+  "hp", "lenovo", "dell", "asus", "acer", "apple", "msi", "samsung", "lg", "sony", "philips", "xiaomi", "huawei", "tp-link", "aoc", "epson", "canon", "brother", "apc", "amd", "intel", "gigabyte", "zotac", "nvidia", "sandisk", "kingston"
+];
+
 function BannerSection({ banners }: { banners: any[] }) {
   const [index, setIndex] = useState(0);
   const safeBanners = useMemo(() => banners || [], [banners]);
@@ -97,6 +101,56 @@ function SimpleListSection({
           return (
             <Link key={item.id} href={buildHref(item.slug)}>
               {card}
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function BrandLogoCarousel({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ id: string; name: string; slug?: string; logo_url?: string; image?: string }>;
+}) {
+  if (!items.length) return null;
+
+  const sorted = [...items].sort((a, b) => {
+    const ai = PRIORITY_BRANDS.indexOf(String(a.name || "").toLowerCase());
+    const bi = PRIORITY_BRANDS.indexOf(String(b.name || "").toLowerCase());
+    if (ai === -1 && bi === -1) return String(a.name).localeCompare(String(b.name));
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  return (
+    <section className="w-full px-4 sm:px-6">
+      <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+        {sorted.map((brand) => {
+          const logo = String(brand.logo_url || brand.image || "/No_Image_Available.png");
+          return (
+            <Link
+              key={brand.id}
+              href={`/products?brand=${encodeURIComponent(brand.slug || "")}`}
+              className="group min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
+              title={brand.name}
+            >
+              <div className="flex h-16 items-center justify-center rounded-lg bg-slate-50">
+                <img
+                  src={logo}
+                  alt={brand.name}
+                  className="max-h-10 max-w-[120px] object-contain"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = "/No_Image_Available.png";
+                  }}
+                />
+              </div>
             </Link>
           );
         })}
@@ -202,7 +256,7 @@ export default function HomeDynamicSections() {
           case "TOP_CATEGORIES_GRID":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.topCategories")} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "BRANDS_STRIP":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.brands")} buildHref={(slug) => `/products?brand=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} /></SectionShell>;
           case "TRUST_BAR":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
           default:

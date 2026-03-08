@@ -48,6 +48,12 @@ function initialsSvgDataUri(name?: string) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="48"><rect width="100%" height="100%" rx="8" fill="%23ffffff" stroke="%23e2e8f0"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" fill="%23475569">${brandInitials(name)}</text></svg>`)}`;
 }
 
+function isMissingLogoAsset(value?: string) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return true;
+  return raw.includes("no_image_available");
+}
+
 function BannerSection({ banners }: { banners: any[] }) {
   const [index, setIndex] = useState(0);
   const safeBanners = useMemo(() => banners || [], [banners]);
@@ -159,7 +165,7 @@ function BrandLogoCarousel({
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         {sorted.map((brand) => {
           const rawLogo = String(brand.logo_url || brand.image || "").trim();
-          const logo = rawLogo ? resolveAssetUrl(rawLogo) : initialsSvgDataUri(brand.name);
+          const logo = isMissingLogoAsset(rawLogo) ? initialsSvgDataUri(brand.name) : resolveAssetUrl(rawLogo);
           return (
             <Link
               key={brand.id}

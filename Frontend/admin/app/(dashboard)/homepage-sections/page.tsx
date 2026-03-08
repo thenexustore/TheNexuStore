@@ -60,9 +60,9 @@ const SORT_OPTIONS = [
 const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
   HERO_BANNER_SLIDER: { items_per_carousel: 1 },
   TOP_CATEGORIES_GRID: { source: "query", query: { type: "categories", limit: 10 } },
-  BEST_DEALS: { source: "query", query: { type: "products", sortBy: "discount_desc", inStockOnly: true, limit: 12 } },
-  NEW_ARRIVALS: { source: "query", query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 } },
-  FEATURED_PICKS: { source: "query", query: { type: "products", inStockOnly: true, limit: 12 } },
+  BEST_DEALS: { source: "query", query: { type: "products", sortBy: "discount_desc", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
+  NEW_ARRIVALS: { source: "query", query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
+  FEATURED_PICKS: { source: "query", query: { type: "products", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
   BRANDS_STRIP: { source: "query", query: { type: "brands", limit: 12 } },
   TRUST_BAR: {
     items: [
@@ -964,6 +964,25 @@ export default function HomepageSectionsPage() {
                     )}
                   </div>
                 )}
+
+                {PRODUCT_QUERY_TYPES.includes(section.type) ? (
+                  <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel en Store</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                        <input type="checkbox" checked={Boolean(section.config_json.carousel_enabled ?? true)} onChange={(e) => updateConfig(section, { carousel_enabled: e.target.checked })} />
+                        Activar carrusel horizontal
+                      </label>
+                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                        <input type="checkbox" checked={Boolean(section.config_json.carousel_autoplay ?? true)} onChange={(e) => updateConfig(section, { carousel_autoplay: e.target.checked })} />
+                        Autoplay
+                      </label>
+                      <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 4500)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 4500 })} placeholder="Intervalo autoplay (ms)" />
+                      <input type="number" min={1} max={6} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 4)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 4 })} placeholder="Items visibles desktop" />
+                      <input type="number" min={1} max={3} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items visibles móvil" />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
 

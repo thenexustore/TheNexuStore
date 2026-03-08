@@ -182,7 +182,13 @@ export default function HomeDynamicSections() {
           case "BEST_DEALS":
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage="No hay productos disponibles" /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage="No hay productos disponibles" carouselConfig={{
+              enabled: Boolean(section.config_json.carousel_enabled ?? true),
+              autoplay: Boolean(section.config_json.carousel_autoplay ?? true),
+              autoplayIntervalMs: Number(section.config_json.carousel_interval_ms || 5000),
+              itemsPerViewDesktop: Number(section.config_json.carousel_items_desktop || 4),
+              itemsPerViewMobile: Number(section.config_json.carousel_items_mobile || 2),
+            }} /></SectionShell>;
           case "TOP_CATEGORIES_GRID":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || "Top Categories"} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "BRANDS_STRIP":

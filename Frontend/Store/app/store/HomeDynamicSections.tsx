@@ -27,7 +27,10 @@ function resolveAssetUrl(value?: string) {
   if (!raw) return "/No_Image_Available.png";
   if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
   if (raw.startsWith("//")) return `https:${raw}`;
-  if (raw.startsWith("/")) return raw;
+  if (raw.startsWith("/")) {
+    if (raw === "/No_Image_Available.png") return raw;
+    return `${API_URL}${raw}`;
+  }
   if (/^https?:\/\//i.test(raw)) return raw.replace(/^http:\/\//i, "https://");
   if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return `https://${raw}`;
   const normalized = raw.replace(/^\/+/, "");

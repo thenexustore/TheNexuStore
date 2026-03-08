@@ -478,6 +478,33 @@ export class HomepageSectionsService {
       featured_only: featuredOnly,
     });
 
+    if (!result.products.length && (query.inStockOnly ?? true)) {
+      const relaxed = await this.productsService.getProducts({
+        page: 1,
+        limit: query.limit || config.limit || 12,
+        categories: category?.slug ? [category.slug] : undefined,
+        brand: brand?.slug || undefined,
+        min_price: query.priceMin,
+        max_price: query.priceMax,
+        in_stock_only: false,
+        sort_by:
+          sectionType === HomepageSectionType.NEW_ARRIVALS
+            ? ProductSortBy.NEWEST
+            : sortByMap[selectedSort] || ProductSortBy.NEWEST,
+        featured_only: featuredOnly,
+      });
+
+      if (relaxed.products.length) {
+        if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+          return [...relaxed.products].sort(
+            (a: any, b: any) =>
+              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+          );
+        }
+        return relaxed.products;
+      }
+    }
+
     if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
       return [...result.products].sort(
         (a: any, b: any) =>

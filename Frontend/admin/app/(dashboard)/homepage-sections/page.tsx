@@ -167,6 +167,7 @@ export default function HomepageSectionsPage() {
   const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
+  const [autoFixingEmpty, setAutoFixingEmpty] = useState(false);
   const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] = useState("");
   const [categoryCarouselType, setCategoryCarouselType] = useState<"FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("FEATURED_PICKS");
   const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<"discount_desc" | "newest">("discount_desc");
@@ -627,6 +628,65 @@ export default function HomepageSectionsPage() {
     toast.success("Autocorrección aplicada en carruseles vacíos (modo local). Guarda para publicar.");
   };
 
+  const buildAutoFixedSections = (sourceSections: HomepageSection[]) => {
+    if (!diagnostics?.emptyEnabledProductSections?.length) return sourceSections;
+    const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
+    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+
+    return sourceSections.map((section) => {
+      if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
+      const config = { ...(section.config_json || {}) } as Record<string, unknown>;
+      const query = { ...((config.query || {}) as Record<string, unknown>) };
+
+      config.source = "query";
+      query.type = "products";
+      query.inStockOnly = false;
+      query.priceMin = undefined;
+      query.priceMax = undefined;
+      if (section.type === "FEATURED_PICKS") query.featuredOnly = false;
+      if (!query.sortBy) query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
+
+      config.query = query;
+      return { ...section, config_json: config };
+    });
+  };
+
+  const autoFixAndSaveEmptyProductSections = async () => {
+    if (!diagnostics?.emptyEnabledProductSections?.length) {
+      toast.message("No hay carruseles vacíos para autocorregir");
+      return;
+    }
+
+    const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
+    const nextSections = buildAutoFixedSections(sections);
+    const toPersist = nextSections.filter((section) => emptyIds.has(section.id));
+
+    if (!toPersist.length) {
+      toast.message("No hay cambios para persistir");
+      return;
+    }
+
+    setAutoFixingEmpty(true);
+    setSections(nextSections);
+    try {
+      await Promise.all(
+        toPersist.map((section) =>
+          homepageSectionsApi.update(section.id, {
+            enabled: section.enabled,
+            title: section.title,
+            config_json: section.config_json,
+          }),
+        ),
+      );
+      toast.success(`Autocorrección aplicada y guardada en ${toPersist.length} sección(es)`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar la autocorrección");
+    } finally {
+      setAutoFixingEmpty(false);
+    }
+  };
+
   const saveAll = async () => {
     if (!sections.length) return;
 
@@ -914,6 +974,9 @@ export default function HomepageSectionsPage() {
             <div className="mt-2">
               <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={autoFixEmptyProductSections}>
                 Autocorregir carruseles vacíos en local
+              </button>
+              <button className="ml-2 inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs disabled:opacity-50" disabled={autoFixingEmpty} onClick={() => void autoFixAndSaveEmptyProductSections()}>
+                {autoFixingEmpty ? "Aplicando..." : "Autocorregir y guardar"}
               </button>
             </div>
           </div>

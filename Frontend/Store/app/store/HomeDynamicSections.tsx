@@ -25,10 +25,20 @@ const PRIORITY_BRANDS = [
 function resolveAssetUrl(value?: string) {
   const raw = String(value || "").trim();
   if (!raw) return "/No_Image_Available.png";
-  if (raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/")) return raw;
-  if (/^https?:\/\//i.test(raw)) return raw;
-  if (raw.startsWith("uploads/")) return `${API_URL}/${raw}`;
-  return `${API_URL}/${raw.replace(/^\/+/, "")}`;
+  if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  if (raw.startsWith("/")) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw.replace(/^http:\/\//i, "https://");
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return `https://${raw}`;
+  const normalized = raw.replace(/^\/+/, "");
+  return `${API_URL}/${normalized}`;
+}
+
+function brandInitials(name?: string) {
+  const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "BR";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
 }
 
 function BannerSection({ banners }: { banners: any[] }) {
@@ -156,10 +166,11 @@ function BrandLogoCarousel({
                   className="max-h-10 max-w-[120px] object-contain"
                   onError={(event) => {
                     event.currentTarget.onerror = null;
-                    event.currentTarget.src = "/No_Image_Available.png";
+                    event.currentTarget.src = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="48"><rect width="100%" height="100%" rx="8" fill="%23ffffff" stroke="%23e2e8f0"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" fill="%23475569">${brandInitials(brand.name)}</text></svg>`)}`;
                   }}
                 />
               </div>
+              <div className="mt-2 line-clamp-1 text-center text-xs font-medium text-slate-600">{brand.name}</div>
             </Link>
           );
         })}

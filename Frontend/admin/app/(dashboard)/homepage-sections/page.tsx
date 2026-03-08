@@ -226,6 +226,12 @@ export default function HomepageSectionsPage() {
     return new Set(sections.filter((section) => isDirtySection(section)).map((section) => section.id));
   }, [isDirtySection, sections]);
 
+  const brandCatalogStats = useMemo(() => {
+    const total = queryCatalogs.brands.length;
+    const missingLogo = queryCatalogs.brands.filter((brand) => !String(brand.image || "").trim()).length;
+    return { total, missingLogo };
+  }, [queryCatalogs.brands]);
+
   const optionLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of queryCatalogs.categories) map.set(item.id, item.label);
@@ -1122,6 +1128,14 @@ export default function HomepageSectionsPage() {
             {creatingType === "category-carousel" ? "Creando carrusel..." : "Añadir carrusel de categoría"}
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
+        <div className="text-sm font-medium text-slate-700">Estado de logos de marcas</div>
+        <p className="text-xs text-slate-500">
+          Marcas precargadas en selector: <strong>{brandCatalogStats.total}</strong> · Sin logo: <strong>{brandCatalogStats.missingLogo}</strong>.
+          {" "}Si hay muchas sin logo, ejecuta <code>npm run brands:logo:audit</code> en Backend para auditar y <code>npm run brands:logo:normalize</code> para normalizar URLs.
+        </p>
       </div>
 
       {isLoading ? <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">Cargando secciones...</div> : null}

@@ -102,6 +102,75 @@ export class HomepageSectionsService {
     return next;
   }
 
+  private clampNumber(value: unknown, min: number, max: number, fallback: number) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(numeric)));
+  }
+
+  private getSectionConfigIssues(section: { id: string; type: string; enabled: boolean; title: string | null; config_json: unknown }) {
+    const config = ((section.config_json || {}) as Record<string, any>) || {};
+    const issues: string[] = [];
+
+    if (section.enabled && !String(section.title || '').trim()) {
+      issues.push('La sección está visible pero no tiene título.');
+    }
+
+    const source = config.source || 'query';
+    if (!['query', 'manual'].includes(source)) {
+      issues.push('config_json.source debe ser "query" o "manual".');
+    }
+
+    if (source === 'manual' && !Array.isArray(config.ids)) {
+      issues.push('Modo manual requiere config_json.ids como array.');
+    }
+
+    if (source === 'query') {
+      const query = (config.query || {}) as Record<string, any>;
+      const limit = query.limit ?? config.limit;
+      if (limit !== undefined && (typeof limit !== 'number' || limit < 1 || limit > 24)) {
+        issues.push('query.limit debe estar entre 1 y 24.');
+      }
+
+      if (
+        [HomepageSectionType.BEST_DEALS, HomepageSectionType.NEW_ARRIVALS, HomepageSectionType.FEATURED_PICKS].includes(section.type as HomepageSectionType)
+      ) {
+        if (query.type && query.type !== HomepageQueryType.PRODUCTS) {
+          issues.push('Las secciones de productos deben usar query.type="products".');
+        }
+
+        if (config.carousel_interval_ms !== undefined && (typeof config.carousel_interval_ms !== 'number' || config.carousel_interval_ms < 2000)) {
+          issues.push('carousel_interval_ms debe ser >= 2000 ms.');
+        }
+
+        if (config.carousel_items_desktop !== undefined && (typeof config.carousel_items_desktop !== 'number' || config.carousel_items_desktop < 2 || config.carousel_items_desktop > 6)) {
+          issues.push('carousel_items_desktop debe estar entre 2 y 6.');
+        }
+
+        if (config.carousel_items_mobile !== undefined && (typeof config.carousel_items_mobile !== 'number' || config.carousel_items_mobile < 1 || config.carousel_items_mobile > 3)) {
+          issues.push('carousel_items_mobile debe estar entre 1 y 3.');
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  private normalizeProductCarouselConfig(type: HomepageSectionType, config: Record<string, any>) {
+    if (![HomepageSectionType.BEST_DEALS, HomepageSectionType.NEW_ARRIVALS, HomepageSectionType.FEATURED_PICKS].includes(type)) {
+      return config;
+    }
+
+    return {
+      ...config,
+      carousel_enabled: Boolean(config.carousel_enabled ?? true),
+      carousel_autoplay: Boolean(config.carousel_autoplay ?? true),
+      carousel_interval_ms: this.clampNumber(config.carousel_interval_ms, 2000, 15000, 4500),
+      carousel_items_desktop: this.clampNumber(config.carousel_items_desktop, 2, 6, 4),
+      carousel_items_mobile: this.clampNumber(config.carousel_items_mobile, 1, 3, 2),
+    };
+  }
+
   private shouldBackfillLegacyConfig(
     type: HomepageSectionType,
     config: Record<string, any>,
@@ -144,10 +213,25 @@ export class HomepageSectionsService {
 
     const sectionByType = new Map(existingSections.map((section) => [section.type, section]));
 
+    let nextPosition = existingSections.length
+      ? Math.max(...existingSections.map((item) => item.position || 0))
+      : 0;
+
     for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
       const existing = sectionByType.get(section.type as any);
 
       if (!existing) {
+        nextPosition += 1;
+        const created = await this.prisma.homepageSection.create({
+          data: {
+            type: section.type as any,
+            enabled: true,
+            position: nextPosition,
+            title: section.title,
+            config_json: section.config_json,
+          },
+        });
+        sectionByType.set(section.type as any, created);
         continue;
       }
 
@@ -164,6 +248,82 @@ export class HomepageSectionsService {
   async getAdminSections() {
     await this.ensureDefaultSections();
     return this.prisma.homepageSection.findMany({ orderBy: { position: 'asc' } });
+  }
+
+
+  async getAdminDiagnostics() {
+    await this.ensureDefaultSections();
+
+    const sections = await this.prisma.homepageSection.findMany({
+      orderBy: { position: 'asc' },
+    });
+
+    const total = sections.length;
+    const enabled = sections.filter((section) => section.enabled).length;
+    const disabled = total - enabled;
+
+    const byType = new Map<string, number>();
+    for (const section of sections) {
+      byType.set(section.type, (byType.get(section.type) || 0) + 1);
+    }
+
+    const duplicatedTypes = Array.from(byType.entries())
+      .filter(([, count]) => count > 1)
+      .map(([type, count]) => ({ type, count }));
+
+    const publicSections = await this.getPublicSections();
+    const failedPublicSections = publicSections.filter((section) => (section as any).failed === true).length;
+    const emptyPublicSections = publicSections.filter((section) => {
+      const data = (section as any).data;
+      return Array.isArray(data) ? data.length === 0 : !data;
+    }).length;
+
+    const activeBanners = await this.prisma.banner.count({ where: { is_active: true } });
+    const activeFeaturedProducts = await this.prisma.featuredProduct.count({ where: { is_active: true } });
+
+    const heroSections = sections.filter((section) => section.type === HomepageSectionType.HERO_BANNER_SLIDER);
+    const heroEnabledSections = heroSections.filter((section) => section.enabled).length;
+
+    const featuredPicksSections = sections.filter((section) => section.type === HomepageSectionType.FEATURED_PICKS);
+    const featuredManualLinked = featuredPicksSections.some((section) => {
+      const config = (section.config_json || {}) as Record<string, any>;
+      return section.enabled && (config.source === 'manual' || Array.isArray(config.ids));
+    });
+
+    const invalidConfigSections = sections
+      .map((section) => ({
+        id: section.id,
+        type: section.type,
+        title: section.title,
+        issues: this.getSectionConfigIssues(section),
+      }))
+      .filter((section) => section.issues.length > 0);
+
+    return {
+      totals: {
+        total,
+        enabled,
+        disabled,
+        duplicatedTypes: duplicatedTypes.length,
+        failedPublicSections,
+        emptyPublicSections,
+        activeBanners,
+        heroSections: heroSections.length,
+        heroEnabledSections,
+        activeFeaturedProducts,
+        featuredPicksSections: featuredPicksSections.length,
+        invalidConfigSections: invalidConfigSections.length,
+      },
+      duplicatedTypes,
+      invalidConfigSections,
+      checks: {
+        hasVisibleSections: enabled > 0,
+        storePayloadOk: failedPublicSections === 0,
+        bannersLinkedToHome: activeBanners === 0 || heroEnabledSections > 0,
+        featuredLinkedToHome: activeFeaturedProducts === 0 || featuredManualLinked,
+        configsValid: invalidConfigSections.length === 0,
+      },
+    };
   }
 
   async getPublicSections() {
@@ -401,9 +561,12 @@ export class HomepageSectionsService {
   }
 
   async create(dto: CreateHomepageSectionDto) {
-    const normalizedConfig = this.normalizeConfigBySectionType(
+    const normalizedConfig = this.normalizeProductCarouselConfig(
       dto.type,
-      dto.config_json as Record<string, any>,
+      this.normalizeConfigBySectionType(
+        dto.type,
+        dto.config_json as Record<string, any>,
+      ),
     );
     this.validateConfig(dto.type, normalizedConfig);
     return this.prisma.homepageSection.create({
@@ -421,12 +584,15 @@ export class HomepageSectionsService {
     const existing = await this.prisma.homepageSection.findUnique({ where: { id } });
     if (!existing) throw new BadRequestException('Section not found');
 
-    const mergedConfig = this.normalizeConfigBySectionType(
+    const mergedConfig = this.normalizeProductCarouselConfig(
       existing.type as HomepageSectionType,
-      {
-        ...(existing.config_json as Record<string, any>),
-        ...(dto.config_json || {}),
-      },
+      this.normalizeConfigBySectionType(
+        existing.type as HomepageSectionType,
+        {
+          ...(existing.config_json as Record<string, any>),
+          ...(dto.config_json || {}),
+        },
+      ),
     );
     this.validateConfig(existing.type as HomepageSectionType, mergedConfig);
 

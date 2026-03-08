@@ -525,16 +525,54 @@ export class HomepageSectionsService {
           : 'products');
 
     if (target === 'products') {
-      const res = await this.prisma.product.findMany({
-        where: {
-          status: 'ACTIVE',
-          title: { contains: q, mode: 'insensitive' },
-        },
-        select: { id: true, title: true, slug: true },
-        take: limit,
-        orderBy: { created_at: 'desc' },
+      const [category, brand] = await Promise.all([
+        query.categoryId
+          ? this.prisma.category.findUnique({ where: { id: query.categoryId }, select: { slug: true } })
+          : Promise.resolve(null),
+        query.brandId
+          ? this.prisma.brand.findUnique({ where: { id: query.brandId }, select: { slug: true } })
+          : Promise.resolve(null),
+      ]);
+
+      const sortByMap: Record<string, ProductSortBy> = {
+        [HomepageQuerySortBy.NEWEST]: ProductSortBy.NEWEST,
+        [HomepageQuerySortBy.PRICE_ASC]: ProductSortBy.PRICE_LOW_TO_HIGH,
+        [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
+      };
+
+      const fallbackSort =
+        query.type === HomepageSectionType.BEST_DEALS
+          ? HomepageQuerySortBy.DISCOUNT_DESC
+          : HomepageQuerySortBy.NEWEST;
+      const selectedSort = query.sortBy || fallbackSort;
+      const inStockOnly = query.inStockOnly !== 'false';
+
+      const result = await this.productsService.getProducts({
+        page: 1,
+        limit: Math.max(limit * 2, 24),
+        categories: category?.slug ? [category.slug] : undefined,
+        brand: brand?.slug || undefined,
+        min_price: query.priceMin,
+        max_price: query.priceMax,
+        in_stock_only: inStockOnly,
+        sort_by: sortByMap[selectedSort] || ProductSortBy.NEWEST,
+        featured_only: query.type === HomepageSectionType.FEATURED_PICKS,
       });
-      return res.map((x) => ({ id: x.id, label: x.title, subtitle: x.slug }));
+
+      let products = result.products || [];
+      if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+        products = [...products].sort(
+          (a: any, b: any) =>
+            Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+        );
+      }
+
+      if (q) {
+        const nq = q.toLowerCase();
+        products = products.filter((item: any) => String(item.title || '').toLowerCase().includes(nq));
+      }
+
+      return products.slice(0, limit).map((x: any) => ({ id: x.id, label: x.title, subtitle: x.slug }));
     }
 
     if (target === 'categories') {

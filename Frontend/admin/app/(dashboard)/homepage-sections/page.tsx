@@ -144,6 +144,14 @@ function findPresetCategoryId(presetMatchers: string[], tree: CategoryMenuTreeNo
 export default function HomepageSectionsPage() {
   const [sections, setSections] = useState<HomepageSection[]>([]);
   const [search, setSearch] = useState<Record<string, string>>({});
+  const [manualProductFilters, setManualProductFilters] = useState<Record<string, {
+    categoryId?: string;
+    brandId?: string;
+    sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
+    inStockOnly?: boolean;
+    priceMin?: number;
+    priceMax?: number;
+  }>>({});
   const [options, setOptions] = useState<Record<string, HomepageOption[]>>({});
   const [queryCatalogs, setQueryCatalogs] = useState<{ categories: HomepageOption[]; brands: HomepageOption[] }>({ categories: [], brands: [] });
   const [menuTree, setMenuTree] = useState<CategoryMenuTreeNode[]>([]);
@@ -611,10 +619,22 @@ export default function HomepageSectionsPage() {
     toast.message("Cambios locales descartados");
   };
 
-  const loadOptions = async (section: HomepageSection, q: string, target: "products" | "categories" | "brands") => {
+  const loadOptions = async (
+    section: HomepageSection,
+    q: string,
+    target: "products" | "categories" | "brands",
+    filters?: {
+      categoryId?: string;
+      brandId?: string;
+      sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
+      inStockOnly?: boolean;
+      priceMin?: number;
+      priceMax?: number;
+    },
+  ) => {
     if (!supportsSource(section.type)) return;
     try {
-      const data = await homepageSectionsApi.options(section.type, q, 10, target);
+      const data = await homepageSectionsApi.options(section.type, q, 10, target, filters);
       setOptions((prev) => ({ ...prev, [section.id]: data }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Búsqueda fallida");
@@ -1173,6 +1193,99 @@ export default function HomepageSectionsPage() {
                       <div className="text-xs text-slate-500">Seleccionados: <span className="font-semibold">{selectedIds.length}</span></div>
                       <div className="text-xs text-slate-500">{section.type === "TOP_CATEGORIES_GRID" ? "Categorías" : section.type === "BRANDS_STRIP" ? "Marcas" : "Productos"}</div>
                     </div>
+                    {PRODUCT_QUERY_TYPES.includes(section.type) ? (
+                      <div className="grid gap-2 md:grid-cols-3">
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={String(manualProductFilters[section.id]?.categoryId || "")}
+                          onChange={(e) => setManualProductFilters((prev) => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              categoryId: e.target.value || undefined,
+                            },
+                          }))}
+                        >
+                          <option value="">Filtrar por categoría</option>
+                          {queryCatalogs.categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>{cat.label}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={String(manualProductFilters[section.id]?.brandId || "")}
+                          onChange={(e) => setManualProductFilters((prev) => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              brandId: e.target.value || undefined,
+                            },
+                          }))}
+                        >
+                          <option value="">Filtrar por marca</option>
+                          {queryCatalogs.brands.map((brand) => (
+                            <option key={brand.id} value={brand.id}>{brand.label}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={String(manualProductFilters[section.id]?.sortBy || (section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc"))}
+                          onChange={(e) => setManualProductFilters((prev) => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              sortBy: e.target.value as "newest" | "price_asc" | "price_desc" | "discount_desc",
+                            },
+                          }))}
+                        >
+                          {SORT_OPTIONS.map((sort) => (
+                            <option key={sort.value} value={sort.value}>{sort.label}</option>
+                          ))}
+                        </select>
+                        <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(manualProductFilters[section.id]?.inStockOnly ?? true)}
+                            onChange={(e) => setManualProductFilters((prev) => ({
+                              ...prev,
+                              [section.id]: {
+                                ...prev[section.id],
+                                inStockOnly: e.target.checked,
+                              },
+                            }))}
+                          />
+                          Solo con stock
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="border rounded-lg px-3 py-2"
+                          value={typeof manualProductFilters[section.id]?.priceMin === "number" ? manualProductFilters[section.id]?.priceMin : ""}
+                          onChange={(e) => setManualProductFilters((prev) => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              priceMin: e.target.value ? Number(e.target.value) : undefined,
+                            },
+                          }))}
+                          placeholder="Precio mínimo"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          className="border rounded-lg px-3 py-2"
+                          value={typeof manualProductFilters[section.id]?.priceMax === "number" ? manualProductFilters[section.id]?.priceMax : ""}
+                          onChange={(e) => setManualProductFilters((prev) => ({
+                            ...prev,
+                            [section.id]: {
+                              ...prev[section.id],
+                              priceMax: e.target.value ? Number(e.target.value) : undefined,
+                            },
+                          }))}
+                          placeholder="Precio máximo"
+                        />
+                      </div>
+                    ) : null}
                     <div className="flex gap-2">
                       <input className="border rounded-lg px-3 py-2 flex-1" value={search[section.id] || ""} onChange={(e) => setSearch((prev) => ({ ...prev, [section.id]: e.target.value }))} placeholder="Buscar item" />
                       <button
@@ -1182,6 +1295,7 @@ export default function HomepageSectionsPage() {
                             section,
                             search[section.id] || "",
                             section.type === "TOP_CATEGORIES_GRID" ? "categories" : section.type === "BRANDS_STRIP" ? "brands" : "products",
+                            PRODUCT_QUERY_TYPES.includes(section.type) ? manualProductFilters[section.id] : undefined,
                           )
                         }
                       >

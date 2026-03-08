@@ -10,7 +10,7 @@ import {
   HomepageSectionsDiagnostics,
   homepageSectionsApi,
 } from "@/lib/api/homepage-sections";
-import { API_URL } from "@/lib/constants";
+import { API_URL, SITE_URL } from "@/lib/constants";
 import {
   Banner,
   getBanners,
@@ -150,6 +150,8 @@ export default function HomepageSectionsPage() {
   const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
+  const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] = useState("");
+  const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<"discount_desc" | "newest">("discount_desc");
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
 
@@ -390,6 +392,43 @@ export default function HomepageSectionsPage() {
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : `No se pudo crear el preset ${preset.title}`);
+    }
+  };
+
+  const createCategoryCarousel = async () => {
+    if (!categoryCarouselCategoryId) {
+      toast.error("Selecciona una categoría para crear el carrusel");
+      return;
+    }
+
+    const category = queryCatalogs.categories.find((item) => item.id === categoryCarouselCategoryId);
+
+    try {
+      await homepageSectionsApi.create({
+        type: "FEATURED_PICKS",
+        position: sorted.length + 1,
+        enabled: true,
+        title: category?.label || "Carrusel por categoría",
+        config_json: {
+          source: "query",
+          query: {
+            type: "products",
+            categoryId: categoryCarouselCategoryId,
+            limit: 12,
+            inStockOnly: true,
+            sortBy: categoryCarouselSortBy,
+          },
+          carousel_enabled: true,
+          carousel_autoplay: true,
+          carousel_interval_ms: 4500,
+          carousel_items_desktop: 4,
+          carousel_items_mobile: 2,
+        },
+      });
+      toast.success(`Carrusel de categoría creado${category ? `: ${category.label}` : ""}`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear el carrusel por categoría");
     }
   };
 
@@ -784,7 +823,7 @@ export default function HomepageSectionsPage() {
         <div className="flex flex-wrap gap-2">
           <a
             className="px-3 py-2 rounded-lg border text-sm"
-            href={`/store`}
+            href={`${SITE_URL}/store`}
             target="_blank"
             rel="noreferrer"
           >
@@ -987,6 +1026,34 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+        <div className="text-sm font-medium text-slate-700">Crear carrusel por categoría</div>
+        <p className="text-xs text-slate-500">Añade una nueva sección FEATURED_PICKS basada en una categoría concreta para la Store.</p>
+        <div className="grid gap-2 md:grid-cols-3">
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={categoryCarouselCategoryId}
+            onChange={(e) => setCategoryCarouselCategoryId(e.target.value)}
+          >
+            <option value="">Selecciona categoría</option>
+            {queryCatalogs.categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.label}</option>
+            ))}
+          </select>
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={categoryCarouselSortBy}
+            onChange={(e) => setCategoryCarouselSortBy(e.target.value as "discount_desc" | "newest")}
+          >
+            <option value="discount_desc">Mayor descuento</option>
+            <option value="newest">Más recientes</option>
+          </select>
+          <button className="px-3 py-2 rounded-lg bg-black text-white text-sm" onClick={() => void createCategoryCarousel()}>
+            Añadir carrusel de categoría
+          </button>
+        </div>
+      </div>
+
       {isLoading ? <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">Cargando secciones...</div> : null}
 
       {filtered.map((section) => {
@@ -1012,7 +1079,7 @@ export default function HomepageSectionsPage() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <a
                   className="px-2 py-1 border rounded text-xs"
-                  href={`/store?highlightSection=${encodeURIComponent(section.id)}`}
+                  href={`${SITE_URL}/store?highlightSection=${encodeURIComponent(section.id)}`}
                   target="_blank"
                   rel="noreferrer"
                 >

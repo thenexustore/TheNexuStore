@@ -456,6 +456,48 @@ export default function HomepageSectionsPage() {
     }
   };
 
+  const syncFeaturedProductsToHomepage = async () => {
+    const activeFeatured = featuredProducts.filter((item) => item.is_active);
+    const productIds = Array.from(new Set(activeFeatured.map((item) => item.product_id).filter(Boolean)));
+
+    if (!productIds.length) {
+      toast.message("No hay productos destacados activos para sincronizar");
+      return;
+    }
+
+    try {
+      const featuredSection = sections.find((section) => section.type === "FEATURED_PICKS");
+
+      if (featuredSection) {
+        await homepageSectionsApi.update(featuredSection.id, {
+          enabled: true,
+          title: featuredSection.title || "Productos Destacados",
+          config_json: {
+            ...featuredSection.config_json,
+            source: "manual",
+            ids: productIds,
+          },
+        });
+      } else {
+        await homepageSectionsApi.create({
+          type: "FEATURED_PICKS",
+          position: sorted.length + 1,
+          enabled: true,
+          title: "Productos Destacados",
+          config_json: {
+            source: "manual",
+            ids: productIds,
+          },
+        });
+      }
+
+      toast.success("Destacados sincronizados con la sección FEATURED_PICKS de portada");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo sincronizar destacados con portada");
+    }
+  };
+
   const moveBanner = async (index: number, delta: number) => {
     const next = index + delta;
     if (next < 0 || next >= banners.length) return;
@@ -717,14 +759,19 @@ export default function HomepageSectionsPage() {
         </div>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <Star className="h-4 w-4" />
               Productos destacados (integrado)
             </div>
-            <Link className="text-xs underline" href="/featured-products/new">Nuevo destacado</Link>
+            <div className="flex items-center gap-3">
+              <button className="text-xs underline" onClick={() => void syncFeaturedProductsToHomepage()}>
+                Sincronizar con portada
+              </button>
+              <Link className="text-xs underline" href="/featured-products/new">Nuevo destacado</Link>
+            </div>
           </div>
-          <div className="text-xs text-slate-500">Controla orden y estado sin salir de Página Principal.</div>
+          <div className="text-xs text-slate-500">Controla orden/estado y sincroniza los activos en FEATURED_PICKS para que salgan en la Store.</div>
           <div className="space-y-2 max-h-64 overflow-auto">
             {featuredProducts.map((item, index) => (
               <div key={item.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">

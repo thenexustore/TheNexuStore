@@ -280,6 +280,11 @@ export class HomepageSectionsService {
 
     const activeBanners = await this.prisma.banner.count({ where: { is_active: true } });
     const activeFeaturedProducts = await this.prisma.featuredProduct.count({ where: { is_active: true } });
+    const [totalBrands, brandsWithLogo] = await Promise.all([
+      this.prisma.brand.count({ where: { is_active: true } }),
+      this.prisma.brand.count({ where: { is_active: true, NOT: [{ logo_url: null }, { logo_url: '' }] } }),
+    ]);
+    const brandsMissingLogo = totalBrands - brandsWithLogo;
 
     const heroSections = sections.filter((section) => section.type === HomepageSectionType.HERO_BANNER_SLIDER);
     const heroEnabledSections = heroSections.filter((section) => section.enabled).length;
@@ -313,6 +318,9 @@ export class HomepageSectionsService {
         activeFeaturedProducts,
         featuredPicksSections: featuredPicksSections.length,
         invalidConfigSections: invalidConfigSections.length,
+        totalBrands,
+        brandsWithLogo,
+        brandsMissingLogo,
       },
       duplicatedTypes,
       invalidConfigSections,
@@ -322,6 +330,7 @@ export class HomepageSectionsService {
         bannersLinkedToHome: activeBanners === 0 || heroEnabledSections > 0,
         featuredLinkedToHome: activeFeaturedProducts === 0 || featuredManualLinked,
         configsValid: invalidConfigSections.length === 0,
+        brandLogosHealthy: totalBrands === 0 || brandsMissingLogo === 0,
       },
     };
   }

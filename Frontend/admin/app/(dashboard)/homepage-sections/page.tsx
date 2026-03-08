@@ -226,12 +226,6 @@ export default function HomepageSectionsPage() {
     return new Set(sections.filter((section) => isDirtySection(section)).map((section) => section.id));
   }, [isDirtySection, sections]);
 
-  const brandCatalogStats = useMemo(() => {
-    const total = queryCatalogs.brands.length;
-    const missingLogo = queryCatalogs.brands.filter((brand) => !String(brand.image || "").trim()).length;
-    return { total, missingLogo };
-  }, [queryCatalogs.brands]);
-
   const optionLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of queryCatalogs.categories) map.set(item.id, item.label);
@@ -1133,9 +1127,14 @@ export default function HomepageSectionsPage() {
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
         <div className="text-sm font-medium text-slate-700">Estado de logos de marcas</div>
         <p className="text-xs text-slate-500">
-          Marcas precargadas en selector: <strong>{brandCatalogStats.total}</strong> · Sin logo: <strong>{brandCatalogStats.missingLogo}</strong>.
+          Marcas activas: <strong>{diagnostics?.totals.totalBrands ?? 0}</strong> · Con logo: <strong>{diagnostics?.totals.brandsWithLogo ?? 0}</strong> · Sin logo: <strong>{diagnostics?.totals.brandsMissingLogo ?? 0}</strong>.
           {" "}Si hay muchas sin logo, ejecuta <code>npm run brands:logo:audit</code> en Backend para auditar y <code>npm run brands:logo:normalize</code> para normalizar URLs.
         </p>
+        {diagnostics && !diagnostics.checks.brandLogosHealthy ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Hay marcas activas sin logo. El carrusel mostrará fallback de iniciales, pero se recomienda normalizar logos para un look premium.
+          </div>
+        ) : null}
       </div>
 
       {isLoading ? <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">Cargando secciones...</div> : null}

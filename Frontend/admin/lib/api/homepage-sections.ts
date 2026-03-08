@@ -50,6 +50,9 @@ export interface HomepageSectionsDiagnostics {
     activeFeaturedProducts: number;
     featuredPicksSections: number;
     invalidConfigSections: number;
+    totalBrands: number;
+    brandsWithLogo: number;
+    brandsMissingLogo: number;
   };
   duplicatedTypes: Array<{ type: string; count: number }>;
   invalidConfigSections: Array<{ id: string; type: string; title?: string | null; issues: string[] }>;
@@ -59,6 +62,7 @@ export interface HomepageSectionsDiagnostics {
     bannersLinkedToHome: boolean;
     featuredLinkedToHome: boolean;
     configsValid: boolean;
+    brandLogosHealthy: boolean;
   };
 }
 

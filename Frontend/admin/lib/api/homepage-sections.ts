@@ -13,6 +13,7 @@ export interface HomepageOption {
   id: string;
   label: string;
   subtitle?: string;
+  image?: string;
 }
 
 export interface CategoryMenuTreeNode {
@@ -33,6 +34,32 @@ export interface CategoryMenuTreeResponse {
     product_count?: number;
   }>;
   tree: CategoryMenuTreeNode[];
+}
+
+export interface HomepageSectionsDiagnostics {
+  totals: {
+    total: number;
+    enabled: number;
+    disabled: number;
+    duplicatedTypes: number;
+    failedPublicSections: number;
+    emptyPublicSections: number;
+    activeBanners: number;
+    heroSections: number;
+    heroEnabledSections: number;
+    activeFeaturedProducts: number;
+    featuredPicksSections: number;
+    invalidConfigSections: number;
+  };
+  duplicatedTypes: Array<{ type: string; count: number }>;
+  invalidConfigSections: Array<{ id: string; type: string; title?: string | null; issues: string[] }>;
+  checks: {
+    hasVisibleSections: boolean;
+    storePayloadOk: boolean;
+    bannersLinkedToHome: boolean;
+    featuredLinkedToHome: boolean;
+    configsValid: boolean;
+  };
 }
 
 async function req(path: string, options: RequestInit = {}) {
@@ -56,6 +83,7 @@ async function req(path: string, options: RequestInit = {}) {
 
 export const homepageSectionsApi = {
   list: (): Promise<HomepageSection[]> => req("/admin/homepage/sections"),
+  diagnostics: (): Promise<HomepageSectionsDiagnostics> => req("/admin/homepage/sections/diagnostics"),
   create: (payload: {
     type: string;
     position: number;

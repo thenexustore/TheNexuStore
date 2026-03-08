@@ -30,7 +30,18 @@
     "featured": "Productos destacados",
     "featuredEmpty": "No hay productos destacados activos.",
     "deals": "Ofertas",
-    "dealsEmpty": "No hay ofertas activas en este momento."
+    "dealsEmpty": "No hay ofertas activas en este momento.",
+    "dynamic": {
+      "loading": "Cargando portada...",
+      "previewMode": "Modo previsualización activado para la sección:",
+      "sectionUnavailable": "Sección no disponible temporalmente.",
+      "emptyProducts": "No hay productos disponibles",
+      "topCategories": "Top categorías",
+      "brands": "Marcas",
+      "carouselPrev": "Anterior",
+      "carouselNext": "Siguiente",
+      "carouselGoToPage": "Ir a la página {page}"
+    }
   },
   "products": {
     "all": "Todos los productos",

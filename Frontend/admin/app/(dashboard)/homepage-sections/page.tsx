@@ -1,13 +1,42 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "@/i18n/navigation";
 import { toast } from "sonner";
 import {
   CategoryMenuTreeNode,
   HomepageOption,
   HomepageSection,
+  HomepageSectionsDiagnostics,
   homepageSectionsApi,
 } from "@/lib/api/homepage-sections";
+import { API_URL } from "@/lib/constants";
+import {
+  Banner,
+  getBanners,
+  reorderBanners,
+  toggleBannerStatus,
+} from "@/lib/api/banners";
+import {
+  FeaturedProduct,
+  fetchFeaturedProducts,
+  toggleFeaturedProductStatus,
+  updateFeaturedProductOrder,
+} from "@/lib/api/featured-products";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleOff,
+  Copy,
+  Eye,
+  Layers3,
+  RotateCw,
+  ServerCrash,
+  Images,
+  Star,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 
 const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
 const PRODUCT_QUERY_TYPES = ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
@@ -109,22 +138,89 @@ export default function HomepageSectionsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
+
+  const sectionSignature = useCallback((section: HomepageSection) => {
+    return JSON.stringify({
+      enabled: section.enabled,
+      title: section.title || "",
+      config_json: section.config_json || {},
+      position: section.position,
+      type: section.type,
+    });
+  }, []);
+
+  const duplicateTypeSummary = useMemo(() => {
+    const countByType = new Map<string, number>();
+    for (const section of sections) {
+      countByType.set(section.type, (countByType.get(section.type) || 0) + 1);
+    }
+    return Array.from(countByType.entries()).filter(([, count]) => count > 1);
+  }, [sections]);
+
+  const sectionTypeStats = useMemo(() => {
+    const countByType = new Map<string, number>();
+    for (const type of SECTION_TYPES) countByType.set(type, 0);
+    for (const section of sections) {
+      countByType.set(section.type, (countByType.get(section.type) || 0) + 1);
+    }
+
+    return SECTION_TYPES.map((type) => ({
+      type,
+      count: countByType.get(type) || 0,
+    }));
+  }, [sections]);
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return sorted;
     return sorted.filter((section) => (section.title || "").toLowerCase().includes(q) || section.type.toLowerCase().includes(q));
   }, [sorted, filter]);
 
+  const dirtySectionIds = useMemo(() => {
+    const originalById = new Map(originalSections.map((section) => [section.id, section]));
+    const dirty = new Set<string>();
+
+    for (const section of sections) {
+      const original = originalById.get(section.id);
+      if (!original) {
+        dirty.add(section.id);
+        continue;
+      }
+
+      if (sectionSignature(section) !== sectionSignature(original)) {
+        dirty.add(section.id);
+      }
+    }
+
+    return dirty;
+  }, [originalSections, sectionSignature, sections]);
+
   const load = useCallback(async () => {
     setIsLoading(true);
+    setDiagnosticsLoading(true);
     try {
-      setSections(await homepageSectionsApi.list());
+      const [sectionsData, diagnosticsData, bannersData, featuredResponse] = await Promise.all([
+        homepageSectionsApi.list(),
+        homepageSectionsApi.diagnostics(),
+        getBanners(),
+        fetchFeaturedProducts({ take: 20 }),
+      ]);
+      setSections(sectionsData);
+      setOriginalSections(sectionsData);
+      setDiagnostics(diagnosticsData);
+      setBanners(bannersData);
+      setFeaturedProducts(featuredResponse.data || []);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar las secciones");
     } finally {
       setIsLoading(false);
+      setDiagnosticsLoading(false);
     }
   }, []);
 
@@ -194,6 +290,47 @@ export default function HomepageSectionsPage() {
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear la sección");
+    }
+  };
+
+  const createOfType = async (type: SectionType) => {
+    try {
+      await homepageSectionsApi.create({
+        type,
+        position: sorted.length + 1,
+        enabled: true,
+        title: type.replaceAll("_", " "),
+        config_json: defaultConfigFor(type),
+      });
+      toast.success(`Sección ${type} creada`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `No se pudo crear ${type}`);
+    }
+  };
+
+  const createMissingBaseSections = async () => {
+    const missing = sectionTypeStats.filter((item) => item.count === 0).map((item) => item.type);
+    if (!missing.length) {
+      toast.message("No faltan tipos base de sección");
+      return;
+    }
+
+    try {
+      const startPosition = sorted.length;
+      for (const [index, type] of missing.entries()) {
+        await homepageSectionsApi.create({
+          type,
+          position: startPosition + index + 1,
+          enabled: true,
+          title: type.replaceAll("_", " "),
+          config_json: defaultConfigFor(type),
+        });
+      }
+      toast.success(`Se añadieron ${missing.length} tipo(s) faltantes`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron crear los faltantes");
     }
   };
 
@@ -280,9 +417,16 @@ export default function HomepageSectionsPage() {
 
   const saveAll = async () => {
     if (!sections.length) return;
+
+    const pending = sections.filter((section) => dirtySectionIds.has(section.id));
+    if (!pending.length) {
+      toast.message("No hay cambios pendientes por guardar");
+      return;
+    }
+
     try {
       await Promise.all(
-        sections.map((section) =>
+        pending.map((section) =>
           homepageSectionsApi.update(section.id, {
             enabled: section.enabled,
             title: section.title,
@@ -290,11 +434,16 @@ export default function HomepageSectionsPage() {
           }),
         ),
       );
-      toast.success('Todos los cambios guardados');
+      toast.success(`${pending.length} sección(es) guardadas`);
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar todo');
     }
+  };
+
+  const discardLocalChanges = () => {
+    setSections(originalSections);
+    toast.message("Cambios locales descartados");
   };
 
   const loadOptions = async (section: HomepageSection, q: string, target: "products" | "categories" | "brands") => {
@@ -307,19 +456,259 @@ export default function HomepageSectionsPage() {
     }
   };
 
+  const syncFeaturedProductsToHomepage = async () => {
+    const activeFeatured = featuredProducts.filter((item) => item.is_active);
+    const productIds = Array.from(new Set(activeFeatured.map((item) => item.product_id).filter(Boolean)));
+
+    if (!productIds.length) {
+      toast.message("No hay productos destacados activos para sincronizar");
+      return;
+    }
+
+    try {
+      const featuredSection = sections.find((section) => section.type === "FEATURED_PICKS");
+
+      if (featuredSection) {
+        await homepageSectionsApi.update(featuredSection.id, {
+          enabled: true,
+          title: featuredSection.title || "Productos Destacados",
+          config_json: {
+            ...featuredSection.config_json,
+            source: "manual",
+            ids: productIds,
+          },
+        });
+      } else {
+        await homepageSectionsApi.create({
+          type: "FEATURED_PICKS",
+          position: sorted.length + 1,
+          enabled: true,
+          title: "Productos Destacados",
+          config_json: {
+            source: "manual",
+            ids: productIds,
+          },
+        });
+      }
+
+      toast.success("Destacados sincronizados con la sección FEATURED_PICKS de portada");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo sincronizar destacados con portada");
+    }
+  };
+
+  const moveBanner = async (index: number, delta: number) => {
+    const next = index + delta;
+    if (next < 0 || next >= banners.length) return;
+
+    const arr = [...banners];
+    const [item] = arr.splice(index, 1);
+    arr.splice(next, 0, item);
+    setBanners(arr);
+
+    try {
+      await reorderBanners(arr.map((banner) => banner.id));
+      toast.success("Orden de banners actualizado");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar banners");
+    }
+  };
+
+  const toggleBanner = async (id: string) => {
+    try {
+      await toggleBannerStatus(id);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cambiar banner");
+    }
+  };
+
+  const moveFeatured = async (index: number, delta: number) => {
+    const next = index + delta;
+    if (next < 0 || next >= featuredProducts.length) return;
+
+    const arr = [...featuredProducts];
+    const [item] = arr.splice(index, 1);
+    arr.splice(next, 0, item);
+    setFeaturedProducts(arr);
+
+    try {
+      await updateFeaturedProductOrder(arr.map((x, i) => ({ id: x.id, sort_order: i + 1 })));
+      toast.success("Orden de destacados actualizado");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar destacados");
+    }
+  };
+
+  const toggleFeatured = async (id: string) => {
+    try {
+      await toggleFeaturedProductStatus(id);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cambiar destacado");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Control Home</h1>
-        <p className="text-sm text-slate-500">Configura y ordena secciones legacy que se exportan a la Store.</p>
+        <h1 className="text-3xl font-bold">Página Principal</h1>
+        <p className="text-sm text-slate-500">Configura y ordena las secciones que se exportan a la tienda.</p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Secciones</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.total ?? sections.length}</div>
+            <Layers3 className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Total configuradas en admin</div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Visibilidad</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.enabled ?? sections.filter((x) => x.enabled).length}</div>
+            <Eye className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {diagnostics?.totals.disabled ?? sections.filter((x) => !x.enabled).length} ocultas
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Duplicadas</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.duplicatedTypes ?? duplicateTypeSummary.length}</div>
+            <Copy className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Tipos que aparecen más de una vez</div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Store payload</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.failedPublicSections ?? 0}</div>
+            {diagnostics?.checks.storePayloadOk ?? true ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <ServerCrash className="h-4 w-4 text-red-500" />
+            )}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Secciones públicas con error al resolver</div>
+        </div>
+      </div>
+
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.hasVisibleSections ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <CircleOff className="h-4 w-4 mt-0.5" />
+          No hay secciones visibles. La Store no mostrará contenido de Página Principal hasta activar alguna sección.
+        </div>
+      ) : null}
+
+      {!diagnosticsLoading && diagnostics && diagnostics.totals.failedPublicSections > 0 ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          Hay {diagnostics.totals.failedPublicSections} secciones con fallo en el endpoint público. Revisa su configuración y vuelve a guardar.
+        </div>
+      ) : null}
+
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.bannersLinkedToHome ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          <div>
+            Hay {diagnostics.totals.activeBanners} banner(s) activos pero no hay una sección HERO_BANNER_SLIDER visible en Página Principal. Crea/activa la sección HERO para que se muestren en la Store.
+            <div className="mt-2">
+              <Link className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" href="/banners">
+                Ir a Banners
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.featuredLinkedToHome ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          <div>
+            Hay {diagnostics.totals.activeFeaturedProducts} destacado(s) activos pero no están enlazados manualmente a FEATURED_PICKS en portada.
+            <div className="mt-2">
+              <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={() => void syncFeaturedProductsToHomepage()}>
+                Sincronizar destacados con portada
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
+        <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
+        <p className="text-xs text-slate-600">
+          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver el layout moderno de <code>/home</code>. Banners activos: <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO visibles: <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong> · Destacados activos: <strong>{diagnostics?.totals.activeFeaturedProducts ?? 0}</strong> · Secciones FEATURED_PICKS: <strong>{diagnostics?.totals.featuredPicksSections ?? 0}</strong>.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a
+            className="px-3 py-2 rounded-lg border text-sm"
+            href={`/store`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir Store
+          </a>
+          <a
+            className="px-3 py-2 rounded-lg border text-sm"
+            href={`${API_URL}/homepage/sections`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ver JSON público de secciones
+          </a>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-2"
+            onClick={() => void load()}
+            disabled={diagnosticsLoading || isLoading}
+          >
+            <RotateCw className={`h-4 w-4 ${(diagnosticsLoading || isLoading) ? "animate-spin" : ""}`} />
+            Recargar diagnóstico
+          </button>
+        </div>
+        {duplicateTypeSummary.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Tipos duplicados detectados: {duplicateTypeSummary.map(([type, count]) => `${type} (${count})`).join(", ")}. Esto puede ser válido, pero revisa que no sea contenido repetido.
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-slate-700">
+            Cambios pendientes: <span className="font-semibold">{dirtySectionIds.size}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50"
+              disabled={!dirtySectionIds.size}
+              onClick={discardLocalChanges}
+            >
+              Descartar cambios locales
+            </button>
+            <button
+              className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
+              disabled={!dirtySectionIds.size}
+              onClick={() => void saveAll()}
+            >
+              Guardar cambios pendientes
+            </button>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
-          <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={!sections.length} onClick={() => void saveAll()}>Guardar todo</button>
-        </div>
+                  </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
             {SECTION_TYPES.map((type) => (
@@ -328,6 +717,91 @@ export default function HomepageSectionsPage() {
           </select>
           <input className="border rounded-lg px-3 py-2" placeholder="Filtrar secciones por título/tipo" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <button onClick={() => void create()} className="px-3 py-2 rounded-lg bg-black text-white text-sm">Añadir sección</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm font-medium text-slate-700">Cobertura de tipos de sección</div>
+          <button
+            className="px-3 py-2 rounded-lg border text-xs"
+            onClick={() => void createMissingBaseSections()}
+          >
+            Añadir tipos faltantes
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {sectionTypeStats.map((item) => (
+            <button
+              key={item.type}
+              className={`rounded-full border px-3 py-1.5 text-xs ${item.count === 0 ? "border-red-300 bg-red-50 text-red-700" : item.count > 1 ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-300 bg-emerald-50 text-emerald-700"}`}
+              onClick={() => item.count === 0 ? void createOfType(item.type) : setFilter(item.type)}
+              title={item.count === 0 ? "Crear este tipo" : "Filtrar por este tipo"}
+            >
+              {item.type} · {item.count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Images className="h-4 w-4" />
+              Banners (integrado)
+            </div>
+            <Link className="text-xs underline" href="/banners/new">Nuevo banner</Link>
+          </div>
+          <div className="text-xs text-slate-500">Gestiona aquí el orden y visibilidad para la portada.</div>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {banners.map((banner, index) => (
+              <div key={banner.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{banner.title_text || `Banner ${index + 1}`}</div>
+                  <div className="text-xs text-slate-500">#{index + 1}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, -1)}><ArrowUp className="h-3 w-3" /></button>
+                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, 1)}><ArrowDown className="h-3 w-3" /></button>
+                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleBanner(banner.id)}>{banner.is_active ? "Activo" : "Inactivo"}</button>
+                </div>
+              </div>
+            ))}
+            {!banners.length ? <div className="text-xs text-slate-500">No hay banners</div> : null}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Star className="h-4 w-4" />
+              Productos destacados (integrado)
+            </div>
+            <div className="flex items-center gap-3">
+              <button className="text-xs underline" onClick={() => void syncFeaturedProductsToHomepage()}>
+                Sincronizar con portada
+              </button>
+              <Link className="text-xs underline" href="/featured-products/new">Nuevo destacado</Link>
+            </div>
+          </div>
+          <div className="text-xs text-slate-500">Controla orden/estado y sincroniza los activos en FEATURED_PICKS para que salgan en la Store.</div>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {featuredProducts.map((item, index) => (
+              <div key={item.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{item.title || item.product?.title || `Destacado ${index + 1}`}</div>
+                  <div className="text-xs text-slate-500">#{index + 1}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, -1)}><ArrowUp className="h-3 w-3" /></button>
+                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, 1)}><ArrowDown className="h-3 w-3" /></button>
+                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleFeatured(item.id)}>{item.is_active ? "Activo" : "Inactivo"}</button>
+                </div>
+              </div>
+            ))}
+            {!featuredProducts.length ? <div className="text-xs text-slate-500">No hay productos destacados</div> : null}
+          </div>
         </div>
       </div>
 
@@ -356,9 +830,22 @@ export default function HomepageSectionsPage() {
               <div>
                 <div className="font-semibold">{section.title || section.type}</div>
                 <div className="text-xs text-slate-500">{section.type} · Posición #{section.position}</div>
+                {dirtySectionIds.has(section.id) ? (
+                  <div className="mt-1 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                    Sin guardar
+                  </div>
+                ) : null}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <a
+                  className="px-2 py-1 border rounded text-xs"
+                  href={`/store?highlightSection=${encodeURIComponent(section.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Ver en Store
+                </a>
                 <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, -1)}>↑</button>
                 <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, 1)}>↓</button>
                 <button className="px-2 py-1 border rounded" onClick={() => void duplicate(section)}>Duplicar</button>
@@ -502,7 +989,12 @@ export default function HomepageSectionsPage() {
       })}
 
       {!isLoading && filtered.length === 0 ? (
-        <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">No hay secciones para el filtro actual.</div>
+        <div className="rounded-lg border bg-white p-4 text-sm text-slate-500 flex flex-wrap items-center justify-between gap-3">
+          <span>No hay secciones para el filtro actual.</span>
+          {filter ? (
+            <button className="px-3 py-1.5 border rounded-lg text-xs" onClick={() => setFilter("")}>Limpiar filtro</button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

@@ -16,12 +16,9 @@
     "coupons": "Coupons",
     "chat": "Chat",
     "homeContent": "Home Content",
-    "banners": "Banners",
-    "homepageSections": "Home Control",
-    "featuredProducts": "Featured Products",
+    "homepageSections": "Homepage Manager",
     "pricing": "Pricing",
     "logout": "Logout",
-    "homeBuilder": "Home Builder",
     "imports": "Imports",
     "rmas": "Returns (RMA)",
     "settings": "Settings"

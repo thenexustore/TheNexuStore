@@ -215,25 +215,6 @@ export default function HomepageSectionsPage() {
     return map;
   }, [options, queryCatalogs.brands, queryCatalogs.categories]);
 
-  const dirtySectionIds = useMemo(() => {
-    const originalById = new Map(originalSections.map((section) => [section.id, section]));
-    const dirty = new Set<string>();
-
-    for (const section of sections) {
-      const original = originalById.get(section.id);
-      if (!original) {
-        dirty.add(section.id);
-        continue;
-      }
-
-      if (sectionSignature(section) !== sectionSignature(original)) {
-        dirty.add(section.id);
-      }
-    }
-
-    return dirty;
-  }, [originalSections, sectionSignature, sections]);
-
   const load = useCallback(async () => {
     setIsLoading(true);
     setDiagnosticsLoading(true);

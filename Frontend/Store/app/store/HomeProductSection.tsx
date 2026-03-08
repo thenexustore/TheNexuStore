@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Product } from "../lib/products";
 
@@ -103,9 +103,9 @@ export default function HomeProductSection({
       <Link
         key={product.id}
         href={`/products/${product.slug}`}
-        className="group flex h-full min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"
+        className="group flex h-full min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-3 transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
       >
-        <div className="relative mb-3 aspect-square overflow-hidden rounded-lg bg-slate-50">
+        <div className="relative mb-3 aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100">
           <Image
             src={product.thumbnail || "/No_Image_Available.png"}
             alt={product.title}
@@ -114,7 +114,7 @@ export default function HomeProductSection({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
           {hasDeal && product.discount_percentage ? (
-            <span className="absolute left-2 top-2 rounded bg-red-600 px-2 py-1 text-[11px] font-bold leading-none text-white">
+            <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold leading-none text-white shadow">
               -{product.discount_percentage}%
             </span>
           ) : null}
@@ -137,14 +137,17 @@ export default function HomeProductSection({
 
   return (
     <section className="w-full max-w-7xl px-4 sm:px-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
+      <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
+        </div>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg border p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label={t("dynamic.carouselPrev")}>
+            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label={t("dynamic.carouselPrev")}>
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button className="rounded-lg border p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label={t("dynamic.carouselNext")}>
+            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label={t("dynamic.carouselNext")}>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>

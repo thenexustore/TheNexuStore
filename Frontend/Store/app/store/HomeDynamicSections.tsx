@@ -35,7 +35,7 @@ function BannerSection({ banners }: { banners: any[] }) {
 
   return (
     <section className="w-full max-w-7xl px-4 pt-4 sm:px-6">
-      <div className="relative h-52 overflow-hidden rounded-2xl sm:h-72 lg:h-80">
+      <div className="relative h-52 overflow-hidden rounded-3xl border border-slate-200 shadow-sm sm:h-72 lg:h-80">
         <img
           src={String(banner.image || "/No_Image_Available.png")}
           alt={banner.title_text || "Banner"}
@@ -46,16 +46,24 @@ function BannerSection({ banners }: { banners: any[] }) {
             event.currentTarget.src = "/No_Image_Available.png";
           }}
         />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/55 via-slate-900/25 to-transparent" />
         <div className="absolute inset-0" style={{ background: banner.overlay }} />
         <div className="absolute inset-0 flex flex-col justify-end gap-2 p-5 text-white sm:p-8">
           <h2 className="text-2xl font-bold sm:text-4xl">{banner.title_text}</h2>
           <p className="max-w-2xl text-sm sm:text-base">{banner.subtitle_text}</p>
           {banner.button_text ? (
-            <Link href={banner.button_link || "/products"} className="mt-2 w-fit rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-900">
+            <Link href={banner.button_link || "/products"} className="mt-2 w-fit rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow">
               {banner.button_text}
             </Link>
           ) : null}
         </div>
+        {safeBanners.length > 1 ? (
+          <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/35 px-2 py-1">
+            {safeBanners.map((_, idx) => (
+              <button key={idx} onClick={() => setIndex(idx)} className={`h-1.5 rounded-full transition-all ${idx === index ? "w-5 bg-white" : "w-1.5 bg-white/60"}`} aria-label={`Banner ${idx + 1}`} />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );

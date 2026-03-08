@@ -869,10 +869,20 @@ export default function HomepageSectionsPage() {
         </div>
       ) : null}
 
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.productSectionsHaveData ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          <div>
+            Hay {diagnostics.totals.emptyEnabledProductSections} sección(es) de productos visibles con resultado vacío en el endpoint público.
+            <div className="mt-1 text-xs">Revisa filtros de categoría/marca, límites y stock para que el carrusel tenga contenido.</div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
         <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
         <p className="text-xs text-slate-600">
-          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver el layout moderno de <code>/home</code>. Banners activos: <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO visibles: <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong> · Destacados activos: <strong>{diagnostics?.totals.activeFeaturedProducts ?? 0}</strong> · Secciones FEATURED_PICKS: <strong>{diagnostics?.totals.featuredPicksSections ?? 0}</strong>.
+          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver el layout moderno de <code>/home</code>. Banners activos: <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO visibles: <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong> · Destacados activos: <strong>{diagnostics?.totals.activeFeaturedProducts ?? 0}</strong> · Secciones FEATURED_PICKS: <strong>{diagnostics?.totals.featuredPicksSections ?? 0}</strong> · Carruseles vacíos: <strong>{diagnostics?.totals.emptyEnabledProductSections ?? 0}</strong>.
         </p>
         <div className="flex flex-wrap gap-2">
           <a
@@ -919,6 +929,19 @@ export default function HomepageSectionsPage() {
             {diagnostics.invalidConfigSections.length > 6 ? (
               <div>Y {diagnostics.invalidConfigSections.length - 6} más…</div>
             ) : null}
+          </div>
+        ) : null}
+
+        {diagnostics && diagnostics.emptyEnabledProductSections.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
+            <div className="font-semibold">Secciones de productos visibles sin resultados</div>
+            <ul className="list-disc pl-4 space-y-1">
+              {diagnostics.emptyEnabledProductSections.slice(0, 6).map((item) => (
+                <li key={item.id}>
+                  <span className="font-medium">{item.title || item.type}</span> ({item.type})
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </div>

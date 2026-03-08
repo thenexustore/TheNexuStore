@@ -53,9 +53,11 @@ export interface HomepageSectionsDiagnostics {
     totalBrands: number;
     brandsWithLogo: number;
     brandsMissingLogo: number;
+    emptyEnabledProductSections: number;
   };
   duplicatedTypes: Array<{ type: string; count: number }>;
   invalidConfigSections: Array<{ id: string; type: string; title?: string | null; issues: string[] }>;
+  emptyEnabledProductSections: Array<{ id: string; type: string; title?: string | null }>;
   checks: {
     hasVisibleSections: boolean;
     storePayloadOk: boolean;
@@ -63,6 +65,7 @@ export interface HomepageSectionsDiagnostics {
     featuredLinkedToHome: boolean;
     configsValid: boolean;
     brandLogosHealthy: boolean;
+    productSectionsHaveData: boolean;
   };
 }
 

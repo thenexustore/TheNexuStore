@@ -304,6 +304,21 @@ export class HomepageSectionsService {
       }))
       .filter((section) => section.issues.length > 0);
 
+    const productSectionTypes = new Set([
+      HomepageSectionType.BEST_DEALS,
+      HomepageSectionType.NEW_ARRIVALS,
+      HomepageSectionType.FEATURED_PICKS,
+    ]);
+
+    const emptyEnabledProductSections = publicSections
+      .filter((section) => productSectionTypes.has((section as any).type))
+      .filter((section) => Array.isArray((section as any).data) && (section as any).data.length === 0)
+      .map((section) => ({
+        id: (section as any).id,
+        type: (section as any).type,
+        title: (section as any).title,
+      }));
+
     return {
       totals: {
         total,
@@ -321,9 +336,11 @@ export class HomepageSectionsService {
         totalBrands,
         brandsWithLogo,
         brandsMissingLogo,
+        emptyEnabledProductSections: emptyEnabledProductSections.length,
       },
       duplicatedTypes,
       invalidConfigSections,
+      emptyEnabledProductSections,
       checks: {
         hasVisibleSections: enabled > 0,
         storePayloadOk: failedPublicSections === 0,
@@ -331,6 +348,7 @@ export class HomepageSectionsService {
         featuredLinkedToHome: activeFeaturedProducts === 0 || featuredManualLinked,
         configsValid: invalidConfigSections.length === 0,
         brandLogosHealthy: totalBrands === 0 || brandsMissingLogo === 0,
+        productSectionsHaveData: emptyEnabledProductSections.length === 0,
       },
     };
   }

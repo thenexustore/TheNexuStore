@@ -328,7 +328,14 @@ export default function HomepageSectionsPage() {
     }));
   };
 
-  const save = async (section: HomepageSection) => {
+  const save = async (sectionOrId: HomepageSection | string) => {
+    const sectionId = typeof sectionOrId === "string" ? sectionOrId : sectionOrId.id;
+    const section = sections.find((item) => item.id === sectionId);
+    if (!section) {
+      toast.error("No se encontró la sección a guardar");
+      return false;
+    }
+
     setSavingId(section.id);
     try {
       await homepageSectionsApi.update(section.id, {
@@ -347,10 +354,10 @@ export default function HomepageSectionsPage() {
     }
   };
 
-  const saveAndOpenStore = async (section: HomepageSection) => {
-    const ok = await save(section);
+  const saveAndOpenStore = async (sectionId: string) => {
+    const ok = await save(sectionId);
     if (!ok) return;
-    window.open(`${SITE_URL}/store?highlightSection=${encodeURIComponent(section.id)}`, "_blank", "noopener,noreferrer");
+    window.open(`${SITE_URL}/store?highlightSection=${encodeURIComponent(sectionId)}`, "_blank", "noopener,noreferrer");
   };
 
   const create = async () => {
@@ -1677,10 +1684,10 @@ export default function HomepageSectionsPage() {
             )}
 
                 <div className="flex flex-wrap gap-2">
-                  <button className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void saveAndOpenStore(section)}>
+                  <button className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void saveAndOpenStore(section.id)}>
                     {savingId === section.id ? "Guardando..." : "Guardar y ver en Store"}
                   </button>
-                  <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void save(section)}>
+                  <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void save(section.id)}>
                     {savingId === section.id ? "Guardando..." : "Guardar cambios"}
                   </button>
                 </div>

@@ -550,11 +550,11 @@ export class HomepageSectionsService {
     if (target === 'brands') {
       const res = await this.prisma.brand.findMany({
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, logo_url: true },
         take: limit,
         orderBy: { name: 'asc' },
       });
-      return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug }));
+      return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug, image: x.logo_url || undefined }));
     }
 
     return [];

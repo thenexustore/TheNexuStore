@@ -98,6 +98,14 @@ function normalizeText(value?: string) {
     .trim();
 }
 
+function resolveOptionImageSrc(src?: string) {
+  const raw = String(src || "").trim();
+  if (!raw) return "/No_Image_Available.png";
+  if (raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/")) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${API_URL}/${raw.replace(/^\/+/, "")}`;
+}
+
 function supportsSource(type: string) {
   return MANUAL_TYPES.includes(type);
 }
@@ -365,47 +373,6 @@ export default function HomepageSectionsPage() {
     }
   };
 
-  const createOfType = async (type: SectionType) => {
-    try {
-      await homepageSectionsApi.create({
-        type,
-        position: sorted.length + 1,
-        enabled: true,
-        title: type.replaceAll("_", " "),
-        config_json: defaultConfigFor(type),
-      });
-      toast.success(`Sección ${type} creada`);
-      await load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : `No se pudo crear ${type}`);
-    }
-  };
-
-  const createMissingBaseSections = async () => {
-    const missing = sectionTypeStats.filter((item) => item.count === 0).map((item) => item.type);
-    if (!missing.length) {
-      toast.message("No faltan tipos base de sección");
-      return;
-    }
-
-    try {
-      const startPosition = sorted.length;
-      for (const [index, type] of missing.entries()) {
-        await homepageSectionsApi.create({
-          type,
-          position: startPosition + index + 1,
-          enabled: true,
-          title: type.replaceAll("_", " "),
-          config_json: defaultConfigFor(type),
-        });
-      }
-      toast.success(`Se añadieron ${missing.length} tipo(s) faltantes`);
-      await load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudieron crear los faltantes");
-    }
-  };
-
   const duplicate = async (section: HomepageSection) => {
     try {
       await homepageSectionsApi.create({
@@ -492,43 +459,6 @@ export default function HomepageSectionsPage() {
       toast.error(error instanceof Error ? error.message : "No se pudo crear el carrusel por categoría");
     } finally {
       setCreatingType(null);
-    }
-  };
-
-  const createCategoryCarousel = async () => {
-    if (!categoryCarouselCategoryId) {
-      toast.error("Selecciona una categoría para crear el carrusel");
-      return;
-    }
-
-    const category = queryCatalogs.categories.find((item) => item.id === categoryCarouselCategoryId);
-
-    try {
-      await homepageSectionsApi.create({
-        type: "FEATURED_PICKS",
-        position: sorted.length + 1,
-        enabled: true,
-        title: category?.label || "Carrusel por categoría",
-        config_json: {
-          source: "query",
-          query: {
-            type: "products",
-            categoryId: categoryCarouselCategoryId,
-            limit: 12,
-            inStockOnly: true,
-            sortBy: categoryCarouselSortBy,
-          },
-          carousel_enabled: true,
-          carousel_autoplay: true,
-          carousel_interval_ms: 4500,
-          carousel_items_desktop: 4,
-          carousel_items_mobile: 2,
-        },
-      });
-      toast.success(`Carrusel de categoría creado${category ? `: ${category.label}` : ""}`);
-      await load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el carrusel por categoría");
     }
   };
 
@@ -1118,95 +1048,6 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm font-medium text-slate-700">Cobertura de tipos de sección</div>
-          <button
-            className="px-3 py-2 rounded-lg border text-xs"
-            onClick={() => void createMissingBaseSections()}
-          >
-            Añadir tipos faltantes
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {sectionTypeStats.map((item) => (
-            <button
-              key={item.type}
-              className={`rounded-full border px-3 py-1.5 text-xs ${item.count === 0 ? "border-red-300 bg-red-50 text-red-700" : item.count > 1 ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-300 bg-emerald-50 text-emerald-700"}`}
-              onClick={() => item.count === 0 ? void createOfType(item.type) : setFilter(item.type)}
-              title={item.count === 0 ? "Crear este tipo" : "Filtrar por este tipo"}
-            >
-              {item.type} · {item.count}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Images className="h-4 w-4" />
-              Banners (integrado) · {banners.length}
-            </div>
-            <Link className="text-xs underline" href="/banners/new">Nuevo banner</Link>
-          </div>
-          <div className="text-xs text-slate-500">Gestiona aquí el orden y visibilidad para la portada.</div>
-          <div className="space-y-2 max-h-64 overflow-auto">
-            {banners.map((banner, index) => (
-              <div key={banner.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
-                <div className="min-w-0 flex items-center gap-2">
-                  <img src={banner.image || "/No_Image_Available.png"} alt={banner.title_text || `Banner ${index + 1}`} className="h-10 w-16 rounded object-cover border" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/No_Image_Available.png"; }} />
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{banner.title_text || `Banner ${index + 1}`}</div>
-                    <div className="text-xs text-slate-500">#{index + 1} · {banner.is_active ? "Visible" : "Oculto"}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Link className="px-2 py-1 border rounded text-xs" href={`/banners/${banner.id}/edit`}>Editar</Link>
-                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, -1)}><ArrowUp className="h-3 w-3" /></button>
-                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, 1)}><ArrowDown className="h-3 w-3" /></button>
-                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleBanner(banner.id)}>{banner.is_active ? "Activo" : "Inactivo"}</button>
-                </div>
-              </div>
-            ))}
-            {!banners.length ? <div className="text-xs text-slate-500">No hay banners</div> : null}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Star className="h-4 w-4" />
-              Productos destacados (integrado) · {featuredProducts.length}
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="text-xs underline" onClick={() => void syncFeaturedProductsToHomepage()}>
-                Sincronizar con portada
-              </button>
-              <Link className="text-xs underline" href="/featured-products/new">Nuevo destacado</Link>
-            </div>
-          </div>
-          <div className="text-xs text-slate-500">Controla orden/estado y sincroniza los activos en FEATURED_PICKS para que salgan en la Store.</div>
-          <div className="space-y-2 max-h-64 overflow-auto">
-            {featuredProducts.map((item, index) => (
-              <div key={item.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{item.title || item.product?.title || `Destacado ${index + 1}`}</div>
-                  <div className="text-xs text-slate-500">#{index + 1}</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, -1)}><ArrowUp className="h-3 w-3" /></button>
-                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, 1)}><ArrowDown className="h-3 w-3" /></button>
-                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleFeatured(item.id)}>{item.is_active ? "Activo" : "Inactivo"}</button>
-                </div>
-              </div>
-            ))}
-            {!featuredProducts.length ? <div className="text-xs text-slate-500">No hay productos destacados</div> : null}
-          </div>
-        </div>
-      </div>
-
       <div className="rounded-2xl border bg-white p-4 shadow-sm">
         <div className="text-sm font-medium text-slate-700 mb-3">Presets rápidos</div>
         <div className="flex flex-wrap gap-2">
@@ -1357,7 +1198,22 @@ export default function HomepageSectionsPage() {
                             onClick={() => toggleManualSelection(section, opt.id)}
                             className={`block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${selected ? "bg-slate-50" : ""}`}
                           >
-                            <span className="font-medium">{opt.label}</span>
+                            {section.type === "BRANDS_STRIP" ? (
+                              <span className="inline-flex items-center gap-2">
+                                <img
+                                  src={resolveOptionImageSrc(opt.image)}
+                                  alt={opt.label}
+                                  className="h-5 w-10 rounded border bg-white object-contain"
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src = "/No_Image_Available.png";
+                                  }}
+                                />
+                                <span className="font-medium">{opt.label}</span>
+                              </span>
+                            ) : (
+                              <span className="font-medium">{opt.label}</span>
+                            )}
                             <span className="text-xs text-slate-400 ml-2">{opt.subtitle}</span>
                             <span className={`ml-2 text-[11px] ${selected ? "text-emerald-600" : "text-slate-400"}`}>{selected ? "Seleccionado" : "Seleccionar"}</span>
                           </button>

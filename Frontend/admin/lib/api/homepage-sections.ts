@@ -13,6 +13,7 @@ export interface HomepageOption {
   id: string;
   label: string;
   subtitle?: string;
+  image?: string;
 }
 
 export interface CategoryMenuTreeNode {

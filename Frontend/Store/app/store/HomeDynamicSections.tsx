@@ -22,6 +22,15 @@ const PRIORITY_BRANDS = [
   "hp", "lenovo", "dell", "asus", "acer", "apple", "msi", "samsung", "lg", "sony", "philips", "xiaomi", "huawei", "tp-link", "aoc", "epson", "canon", "brother", "apc", "amd", "intel", "gigabyte", "zotac", "nvidia", "sandisk", "kingston"
 ];
 
+function resolveAssetUrl(value?: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "/No_Image_Available.png";
+  if (raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/")) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("uploads/")) return `${API_URL}/${raw}`;
+  return `${API_URL}/${raw.replace(/^\/+/, "")}`;
+}
+
 function BannerSection({ banners }: { banners: any[] }) {
   const [index, setIndex] = useState(0);
   const safeBanners = useMemo(() => banners || [], [banners]);
@@ -132,7 +141,7 @@ function BrandLogoCarousel({
       <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         {sorted.map((brand) => {
-          const logo = String(brand.logo_url || brand.image || "/No_Image_Available.png");
+          const logo = resolveAssetUrl(String(brand.logo_url || brand.image || ""));
           return (
             <Link
               key={brand.id}

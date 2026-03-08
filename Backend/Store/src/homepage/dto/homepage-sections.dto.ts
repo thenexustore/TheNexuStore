@@ -168,4 +168,32 @@ export class HomepageSectionOptionsQueryDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
+  @IsOptional()
+  @IsIn(['newest', 'price_asc', 'price_desc', 'discount_desc'])
+  sortBy?: HomepageQuerySortBy;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  priceMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  priceMax?: number;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  inStockOnly?: 'true' | 'false';
 }

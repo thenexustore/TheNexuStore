@@ -237,6 +237,29 @@ export default function HomepageSectionsPage() {
     }
     return map;
   }, [options, queryCatalogs.brands, queryCatalogs.categories]);
+  const allCategoryOptions = useMemo(() => {
+    const map = new Map<string, HomepageOption>();
+    const push = (id: string, label: string, subtitle?: string) => {
+      if (!id) return;
+      if (!map.has(id)) map.set(id, { id, label, subtitle });
+    };
+
+    for (const item of queryCatalogs.categories) {
+      push(item.id, item.label, item.subtitle);
+    }
+
+    const walk = (nodes: CategoryMenuTreeNode[], parentPath = "") => {
+      for (const node of nodes) {
+        const path = parentPath ? `${parentPath} › ${node.name}` : node.name;
+        push(node.id, path, node.slug);
+        if (node.children?.length) walk(node.children, path);
+      }
+    };
+
+    walk(menuTree || []);
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+  }, [menuTree, queryCatalogs.categories]);
+
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -266,8 +289,8 @@ export default function HomepageSectionsPage() {
     (async () => {
       try {
         const [categories, brands, menuTreeResponse] = await Promise.all([
-          homepageSectionsApi.options("TOP_CATEGORIES_GRID", "", 100, "categories"),
-          homepageSectionsApi.options("BRANDS_STRIP", "", 100, "brands"),
+          homepageSectionsApi.options("TOP_CATEGORIES_GRID", "", 500, "categories"),
+          homepageSectionsApi.options("BRANDS_STRIP", "", 500, "brands"),
           homepageSectionsApi.menuTree(),
         ]);
         setQueryCatalogs({ categories, brands });
@@ -283,18 +306,26 @@ export default function HomepageSectionsPage() {
   };
 
   const updateConfig = (section: HomepageSection, patch: Record<string, unknown>) => {
-    updateLocal(section.id, { config_json: { ...section.config_json, ...patch } });
+    setSections((prev) => prev.map((item) => {
+      if (item.id !== section.id) return item;
+      return { ...item, config_json: { ...(item.config_json || {}), ...patch } };
+    }));
   };
 
   const updateQueryConfig = (section: HomepageSection, patch: Record<string, unknown>) => {
-    const query = (section.config_json.query || {}) as Record<string, unknown>;
-    updateLocal(section.id, {
-      config_json: {
-        ...section.config_json,
-        source: "query",
-        query: { ...query, ...patch },
-      },
-    });
+    setSections((prev) => prev.map((item) => {
+      if (item.id !== section.id) return item;
+      const currentConfig = (item.config_json || {}) as Record<string, unknown>;
+      const query = (currentConfig.query || {}) as Record<string, unknown>;
+      return {
+        ...item,
+        config_json: {
+          ...currentConfig,
+          source: "query",
+          query: { ...query, ...patch },
+        },
+      };
+    }));
   };
 
   const save = async (section: HomepageSection) => {
@@ -439,7 +470,7 @@ export default function HomepageSectionsPage() {
       return;
     }
 
-    const category = queryCatalogs.categories.find((item) => item.id === categoryCarouselCategoryId);
+    const category = allCategoryOptions.find((item) => item.id === categoryCarouselCategoryId);
 
     setCreatingType("category-carousel");
     try {
@@ -1082,7 +1113,7 @@ export default function HomepageSectionsPage() {
       <div id="homepage-builder" className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm text-slate-700">
-            Cambios pendientes: <span className="font-semibold">{dirtySectionIds.size}</span>
+            Cambios pendientes: <span className="font-semibold">{dirtySectionIds.size}</span> · Mostrando: <span className="font-semibold">{filtered.length}</span>
           </div>
           <div className="flex gap-2">
             <button
@@ -1262,7 +1293,7 @@ export default function HomepageSectionsPage() {
             onChange={(e) => setCategoryCarouselCategoryId(e.target.value)}
           >
             <option value="">Selecciona categoría</option>
-            {queryCatalogs.categories.map((cat) => (
+            {allCategoryOptions.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.label}</option>
             ))}
           </select>
@@ -1393,7 +1424,7 @@ export default function HomepageSectionsPage() {
                           }))}
                         >
                           <option value="">Filtrar por categoría</option>
-                          {queryCatalogs.categories.map((cat) => (
+                          {allCategoryOptions.map((cat) => (
                             <option key={cat.id} value={cat.id}>{cat.label}</option>
                           ))}
                         </select>
@@ -1564,7 +1595,7 @@ export default function HomepageSectionsPage() {
                       <>
                         <select className="border rounded-lg px-3 py-2" value={String(query.categoryId || "")} onChange={(e) => updateQueryConfig(section, { type: "products", categoryId: e.target.value || undefined })}>
                           <option value="">Todas las categorías</option>
-                          {queryCatalogs.categories.map((cat) => (
+                          {allCategoryOptions.map((cat) => (
                             <option key={cat.id} value={cat.id}>{cat.label}</option>
                           ))}
                         </select>

@@ -102,6 +102,75 @@ export class HomepageSectionsService {
     return next;
   }
 
+  private clampNumber(value: unknown, min: number, max: number, fallback: number) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(numeric)));
+  }
+
+  private getSectionConfigIssues(section: { id: string; type: string; enabled: boolean; title: string | null; config_json: unknown }) {
+    const config = ((section.config_json || {}) as Record<string, any>) || {};
+    const issues: string[] = [];
+
+    if (section.enabled && !String(section.title || '').trim()) {
+      issues.push('La sección está visible pero no tiene título.');
+    }
+
+    const source = config.source || 'query';
+    if (!['query', 'manual'].includes(source)) {
+      issues.push('config_json.source debe ser "query" o "manual".');
+    }
+
+    if (source === 'manual' && !Array.isArray(config.ids)) {
+      issues.push('Modo manual requiere config_json.ids como array.');
+    }
+
+    if (source === 'query') {
+      const query = (config.query || {}) as Record<string, any>;
+      const limit = query.limit ?? config.limit;
+      if (limit !== undefined && (typeof limit !== 'number' || limit < 1 || limit > 24)) {
+        issues.push('query.limit debe estar entre 1 y 24.');
+      }
+
+      if (
+        [HomepageSectionType.BEST_DEALS, HomepageSectionType.NEW_ARRIVALS, HomepageSectionType.FEATURED_PICKS].includes(section.type as HomepageSectionType)
+      ) {
+        if (query.type && query.type !== HomepageQueryType.PRODUCTS) {
+          issues.push('Las secciones de productos deben usar query.type="products".');
+        }
+
+        if (config.carousel_interval_ms !== undefined && (typeof config.carousel_interval_ms !== 'number' || config.carousel_interval_ms < 2000)) {
+          issues.push('carousel_interval_ms debe ser >= 2000 ms.');
+        }
+
+        if (config.carousel_items_desktop !== undefined && (typeof config.carousel_items_desktop !== 'number' || config.carousel_items_desktop < 2 || config.carousel_items_desktop > 6)) {
+          issues.push('carousel_items_desktop debe estar entre 2 y 6.');
+        }
+
+        if (config.carousel_items_mobile !== undefined && (typeof config.carousel_items_mobile !== 'number' || config.carousel_items_mobile < 1 || config.carousel_items_mobile > 3)) {
+          issues.push('carousel_items_mobile debe estar entre 1 y 3.');
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  private normalizeProductCarouselConfig(type: HomepageSectionType, config: Record<string, any>) {
+    if (![HomepageSectionType.BEST_DEALS, HomepageSectionType.NEW_ARRIVALS, HomepageSectionType.FEATURED_PICKS].includes(type)) {
+      return config;
+    }
+
+    return {
+      ...config,
+      carousel_enabled: Boolean(config.carousel_enabled ?? true),
+      carousel_autoplay: Boolean(config.carousel_autoplay ?? true),
+      carousel_interval_ms: this.clampNumber(config.carousel_interval_ms, 2000, 15000, 4500),
+      carousel_items_desktop: this.clampNumber(config.carousel_items_desktop, 2, 6, 4),
+      carousel_items_mobile: this.clampNumber(config.carousel_items_mobile, 1, 3, 2),
+    };
+  }
+
   private shouldBackfillLegacyConfig(
     type: HomepageSectionType,
     config: Record<string, any>,
@@ -144,10 +213,25 @@ export class HomepageSectionsService {
 
     const sectionByType = new Map(existingSections.map((section) => [section.type, section]));
 
+    let nextPosition = existingSections.length
+      ? Math.max(...existingSections.map((item) => item.position || 0))
+      : 0;
+
     for (const section of DEFAULT_HOMEPAGE_SECTIONS) {
       const existing = sectionByType.get(section.type as any);
 
       if (!existing) {
+        nextPosition += 1;
+        const created = await this.prisma.homepageSection.create({
+          data: {
+            type: section.type as any,
+            enabled: true,
+            position: nextPosition,
+            title: section.title,
+            config_json: section.config_json,
+          },
+        });
+        sectionByType.set(section.type as any, created);
         continue;
       }
 
@@ -164,6 +248,109 @@ export class HomepageSectionsService {
   async getAdminSections() {
     await this.ensureDefaultSections();
     return this.prisma.homepageSection.findMany({ orderBy: { position: 'asc' } });
+  }
+
+
+  async getAdminDiagnostics() {
+    await this.ensureDefaultSections();
+
+    const sections = await this.prisma.homepageSection.findMany({
+      orderBy: { position: 'asc' },
+    });
+
+    const total = sections.length;
+    const enabled = sections.filter((section) => section.enabled).length;
+    const disabled = total - enabled;
+
+    const byType = new Map<string, number>();
+    for (const section of sections) {
+      byType.set(section.type, (byType.get(section.type) || 0) + 1);
+    }
+
+    const duplicatedTypes = Array.from(byType.entries())
+      .filter(([, count]) => count > 1)
+      .map(([type, count]) => ({ type, count }));
+
+    const publicSections = await this.getPublicSections();
+    const failedPublicSections = publicSections.filter((section) => (section as any).failed === true).length;
+    const emptyPublicSections = publicSections.filter((section) => {
+      const data = (section as any).data;
+      return Array.isArray(data) ? data.length === 0 : !data;
+    }).length;
+
+    const activeBanners = await this.prisma.banner.count({ where: { is_active: true } });
+    const activeFeaturedProducts = await this.prisma.featuredProduct.count({ where: { is_active: true } });
+    const [totalBrands, brandsWithLogo] = await Promise.all([
+      this.prisma.brand.count({ where: { is_active: true } }),
+      this.prisma.brand.count({ where: { is_active: true, NOT: [{ logo_url: null }, { logo_url: '' }] } }),
+    ]);
+    const brandsMissingLogo = totalBrands - brandsWithLogo;
+
+    const heroSections = sections.filter((section) => section.type === HomepageSectionType.HERO_BANNER_SLIDER);
+    const heroEnabledSections = heroSections.filter((section) => section.enabled).length;
+
+    const featuredPicksSections = sections.filter((section) => section.type === HomepageSectionType.FEATURED_PICKS);
+    const featuredManualLinked = featuredPicksSections.some((section) => {
+      const config = (section.config_json || {}) as Record<string, any>;
+      return section.enabled && (config.source === 'manual' || Array.isArray(config.ids));
+    });
+
+    const invalidConfigSections = sections
+      .map((section) => ({
+        id: section.id,
+        type: section.type,
+        title: section.title,
+        issues: this.getSectionConfigIssues(section),
+      }))
+      .filter((section) => section.issues.length > 0);
+
+    const productSectionTypes = new Set([
+      HomepageSectionType.BEST_DEALS,
+      HomepageSectionType.NEW_ARRIVALS,
+      HomepageSectionType.FEATURED_PICKS,
+    ]);
+
+    const emptyEnabledProductSections = publicSections
+      .filter((section) => productSectionTypes.has((section as any).type))
+      .filter((section) => Array.isArray((section as any).data) && (section as any).data.length === 0)
+      .map((section) => ({
+        id: (section as any).id,
+        type: (section as any).type,
+        title: (section as any).title,
+      }));
+
+    return {
+      totals: {
+        total,
+        enabled,
+        disabled,
+        duplicatedTypes: duplicatedTypes.length,
+        failedPublicSections,
+        emptyPublicSections,
+        activeBanners,
+        heroSections: heroSections.length,
+        heroEnabledSections,
+        activeFeaturedProducts,
+        featuredPicksSections: featuredPicksSections.length,
+        invalidConfigSections: invalidConfigSections.length,
+        totalBrands,
+        brandsWithLogo,
+        brandsMissingLogo,
+        emptyEnabledProductSections: emptyEnabledProductSections.length,
+      },
+      duplicatedTypes,
+      invalidConfigSections,
+      emptyEnabledProductSections,
+      checks: {
+        hasVisibleSections: enabled > 0,
+        storePayloadOk: failedPublicSections === 0,
+        bannersLinkedToHome: activeBanners === 0 || heroEnabledSections > 0,
+        featuredLinkedToHome: activeFeaturedProducts === 0 || featuredManualLinked,
+        configsValid: invalidConfigSections.length === 0,
+        brandLogosHealthy: totalBrands === 0 || brandsMissingLogo === 0,
+        productSectionsHaveData: emptyEnabledProductSections.length === 0,
+      },
+    };
   }
 
   async getPublicSections() {
@@ -199,9 +386,9 @@ export class HomepageSectionsService {
         main_category: true,
         media: { where: { sku_id: null }, orderBy: { sort_order: 'asc' }, take: 1 },
         skus: {
-          where: { name: null },
           include: { prices: true, inventory: true },
-          take: 1,
+          orderBy: { created_at: 'asc' },
+          take: 3,
         },
       },
     });
@@ -211,13 +398,13 @@ export class HomepageSectionsService {
     return products
       .sort((a, b) => Number(order.get(a.id) ?? 10_000) - Number(order.get(b.id) ?? 10_000))
       .map((p) => {
-        const sku = p.skus[0];
+        const sku = p.skus.find((candidate) => (candidate.prices || []).length > 0) || p.skus[0];
         const price = sku?.prices?.[0];
-        if (!price) return null;
-        const priceValue = Number(price.sale_price);
-        const compareAt = price.compare_at_price
+        const priceValue = Number(price?.sale_price || 0);
+        const compareAt = price?.compare_at_price
           ? Number(price.compare_at_price)
           : undefined;
+        const stockQty = Number(sku?.inventory?.[0]?.qty_on_hand || 0);
         return {
           id: p.id,
           title: p.title,
@@ -233,8 +420,8 @@ export class HomepageSectionsService {
             compareAt && compareAt > priceValue
               ? Math.round(((compareAt - priceValue) / compareAt) * 100)
               : undefined,
-          stock_quantity: sku?.inventory?.[0]?.qty_on_hand || 0,
-          stock_status: 'IN_STOCK',
+          stock_quantity: stockQty,
+          stock_status: stockQty > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
           thumbnail: p.media[0]?.url || '/No_Image_Available.png',
           rating_count: p.rating_count,
           is_featured: false,
@@ -263,6 +450,7 @@ export class HomepageSectionsService {
       [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
     };
 
+    const featuredOnly = Boolean(query.featuredOnly ?? config.featured_only ?? false);
     const selectedSort = query.sortBy || config.sort_by || ProductSortBy.NEWEST;
 
     if (
@@ -272,7 +460,9 @@ export class HomepageSectionsService {
       query.priceMin === undefined &&
       query.priceMax === undefined
     ) {
-      return this.productsService.getDealsProducts(query.limit || config.limit || 12, query.inStockOnly ?? true);
+      const deals = await this.productsService.getDealsProducts(query.limit || config.limit || 12, query.inStockOnly ?? true);
+      if (deals.length || !(query.inStockOnly ?? true)) return deals;
+      return this.productsService.getDealsProducts(query.limit || config.limit || 12, false);
     }
 
     const result = await this.productsService.getProducts({
@@ -287,8 +477,35 @@ export class HomepageSectionsService {
         sectionType === HomepageSectionType.NEW_ARRIVALS
           ? ProductSortBy.NEWEST
           : sortByMap[selectedSort] || ProductSortBy.NEWEST,
-      featured_only: sectionType === HomepageSectionType.FEATURED_PICKS,
+      featured_only: featuredOnly,
     });
+
+    if (!result.products.length && (query.inStockOnly ?? true)) {
+      const relaxed = await this.productsService.getProducts({
+        page: 1,
+        limit: query.limit || config.limit || 12,
+        categories: category?.slug ? [category.slug] : undefined,
+        brand: brand?.slug || undefined,
+        min_price: query.priceMin,
+        max_price: query.priceMax,
+        in_stock_only: false,
+        sort_by:
+          sectionType === HomepageSectionType.NEW_ARRIVALS
+            ? ProductSortBy.NEWEST
+            : sortByMap[selectedSort] || ProductSortBy.NEWEST,
+        featured_only: featuredOnly,
+      });
+
+      if (relaxed.products.length) {
+        if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+          return [...relaxed.products].sort(
+            (a: any, b: any) =>
+              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+          );
+        }
+        return relaxed.products;
+      }
+    }
 
     if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
       return [...result.products].sort(
@@ -310,7 +527,11 @@ export class HomepageSectionsService {
         if (source === 'query' && config.query?.type === HomepageQueryType.PRODUCTS) {
           return this.executeProductsQuery(config, type);
         }
-        return this.productsService.getDealsProducts(config.limit || 12, true);
+        {
+          const deals = await this.productsService.getDealsProducts(config.limit || 12, true);
+          if (deals.length) return deals;
+          return this.productsService.getDealsProducts(config.limit || 12, false);
+        }
       case HomepageSectionType.NEW_ARRIVALS:
       case HomepageSectionType.FEATURED_PICKS:
         if (source === 'manual') {
@@ -365,16 +586,55 @@ export class HomepageSectionsService {
           : 'products');
 
     if (target === 'products') {
-      const res = await this.prisma.product.findMany({
-        where: {
-          status: 'ACTIVE',
-          title: { contains: q, mode: 'insensitive' },
-        },
-        select: { id: true, title: true, slug: true },
-        take: limit,
-        orderBy: { created_at: 'desc' },
+      const [category, brand] = await Promise.all([
+        query.categoryId
+          ? this.prisma.category.findUnique({ where: { id: query.categoryId }, select: { slug: true } })
+          : Promise.resolve(null),
+        query.brandId
+          ? this.prisma.brand.findUnique({ where: { id: query.brandId }, select: { slug: true } })
+          : Promise.resolve(null),
+      ]);
+
+      const sortByMap: Record<string, ProductSortBy> = {
+        [HomepageQuerySortBy.NEWEST]: ProductSortBy.NEWEST,
+        [HomepageQuerySortBy.PRICE_ASC]: ProductSortBy.PRICE_LOW_TO_HIGH,
+        [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
+      };
+
+      const fallbackSort =
+        query.type === HomepageSectionType.BEST_DEALS
+          ? HomepageQuerySortBy.DISCOUNT_DESC
+          : HomepageQuerySortBy.NEWEST;
+      const selectedSort = query.sortBy || fallbackSort;
+      const inStockOnly = query.inStockOnly !== 'false';
+      const featuredOnly = query.featuredOnly === 'true';
+
+      const result = await this.productsService.getProducts({
+        page: 1,
+        limit: Math.max(limit * 2, 24),
+        categories: category?.slug ? [category.slug] : undefined,
+        brand: brand?.slug || undefined,
+        min_price: query.priceMin,
+        max_price: query.priceMax,
+        in_stock_only: inStockOnly,
+        sort_by: sortByMap[selectedSort] || ProductSortBy.NEWEST,
+        featured_only: featuredOnly,
       });
-      return res.map((x) => ({ id: x.id, label: x.title, subtitle: x.slug }));
+
+      let products = result.products || [];
+      if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+        products = [...products].sort(
+          (a: any, b: any) =>
+            Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+        );
+      }
+
+      if (q) {
+        const nq = q.toLowerCase();
+        products = products.filter((item: any) => String(item.title || '').toLowerCase().includes(nq));
+      }
+
+      return products.slice(0, limit).map((x: any) => ({ id: x.id, label: x.title, subtitle: x.slug }));
     }
 
     if (target === 'categories') {
@@ -390,20 +650,23 @@ export class HomepageSectionsService {
     if (target === 'brands') {
       const res = await this.prisma.brand.findMany({
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, logo_url: true },
         take: limit,
         orderBy: { name: 'asc' },
       });
-      return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug }));
+      return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug, image: x.logo_url || undefined }));
     }
 
     return [];
   }
 
   async create(dto: CreateHomepageSectionDto) {
-    const normalizedConfig = this.normalizeConfigBySectionType(
+    const normalizedConfig = this.normalizeProductCarouselConfig(
       dto.type,
-      dto.config_json as Record<string, any>,
+      this.normalizeConfigBySectionType(
+        dto.type,
+        dto.config_json as Record<string, any>,
+      ),
     );
     this.validateConfig(dto.type, normalizedConfig);
     return this.prisma.homepageSection.create({
@@ -421,12 +684,15 @@ export class HomepageSectionsService {
     const existing = await this.prisma.homepageSection.findUnique({ where: { id } });
     if (!existing) throw new BadRequestException('Section not found');
 
-    const mergedConfig = this.normalizeConfigBySectionType(
+    const mergedConfig = this.normalizeProductCarouselConfig(
       existing.type as HomepageSectionType,
-      {
-        ...(existing.config_json as Record<string, any>),
-        ...(dto.config_json || {}),
-      },
+      this.normalizeConfigBySectionType(
+        existing.type as HomepageSectionType,
+        {
+          ...(existing.config_json as Record<string, any>),
+          ...(dto.config_json || {}),
+        },
+      ),
     );
     this.validateConfig(existing.type as HomepageSectionType, mergedConfig);
 

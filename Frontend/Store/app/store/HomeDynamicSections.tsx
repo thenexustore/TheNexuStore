@@ -34,7 +34,7 @@ function BannerSection({ banners }: { banners: any[] }) {
   const banner = safeBanners[index];
 
   return (
-    <section className="w-full max-w-7xl px-4 pt-4 sm:px-6">
+    <section className="w-full px-4 pt-4 sm:px-6">
       <div className="relative h-52 overflow-hidden rounded-3xl border border-slate-200 shadow-sm sm:h-72 lg:h-80">
         <img
           src={String(banner.image || "/No_Image_Available.png")}
@@ -80,7 +80,7 @@ function SimpleListSection({
 }) {
   if (!items.length) return null;
   return (
-    <section className="w-full max-w-7xl px-4 sm:px-6">
+    <section className="w-full px-4 sm:px-6">
       <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
         {items.map((item) => {
@@ -117,7 +117,7 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
   };
 
   return (
-    <section className="w-full max-w-7xl px-4 sm:px-6">
+    <section className="w-full px-4 sm:px-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {items.map((item, i) => {
           const Icon = resolveIcon(item.icon);
@@ -142,7 +142,7 @@ type SectionShellProps = {
 function SectionShell({ sectionId, highlightedId, children }: SectionShellProps) {
   const highlighted = highlightedId === sectionId;
   return (
-    <div className={highlighted ? "rounded-2xl ring-2 ring-slate-900/20 bg-slate-100/50" : ""}>
+    <div className={`w-full ${highlighted ? "rounded-2xl ring-2 ring-slate-900/20 bg-slate-100/50" : ""}`}>
       {children}
     </div>
   );
@@ -170,12 +170,12 @@ export default function HomeDynamicSections() {
     load();
   }, []);
 
-  if (loading) return <div className="w-full max-w-7xl px-4 sm:px-6 py-8 text-sm text-slate-500">{t("dynamic.loading")}</div>;
+  if (loading) return <div className="w-full px-4 sm:px-6 py-8 text-sm text-slate-500">{t("dynamic.loading")}</div>;
 
   return (
     <>
       {highlightedSectionId ? (
-        <section className="w-full max-w-7xl px-4 sm:px-6 pt-2">
+        <section className="w-full px-4 sm:px-6 pt-2">
           <div className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs text-slate-600">
             {t("dynamic.previewMode")} <span className="font-mono">{highlightedSectionId}</span>
           </div>
@@ -183,7 +183,7 @@ export default function HomeDynamicSections() {
       ) : null}
       {sections.map((section) => {
         if (section.failed) {
-          return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full max-w-7xl px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">{t("dynamic.sectionUnavailable")}</div></section></SectionShell>;
+          return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">{t("dynamic.sectionUnavailable")}</div></section></SectionShell>;
         }
 
         switch (section.type) {

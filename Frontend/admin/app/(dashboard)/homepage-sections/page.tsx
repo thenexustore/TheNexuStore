@@ -162,6 +162,7 @@ export default function HomepageSectionsPage() {
   const [filter, setFilter] = useState("");
   const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"overview" | "builder" | "assets">("builder");
   const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
@@ -837,6 +838,15 @@ export default function HomepageSectionsPage() {
     }
   };
 
+
+  const jumpToTabSection = (tab: "overview" | "builder" | "assets") => {
+    setActiveWorkspaceTab(tab);
+    const id = tab === "overview" ? "homepage-overview" : tab === "builder" ? "homepage-builder" : "homepage-assets";
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 30);
+  };
+
   return (
     <div className="space-y-4">
       <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 text-white shadow-sm">
@@ -854,7 +864,26 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="sticky top-3 z-20 rounded-2xl border bg-white/95 p-2 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: "overview", label: "Resumen", hint: "Estado y diagnóstico" },
+            { key: "builder", label: "Secciones", hint: "Editor principal" },
+            { key: "assets", label: "Integraciones", hint: "Banners y destacados" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              className={`rounded-xl px-3 py-2 text-left transition ${activeWorkspaceTab === tab.key ? "bg-slate-900 text-white shadow" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
+              onClick={() => jumpToTabSection(tab.key as "overview" | "builder" | "assets")}
+            >
+              <div className="text-xs font-semibold leading-none">{tab.label}</div>
+              <div className={`mt-0.5 text-[11px] ${activeWorkspaceTab === tab.key ? "text-slate-200" : "text-slate-500"}`}>{tab.hint}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div id="homepage-overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Secciones</div>
           <div className="mt-2 flex items-end justify-between">
@@ -1050,7 +1079,7 @@ export default function HomepageSectionsPage() {
         ) : null}
       </div>
 
-      <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+      <div id="homepage-builder" className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm text-slate-700">
             Cambios pendientes: <span className="font-semibold">{dirtySectionIds.size}</span>
@@ -1134,7 +1163,7 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div id="homepage-assets" className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">

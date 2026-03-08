@@ -288,6 +288,8 @@ export default function HomeDynamicSections() {
           return null;
         }
 
+        const sectionConfig = section.config_json || {};
+
         switch (section.type) {
           case "HERO_BANNER_SLIDER":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BannerSection banners={section.data || []} /></SectionShell>;
@@ -295,11 +297,11 @@ export default function HomeDynamicSections() {
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage={t("dynamic.emptyProducts")} carouselConfig={{
-              enabled: Boolean(section.config_json.carousel_enabled ?? true),
-              autoplay: Boolean(section.config_json.carousel_autoplay ?? true),
-              autoplayIntervalMs: Number(section.config_json.carousel_interval_ms || 5000),
-              itemsPerViewDesktop: Number(section.config_json.carousel_items_desktop || 4),
-              itemsPerViewMobile: Number(section.config_json.carousel_items_mobile || 2),
+              enabled: Boolean(sectionConfig.carousel_enabled ?? true),
+              autoplay: Boolean(sectionConfig.carousel_autoplay ?? true),
+              autoplayIntervalMs: Number(sectionConfig.carousel_interval_ms || 5000),
+              itemsPerViewDesktop: Number(sectionConfig.carousel_items_desktop || 4),
+              itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2),
             }} /></SectionShell>;
           case "TOP_CATEGORIES_GRID":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.topCategories")} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;

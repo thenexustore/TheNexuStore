@@ -622,6 +622,20 @@ export class HomepageSectionsService {
       });
 
       let products = result.products || [];
+      if (!products.length && inStockOnly) {
+        const relaxed = await this.productsService.getProducts({
+          page: 1,
+          limit: Math.max(limit * 2, 24),
+          categories: category?.slug ? [category.slug] : undefined,
+          brand: brand?.slug || undefined,
+          min_price: query.priceMin,
+          max_price: query.priceMax,
+          in_stock_only: false,
+          sort_by: sortByMap[selectedSort] || ProductSortBy.NEWEST,
+          featured_only: featuredOnly,
+        });
+        products = relaxed.products || [];
+      }
       if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
         products = [...products].sort(
           (a: any, b: any) =>

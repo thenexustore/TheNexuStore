@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Product } from "../lib/products";
 
 interface CarouselConfig {
@@ -34,6 +35,7 @@ export default function HomeProductSection({
   emptyMessage,
   carouselConfig,
 }: Props) {
+  const t = useTranslations("home");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -139,10 +141,10 @@ export default function HomeProductSection({
         <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg border p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label="Anterior">
+            <button className="rounded-lg border p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label={t("dynamic.carouselPrev")}>
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button className="rounded-lg border p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label="Siguiente">
+            <button className="rounded-lg border p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label={t("dynamic.carouselNext")}>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -189,7 +191,7 @@ export default function HomeProductSection({
                   key={idx}
                   className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`}
                   onClick={() => scrollToPage(idx)}
-                  aria-label={`Ir a página ${idx + 1}`}
+                  aria-label={t("dynamic.carouselGoToPage", { page: idx + 1 })}
                 />
               ))}
             </div>

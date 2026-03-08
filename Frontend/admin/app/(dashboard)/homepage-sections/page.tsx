@@ -36,6 +36,11 @@ import {
   Star,
   ArrowUp,
   ArrowDown,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  FoldVertical,
+  UnfoldVertical,
 } from "lucide-react";
 
 const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
@@ -143,6 +148,8 @@ export default function HomepageSectionsPage() {
   const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
 
@@ -176,11 +183,37 @@ export default function HomepageSectionsPage() {
       count: countByType.get(type) || 0,
     }));
   }, [sections]);
+  const isDirtySection = useCallback((section: HomepageSection) => {
+    const original = originalSections.find((item) => item.id === section.id);
+    if (!original) return true;
+    return sectionSignature(section) !== sectionSignature(original);
+  }, [originalSections, sectionSignature]);
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter((section) => (section.title || "").toLowerCase().includes(q) || section.type.toLowerCase().includes(q));
-  }, [sorted, filter]);
+    return sorted.filter((section) => {
+      const textOk = !q || (section.title || "").toLowerCase().includes(q) || section.type.toLowerCase().includes(q);
+      if (!textOk) return false;
+      if (statusFilter === "enabled") return section.enabled;
+      if (statusFilter === "disabled") return !section.enabled;
+      if (statusFilter === "dirty") return isDirtySection(section);
+      return true;
+    });
+  }, [sorted, filter, statusFilter, isDirtySection]);
+
+  const dirtySectionIds = useMemo(() => {
+    return new Set(sections.filter((section) => isDirtySection(section)).map((section) => section.id));
+  }, [isDirtySection, sections]);
+
+  const optionLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of queryCatalogs.categories) map.set(item.id, item.label);
+    for (const item of queryCatalogs.brands) map.set(item.id, item.label);
+    for (const sectionOptions of Object.values(options)) {
+      for (const opt of sectionOptions) map.set(opt.id, opt.label);
+    }
+    return map;
+  }, [options, queryCatalogs.brands, queryCatalogs.categories]);
 
   const dirtySectionIds = useMemo(() => {
     const originalById = new Map(originalSections.map((section) => [section.id, section]));
@@ -415,6 +448,39 @@ export default function HomepageSectionsPage() {
     setSections((prev) => prev.map((section) => ({ ...section, enabled })));
   };
 
+  const setAllCollapsed = (collapsed: boolean) => {
+    setCollapsedSections(Object.fromEntries(sorted.map((section) => [section.id, collapsed])));
+  };
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const applyCarouselPreset = (section: HomepageSection, preset: "compact" | "balanced" | "showcase") => {
+    const presets: Record<string, Record<string, unknown>> = {
+      compact: { carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 3500, carousel_items_desktop: 5, carousel_items_mobile: 2 },
+      balanced: { carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
+      showcase: { carousel_enabled: true, carousel_autoplay: false, carousel_interval_ms: 5500, carousel_items_desktop: 3, carousel_items_mobile: 1 },
+    };
+    updateConfig(section, presets[preset]);
+    toast.success(`Preset de carrusel aplicado: ${preset}`);
+  };
+
+  const applyCatalogQuickSelection = (section: HomepageSection, mode: "append" | "replace") => {
+    const source = section.type === "TOP_CATEGORIES_GRID" ? queryCatalogs.categories : section.type === "BRANDS_STRIP" ? queryCatalogs.brands : [];
+    if (!source.length) {
+      toast.message("No hay catálogo precargado para esta sección todavía");
+      return;
+    }
+
+    const topIds = source.slice(0, 10).map((item) => item.id);
+    const currentIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+    const nextIds = mode === "replace" ? topIds : Array.from(new Set([...currentIds, ...topIds]));
+
+    updateConfig(section, { source: "manual", ids: nextIds });
+    toast.success(mode === "replace" ? "Selección reemplazada con top 10" : "Top 10 añadido a la selección");
+  };
+
   const autoFixSectionConfigs = () => {
     const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
     setSections((prev) =>
@@ -583,9 +649,19 @@ export default function HomepageSectionsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-3xl font-bold">Página Principal</h1>
-        <p className="text-sm text-slate-500">Configura y ordena las secciones que se exportan a la tienda.</p>
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 text-white shadow-sm">
+        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
+        <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold">Página Principal</h1>
+            <p className="text-sm text-slate-200">Configura, valida y publica secciones para la Store desde un único panel fullstack.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs">
+            <Sparkles className="h-3.5 w-3.5" />
+            Modo Pro Admin
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -779,6 +855,25 @@ export default function HomepageSectionsPage() {
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={autoFixSectionConfigs}>Autocorregir configs</button>
+          <button className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1" onClick={() => setAllCollapsed(true)}><FoldVertical className="h-3.5 w-3.5" /> Colapsar todo</button>
+          <button className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1" onClick={() => setAllCollapsed(false)}><UnfoldVertical className="h-3.5 w-3.5" /> Expandir todo</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">Filtro rápido:</span>
+          {[
+            { key: "all", label: "Todas" },
+            { key: "enabled", label: "Visibles" },
+            { key: "disabled", label: "Ocultas" },
+            { key: "dirty", label: "Con cambios" },
+          ].map((option) => (
+            <button
+              key={option.key}
+              className={`rounded-full border px-3 py-1 text-xs ${statusFilter === option.key ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700"}`}
+              onClick={() => setStatusFilter(option.key as "all" | "enabled" | "disabled" | "dirty")}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
@@ -828,11 +923,15 @@ export default function HomepageSectionsPage() {
           <div className="space-y-2 max-h-64 overflow-auto">
             {banners.map((banner, index) => (
               <div key={banner.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{banner.title_text || `Banner ${index + 1}`}</div>
-                  <div className="text-xs text-slate-500">#{index + 1}</div>
+                <div className="min-w-0 flex items-center gap-2">
+                  <img src={banner.image || "/No_Image_Available.png"} alt={banner.title_text || `Banner ${index + 1}`} className="h-10 w-16 rounded object-cover border" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/No_Image_Available.png"; }} />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{banner.title_text || `Banner ${index + 1}`}</div>
+                    <div className="text-xs text-slate-500">#{index + 1} · {banner.is_active ? "Visible" : "Oculto"}</div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Link className="px-2 py-1 border rounded text-xs" href={`/banners/${banner.id}/edit`}>Editar</Link>
                   <button className="p-1 border rounded" onClick={() => void moveBanner(index, -1)}><ArrowUp className="h-3 w-3" /></button>
                   <button className="p-1 border rounded" onClick={() => void moveBanner(index, 1)}><ArrowDown className="h-3 w-3" /></button>
                   <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleBanner(banner.id)}>{banner.is_active ? "Activo" : "Inactivo"}</button>
@@ -894,9 +993,10 @@ export default function HomepageSectionsPage() {
         const query = (section.config_json.query || {}) as Record<string, unknown>;
         const currentIndex = sorted.findIndex((x) => x.id === section.id);
         const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+        const isCollapsed = Boolean(collapsedSections[section.id]);
 
         return (
-          <div key={section.id} className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+          <div key={section.id} className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm transition hover:shadow-md">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold">{section.title || section.type}</div>
@@ -920,6 +1020,10 @@ export default function HomepageSectionsPage() {
                 <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, -1)}>↑</button>
                 <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, 1)}>↓</button>
                 <button className="px-2 py-1 border rounded" onClick={() => void duplicate(section)}>Duplicar</button>
+                <button className="px-2 py-1 border rounded inline-flex items-center gap-1 text-xs" onClick={() => toggleCollapsed(section.id)}>
+                  {isCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                  {isCollapsed ? "Expandir" : "Colapsar"}
+                </button>
                 <label className="text-sm flex items-center gap-1">
                   <input type="checkbox" checked={section.enabled} onChange={(e) => updateLocal(section.id, { enabled: e.target.checked })} />
                   Visible
@@ -928,10 +1032,12 @@ export default function HomepageSectionsPage() {
               </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <input className="border rounded-lg px-3 py-2" value={section.title || ""} onChange={(e) => updateLocal(section.id, { title: e.target.value })} placeholder="Título de sección" />
-              <button className="border rounded-lg px-3 py-2 text-sm" onClick={() => updateLocal(section.id, { config_json: defaultConfigFor(section.type) })}>Reset config por defecto</button>
-            </div>
+            {!isCollapsed ? (
+              <>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input className="border rounded-lg px-3 py-2" value={section.title || ""} onChange={(e) => updateLocal(section.id, { title: e.target.value })} placeholder="Título de sección" />
+                  <button className="border rounded-lg px-3 py-2 text-sm" onClick={() => updateLocal(section.id, { config_json: defaultConfigFor(section.type) })}>Reset config por defecto</button>
+                </div>
 
             {supportsSource(section.type) && (
               <div className="space-y-2">
@@ -952,6 +1058,16 @@ export default function HomepageSectionsPage() {
 
                 {source === "manual" && (
                   <div className="space-y-2">
+                    {(section.type === "TOP_CATEGORIES_GRID" || section.type === "BRANDS_STRIP") ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCatalogQuickSelection(section, "append")}>
+                          Añadir top 10
+                        </button>
+                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCatalogQuickSelection(section, "replace")}>
+                          Reemplazar por top 10
+                        </button>
+                      </div>
+                    ) : null}
                     <div className="flex gap-2">
                       <input className="border rounded-lg px-3 py-2 flex-1" value={search[section.id] || ""} onChange={(e) => setSearch((prev) => ({ ...prev, [section.id]: e.target.value }))} placeholder="Buscar item" />
                       <button
@@ -981,16 +1097,22 @@ export default function HomepageSectionsPage() {
                       ))}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 items-center">
                       {selectedIds.map((id) => (
                         <button
                           key={id}
                           className="rounded-full border px-2 py-1 text-xs"
                           onClick={() => updateConfig(section, { ids: selectedIds.filter((value) => value !== id) })}
+                          title={id}
                         >
-                          {id} ✕
+                          {optionLabelById.get(id) || id} ✕
                         </button>
                       ))}
+                      {selectedIds.length ? (
+                        <button className="rounded-full border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700" onClick={() => updateConfig(section, { ids: [] })}>
+                          Limpiar selección
+                        </button>
+                      ) : null}
                       {!selectedIds.length ? <div className="text-xs text-slate-500">Sin IDs seleccionados</div> : null}
                     </div>
                   </div>
@@ -1038,7 +1160,14 @@ export default function HomepageSectionsPage() {
 
                 {PRODUCT_QUERY_TYPES.includes(section.type) ? (
                   <div className="rounded-lg border border-slate-200 p-3 space-y-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel en Store</div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel en Store</div>
+                      <div className="flex gap-1">
+                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "compact")}>Compacto</button>
+                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "balanced")}>Balanceado</button>
+                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "showcase")}>Escaparate</button>
+                      </div>
+                    </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
                         <input type="checkbox" checked={Boolean(section.config_json.carousel_enabled ?? true)} onChange={(e) => updateConfig(section, { carousel_enabled: e.target.checked })} />
@@ -1071,9 +1200,13 @@ export default function HomepageSectionsPage() {
               />
             )}
 
-            <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void save(section)}>
-              {savingId === section.id ? "Guardando..." : "Guardar cambios"}
-            </button>
+                <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void save(section)}>
+                  {savingId === section.id ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">Sección colapsada. Expándela para editar su configuración.</div>
+            )}
           </div>
         );
       })}

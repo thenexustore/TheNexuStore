@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
@@ -143,6 +144,7 @@ export default function HomeDynamicSections() {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
+  const t = useTranslations("home");
   const highlightedSectionId = searchParams.get("highlightSection");
 
   useEffect(() => {
@@ -160,20 +162,20 @@ export default function HomeDynamicSections() {
     load();
   }, []);
 
-  if (loading) return <div className="w-full max-w-7xl px-4 sm:px-6 py-8 text-sm text-slate-500">Loading homepage...</div>;
+  if (loading) return <div className="w-full max-w-7xl px-4 sm:px-6 py-8 text-sm text-slate-500">{t("dynamic.loading")}</div>;
 
   return (
     <>
       {highlightedSectionId ? (
         <section className="w-full max-w-7xl px-4 sm:px-6 pt-2">
           <div className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs text-slate-600">
-            Modo previsualización activado para la sección: <span className="font-mono">{highlightedSectionId}</span>
+            {t("dynamic.previewMode")} <span className="font-mono">{highlightedSectionId}</span>
           </div>
         </section>
       ) : null}
       {sections.map((section) => {
         if (section.failed) {
-          return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full max-w-7xl px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Sección no disponible temporalmente.</div></section></SectionShell>;
+          return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full max-w-7xl px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">{t("dynamic.sectionUnavailable")}</div></section></SectionShell>;
         }
 
         switch (section.type) {
@@ -182,7 +184,7 @@ export default function HomeDynamicSections() {
           case "BEST_DEALS":
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage="No hay productos disponibles" carouselConfig={{
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage={t("dynamic.emptyProducts")} carouselConfig={{
               enabled: Boolean(section.config_json.carousel_enabled ?? true),
               autoplay: Boolean(section.config_json.carousel_autoplay ?? true),
               autoplayIntervalMs: Number(section.config_json.carousel_interval_ms || 5000),
@@ -190,9 +192,9 @@ export default function HomeDynamicSections() {
               itemsPerViewMobile: Number(section.config_json.carousel_items_mobile || 2),
             }} /></SectionShell>;
           case "TOP_CATEGORIES_GRID":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || "Top Categories"} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.topCategories")} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "BRANDS_STRIP":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || "Brands"} buildHref={(slug) => `/products?brand=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.brands")} buildHref={(slug) => `/products?brand=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "TRUST_BAR":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
           default:

@@ -46,12 +46,15 @@ export interface HomepageSectionsDiagnostics {
     activeBanners: number;
     heroSections: number;
     heroEnabledSections: number;
+    activeFeaturedProducts: number;
+    featuredPicksSections: number;
   };
   duplicatedTypes: Array<{ type: string; count: number }>;
   checks: {
     hasVisibleSections: boolean;
     storePayloadOk: boolean;
     bannersLinkedToHome: boolean;
+    featuredLinkedToHome: boolean;
   };
 }
 

@@ -631,10 +631,24 @@ export default function HomepageSectionsPage() {
         </div>
       ) : null}
 
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.featuredLinkedToHome ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          <div>
+            Hay {diagnostics.totals.activeFeaturedProducts} destacado(s) activos pero no están enlazados manualmente a FEATURED_PICKS en portada.
+            <div className="mt-2">
+              <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={() => void syncFeaturedProductsToHomepage()}>
+                Sincronizar destacados con portada
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
         <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
         <p className="text-xs text-slate-600">
-          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver el layout moderno de <code>/home</code>. Banners activos: <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO visibles: <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong>.
+          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver el layout moderno de <code>/home</code>. Banners activos: <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO visibles: <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong> · Destacados activos: <strong>{diagnostics?.totals.activeFeaturedProducts ?? 0}</strong> · Secciones FEATURED_PICKS: <strong>{diagnostics?.totals.featuredPicksSections ?? 0}</strong>.
         </p>
         <div className="flex flex-wrap gap-2">
           <a

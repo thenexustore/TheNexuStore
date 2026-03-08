@@ -51,7 +51,21 @@ function initialsSvgDataUri(name?: string) {
 function isMissingLogoAsset(value?: string) {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw) return true;
-  return raw.includes("no_image_available");
+  return ["no_image_available", "placeholder", "default-logo", "default_brand", "no-logo", "logo-missing"].some((token) => raw.includes(token));
+}
+
+function resolveBrandOverrideLogo(brand: { id: string; name: string; slug?: string }, overrides?: Record<string, string>) {
+  if (!overrides) return "";
+  const candidates = [brand.id, brand.slug || "", String(brand.name || "").toLowerCase()]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  for (const key of candidates) {
+    const exact = overrides[key];
+    if (String(exact || "").trim()) return String(exact).trim();
+    const lower = overrides[key.toLowerCase()];
+    if (String(lower || "").trim()) return String(lower).trim();
+  }
+  return "";
 }
 
 function BannerSection({ banners }: { banners: any[] }) {
@@ -144,9 +158,11 @@ function SimpleListSection({
 function BrandLogoCarousel({
   title,
   items,
+  logoOverrides,
 }: {
   title: string;
   items: Array<{ id: string; name: string; slug?: string; logo_url?: string; image?: string }>;
+  logoOverrides?: Record<string, string>;
 }) {
   if (!items.length) return null;
 
@@ -164,7 +180,8 @@ function BrandLogoCarousel({
       <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         {sorted.map((brand) => {
-          const rawLogo = String(brand.logo_url || brand.image || "").trim();
+          const overrideLogo = resolveBrandOverrideLogo(brand, logoOverrides);
+          const rawLogo = String(overrideLogo || brand.logo_url || brand.image || "").trim();
           const logo = isMissingLogoAsset(rawLogo) ? initialsSvgDataUri(brand.name) : resolveAssetUrl(rawLogo);
           return (
             <Link
@@ -306,7 +323,7 @@ export default function HomeDynamicSections() {
           case "TOP_CATEGORIES_GRID":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.topCategories")} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "BRANDS_STRIP":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} logoOverrides={(sectionConfig.logo_overrides || {}) as Record<string, string>} /></SectionShell>;
           case "TRUST_BAR":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
           default:

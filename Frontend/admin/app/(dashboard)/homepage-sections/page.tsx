@@ -328,6 +328,38 @@ export default function HomepageSectionsPage() {
     }));
   };
 
+
+  const normalizeLogoOverrides = (value: unknown): Record<string, string> => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    const out: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const nextKey = String(key || "").trim();
+      const nextVal = String(raw || "").trim();
+      if (!nextKey || !nextVal) continue;
+      out[nextKey] = nextVal;
+      out[nextKey.toLowerCase()] = nextVal;
+    }
+    return out;
+  };
+
+  const updateBrandLogoOverride = (section: HomepageSection, brandKey: string, value: string) => {
+    const key = String(brandKey || "").trim();
+    if (!key) return;
+    const current = normalizeLogoOverrides(section.config_json.logo_overrides);
+    const next = { ...current };
+    const lowerKey = key.toLowerCase();
+
+    if (!value.trim()) {
+      delete next[key];
+      delete next[lowerKey];
+    } else {
+      next[key] = value.trim();
+      next[lowerKey] = value.trim();
+    }
+
+    updateConfig(section, { logo_overrides: next });
+  };
+
   const save = async (sectionOrId: HomepageSection | string) => {
     const sectionId = typeof sectionOrId === "string" ? sectionOrId : sectionOrId.id;
     const section = sections.find((item) => item.id === sectionId);
@@ -1640,6 +1672,43 @@ export default function HomepageSectionsPage() {
                     )}
                   </div>
                 )}
+
+                {section.type === "BRANDS_STRIP" ? (
+                  <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Logo overrides (manual)</div>
+                    <p className="text-xs text-slate-500">Si un logo sale en negro o incorrecto, pega aquí la URL correcta. Puedes usar id, slug o nombre de marca como clave.</p>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {((source === "manual" ? selectedIds : queryCatalogs.brands.slice(0, 24).map((b) => b.id)) as string[]).map((brandId) => {
+                        const brandLabel = optionLabelById.get(brandId) || brandId;
+                        const overrides = normalizeLogoOverrides(section.config_json.logo_overrides);
+                        const value = overrides[brandId] || overrides[brandId.toLowerCase()] || "";
+                        return (
+                          <label key={brandId} className="space-y-1">
+                            <span className="text-xs text-slate-600">{brandLabel}</span>
+                            <input
+                              className="w-full border rounded-lg px-2 py-1.5 text-xs"
+                              value={value}
+                              placeholder="https://.../logo.png"
+                              onChange={(e) => updateBrandLogoOverride(section, brandId, e.target.value)}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <textarea
+                      className="border rounded-lg px-3 py-2 w-full min-h-24 text-xs font-mono"
+                      value={JSON.stringify(normalizeLogoOverrides(section.config_json.logo_overrides), null, 2)}
+                      onChange={(e) => {
+                        try {
+                          const parsed = JSON.parse(e.target.value) as Record<string, unknown>;
+                          updateConfig(section, { logo_overrides: normalizeLogoOverrides(parsed) });
+                        } catch {
+                          // avoid noisy toasts while typing partial json
+                        }
+                      }}
+                    />
+                  </div>
+                ) : null}
 
                 {PRODUCT_QUERY_TYPES.includes(section.type) ? (
                   <div className="rounded-lg border border-slate-200 p-3 space-y-3">

@@ -386,9 +386,9 @@ export class HomepageSectionsService {
         main_category: true,
         media: { where: { sku_id: null }, orderBy: { sort_order: 'asc' }, take: 1 },
         skus: {
-          where: { name: null },
           include: { prices: true, inventory: true },
-          take: 1,
+          orderBy: { created_at: 'asc' },
+          take: 3,
         },
       },
     });
@@ -398,13 +398,13 @@ export class HomepageSectionsService {
     return products
       .sort((a, b) => Number(order.get(a.id) ?? 10_000) - Number(order.get(b.id) ?? 10_000))
       .map((p) => {
-        const sku = p.skus[0];
+        const sku = p.skus.find((candidate) => (candidate.prices || []).length > 0) || p.skus[0];
         const price = sku?.prices?.[0];
-        if (!price) return null;
-        const priceValue = Number(price.sale_price);
-        const compareAt = price.compare_at_price
+        const priceValue = Number(price?.sale_price || 0);
+        const compareAt = price?.compare_at_price
           ? Number(price.compare_at_price)
           : undefined;
+        const stockQty = Number(sku?.inventory?.[0]?.qty_on_hand || 0);
         return {
           id: p.id,
           title: p.title,
@@ -420,8 +420,8 @@ export class HomepageSectionsService {
             compareAt && compareAt > priceValue
               ? Math.round(((compareAt - priceValue) / compareAt) * 100)
               : undefined,
-          stock_quantity: sku?.inventory?.[0]?.qty_on_hand || 0,
-          stock_status: 'IN_STOCK',
+          stock_quantity: stockQty,
+          stock_status: stockQty > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
           thumbnail: p.media[0]?.url || '/No_Image_Available.png',
           rating_count: p.rating_count,
           is_featured: false,

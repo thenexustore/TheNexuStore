@@ -136,7 +136,7 @@ export default function HomeProductSection({
   };
 
   return (
-    <section className="w-full max-w-7xl px-4 sm:px-6">
+    <section className="w-full px-4 sm:px-6">
       <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-amber-500" />

@@ -462,6 +462,26 @@ export default function HomepageSectionsPage() {
     toast.success(mode === "replace" ? "Selección reemplazada con top 10" : "Top 10 añadido a la selección");
   };
 
+  const toggleManualSelection = (section: HomepageSection, id: string) => {
+    const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+    const nextIds = selectedIds.includes(id)
+      ? selectedIds.filter((value) => value !== id)
+      : [...selectedIds, id];
+    updateConfig(section, { ids: nextIds });
+  };
+
+  const moveSelectedId = (section: HomepageSection, id: string, delta: number) => {
+    const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+    const index = selectedIds.indexOf(id);
+    if (index < 0) return;
+    const next = index + delta;
+    if (next < 0 || next >= selectedIds.length) return;
+    const arr = [...selectedIds];
+    const [item] = arr.splice(index, 1);
+    arr.splice(next, 0, item);
+    updateConfig(section, { ids: arr });
+  };
+
   const autoFixSectionConfigs = () => {
     const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
     setSections((prev) =>
@@ -896,7 +916,7 @@ export default function HomepageSectionsPage() {
           <div className="flex items-center justify-between">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <Images className="h-4 w-4" />
-              Banners (integrado)
+              Banners (integrado) · {banners.length}
             </div>
             <Link className="text-xs underline" href="/banners/new">Nuevo banner</Link>
           </div>
@@ -927,7 +947,7 @@ export default function HomepageSectionsPage() {
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <Star className="h-4 w-4" />
-              Productos destacados (integrado)
+              Productos destacados (integrado) · {featuredProducts.length}
             </div>
             <div className="flex items-center gap-3">
               <button className="text-xs underline" onClick={() => void syncFeaturedProductsToHomepage()}>
@@ -1049,6 +1069,10 @@ export default function HomepageSectionsPage() {
                         </button>
                       </div>
                     ) : null}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="text-xs text-slate-500">Seleccionados: <span className="font-semibold">{selectedIds.length}</span></div>
+                      <div className="text-xs text-slate-500">{section.type === "TOP_CATEGORIES_GRID" ? "Categorías" : section.type === "BRANDS_STRIP" ? "Marcas" : "Productos"}</div>
+                    </div>
                     <div className="flex gap-2">
                       <input className="border rounded-lg px-3 py-2 flex-1" value={search[section.id] || ""} onChange={(e) => setSearch((prev) => ({ ...prev, [section.id]: e.target.value }))} placeholder="Buscar item" />
                       <button
@@ -1065,29 +1089,31 @@ export default function HomepageSectionsPage() {
                       </button>
                     </div>
 
-                    <div className="max-h-36 overflow-auto border rounded-lg">
-                      {(options[section.id] || []).map((opt) => (
-                        <button
-                          key={opt.id}
-                          onClick={() => updateConfig(section, { ids: Array.from(new Set([...selectedIds, opt.id])) })}
-                          className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                        >
-                          {opt.label}
-                          <span className="text-xs text-slate-400 ml-2">{opt.subtitle}</span>
-                        </button>
-                      ))}
+                    <div className="max-h-44 overflow-auto border rounded-lg divide-y">
+                      {(options[section.id] || []).map((opt) => {
+                        const selected = selectedIds.includes(opt.id);
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => toggleManualSelection(section, opt.id)}
+                            className={`block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${selected ? "bg-slate-50" : ""}`}
+                          >
+                            <span className="font-medium">{opt.label}</span>
+                            <span className="text-xs text-slate-400 ml-2">{opt.subtitle}</span>
+                            <span className={`ml-2 text-[11px] ${selected ? "text-emerald-600" : "text-slate-400"}`}>{selected ? "Seleccionado" : "Seleccionar"}</span>
+                          </button>
+                        );
+                      })}
                     </div>
 
                     <div className="flex flex-wrap gap-2 items-center">
                       {selectedIds.map((id) => (
-                        <button
-                          key={id}
-                          className="rounded-full border px-2 py-1 text-xs"
-                          onClick={() => updateConfig(section, { ids: selectedIds.filter((value) => value !== id) })}
-                          title={id}
-                        >
-                          {optionLabelById.get(id) || id} ✕
-                        </button>
+                        <div key={id} className="inline-flex items-center gap-1 rounded-full border bg-white px-2 py-1 text-xs" title={id}>
+                          <span>{optionLabelById.get(id) || id}</span>
+                          <button className="rounded border px-1" onClick={() => moveSelectedId(section, id, -1)}>↑</button>
+                          <button className="rounded border px-1" onClick={() => moveSelectedId(section, id, 1)}>↓</button>
+                          <button className="rounded border px-1 text-red-600" onClick={() => updateConfig(section, { ids: selectedIds.filter((value) => value !== id) })}>✕</button>
+                        </div>
                       ))}
                       {selectedIds.length ? (
                         <button className="rounded-full border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700" onClick={() => updateConfig(section, { ids: [] })}>

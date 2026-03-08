@@ -82,10 +82,10 @@ function SimpleListSection({
   return (
     <section className="w-full px-4 sm:px-6">
       <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         {items.map((item) => {
           const card = (
-            <div className="rounded-xl border bg-white px-3 py-4 text-sm font-medium text-slate-700 hover:border-slate-300 hover:shadow-sm transition">
+            <div className="flex min-h-[64px] items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm">
               {item.name}
             </div>
           );
@@ -118,11 +118,11 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
 
   return (
     <section className="w-full px-4 sm:px-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {items.map((item, i) => {
           const Icon = resolveIcon(item.icon);
           return (
-            <div key={i} className="rounded-xl border bg-white px-4 py-3 text-sm text-slate-700 flex items-center gap-2">
+            <div key={i} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
               <Icon className="h-4 w-4 text-slate-500" />
               <span>{item.text}</span>
             </div>

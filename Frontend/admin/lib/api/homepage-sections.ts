@@ -120,11 +120,12 @@ export const homepageSectionsApi = {
       brandId?: string;
       sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
       inStockOnly?: boolean;
+      featuredOnly?: boolean;
       priceMin?: number;
       priceMax?: number;
     },
   ): Promise<HomepageOption[]> =>
     req(
-      `/admin/homepage/sections/options?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=${limit}${target ? `&target=${encodeURIComponent(target)}` : ""}${filters?.categoryId ? `&categoryId=${encodeURIComponent(filters.categoryId)}` : ""}${filters?.brandId ? `&brandId=${encodeURIComponent(filters.brandId)}` : ""}${filters?.sortBy ? `&sortBy=${encodeURIComponent(filters.sortBy)}` : ""}${typeof filters?.inStockOnly === "boolean" ? `&inStockOnly=${filters.inStockOnly ? "true" : "false"}` : ""}${typeof filters?.priceMin === "number" ? `&priceMin=${encodeURIComponent(String(filters.priceMin))}` : ""}${typeof filters?.priceMax === "number" ? `&priceMax=${encodeURIComponent(String(filters.priceMax))}` : ""}`,
+      `/admin/homepage/sections/options?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=${limit}${target ? `&target=${encodeURIComponent(target)}` : ""}${filters?.categoryId ? `&categoryId=${encodeURIComponent(filters.categoryId)}` : ""}${filters?.brandId ? `&brandId=${encodeURIComponent(filters.brandId)}` : ""}${filters?.sortBy ? `&sortBy=${encodeURIComponent(filters.sortBy)}` : ""}${typeof filters?.inStockOnly === "boolean" ? `&inStockOnly=${filters.inStockOnly ? "true" : "false"}` : ""}${typeof filters?.featuredOnly === "boolean" ? `&featuredOnly=${filters.featuredOnly ? "true" : "false"}` : ""}${typeof filters?.priceMin === "number" ? `&priceMin=${encodeURIComponent(String(filters.priceMin))}` : ""}${typeof filters?.priceMax === "number" ? `&priceMax=${encodeURIComponent(String(filters.priceMax))}` : ""}`,
     ),
 };

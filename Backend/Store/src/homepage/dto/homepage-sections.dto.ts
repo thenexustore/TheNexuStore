@@ -59,6 +59,10 @@ export class HomepageQueryConfigDto {
   inStockOnly?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  featuredOnly?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   limit?: number;
@@ -196,4 +200,8 @@ export class HomepageSectionOptionsQueryDto {
   @IsOptional()
   @IsIn(['true', 'false'])
   inStockOnly?: 'true' | 'false';
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  featuredOnly?: 'true' | 'false';
 }

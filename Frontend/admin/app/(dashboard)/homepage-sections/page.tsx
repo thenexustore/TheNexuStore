@@ -149,6 +149,7 @@ export default function HomepageSectionsPage() {
     brandId?: string;
     sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
     inStockOnly?: boolean;
+    featuredOnly?: boolean;
     priceMin?: number;
     priceMax?: number;
   }>>({});
@@ -167,6 +168,7 @@ export default function HomepageSectionsPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
   const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] = useState("");
+  const [categoryCarouselType, setCategoryCarouselType] = useState<"FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("FEATURED_PICKS");
   const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<"discount_desc" | "newest">("discount_desc");
   const [creatingType, setCreatingType] = useState<string | null>(null);
 
@@ -440,7 +442,7 @@ export default function HomepageSectionsPage() {
     setCreatingType("category-carousel");
     try {
       await homepageSectionsApi.create({
-        type: "FEATURED_PICKS",
+        type: categoryCarouselType,
         position: sorted.length + 1,
         enabled: true,
         title: category?.label || "Carrusel por categoría",
@@ -452,6 +454,7 @@ export default function HomepageSectionsPage() {
             limit: 12,
             inStockOnly: true,
             sortBy: categoryCarouselSortBy,
+            featuredOnly: false,
           },
           carousel_enabled: true,
           carousel_autoplay: true,
@@ -628,6 +631,7 @@ export default function HomepageSectionsPage() {
       brandId?: string;
       sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
       inStockOnly?: boolean;
+      featuredOnly?: boolean;
       priceMin?: number;
       priceMax?: number;
     },
@@ -1081,8 +1085,21 @@ export default function HomepageSectionsPage() {
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
         <div className="text-sm font-medium text-slate-700">Crear carrusel por categoría</div>
-        <p className="text-xs text-slate-500">Añade una nueva sección FEATURED_PICKS basada en una categoría concreta para la Store.</p>
-        <div className="grid gap-2 md:grid-cols-3">
+        <p className="text-xs text-slate-500">Añade un carrusel por categoría eligiendo el tipo de sección que mejor encaje con tu estrategia comercial.</p>
+        <div className="grid gap-2 md:grid-cols-4">
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={categoryCarouselType}
+            onChange={(e) => {
+              const nextType = e.target.value as "FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS";
+              setCategoryCarouselType(nextType);
+              setCategoryCarouselSortBy(nextType === "NEW_ARRIVALS" ? "newest" : "discount_desc");
+            }}
+          >
+            <option value="FEATURED_PICKS">FEATURED_PICKS</option>
+            <option value="BEST_DEALS">BEST_DEALS</option>
+            <option value="NEW_ARRIVALS">NEW_ARRIVALS</option>
+          </select>
           <select
             className="border rounded-lg px-3 py-2"
             value={categoryCarouselCategoryId}
@@ -1256,6 +1273,22 @@ export default function HomepageSectionsPage() {
                           />
                           Solo con stock
                         </label>
+                        {section.type === "FEATURED_PICKS" ? (
+                          <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(manualProductFilters[section.id]?.featuredOnly ?? false)}
+                              onChange={(e) => setManualProductFilters((prev) => ({
+                                ...prev,
+                                [section.id]: {
+                                  ...prev[section.id],
+                                  featuredOnly: e.target.checked,
+                                },
+                              }))}
+                            />
+                            Solo destacados
+                          </label>
+                        ) : null}
                         <input
                           type="number"
                           min={0}
@@ -1384,6 +1417,13 @@ export default function HomepageSectionsPage() {
                           <input type="checkbox" checked={Boolean(query.inStockOnly ?? true)} onChange={(e) => updateQueryConfig(section, { type: "products", inStockOnly: e.target.checked })} />
                           Solo con stock
                         </label>
+
+                        {section.type === "FEATURED_PICKS" ? (
+                          <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                            <input type="checkbox" checked={Boolean(query.featuredOnly ?? false)} onChange={(e) => updateQueryConfig(section, { type: "products", featuredOnly: e.target.checked })} />
+                            Solo destacados
+                          </label>
+                        ) : null}
 
                         <input type="number" min={0} className="border rounded-lg px-3 py-2" value={typeof query.priceMin === "number" ? query.priceMin : ""} onChange={(e) => updateQueryConfig(section, { type: "products", priceMin: e.target.value ? Number(e.target.value) : undefined })} placeholder="Precio mínimo" />
                         <input type="number" min={0} className="border rounded-lg px-3 py-2" value={typeof query.priceMax === "number" ? query.priceMax : ""} onChange={(e) => updateQueryConfig(section, { type: "products", priceMax: e.target.value ? Number(e.target.value) : undefined })} placeholder="Precio máximo" />

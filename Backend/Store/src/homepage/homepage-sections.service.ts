@@ -423,6 +423,7 @@ export class HomepageSectionsService {
       [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
     };
 
+    const featuredOnly = Boolean(query.featuredOnly ?? config.featured_only ?? false);
     const selectedSort = query.sortBy || config.sort_by || ProductSortBy.NEWEST;
 
     if (
@@ -447,7 +448,7 @@ export class HomepageSectionsService {
         sectionType === HomepageSectionType.NEW_ARRIVALS
           ? ProductSortBy.NEWEST
           : sortByMap[selectedSort] || ProductSortBy.NEWEST,
-      featured_only: sectionType === HomepageSectionType.FEATURED_PICKS,
+      featured_only: featuredOnly,
     });
 
     if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
@@ -546,6 +547,7 @@ export class HomepageSectionsService {
           : HomepageQuerySortBy.NEWEST;
       const selectedSort = query.sortBy || fallbackSort;
       const inStockOnly = query.inStockOnly !== 'false';
+      const featuredOnly = query.featuredOnly === 'true';
 
       const result = await this.productsService.getProducts({
         page: 1,
@@ -556,7 +558,7 @@ export class HomepageSectionsService {
         max_price: query.priceMax,
         in_stock_only: inStockOnly,
         sort_by: sortByMap[selectedSort] || ProductSortBy.NEWEST,
-        featured_only: query.type === HomepageSectionType.FEATURED_PICKS,
+        featured_only: featuredOnly,
       });
 
       let products = result.products || [];

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import HomeProductSection from "./HomeProductSection";
 import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
+import { RefreshCcw, ShieldCheck, Truck } from "lucide-react";
 
 type Section = {
   id: string;
@@ -34,12 +35,15 @@ function BannerSection({ banners }: { banners: any[] }) {
   return (
     <section className="w-full max-w-7xl px-4 pt-4 sm:px-6">
       <div className="relative h-52 overflow-hidden rounded-2xl sm:h-72 lg:h-80">
-        <Image
-          src={banner.image}
+        <img
+          src={String(banner.image || "/No_Image_Available.png")}
           alt={banner.title_text || "Banner"}
-          fill
-          priority
-          className="object-cover"
+          className="h-full w-full object-cover"
+          loading="eager"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = "/No_Image_Available.png";
+          }}
         />
         <div className="absolute inset-0" style={{ background: banner.overlay }} />
         <div className="absolute inset-0 flex flex-col justify-end gap-2 p-5 text-white sm:p-8">
@@ -94,20 +98,52 @@ function SimpleListSection({
 
 function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) {
   if (!items.length) return null;
+
+  const resolveIcon = (icon?: string) => {
+    const normalized = String(icon || "").toLowerCase();
+    if (normalized.includes("truck")) return Truck;
+    if (normalized.includes("shield")) return ShieldCheck;
+    if (normalized.includes("refresh")) return RefreshCcw;
+    return ShieldCheck;
+  };
+
   return (
     <section className="w-full max-w-7xl px-4 sm:px-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {items.map((item, i) => (
-          <div key={i} className="rounded-xl border bg-white px-4 py-3 text-sm text-slate-700">{item.text}</div>
-        ))}
+        {items.map((item, i) => {
+          const Icon = resolveIcon(item.icon);
+          return (
+            <div key={i} className="rounded-xl border bg-white px-4 py-3 text-sm text-slate-700 flex items-center gap-2">
+              <Icon className="h-4 w-4 text-slate-500" />
+              <span>{item.text}</span>
+            </div>
+          );
+        })}
       </div>
     </section>
+  );
+}
+
+type SectionShellProps = {
+  sectionId: string;
+  highlightedId?: string | null;
+  children: React.ReactNode;
+};
+
+function SectionShell({ sectionId, highlightedId, children }: SectionShellProps) {
+  const highlighted = highlightedId === sectionId;
+  return (
+    <div className={highlighted ? "rounded-2xl ring-2 ring-slate-900/20 bg-slate-100/50" : ""}>
+      {children}
+    </div>
   );
 }
 
 export default function HomeDynamicSections() {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const highlightedSectionId = searchParams.get("highlightSection");
 
   useEffect(() => {
     const load = async () => {
@@ -128,24 +164,31 @@ export default function HomeDynamicSections() {
 
   return (
     <>
+      {highlightedSectionId ? (
+        <section className="w-full max-w-7xl px-4 sm:px-6 pt-2">
+          <div className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs text-slate-600">
+            Modo previsualización activado para la sección: <span className="font-mono">{highlightedSectionId}</span>
+          </div>
+        </section>
+      ) : null}
       {sections.map((section) => {
         if (section.failed) {
-          return <section key={section.id} className="w-full max-w-7xl px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Section unavailable.</div></section>;
+          return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full max-w-7xl px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Sección no disponible temporalmente.</div></section></SectionShell>;
         }
 
         switch (section.type) {
           case "HERO_BANNER_SLIDER":
-            return <BannerSection key={section.id} banners={section.data || []} />;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BannerSection banners={section.data || []} /></SectionShell>;
           case "BEST_DEALS":
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS":
-            return <HomeProductSection key={section.id} title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage="No items available" />;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage="No hay productos disponibles" /></SectionShell>;
           case "TOP_CATEGORIES_GRID":
-            return <SimpleListSection key={section.id} title={section.title || "Top Categories"} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} />;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || "Top Categories"} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "BRANDS_STRIP":
-            return <SimpleListSection key={section.id} title={section.title || "Brands"} buildHref={(slug) => `/products?brand=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} />;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || "Brands"} buildHref={(slug) => `/products?brand=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "TRUST_BAR":
-            return <TrustBar key={section.id} items={section.data || []} />;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
           default:
             return null;
         }

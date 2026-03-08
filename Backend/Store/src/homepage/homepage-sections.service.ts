@@ -460,7 +460,9 @@ export class HomepageSectionsService {
       query.priceMin === undefined &&
       query.priceMax === undefined
     ) {
-      return this.productsService.getDealsProducts(query.limit || config.limit || 12, query.inStockOnly ?? true);
+      const deals = await this.productsService.getDealsProducts(query.limit || config.limit || 12, query.inStockOnly ?? true);
+      if (deals.length || !(query.inStockOnly ?? true)) return deals;
+      return this.productsService.getDealsProducts(query.limit || config.limit || 12, false);
     }
 
     const result = await this.productsService.getProducts({

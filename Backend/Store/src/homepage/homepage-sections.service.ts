@@ -527,7 +527,11 @@ export class HomepageSectionsService {
         if (source === 'query' && config.query?.type === HomepageQueryType.PRODUCTS) {
           return this.executeProductsQuery(config, type);
         }
-        return this.productsService.getDealsProducts(config.limit || 12, true);
+        {
+          const deals = await this.productsService.getDealsProducts(config.limit || 12, true);
+          if (deals.length) return deals;
+          return this.productsService.getDealsProducts(config.limit || 12, false);
+        }
       case HomepageSectionType.NEW_ARRIVALS:
       case HomepageSectionType.FEATURED_PICKS:
         if (source === 'manual') {

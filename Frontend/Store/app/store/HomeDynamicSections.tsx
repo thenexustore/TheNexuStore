@@ -221,6 +221,16 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
   );
 }
 
+
+function isEmptyRenderableSection(section: Section) {
+  const list = Array.isArray(section.data) ? section.data : [];
+  if (section.type === "TRUST_BAR") return list.length === 0;
+  if (["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP", "HERO_BANNER_SLIDER"].includes(section.type)) {
+    return list.length === 0;
+  }
+  return false;
+}
+
 type SectionShellProps = {
   sectionId: string;
   highlightedId?: string | null;
@@ -272,6 +282,10 @@ export default function HomeDynamicSections() {
       {sections.map((section) => {
         if (section.failed) {
           return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">{t("dynamic.sectionUnavailable")}</div></section></SectionShell>;
+        }
+
+        if (!highlightedSectionId && isEmptyRenderableSection(section)) {
+          return null;
         }
 
         switch (section.type) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "@/i18n/navigation";
 import { toast } from "sonner";
 import {
   CategoryMenuTreeNode,
@@ -11,6 +12,18 @@ import {
 } from "@/lib/api/homepage-sections";
 import { API_URL } from "@/lib/constants";
 import {
+  Banner,
+  getBanners,
+  reorderBanners,
+  toggleBannerStatus,
+} from "@/lib/api/banners";
+import {
+  FeaturedProduct,
+  fetchFeaturedProducts,
+  toggleFeaturedProductStatus,
+  updateFeaturedProductOrder,
+} from "@/lib/api/featured-products";
+import {
   AlertTriangle,
   CheckCircle2,
   CircleOff,
@@ -19,6 +32,10 @@ import {
   Layers3,
   RotateCw,
   ServerCrash,
+  Images,
+  Star,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
@@ -124,6 +141,8 @@ export default function HomepageSectionsPage() {
   const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
 
@@ -186,13 +205,17 @@ export default function HomepageSectionsPage() {
     setIsLoading(true);
     setDiagnosticsLoading(true);
     try {
-      const [sectionsData, diagnosticsData] = await Promise.all([
+      const [sectionsData, diagnosticsData, bannersData, featuredResponse] = await Promise.all([
         homepageSectionsApi.list(),
         homepageSectionsApi.diagnostics(),
+        getBanners(),
+        fetchFeaturedProducts({ take: 20 }),
       ]);
       setSections(sectionsData);
       setOriginalSections(sectionsData);
       setDiagnostics(diagnosticsData);
+      setBanners(bannersData);
+      setFeaturedProducts(featuredResponse.data || []);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar las secciones");
     } finally {
@@ -433,6 +456,60 @@ export default function HomepageSectionsPage() {
     }
   };
 
+  const moveBanner = async (index: number, delta: number) => {
+    const next = index + delta;
+    if (next < 0 || next >= banners.length) return;
+
+    const arr = [...banners];
+    const [item] = arr.splice(index, 1);
+    arr.splice(next, 0, item);
+    setBanners(arr);
+
+    try {
+      await reorderBanners(arr.map((banner) => banner.id));
+      toast.success("Orden de banners actualizado");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar banners");
+    }
+  };
+
+  const toggleBanner = async (id: string) => {
+    try {
+      await toggleBannerStatus(id);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cambiar banner");
+    }
+  };
+
+  const moveFeatured = async (index: number, delta: number) => {
+    const next = index + delta;
+    if (next < 0 || next >= featuredProducts.length) return;
+
+    const arr = [...featuredProducts];
+    const [item] = arr.splice(index, 1);
+    arr.splice(next, 0, item);
+    setFeaturedProducts(arr);
+
+    try {
+      await updateFeaturedProductOrder(arr.map((x, i) => ({ id: x.id, sort_order: i + 1 })));
+      toast.success("Orden de destacados actualizado");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar destacados");
+    }
+  };
+
+  const toggleFeatured = async (id: string) => {
+    try {
+      await toggleFeaturedProductStatus(id);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cambiar destacado");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -504,9 +581,9 @@ export default function HomepageSectionsPage() {
           <div>
             Hay {diagnostics.totals.activeBanners} banner(s) activos pero no hay una sección HERO_BANNER_SLIDER visible en Página Principal. Crea/activa la sección HERO para que se muestren en la Store.
             <div className="mt-2">
-              <a className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" href="/banners">
+              <Link className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" href="/banners">
                 Ir a Banners
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -608,6 +685,62 @@ export default function HomepageSectionsPage() {
               {item.type} · {item.count}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Images className="h-4 w-4" />
+              Banners (integrado)
+            </div>
+            <Link className="text-xs underline" href="/banners/new">Nuevo banner</Link>
+          </div>
+          <div className="text-xs text-slate-500">Gestiona aquí el orden y visibilidad para la portada.</div>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {banners.map((banner, index) => (
+              <div key={banner.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{banner.title_text || `Banner ${index + 1}`}</div>
+                  <div className="text-xs text-slate-500">#{index + 1}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, -1)}><ArrowUp className="h-3 w-3" /></button>
+                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, 1)}><ArrowDown className="h-3 w-3" /></button>
+                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleBanner(banner.id)}>{banner.is_active ? "Activo" : "Inactivo"}</button>
+                </div>
+              </div>
+            ))}
+            {!banners.length ? <div className="text-xs text-slate-500">No hay banners</div> : null}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Star className="h-4 w-4" />
+              Productos destacados (integrado)
+            </div>
+            <Link className="text-xs underline" href="/featured-products/new">Nuevo destacado</Link>
+          </div>
+          <div className="text-xs text-slate-500">Controla orden y estado sin salir de Página Principal.</div>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {featuredProducts.map((item, index) => (
+              <div key={item.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{item.title || item.product?.title || `Destacado ${index + 1}`}</div>
+                  <div className="text-xs text-slate-500">#{index + 1}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, -1)}><ArrowUp className="h-3 w-3" /></button>
+                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, 1)}><ArrowDown className="h-3 w-3" /></button>
+                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleFeatured(item.id)}>{item.is_active ? "Activo" : "Inactivo"}</button>
+                </div>
+              </div>
+            ))}
+            {!featuredProducts.length ? <div className="text-xs text-slate-500">No hay productos destacados</div> : null}
+          </div>
         </div>
       </div>
 

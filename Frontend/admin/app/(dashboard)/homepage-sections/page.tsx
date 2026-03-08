@@ -591,6 +591,42 @@ export default function HomepageSectionsPage() {
     toast.success("Configuración normalizada localmente. Revisa y guarda cambios pendientes.");
   };
 
+  const autoFixEmptyProductSections = () => {
+    if (!diagnostics?.emptyEnabledProductSections?.length) {
+      toast.message("No hay carruseles vacíos para autocorregir");
+      return;
+    }
+
+    const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
+    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+
+    setSections((prev) =>
+      prev.map((section) => {
+        if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
+
+        const config = { ...(section.config_json || {}) } as Record<string, unknown>;
+        const query = { ...((config.query || {}) as Record<string, unknown>) };
+
+        config.source = "query";
+        query.type = "products";
+        query.inStockOnly = false;
+        query.priceMin = undefined;
+        query.priceMax = undefined;
+        if (section.type === "FEATURED_PICKS") {
+          query.featuredOnly = false;
+        }
+        if (!query.sortBy) {
+          query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
+        }
+
+        config.query = query;
+        return { ...section, config_json: config };
+      }),
+    );
+
+    toast.success("Autocorrección aplicada en carruseles vacíos (modo local). Guarda para publicar.");
+  };
+
   const saveAll = async () => {
     if (!sections.length) return;
 
@@ -875,6 +911,11 @@ export default function HomepageSectionsPage() {
           <div>
             Hay {diagnostics.totals.emptyEnabledProductSections} sección(es) de productos visibles con resultado vacío en el endpoint público.
             <div className="mt-1 text-xs">Revisa filtros de categoría/marca, límites y stock para que el carrusel tenga contenido.</div>
+            <div className="mt-2">
+              <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={autoFixEmptyProductSections}>
+                Autocorregir carruseles vacíos en local
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

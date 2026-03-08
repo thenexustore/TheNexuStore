@@ -35,6 +35,29 @@ export interface CategoryMenuTreeResponse {
   tree: CategoryMenuTreeNode[];
 }
 
+export interface HomepageSectionsDiagnostics {
+  totals: {
+    total: number;
+    enabled: number;
+    disabled: number;
+    duplicatedTypes: number;
+    failedPublicSections: number;
+    emptyPublicSections: number;
+    activeBanners: number;
+    heroSections: number;
+    heroEnabledSections: number;
+    activeFeaturedProducts: number;
+    featuredPicksSections: number;
+  };
+  duplicatedTypes: Array<{ type: string; count: number }>;
+  checks: {
+    hasVisibleSections: boolean;
+    storePayloadOk: boolean;
+    bannersLinkedToHome: boolean;
+    featuredLinkedToHome: boolean;
+  };
+}
+
 async function req(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem("admin_token");
   const res = await fetch(`${API_URL}${path}`, {
@@ -56,6 +79,7 @@ async function req(path: string, options: RequestInit = {}) {
 
 export const homepageSectionsApi = {
   list: (): Promise<HomepageSection[]> => req("/admin/homepage/sections"),
+  diagnostics: (): Promise<HomepageSectionsDiagnostics> => req("/admin/homepage/sections/diagnostics"),
   create: (payload: {
     type: string;
     position: number;

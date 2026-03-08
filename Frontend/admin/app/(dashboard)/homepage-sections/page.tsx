@@ -415,6 +415,35 @@ export default function HomepageSectionsPage() {
     setSections((prev) => prev.map((section) => ({ ...section, enabled })));
   };
 
+  const autoFixSectionConfigs = () => {
+    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    setSections((prev) =>
+      prev.map((section) => {
+        const config = { ...(section.config_json || {}) } as Record<string, unknown>;
+        const query = ((config.query || {}) as Record<string, unknown>);
+
+        if (config.source !== "manual" && !query.type) {
+          if (section.type === "TOP_CATEGORIES_GRID") query.type = "categories";
+          else if (section.type === "BRANDS_STRIP") query.type = "brands";
+          else query.type = "products";
+          config.query = query;
+          config.source = "query";
+        }
+
+        if (productTypes.has(section.type)) {
+          config.carousel_enabled = Boolean(config.carousel_enabled ?? true);
+          config.carousel_autoplay = Boolean(config.carousel_autoplay ?? true);
+          config.carousel_interval_ms = Math.min(15000, Math.max(2000, Number(config.carousel_interval_ms || 4500)));
+          config.carousel_items_desktop = Math.min(6, Math.max(2, Number(config.carousel_items_desktop || 4)));
+          config.carousel_items_mobile = Math.min(3, Math.max(1, Number(config.carousel_items_mobile || 2)));
+        }
+
+        return { ...section, config_json: config };
+      }),
+    );
+    toast.success("Configuración normalizada localmente. Revisa y guarda cambios pendientes.");
+  };
+
   const saveAll = async () => {
     if (!sections.length) return;
 
@@ -559,7 +588,7 @@ export default function HomepageSectionsPage() {
         <p className="text-sm text-slate-500">Configura y ordena las secciones que se exportan a la tienda.</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Secciones</div>
           <div className="mt-2 flex items-end justify-between">
@@ -601,6 +630,19 @@ export default function HomepageSectionsPage() {
           </div>
           <div className="mt-1 text-xs text-slate-500">Secciones públicas con error al resolver</div>
         </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Config inválida</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.totals.invalidConfigSections ?? 0}</div>
+            {diagnostics?.checks.configsValid ?? true ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            )}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Secciones con ajustes recomendados</div>
+        </div>
       </div>
 
       {!diagnosticsLoading && diagnostics && !diagnostics.checks.hasVisibleSections ? (
@@ -614,6 +656,18 @@ export default function HomepageSectionsPage() {
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
           Hay {diagnostics.totals.failedPublicSections} secciones con fallo en el endpoint público. Revisa su configuración y vuelve a guardar.
+        </div>
+      ) : null}
+
+      {!diagnosticsLoading && diagnostics && !diagnostics.checks.configsValid ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          <div className="space-y-2">
+            <div>Hay {diagnostics.totals.invalidConfigSections} sección(es) con configuración mejorable o inconsistente.</div>
+            <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={autoFixSectionConfigs}>
+              Autocorregir configuración en local
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -681,6 +735,22 @@ export default function HomepageSectionsPage() {
             Tipos duplicados detectados: {duplicateTypeSummary.map(([type, count]) => `${type} (${count})`).join(", ")}. Esto puede ser válido, pero revisa que no sea contenido repetido.
           </div>
         ) : null}
+
+        {diagnostics && diagnostics.invalidConfigSections.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
+            <div className="font-semibold">Secciones con configuración a revisar</div>
+            <ul className="list-disc pl-4 space-y-1">
+              {diagnostics.invalidConfigSections.slice(0, 6).map((item) => (
+                <li key={item.id}>
+                  <span className="font-medium">{item.title || item.type}</span>: {item.issues.join(" · ")}
+                </li>
+              ))}
+            </ul>
+            {diagnostics.invalidConfigSections.length > 6 ? (
+              <div>Y {diagnostics.invalidConfigSections.length - 6} más…</div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
@@ -708,7 +778,8 @@ export default function HomepageSectionsPage() {
         <div className="flex flex-wrap gap-2">
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
-                  </div>
+          <button className="px-3 py-2 rounded-lg border text-sm" onClick={autoFixSectionConfigs}>Autocorregir configs</button>
+        </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
             {SECTION_TYPES.map((type) => (

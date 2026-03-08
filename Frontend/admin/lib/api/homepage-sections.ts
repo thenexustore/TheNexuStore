@@ -48,13 +48,16 @@ export interface HomepageSectionsDiagnostics {
     heroEnabledSections: number;
     activeFeaturedProducts: number;
     featuredPicksSections: number;
+    invalidConfigSections: number;
   };
   duplicatedTypes: Array<{ type: string; count: number }>;
+  invalidConfigSections: Array<{ id: string; type: string; title?: string | null; issues: string[] }>;
   checks: {
     hasVisibleSections: boolean;
     storePayloadOk: boolean;
     bannersLinkedToHome: boolean;
     featuredLinkedToHome: boolean;
+    configsValid: boolean;
   };
 }
 

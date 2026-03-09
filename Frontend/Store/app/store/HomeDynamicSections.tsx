@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
-import { RefreshCcw, ShieldCheck, Truck } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
 
 type Section = {
   id: string;
@@ -159,12 +159,31 @@ function BrandLogoCarousel({
   title,
   items,
   logoOverrides,
+  carouselConfig,
 }: {
   title: string;
   items: Array<{ id: string; name: string; slug?: string; logo_url?: string; image?: string }>;
   logoOverrides?: Record<string, string>;
+  carouselConfig?: {
+    enabled?: boolean;
+    autoplay?: boolean;
+    autoplayIntervalMs?: number;
+    itemsPerViewDesktop?: number;
+    itemsPerViewMobile?: number;
+  };
 }) {
   if (!items.length) return null;
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [itemsPerView, setItemsPerView] = useState(3);
+
+  const carouselEnabled = Boolean(carouselConfig?.enabled ?? true);
+  const autoplay = Boolean(carouselConfig?.autoplay ?? false);
+  const autoplayIntervalMs = Math.max(2000, Number(carouselConfig?.autoplayIntervalMs || 5000));
+  const mobileItems = Math.min(4, Math.max(1, Number(carouselConfig?.itemsPerViewMobile || 2)));
+  const desktopItems = Math.min(10, Math.max(2, Number(carouselConfig?.itemsPerViewDesktop || 8)));
 
   const sorted = [...items].sort((a, b) => {
     const ai = PRIORITY_BRANDS.indexOf(String(a.name || "").toLowerCase());
@@ -175,10 +194,72 @@ function BrandLogoCarousel({
     return ai - bi;
   });
 
+  useEffect(() => {
+    if (!carouselEnabled) return;
+    const updateItemsPerView = () => {
+      const next = window.innerWidth >= 1024 ? desktopItems : mobileItems;
+      setItemsPerView(next);
+    };
+    updateItemsPerView();
+    window.addEventListener("resize", updateItemsPerView);
+    return () => window.removeEventListener("resize", updateItemsPerView);
+  }, [carouselEnabled, desktopItems, mobileItems]);
+
+  const pageCount = useMemo(() => {
+    if (!carouselEnabled) return 1;
+    return Math.max(1, Math.ceil(sorted.length / Math.max(1, itemsPerView)));
+  }, [carouselEnabled, itemsPerView, sorted.length]);
+
+  const scrollToPage = (page: number) => {
+    if (!scrollRef.current) return;
+    const targetPage = ((page % pageCount) + pageCount) % pageCount;
+    const pageWidth = scrollRef.current.clientWidth;
+    scrollRef.current.scrollTo({ left: targetPage * pageWidth, behavior: "smooth" });
+    setCurrentPage(targetPage);
+  };
+
+  useEffect(() => {
+    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering) return;
+    const timer = setInterval(() => {
+      scrollToPage(currentPage + 1);
+    }, autoplayIntervalMs);
+    return () => clearInterval(timer);
+  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, pageCount]);
+
+  useEffect(() => {
+    if (!carouselEnabled || !scrollRef.current) return;
+    const el = scrollRef.current;
+    const onScroll = () => {
+      const pageWidth = el.clientWidth;
+      if (!pageWidth) return;
+      const page = Math.round(el.scrollLeft / pageWidth);
+      if (page !== currentPage) setCurrentPage(page);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [carouselEnabled, currentPage]);
+
   return (
     <section className="w-full px-4 sm:px-6">
-      <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
+        {carouselEnabled && pageCount > 1 ? (
+          <div className="flex items-center gap-2">
+            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label="Anterior marcas">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label="Siguiente marcas">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div
+        ref={carouselEnabled ? scrollRef : null}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         {sorted.map((brand) => {
           const overrideLogo = resolveBrandOverrideLogo(brand, logoOverrides);
           const rawLogo = String(overrideLogo || brand.logo_url || brand.image || "").trim();
@@ -189,6 +270,7 @@ function BrandLogoCarousel({
               href={`/products?brand=${encodeURIComponent(brand.slug || "")}`}
               className="group min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
               title={brand.name}
+              style={carouselEnabled ? { flexBasis: `calc((100% - ${(itemsPerView - 1) * 12}px) / ${itemsPerView})` } : undefined}
             >
               <div className="flex h-16 items-center justify-center rounded-lg bg-slate-50">
                 <img
@@ -206,6 +288,13 @@ function BrandLogoCarousel({
           );
         })}
       </div>
+      {carouselEnabled && pageCount > 1 ? (
+        <div className="mt-3 flex items-center justify-center gap-2">
+          {Array.from({ length: pageCount }).map((_, idx) => (
+            <button key={idx} className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`} onClick={() => scrollToPage(idx)} aria-label={`Ir a página ${idx + 1}`} />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -323,7 +412,7 @@ export default function HomeDynamicSections() {
           case "TOP_CATEGORIES_GRID":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.topCategories")} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
           case "BRANDS_STRIP":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} logoOverrides={(sectionConfig.logo_overrides || {}) as Record<string, string>} /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} logoOverrides={(sectionConfig.logo_overrides || {}) as Record<string, string>} carouselConfig={{ enabled: Boolean(sectionConfig.carousel_enabled ?? true), autoplay: Boolean(sectionConfig.carousel_autoplay ?? false), autoplayIntervalMs: Number(sectionConfig.carousel_interval_ms || 5000), itemsPerViewDesktop: Number(sectionConfig.carousel_items_desktop || 8), itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2) }} /></SectionShell>;
           case "TRUST_BAR":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
           default:

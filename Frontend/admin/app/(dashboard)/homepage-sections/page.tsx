@@ -1710,6 +1710,25 @@ export default function HomepageSectionsPage() {
                   </div>
                 ) : null}
 
+                {section.type === "BRANDS_STRIP" ? (
+                  <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel de marcas en Store</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                        <input type="checkbox" checked={Boolean(section.config_json.carousel_enabled ?? true)} onChange={(e) => updateConfig(section, { carousel_enabled: e.target.checked })} />
+                        Activar carrusel horizontal
+                      </label>
+                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                        <input type="checkbox" checked={Boolean(section.config_json.carousel_autoplay ?? false)} onChange={(e) => updateConfig(section, { carousel_autoplay: e.target.checked })} />
+                        Autoplay
+                      </label>
+                      <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 5000)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 5000 })} placeholder="Intervalo autoplay (ms)" />
+                      <input type="number" min={2} max={10} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 8)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 8 })} placeholder="Items desktop" />
+                      <input type="number" min={1} max={4} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items móvil" />
+                    </div>
+                  </div>
+                ) : null}
+
                 {PRODUCT_QUERY_TYPES.includes(section.type) ? (
                   <div className="rounded-lg border border-slate-200 p-3 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">

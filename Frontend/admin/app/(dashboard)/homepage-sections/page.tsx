@@ -8,6 +8,7 @@ import {
   HomepageOption,
   HomepageSection,
   HomepageSectionsDiagnostics,
+  HomepageSectionPreview,
   homepageSectionsApi,
 } from "@/lib/api/homepage-sections";
 import { API_URL, SITE_URL } from "@/lib/constants";
@@ -162,6 +163,8 @@ export default function HomepageSectionsPage() {
   const [filter, setFilter] = useState("");
   const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [previewBySectionId, setPreviewBySectionId] = useState<Record<string, HomepageSectionPreview>>({});
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"overview" | "builder" | "assets">("builder");
   const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -390,6 +393,19 @@ export default function HomepageSectionsPage() {
     const ok = await save(sectionId);
     if (!ok) return;
     window.open(`${SITE_URL}/store?highlightSection=${encodeURIComponent(sectionId)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const runSectionPreview = async (sectionId: string) => {
+    setPreviewLoadingId(sectionId);
+    try {
+      const data = await homepageSectionsApi.sectionPreview(sectionId);
+      setPreviewBySectionId((prev) => ({ ...prev, [sectionId]: data }));
+      toast.success("Preview actualizado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo generar preview");
+    } finally {
+      setPreviewLoadingId(null);
+    }
   };
 
   const create = async () => {
@@ -1010,6 +1026,26 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Health score</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.healthScore ?? 0}/100</div>
+            {(diagnostics?.healthScore ?? 0) >= 80 ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Basado en vacíos, configuración, logos y solapamiento.</div>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Publish readiness</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">{diagnostics?.publishReadiness ? "Ready" : "Review"}</div>
+            {diagnostics?.publishReadiness ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">Listo para publicar cuando no hay fallos críticos.</div>
+        </div>
+      </div>
+
       {!diagnosticsLoading && diagnostics && !diagnostics.checks.hasVisibleSections ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <CircleOff className="h-4 w-4 mt-0.5" />
@@ -1145,6 +1181,23 @@ export default function HomepageSectionsPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        ) : null}
+
+        {diagnostics && (diagnostics.overlapWarnings || []).length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
+            <div className="font-semibold">Riesgo de solapamiento entre carruseles</div>
+            <ul className="list-disc pl-4 space-y-1">
+              {(diagnostics.overlapWarnings || []).slice(0, 5).map((item, idx) => (
+                <li key={`${item.aId}-${item.bId}-${idx}`}>{item.aTitle || item.aId} ↔ {item.bTitle || item.bId}: {item.overlapPct}% ({item.shared} SKU compartidos)</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {diagnostics && (diagnostics.missingVisibleTypes || []).length > 0 ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+            Tipos clave ausentes en visible: {(diagnostics.missingVisibleTypes || []).join(', ')}.
           </div>
         ) : null}
       </div>
@@ -1758,20 +1811,49 @@ export default function HomepageSectionsPage() {
             )}
 
             {section.type === "TRUST_BAR" && (
-              <textarea
-                className="border rounded-lg px-3 py-2 w-full min-h-24 text-xs font-mono"
-                value={JSON.stringify(section.config_json.items || [], null, 2)}
-                onChange={(e) => {
-                  try {
-                    updateConfig(section, { items: JSON.parse(e.target.value) as unknown[] });
-                  } catch {
-                    // skip partial JSON
-                  }
-                }}
-              />
+              <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Items de confianza</div>
+                {((section.config_json.items || []) as Array<{ icon?: string; text: string }>).map((item, idx) => (
+                  <div key={idx} className="grid gap-2 md:grid-cols-[160px_1fr_auto]">
+                    <select className="border rounded-lg px-3 py-2" value={String(item.icon || "shield")} onChange={(e) => {
+                      const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>)];
+                      arr[idx] = { ...arr[idx], icon: e.target.value };
+                      updateConfig(section, { items: arr });
+                    }}>
+                      <option value="truck">truck</option>
+                      <option value="shield">shield</option>
+                      <option value="refresh-ccw">refresh-ccw</option>
+                    </select>
+                    <input className="border rounded-lg px-3 py-2" value={String(item.text || "")} placeholder="Texto" onChange={(e) => {
+                      const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>)];
+                      arr[idx] = { ...arr[idx], text: e.target.value };
+                      updateConfig(section, { items: arr });
+                    }} />
+                    <button className="border rounded-lg px-3 py-2 text-red-600" onClick={() => {
+                      const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>)].filter((_, i) => i !== idx);
+                      updateConfig(section, { items: arr });
+                    }}>Eliminar</button>
+                  </div>
+                ))}
+                <button className="border rounded-lg px-3 py-2 text-sm" onClick={() => {
+                  const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>), { icon: "shield", text: "Nuevo item" }];
+                  updateConfig(section, { items: arr });
+                }}>Añadir item</button>
+              </div>
             )}
 
+                {previewBySectionId[section.id] ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                    <div className="font-semibold">Preview sección</div>
+                    <div>Total estimado: <strong>{previewBySectionId[section.id].previewCount}</strong>{typeof previewBySectionId[section.id].inStockCount === "number" ? <> · Con stock: <strong>{previewBySectionId[section.id].inStockCount}</strong></> : null}{typeof previewBySectionId[section.id].withDiscountCount === "number" ? <> · Con descuento: <strong>{previewBySectionId[section.id].withDiscountCount}</strong></> : null}</div>
+                    {(previewBySectionId[section.id].topBrands || []).length ? <div>Top marcas: {(previewBySectionId[section.id].topBrands || []).map((x) => `${x.name} (${x.count})`).join(", ")}</div> : null}
+                  </div>
+                ) : null}
+
                 <div className="flex flex-wrap gap-2">
+                  <button className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50" disabled={previewLoadingId === section.id} onClick={() => void runSectionPreview(section.id)}>
+                    {previewLoadingId === section.id ? "Analizando..." : "Analizar resultados"}
+                  </button>
                   <button className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void saveAndOpenStore(section.id)}>
                     {savingId === section.id ? "Guardando..." : "Guardar y ver en Store"}
                   </button>

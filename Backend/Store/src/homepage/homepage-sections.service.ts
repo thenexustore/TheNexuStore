@@ -251,6 +251,15 @@ export class HomepageSectionsService {
   }
 
 
+
+  private isProductSectionType(type: string) {
+    return [
+      HomepageSectionType.BEST_DEALS,
+      HomepageSectionType.NEW_ARRIVALS,
+      HomepageSectionType.FEATURED_PICKS,
+    ].includes(type as HomepageSectionType);
+  }
+
   async getAdminDiagnostics() {
     await this.ensureDefaultSections();
 
@@ -319,6 +328,45 @@ export class HomepageSectionsService {
         title: (section as any).title,
       }));
 
+    const productSectionsPublic = publicSections.filter((section: any) => this.isProductSectionType(section.type));
+    const sectionSkus = productSectionsPublic.map((section: any) => ({
+      id: section.id,
+      title: section.title,
+      type: section.type,
+      skus: new Set((Array.isArray(section.data) ? section.data : []).map((p: any) => String(p.id))),
+    }));
+
+    const overlaps: Array<{ aId: string; aTitle?: string; bId: string; bTitle?: string; overlapPct: number; shared: number }> = [];
+    for (let i = 0; i < sectionSkus.length; i++) {
+      for (let j = i + 1; j < sectionSkus.length; j++) {
+        const a = sectionSkus[i];
+        const b = sectionSkus[j];
+        if (!a.skus.size || !b.skus.size) continue;
+        let shared = 0;
+        for (const id of a.skus) if (b.skus.has(id)) shared++;
+        const overlapPct = Math.round((shared / Math.max(1, Math.min(a.skus.size, b.skus.size))) * 100);
+        if (overlapPct >= 70) {
+          overlaps.push({ aId: a.id, aTitle: a.title || a.type, bId: b.id, bTitle: b.title || b.type, overlapPct, shared });
+        }
+      }
+    }
+
+    const requiredVisibleTypes: HomepageSectionType[] = [
+      HomepageSectionType.HERO_BANNER_SLIDER,
+      HomepageSectionType.TOP_CATEGORIES_GRID,
+      HomepageSectionType.BRANDS_STRIP,
+    ];
+    const missingVisibleTypes = requiredVisibleTypes.filter((type) => !sections.some((s) => s.type === type && s.enabled));
+
+    const healthDeductions = [
+      Math.min(30, emptyEnabledProductSections.length * 12),
+      Math.min(20, invalidConfigSections.length * 8),
+      Math.min(15, overlaps.length * 8),
+      Math.min(15, Math.round((brandsMissingLogo / Math.max(1, totalBrands)) * 15)),
+      Math.min(20, missingVisibleTypes.length * 7),
+    ].reduce((a, b) => a + b, 0);
+    const healthScore = Math.max(0, 100 - healthDeductions);
+
     return {
       totals: {
         total,
@@ -350,6 +398,54 @@ export class HomepageSectionsService {
         brandLogosHealthy: totalBrands === 0 || brandsMissingLogo === 0,
         productSectionsHaveData: emptyEnabledProductSections.length === 0,
       },
+      overlapWarnings: overlaps,
+      missingVisibleTypes,
+      healthScore,
+      publishReadiness: healthScore >= 75 && failedPublicSections === 0 && invalidConfigSections.length === 0,
+    };
+  }
+
+  async getSectionPreview(sectionId: string) {
+    const section = await this.prisma.homepageSection.findUnique({ where: { id: sectionId } });
+    if (!section) throw new BadRequestException('Section not found');
+
+    const config = (section.config_json || {}) as Record<string, any>;
+    const data = await this.resolveSectionData(section.type as HomepageSectionType, config);
+
+    if (!this.isProductSectionType(section.type)) {
+      return {
+        sectionId: section.id,
+        type: section.type,
+        title: section.title,
+        previewCount: Array.isArray(data) ? data.length : 0,
+        sampleItems: Array.isArray(data) ? data.slice(0, 5) : [],
+      };
+    }
+
+    const products = Array.isArray(data) ? data : [];
+    const inStockCount = products.filter((p: any) => Number(p.stock_quantity || 0) > 0 || p.stock_status === 'IN_STOCK').length;
+    const withDiscountCount = products.filter((p: any) => Number(p.discount_percentage || p.discount_pct || 0) > 0).length;
+
+    const brandsMap = new Map<string, number>();
+    for (const p of products) {
+      const key = String((p as any).brand_name || '').trim();
+      if (!key) continue;
+      brandsMap.set(key, (brandsMap.get(key) || 0) + 1);
+    }
+    const topBrands = Array.from(brandsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+
+    return {
+      sectionId: section.id,
+      type: section.type,
+      title: section.title,
+      previewCount: products.length,
+      inStockCount,
+      withDiscountCount,
+      topBrands,
+      sampleProducts: products.slice(0, 4),
     };
   }
 

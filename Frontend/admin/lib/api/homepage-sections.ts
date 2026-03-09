@@ -67,6 +67,22 @@ export interface HomepageSectionsDiagnostics {
     brandLogosHealthy: boolean;
     productSectionsHaveData: boolean;
   };
+  overlapWarnings?: Array<{ aId: string; aTitle?: string; bId: string; bTitle?: string; overlapPct: number; shared: number }>;
+  missingVisibleTypes?: string[];
+  healthScore?: number;
+  publishReadiness?: boolean;
+}
+
+export interface HomepageSectionPreview {
+  sectionId: string;
+  type: string;
+  title?: string | null;
+  previewCount: number;
+  inStockCount?: number;
+  withDiscountCount?: number;
+  topBrands?: Array<{ name: string; count: number }>;
+  sampleProducts?: Array<{ id: string; title: string; price: number; thumbnail?: string; brand_name?: string }>;
+  sampleItems?: Array<{ id?: string; name?: string; title?: string }>;
 }
 
 async function req(path: string, options: RequestInit = {}) {
@@ -91,6 +107,7 @@ async function req(path: string, options: RequestInit = {}) {
 export const homepageSectionsApi = {
   list: (): Promise<HomepageSection[]> => req("/admin/homepage/sections"),
   diagnostics: (): Promise<HomepageSectionsDiagnostics> => req("/admin/homepage/sections/diagnostics"),
+  sectionPreview: (id: string): Promise<HomepageSectionPreview> => req(`/admin/homepage/sections/${id}/preview`),
   create: (payload: {
     type: string;
     position: number;

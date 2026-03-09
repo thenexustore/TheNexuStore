@@ -561,7 +561,7 @@ export class HomepageSectionsService {
       return this.productsService.getDealsProducts(query.limit || config.limit || 12, false);
     }
 
-    const result = await this.productsService.getProducts({
+    const baseRequest = {
       page: 1,
       limit: query.limit || config.limit || 12,
       categories: category?.slug ? [category.slug] : undefined,
@@ -574,7 +574,66 @@ export class HomepageSectionsService {
           ? ProductSortBy.NEWEST
           : sortByMap[selectedSort] || ProductSortBy.NEWEST,
       featured_only: featuredOnly,
-    });
+    };
+
+    const result = await this.productsService.getProducts(baseRequest);
+
+    if (!result.products.length && (query.inStockOnly ?? true)) {
+      const relaxed = await this.productsService.getProducts({
+        ...baseRequest,
+        in_stock_only: false,
+      });
+
+      if (relaxed.products.length) {
+        if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+          return [...relaxed.products].sort(
+            (a: any, b: any) =>
+              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+          );
+        }
+        return relaxed.products;
+      }
+    }
+
+    if (!result.products.length && featuredOnly) {
+      const withoutFeaturedConstraint = await this.productsService.getProducts({
+        ...baseRequest,
+        in_stock_only: false,
+        featured_only: false,
+      });
+
+      if (withoutFeaturedConstraint.products.length) {
+        if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+          return [...withoutFeaturedConstraint.products].sort(
+            (a: any, b: any) =>
+              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+          );
+        }
+        return withoutFeaturedConstraint.products;
+      }
+    }
+
+    if (!result.products.length && (category?.slug || brand?.slug || query.priceMin !== undefined || query.priceMax !== undefined)) {
+      const broadFallback = await this.productsService.getProducts({
+        ...baseRequest,
+        categories: undefined,
+        brand: undefined,
+        min_price: undefined,
+        max_price: undefined,
+        in_stock_only: false,
+        featured_only: false,
+      });
+
+      if (broadFallback.products.length) {
+        if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
+          return [...broadFallback.products].sort(
+            (a: any, b: any) =>
+              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+          );
+        }
+        return broadFallback.products;
+      }
+    }
 
     if (!result.products.length && (query.inStockOnly ?? true)) {
       const relaxed = await this.productsService.getProducts({

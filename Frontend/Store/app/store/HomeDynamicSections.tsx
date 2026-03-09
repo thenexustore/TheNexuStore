@@ -179,6 +179,7 @@ function BrandLogoCarousel({
   const [itemsPerView, setItemsPerView] = useState(3);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [isFocusWithin, setIsFocusWithin] = useState(false);
 
   const carouselEnabled = Boolean(carouselConfig?.enabled ?? true);
   const autoplay = Boolean(carouselConfig?.autoplay ?? false);
@@ -235,12 +236,12 @@ function BrandLogoCarousel({
   }, [pageCount]);
 
   useEffect(() => {
-    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || !isPageVisible) return;
+    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || isFocusWithin || !isPageVisible) return;
     const timer = setInterval(() => {
       scrollToPage(currentPage + 1);
     }, autoplayIntervalMs);
     return () => clearInterval(timer);
-  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isPageVisible, pageCount, scrollToPage]);
+  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isFocusWithin, isPageVisible, pageCount, scrollToPage]);
 
   useEffect(() => {
     if (!carouselEnabled || !scrollRef.current) return;
@@ -272,6 +273,14 @@ function BrandLogoCarousel({
           </div>
         ) : null}
       </div>
+      <div
+        className="space-y-2"
+        onFocusCapture={() => setIsFocusWithin(true)}
+        onBlurCapture={(event) => {
+          const nextTarget = event.relatedTarget as Node | null;
+          if (!event.currentTarget.contains(nextTarget)) setIsFocusWithin(false);
+        }}
+      >
       <div
         ref={carouselEnabled ? scrollRef : null}
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
@@ -314,6 +323,7 @@ function BrandLogoCarousel({
           ))}
         </div>
       ) : null}
+      </div>
     </section>
   );
 }

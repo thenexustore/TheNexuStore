@@ -42,6 +42,7 @@ export default function HomeProductSection({
   const [itemsPerView, setItemsPerView] = useState(2);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [isFocusWithin, setIsFocusWithin] = useState(false);
 
   const carouselEnabled = Boolean(carouselConfig?.enabled);
   const autoplay = Boolean(carouselConfig?.autoplay ?? true);
@@ -91,12 +92,12 @@ export default function HomeProductSection({
   }, [pageCount]);
 
   useEffect(() => {
-    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || !isPageVisible) return;
+    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || isFocusWithin || !isPageVisible) return;
     const timer = setInterval(() => {
       scrollToPage(currentPage + 1);
     }, autoplayIntervalMs);
     return () => clearInterval(timer);
-  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isPageVisible, pageCount, scrollToPage]);
+  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isFocusWithin, isPageVisible, pageCount, scrollToPage]);
 
   useEffect(() => {
     if (!carouselEnabled || !scrollRef.current) return;
@@ -189,6 +190,14 @@ export default function HomeProductSection({
       ) : carouselEnabled ? (
         <>
           <div
+            className="space-y-2"
+            onFocusCapture={() => setIsFocusWithin(true)}
+            onBlurCapture={(event) => {
+              const nextTarget = event.relatedTarget as Node | null;
+              if (!event.currentTarget.contains(nextTarget)) setIsFocusWithin(false);
+            }}
+          >
+          <div
             ref={scrollRef}
             className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2"
             onMouseEnter={() => setIsHovering(true)}
@@ -217,6 +226,7 @@ export default function HomeProductSection({
               ))}
             </div>
           ) : null}
+          </div>
         </>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">

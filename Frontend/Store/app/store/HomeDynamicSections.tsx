@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -129,6 +129,7 @@ function SimpleListSection({
   buildHref?: (slug?: string) => string;
 }) {
   if (!items.length) return null;
+
   return (
     <section className="w-full px-4 sm:px-6">
       <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
@@ -172,12 +173,12 @@ function BrandLogoCarousel({
     itemsPerViewMobile?: number;
   };
 }) {
-  if (!items.length) return null;
-
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(3);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const [isInteracting, setIsInteracting] = useState(false);
 
   const carouselEnabled = Boolean(carouselConfig?.enabled ?? true);
   const autoplay = Boolean(carouselConfig?.autoplay ?? false);
@@ -205,26 +206,41 @@ function BrandLogoCarousel({
     return () => window.removeEventListener("resize", updateItemsPerView);
   }, [carouselEnabled, desktopItems, mobileItems]);
 
+
+  useEffect(() => {
+    const onVisibility = () => {
+      setIsPageVisible(document.visibilityState === "visible");
+    };
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (!isInteracting) return;
+    const timer = window.setTimeout(() => setIsInteracting(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [isInteracting]);
   const pageCount = useMemo(() => {
     if (!carouselEnabled) return 1;
     return Math.max(1, Math.ceil(sorted.length / Math.max(1, itemsPerView)));
   }, [carouselEnabled, itemsPerView, sorted.length]);
 
-  const scrollToPage = (page: number) => {
+  const scrollToPage = useCallback((page: number) => {
     if (!scrollRef.current) return;
     const targetPage = ((page % pageCount) + pageCount) % pageCount;
     const pageWidth = scrollRef.current.clientWidth;
     scrollRef.current.scrollTo({ left: targetPage * pageWidth, behavior: "smooth" });
     setCurrentPage(targetPage);
-  };
+  }, [pageCount]);
 
   useEffect(() => {
-    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering) return;
+    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || !isPageVisible) return;
     const timer = setInterval(() => {
       scrollToPage(currentPage + 1);
     }, autoplayIntervalMs);
     return () => clearInterval(timer);
-  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, pageCount]);
+  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isPageVisible, pageCount, scrollToPage]);
 
   useEffect(() => {
     if (!carouselEnabled || !scrollRef.current) return;
@@ -237,7 +253,9 @@ function BrandLogoCarousel({
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [carouselEnabled, currentPage]);
+  }, [carouselEnabled, currentPage, scrollToPage]);
+
+  if (!sorted.length) return null;
 
   return (
     <section className="w-full px-4 sm:px-6">
@@ -245,10 +263,10 @@ function BrandLogoCarousel({
         <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label="Anterior marcas">
+            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage - 1); }} aria-label="Anterior marcas">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label="Siguiente marcas">
+            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage + 1); }} aria-label="Siguiente marcas">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -259,6 +277,7 @@ function BrandLogoCarousel({
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
+        onTouchStart={() => setIsInteracting(true)}
       >
         {sorted.map((brand) => {
           const overrideLogo = resolveBrandOverrideLogo(brand, logoOverrides);
@@ -291,7 +310,7 @@ function BrandLogoCarousel({
       {carouselEnabled && pageCount > 1 ? (
         <div className="mt-3 flex items-center justify-center gap-2">
           {Array.from({ length: pageCount }).map((_, idx) => (
-            <button key={idx} className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`} onClick={() => scrollToPage(idx)} aria-label={`Ir a página ${idx + 1}`} />
+            <button key={idx} className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`} onClick={() => { setIsInteracting(true); scrollToPage(idx); }} aria-label={`Ir a página ${idx + 1}`} />
           ))}
         </div>
       ) : null}

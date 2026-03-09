@@ -40,6 +40,8 @@ export default function HomeProductSection({
   const [isHovering, setIsHovering] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(2);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const [isInteracting, setIsInteracting] = useState(false);
 
   const carouselEnabled = Boolean(carouselConfig?.enabled);
   const autoplay = Boolean(carouselConfig?.autoplay ?? true);
@@ -60,6 +62,21 @@ export default function HomeProductSection({
     return () => window.removeEventListener("resize", updateItemsPerView);
   }, [carouselEnabled, desktopItems, mobileItems]);
 
+
+  useEffect(() => {
+    const onVisibility = () => {
+      setIsPageVisible(document.visibilityState === "visible");
+    };
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (!isInteracting) return;
+    const timer = window.setTimeout(() => setIsInteracting(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [isInteracting]);
   const pageCount = useMemo(() => {
     if (!carouselEnabled) return 1;
     return Math.max(1, Math.ceil(products.length / Math.max(1, itemsPerView)));
@@ -74,12 +91,12 @@ export default function HomeProductSection({
   }, [pageCount]);
 
   useEffect(() => {
-    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering) return;
+    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || !isPageVisible) return;
     const timer = setInterval(() => {
       scrollToPage(currentPage + 1);
     }, autoplayIntervalMs);
     return () => clearInterval(timer);
-  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, pageCount, scrollToPage]);
+  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isPageVisible, pageCount, scrollToPage]);
 
   useEffect(() => {
     if (!carouselEnabled || !scrollRef.current) return;
@@ -144,10 +161,10 @@ export default function HomeProductSection({
         </div>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage - 1)} aria-label={t("dynamic.carouselPrev")}>
+            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage - 1); }} aria-label={t("dynamic.carouselPrev")}>
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button className="rounded-lg border bg-white p-2" onClick={() => scrollToPage(currentPage + 1)} aria-label={t("dynamic.carouselNext")}>
+            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage + 1); }} aria-label={t("dynamic.carouselNext")}>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -176,6 +193,7 @@ export default function HomeProductSection({
             className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
+            onTouchStart={() => setIsInteracting(true)}
           >
             {products.map((product) => (
               <div
@@ -193,7 +211,7 @@ export default function HomeProductSection({
                 <button
                   key={idx}
                   className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`}
-                  onClick={() => scrollToPage(idx)}
+                  onClick={() => { setIsInteracting(true); scrollToPage(idx); }}
                   aria-label={t("dynamic.carouselGoToPage", { page: idx + 1 })}
                 />
               ))}

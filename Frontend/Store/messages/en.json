@@ -30,7 +30,18 @@
     "featured": "Featured products",
     "featuredEmpty": "There are no featured products right now.",
     "deals": "Deals",
-    "dealsEmpty": "There are no active deals right now."
+    "dealsEmpty": "There are no active deals right now.",
+    "dynamic": {
+      "loading": "Loading homepage...",
+      "previewMode": "Preview mode enabled for section:",
+      "sectionUnavailable": "Section temporarily unavailable.",
+      "emptyProducts": "No products available",
+      "topCategories": "Top categories",
+      "brands": "Brands",
+      "carouselPrev": "Previous",
+      "carouselNext": "Next",
+      "carouselGoToPage": "Go to page {page}"
+    }
   },
   "products": {
     "all": "All Products",

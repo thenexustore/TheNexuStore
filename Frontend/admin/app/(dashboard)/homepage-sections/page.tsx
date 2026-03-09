@@ -178,6 +178,7 @@ export default function HomepageSectionsPage() {
   const [categoryCarouselType, setCategoryCarouselType] = useState<"FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("FEATURED_PICKS");
   const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<"discount_desc" | "newest">("discount_desc");
   const [creatingType, setCreatingType] = useState<string | null>(null);
+  const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
 
   const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
 
@@ -634,7 +635,7 @@ export default function HomepageSectionsPage() {
         toast.message("Categoría con stock bajo: se creó el carrusel con inStockOnly desactivado para evitar vacío.");
       }
 
-      await homepageSectionsApi.create({
+      const created = await homepageSectionsApi.create({
         type: categoryCarouselType,
         position: sorted.length + 1,
         enabled: true,
@@ -659,6 +660,10 @@ export default function HomepageSectionsPage() {
       toast.success(`Carrusel de categoría creado${category ? `: ${category.label}` : ""}`);
       setCategoryCarouselCategoryId("");
       await load();
+      if (created?.id) {
+        focusSectionCard(created.id);
+        void runSectionPreview(created.id);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo crear el carrusel por categoría");
     } finally {
@@ -1083,6 +1088,15 @@ export default function HomepageSectionsPage() {
     }
     setSections((prev) => prev.map((section) => (riskyPreviewSectionIds.has(section.id) ? { ...section, enabled: false } : section)));
     toast.success(`Se ocultaron ${riskyPreviewSectionIds.size} sección(es) de riesgo en local. Guarda para publicar.`);
+  };
+
+  const focusSectionCard = (sectionId: string) => {
+    setFocusSectionId(sectionId);
+    setCollapsedSections((prev) => ({ ...prev, [sectionId]: false }));
+    setTimeout(() => {
+      document.getElementById(`section-card-${sectionId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    window.setTimeout(() => setFocusSectionId((prev) => (prev === sectionId ? null : prev)), 4200);
   };
 
   const jumpToTabSection = (tab: "overview" | "builder" | "assets") => {
@@ -1597,6 +1611,7 @@ export default function HomepageSectionsPage() {
 
         return (
           <div
+            id={`section-card-${section.id}`}
             key={section.id}
             draggable
             onDragStart={() => setDragSectionId(section.id)}
@@ -1608,7 +1623,7 @@ export default function HomepageSectionsPage() {
               setDragSectionId(null);
             }}
             onDragEnd={() => setDragSectionId(null)}
-            className={`rounded-2xl border bg-white p-4 space-y-3 shadow-sm transition hover:shadow-md ${dragSectionId === section.id ? "opacity-60" : ""}`}
+            className={`rounded-2xl border bg-white p-4 space-y-3 shadow-sm transition hover:shadow-md ${dragSectionId === section.id ? "opacity-60" : ""} ${focusSectionId === section.id ? "ring-2 ring-emerald-400 border-emerald-300" : ""}`}
           >
             <div className="flex items-center justify-between gap-3">
               <div>

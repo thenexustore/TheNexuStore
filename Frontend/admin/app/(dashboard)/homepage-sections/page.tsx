@@ -1914,12 +1914,12 @@ export default function HomepageSectionsPage() {
                         Activar carrusel horizontal
                       </label>
                       <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                        <input type="checkbox" checked={Boolean(section.config_json.carousel_autoplay ?? false)} onChange={(e) => updateConfig(section, { carousel_autoplay: e.target.checked })} />
+                        <input type="checkbox" checked={Boolean(section.config_json.carousel_autoplay ?? true)} onChange={(e) => updateConfig(section, { carousel_autoplay: e.target.checked })} />
                         Autoplay
                       </label>
-                      <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 5000)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 5000 })} placeholder="Intervalo autoplay (ms)" />
-                      <input type="number" min={2} max={10} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 8)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 8 })} placeholder="Items desktop" />
-                      <input type="number" min={1} max={4} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items móvil" />
+                      <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 4500)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 4500 })} placeholder="Intervalo autoplay (ms)" />
+                      <input type="number" min={2} max={6} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 4)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 4 })} placeholder="Items desktop" />
+                      <input type="number" min={1} max={3} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items móvil" />
                     </div>
                   </div>
                 ) : null}
@@ -1944,7 +1944,7 @@ export default function HomepageSectionsPage() {
                         Autoplay
                       </label>
                       <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 4500)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 4500 })} placeholder="Intervalo autoplay (ms)" />
-                      <input type="number" min={1} max={6} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 4)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 4 })} placeholder="Items visibles desktop" />
+                      <input type="number" min={2} max={6} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 4)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 4 })} placeholder="Items visibles desktop" />
                       <input type="number" min={1} max={3} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items visibles móvil" />
                     </div>
                   </div>

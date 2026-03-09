@@ -591,6 +591,33 @@ export default function HomepageSectionsPage() {
 
     setCreatingType("category-carousel");
     try {
+      const strictPreview = await homepageSectionsApi.options(categoryCarouselType, "", 6, "products", {
+        categoryId: categoryCarouselCategoryId,
+        sortBy: categoryCarouselSortBy,
+        inStockOnly: true,
+        featuredOnly: false,
+      });
+
+      const hasStrictProducts = strictPreview.length > 0;
+      let inStockOnly = true;
+
+      if (!hasStrictProducts) {
+        const relaxedPreview = await homepageSectionsApi.options(categoryCarouselType, "", 6, "products", {
+          categoryId: categoryCarouselCategoryId,
+          sortBy: categoryCarouselSortBy,
+          inStockOnly: false,
+          featuredOnly: false,
+        });
+
+        if (!relaxedPreview.length) {
+          toast.error("Esa categoría no tiene productos para carrusel (ni relajando stock). Elige otra categoría.");
+          return;
+        }
+
+        inStockOnly = false;
+        toast.message("Categoría con stock bajo: se creó el carrusel con inStockOnly desactivado para evitar vacío.");
+      }
+
       await homepageSectionsApi.create({
         type: categoryCarouselType,
         position: sorted.length + 1,
@@ -602,7 +629,7 @@ export default function HomepageSectionsPage() {
             type: "products",
             categoryId: categoryCarouselCategoryId,
             limit: 12,
-            inStockOnly: true,
+            inStockOnly,
             sortBy: categoryCarouselSortBy,
             featuredOnly: false,
           },
@@ -763,6 +790,34 @@ export default function HomepageSectionsPage() {
     toast.success("Configuración normalizada localmente. Revisa y guarda cambios pendientes.");
   };
 
+  const applyEmptyProductSectionFallback = (section: HomepageSection) => {
+    const config = { ...(section.config_json || {}) } as Record<string, unknown>;
+    const query = { ...((config.query || {}) as Record<string, unknown>) };
+
+    const activeFeaturedIds = Array.from(new Set(featuredProducts.filter((item) => item.is_active).map((item) => item.product_id).filter(Boolean)));
+    if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
+      config.source = "manual";
+      config.ids = activeFeaturedIds;
+      config.query = { type: "products" };
+      return { ...section, config_json: config };
+    }
+
+    config.source = "query";
+    query.type = "products";
+    query.inStockOnly = false;
+    query.featuredOnly = false;
+    query.priceMin = undefined;
+    query.priceMax = undefined;
+    query.categoryId = undefined;
+    query.brandId = undefined;
+    if (!query.sortBy) {
+      query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
+    }
+
+    config.query = query;
+    return { ...section, config_json: config };
+  };
+
   const autoFixEmptyProductSections = () => {
     if (!diagnostics?.emptyEnabledProductSections?.length) {
       toast.message("No hay carruseles vacíos para autocorregir");
@@ -775,32 +830,7 @@ export default function HomepageSectionsPage() {
     setSections((prev) =>
       prev.map((section) => {
         if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
-
-        const config = { ...(section.config_json || {}) } as Record<string, unknown>;
-        const query = { ...((config.query || {}) as Record<string, unknown>) };
-
-        const activeFeaturedIds = Array.from(new Set(featuredProducts.filter((item) => item.is_active).map((item) => item.product_id).filter(Boolean)));
-        if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
-          config.source = "manual";
-          config.ids = activeFeaturedIds;
-          config.query = { type: "products" };
-          return { ...section, config_json: config };
-        }
-
-        config.source = "query";
-        query.type = "products";
-        query.inStockOnly = false;
-        query.featuredOnly = false;
-        query.priceMin = undefined;
-        query.priceMax = undefined;
-        query.categoryId = undefined;
-        query.brandId = undefined;
-        if (!query.sortBy) {
-          query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
-        }
-
-        config.query = query;
-        return { ...section, config_json: config };
+        return applyEmptyProductSectionFallback(section);
       }),
     );
 
@@ -814,29 +844,7 @@ export default function HomepageSectionsPage() {
 
     return sourceSections.map((section) => {
       if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
-      const config = { ...(section.config_json || {}) } as Record<string, unknown>;
-      const query = { ...((config.query || {}) as Record<string, unknown>) };
-
-      const activeFeaturedIds = Array.from(new Set(featuredProducts.filter((item) => item.is_active).map((item) => item.product_id).filter(Boolean)));
-      if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
-        config.source = "manual";
-        config.ids = activeFeaturedIds;
-        config.query = { type: "products" };
-        return { ...section, config_json: config };
-      }
-
-      config.source = "query";
-      query.type = "products";
-      query.inStockOnly = false;
-      query.featuredOnly = false;
-      query.priceMin = undefined;
-      query.priceMax = undefined;
-      query.categoryId = undefined;
-      query.brandId = undefined;
-      if (!query.sortBy) query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
-
-      config.query = query;
-      return { ...section, config_json: config };
+      return applyEmptyProductSectionFallback(section);
     });
   };
 

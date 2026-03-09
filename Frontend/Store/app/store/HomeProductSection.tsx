@@ -193,7 +193,7 @@ export default function HomeProductSection({
             className="space-y-2"
             onFocusCapture={() => setIsFocusWithin(true)}
             onKeyDownCapture={(event) => {
-              if (["Tab", "ArrowLeft", "ArrowRight", "Enter", " "].includes(event.key)) setIsInteracting(true);
+              if (["Tab", "ArrowLeft", "ArrowRight", "Enter", " ", "Spacebar", "Home", "End"].includes(event.key)) setIsInteracting(true);
             }}
             onBlurCapture={(event) => {
               const nextTarget = event.relatedTarget as Node | null;

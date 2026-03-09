@@ -276,6 +276,9 @@ function BrandLogoCarousel({
       <div
         className="space-y-2"
         onFocusCapture={() => setIsFocusWithin(true)}
+        onKeyDownCapture={(event) => {
+          if (["Tab", "ArrowLeft", "ArrowRight", "Enter", " ", "Spacebar", "Home", "End"].includes(event.key)) setIsInteracting(true);
+        }}
         onBlurCapture={(event) => {
           const nextTarget = event.relatedTarget as Node | null;
           if (!event.currentTarget.contains(nextTarget)) setIsFocusWithin(false);

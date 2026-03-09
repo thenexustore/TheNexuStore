@@ -166,6 +166,7 @@ export default function HomepageSectionsPage() {
   const [previewBySectionId, setPreviewBySectionId] = useState<Record<string, HomepageSectionPreview>>({});
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
+  const [dragSectionId, setDragSectionId] = useState<string | null>(null);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"overview" | "builder" | "assets">("builder");
   const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -642,6 +643,28 @@ export default function HomepageSectionsPage() {
     }
   };
 
+
+  const moveBySectionIds = async (dragId: string, targetId: string) => {
+    if (!dragId || !targetId || dragId === targetId) return;
+    const arr = [...sorted];
+    const from = arr.findIndex((s) => s.id === dragId);
+    const to = arr.findIndex((s) => s.id === targetId);
+    if (from < 0 || to < 0) return;
+
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    const payload = arr.map((x, i) => ({ id: x.id, position: i + 1 }));
+
+    setSections((prev) => prev.map((x) => ({ ...x, position: payload.find((p) => p.id === x.id)?.position || x.position })));
+
+    try {
+      await homepageSectionsApi.reorder(payload);
+      toast.success("Orden actualizado (drag & drop)");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar");
+    }
+  };
 
   const setAllVisibility = (enabled: boolean) => {
     setSections((prev) => prev.map((section) => ({ ...section, enabled })));
@@ -1281,6 +1304,7 @@ export default function HomepageSectionsPage() {
             </button>
           </div>
         </div>
+        <div className="text-xs text-slate-500">Tip: también puedes reordenar secciones arrastrando cada tarjeta.</div>
         <div className="flex flex-wrap gap-2">
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
@@ -1483,11 +1507,24 @@ export default function HomepageSectionsPage() {
         const isCollapsed = Boolean(collapsedSections[section.id]);
 
         return (
-          <div key={section.id} className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm transition hover:shadow-md">
+          <div
+            key={section.id}
+            draggable
+            onDragStart={() => setDragSectionId(section.id)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => {
+              if (dragSectionId) {
+                void moveBySectionIds(dragSectionId, section.id);
+              }
+              setDragSectionId(null);
+            }}
+            onDragEnd={() => setDragSectionId(null)}
+            className={`rounded-2xl border bg-white p-4 space-y-3 shadow-sm transition hover:shadow-md ${dragSectionId === section.id ? "opacity-60" : ""}`}
+          >
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold">{section.title || section.type}</div>
-                <div className="text-xs text-slate-500">{section.type} · Posición #{section.position}</div>
+                <div className="text-xs text-slate-500">↕ {section.type} · Posición #{section.position}</div>
                 <div className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-700">
                   Calidad: {getSectionQuality(section).level} ({getSectionQuality(section).score}/100)
                 </div>

@@ -165,6 +165,7 @@ export default function HomepageSectionsPage() {
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [previewBySectionId, setPreviewBySectionId] = useState<Record<string, HomepageSectionPreview>>({});
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"overview" | "builder" | "assets">("builder");
   const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -406,6 +407,55 @@ export default function HomepageSectionsPage() {
     } finally {
       setPreviewLoadingId(null);
     }
+  };
+
+  const runBulkPreviewVisibleSections = async () => {
+    const ids = sections
+      .filter((section) => section.enabled && ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"].includes(section.type))
+      .map((section) => section.id);
+
+    if (!ids.length) {
+      toast.message("No hay secciones visibles para analizar");
+      return;
+    }
+
+    setBulkPreviewLoading(true);
+    try {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          const data = await homepageSectionsApi.sectionPreview(id);
+          return [id, data] as const;
+        }),
+      );
+      setPreviewBySectionId((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      toast.success(`Preview actualizado para ${ids.length} secciones`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo analizar todas las secciones");
+    } finally {
+      setBulkPreviewLoading(false);
+    }
+  };
+
+  const getSectionQuality = (section: HomepageSection) => {
+    let score = 100;
+    const title = String(section.title || "").trim();
+    if (!title) score -= 20;
+    if (["Sección", "SECTION", section.type].includes(title)) score -= 10;
+
+    const preview = previewBySectionId[section.id];
+    if (section.enabled && preview) {
+      if (preview.previewCount === 0) score -= 35;
+      if (typeof preview.inStockCount === "number" && preview.previewCount > 0 && preview.inStockCount / Math.max(1, preview.previewCount) < 0.35) score -= 15;
+    }
+
+    const overlap = (diagnostics?.overlapWarnings || []).some((item) => item.aId === section.id || item.bId === section.id);
+    if (overlap) score -= 20;
+
+    if ((diagnostics?.invalidConfigSections || []).some((item) => item.id === section.id)) score -= 20;
+
+    const safe = Math.max(0, Math.min(100, score));
+    const level = safe >= 80 ? "Alta" : safe >= 60 ? "Media" : "Baja";
+    return { score: safe, level };
   };
 
   const create = async () => {
@@ -1210,6 +1260,13 @@ export default function HomepageSectionsPage() {
           <div className="flex gap-2">
             <button
               className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50"
+              disabled={bulkPreviewLoading}
+              onClick={() => void runBulkPreviewVisibleSections()}
+            >
+              {bulkPreviewLoading ? "Analizando..." : "Analizar todas visibles"}
+            </button>
+            <button
+              className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50"
               disabled={!dirtySectionIds.size}
               onClick={discardLocalChanges}
             >
@@ -1431,6 +1488,9 @@ export default function HomepageSectionsPage() {
               <div>
                 <div className="font-semibold">{section.title || section.type}</div>
                 <div className="text-xs text-slate-500">{section.type} · Posición #{section.position}</div>
+                <div className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-700">
+                  Calidad: {getSectionQuality(section).level} ({getSectionQuality(section).score}/100)
+                </div>
                 {dirtySectionIds.has(section.id) ? (
                   <div className="mt-1 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
                     Sin guardar

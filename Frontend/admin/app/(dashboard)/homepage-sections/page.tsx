@@ -1608,6 +1608,8 @@ export default function HomepageSectionsPage() {
         const currentIndex = sorted.findIndex((x) => x.id === section.id);
         const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
         const isCollapsed = Boolean(collapsedSections[section.id]);
+        const quality = getSectionQuality(section);
+        const carouselInsight = getCarouselInsight(section);
 
         return (
           <div
@@ -1630,7 +1632,7 @@ export default function HomepageSectionsPage() {
                 <div className="font-semibold">{section.title || section.type}</div>
                 <div className="text-xs text-slate-500">↕ {section.type} · Posición #{section.position}</div>
                 <div className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-700">
-                  Calidad: {getSectionQuality(section).level} ({getSectionQuality(section).score}/100)
+                  Calidad: {quality.level} ({quality.score}/100)
                 </div>
                 {riskyPreviewSectionIds.has(section.id) ? (
                   <div className="mt-1 inline-flex rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800">
@@ -1999,12 +2001,12 @@ export default function HomepageSectionsPage() {
                         <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applySmartCarouselTuning(section)}>Auto por preview</button>
                       </div>
                     </div>
-                    {getCarouselInsight(section) ? (
+                    {carouselInsight ? (
                       <div
-                        className={`rounded-lg border px-3 py-2 text-xs ${getCarouselInsight(section)?.tone === "danger" ? "border-red-200 bg-red-50 text-red-800" : getCarouselInsight(section)?.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+                        className={`rounded-lg border px-3 py-2 text-xs ${carouselInsight.tone === "danger" ? "border-red-200 bg-red-50 text-red-800" : carouselInsight.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
                       >
-                        <div className="font-semibold">Estado carrusel: {getCarouselInsight(section)?.label}</div>
-                        <div>{getCarouselInsight(section)?.hint}</div>
+                        <div className="font-semibold">Estado carrusel: {carouselInsight.label}</div>
+                        <div>{carouselInsight.hint}</div>
                       </div>
                     ) : null}
                     <div className="grid gap-3 md:grid-cols-2">

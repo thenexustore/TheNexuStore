@@ -1,4 +1,5 @@
 import HomeRenderer from './HomeRenderer';
+import HomeDynamicSections from './HomeDynamicSections';
 import { API_URL } from '../lib/env';
 
 const fallbackData = {
@@ -34,14 +35,22 @@ async function getHome(previewLayoutId?: string) {
   }
 }
 
-export default async function StorePage({ searchParams }: { searchParams?: Promise<{ previewLayoutId?: string }> }) {
+export default async function StorePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ previewLayoutId?: string; forceDynamic?: string; useLayout?: string }>;
+}) {
   const sp = (await searchParams) || {};
   const data = await getHome(sp.previewLayoutId);
+  const forceDynamic = sp.forceDynamic === "1";
+  const useLayout = sp.useLayout === "1" || Boolean(sp.previewLayoutId);
+  const hasLayoutSections = Boolean(data?.layout) && Array.isArray(data?.sections) && data.sections.length > 0;
+  const shouldRenderDynamic = forceDynamic || !useLayout;
 
   return (
     <main className="min-h-screen bg-slate-50 pb-10">
-      <div className="mx-auto flex w-full flex-col items-center gap-8">
-        <HomeRenderer payload={data} />
+      <div className="mx-auto w-full max-w-[1440px] space-y-8 px-2 sm:px-4">
+        {shouldRenderDynamic || !hasLayoutSections ? <HomeDynamicSections /> : <HomeRenderer payload={data} />}
       </div>
     </main>
   );

@@ -37,6 +37,22 @@ export class HomepageSectionsController {
   }
 
   @UseGuards(AdminGuard)
+  @Get(['admin/homepage/sections/diagnostics', 'admin/homepage-sections/diagnostics'])
+  async getAdminDiagnostics() {
+    const data = await this.homepageSectionsService.getAdminDiagnostics();
+    return { success: true, data };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('admin/homepage/sections/:id/preview')
+  async getSectionPreview(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    const data = await this.homepageSectionsService.getSectionPreview(id);
+    return { success: true, data };
+  }
+
+  @UseGuards(AdminGuard)
   @Get([
     'admin/homepage/sections/options',
     'admin/homepage-sections/options',

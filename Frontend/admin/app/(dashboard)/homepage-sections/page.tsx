@@ -470,6 +470,22 @@ export default function HomepageSectionsPage() {
     return { score: safe, level };
   };
 
+  const getCarouselInsight = (section: HomepageSection) => {
+    const preview = previewBySectionId[section.id];
+    if (!preview) return null;
+
+    const desktopItems = Number(section.config_json.carousel_items_desktop || 4);
+    if (preview.previewCount === 0) {
+      return { tone: "danger" as const, label: "Sin productos", hint: "Corre análisis/filtros o aplica autocorrección para evitar carrusel vacío." };
+    }
+
+    if (preview.previewCount < desktopItems) {
+      return { tone: "warning" as const, label: "Cobertura corta", hint: `Hay ${preview.previewCount} item(s) para ${desktopItems} slots desktop; puede verse repetitivo.` };
+    }
+
+    return { tone: "ok" as const, label: "Cobertura OK", hint: `${preview.previewCount} item(s) disponibles para ${desktopItems} slots desktop.` };
+  };
+
   const create = async () => {
     setCreatingType(newType);
     try {
@@ -724,6 +740,31 @@ export default function HomepageSectionsPage() {
     };
     updateConfig(section, presets[preset]);
     toast.success(`Preset de carrusel aplicado: ${preset}`);
+  };
+
+  const applySmartCarouselTuning = (section: HomepageSection) => {
+    const preview = previewBySectionId[section.id];
+    if (!preview) {
+      toast.message("Primero analiza resultados para aplicar ajuste inteligente");
+      return;
+    }
+
+    if (preview.previewCount === 0) {
+      updateConfig(section, { carousel_enabled: true, carousel_autoplay: false, carousel_items_desktop: 2, carousel_items_mobile: 1 });
+      if (PRODUCT_QUERY_TYPES.includes(section.type)) {
+        updateQueryConfig(section, { type: "products", inStockOnly: false, featuredOnly: false });
+      }
+      toast.message("Preview vacío: se aplicó modo conservador y query más flexible");
+      return;
+    }
+
+    const preset = preview.previewCount <= 4 ? "showcase" : preview.previewCount <= 9 ? "balanced" : "compact";
+    applyCarouselPreset(section, preset);
+
+    if (PRODUCT_QUERY_TYPES.includes(section.type) && typeof preview.inStockCount === "number" && preview.inStockCount / Math.max(1, preview.previewCount) < 0.5) {
+      updateQueryConfig(section, { type: "products", inStockOnly: false });
+      toast.message("Stock ajustado: inStockOnly desactivado para ganar cobertura");
+    }
   };
 
   const applyCatalogQuickSelection = (section: HomepageSection, mode: "append" | "replace") => {
@@ -1936,12 +1977,21 @@ export default function HomepageSectionsPage() {
                   <div className="rounded-lg border border-slate-200 p-3 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel en Store</div>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
                         <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "compact")}>Compacto</button>
                         <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "balanced")}>Balanceado</button>
                         <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "showcase")}>Escaparate</button>
+                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applySmartCarouselTuning(section)}>Auto por preview</button>
                       </div>
                     </div>
+                    {getCarouselInsight(section) ? (
+                      <div
+                        className={`rounded-lg border px-3 py-2 text-xs ${getCarouselInsight(section)?.tone === "danger" ? "border-red-200 bg-red-50 text-red-800" : getCarouselInsight(section)?.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+                      >
+                        <div className="font-semibold">Estado carrusel: {getCarouselInsight(section)?.label}</div>
+                        <div>{getCarouselInsight(section)?.hint}</div>
+                      </div>
+                    ) : null}
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
                         <input type="checkbox" checked={Boolean(section.config_json.carousel_enabled ?? true)} onChange={(e) => updateConfig(section, { carousel_enabled: e.target.checked })} />

@@ -172,7 +172,7 @@ export default function HomepageSectionsPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty" | "risky">("all");
   const [autoFixingEmpty, setAutoFixingEmpty] = useState(false);
   const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] = useState("");
   const [categoryCarouselType, setCategoryCarouselType] = useState<"FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("FEATURED_PICKS");
@@ -217,6 +217,20 @@ export default function HomepageSectionsPage() {
     return sectionSignature(section) !== sectionSignature(original);
   }, [originalSections, sectionSignature]);
 
+  const dirtySectionIds = useMemo(() => {
+    return new Set(sections.filter((section) => isDirtySection(section)).map((section) => section.id));
+  }, [isDirtySection, sections]);
+  const riskyPreviewSectionIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const section of sections) {
+      if (!section.enabled) continue;
+      if (!["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"].includes(section.type)) continue;
+      const preview = previewBySectionId[section.id];
+      if (preview && preview.previewCount === 0) set.add(section.id);
+    }
+    return set;
+  }, [previewBySectionId, sections]);
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return sorted.filter((section) => {
@@ -225,13 +239,10 @@ export default function HomepageSectionsPage() {
       if (statusFilter === "enabled") return section.enabled;
       if (statusFilter === "disabled") return !section.enabled;
       if (statusFilter === "dirty") return isDirtySection(section);
+      if (statusFilter === "risky") return riskyPreviewSectionIds.has(section.id);
       return true;
     });
-  }, [sorted, filter, statusFilter, isDirtySection]);
-
-  const dirtySectionIds = useMemo(() => {
-    return new Set(sections.filter((section) => isDirtySection(section)).map((section) => section.id));
-  }, [isDirtySection, sections]);
+  }, [sorted, filter, statusFilter, isDirtySection, riskyPreviewSectionIds]);
 
   const optionLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -768,14 +779,22 @@ export default function HomepageSectionsPage() {
         const config = { ...(section.config_json || {}) } as Record<string, unknown>;
         const query = { ...((config.query || {}) as Record<string, unknown>) };
 
+        const activeFeaturedIds = Array.from(new Set(featuredProducts.filter((item) => item.is_active).map((item) => item.product_id).filter(Boolean)));
+        if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
+          config.source = "manual";
+          config.ids = activeFeaturedIds;
+          config.query = { type: "products" };
+          return { ...section, config_json: config };
+        }
+
         config.source = "query";
         query.type = "products";
         query.inStockOnly = false;
+        query.featuredOnly = false;
         query.priceMin = undefined;
         query.priceMax = undefined;
-        if (section.type === "FEATURED_PICKS") {
-          query.featuredOnly = false;
-        }
+        query.categoryId = undefined;
+        query.brandId = undefined;
         if (!query.sortBy) {
           query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
         }
@@ -798,12 +817,22 @@ export default function HomepageSectionsPage() {
       const config = { ...(section.config_json || {}) } as Record<string, unknown>;
       const query = { ...((config.query || {}) as Record<string, unknown>) };
 
+      const activeFeaturedIds = Array.from(new Set(featuredProducts.filter((item) => item.is_active).map((item) => item.product_id).filter(Boolean)));
+      if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
+        config.source = "manual";
+        config.ids = activeFeaturedIds;
+        config.query = { type: "products" };
+        return { ...section, config_json: config };
+      }
+
       config.source = "query";
       query.type = "products";
       query.inStockOnly = false;
+      query.featuredOnly = false;
       query.priceMin = undefined;
       query.priceMax = undefined;
-      if (section.type === "FEATURED_PICKS") query.featuredOnly = false;
+      query.categoryId = undefined;
+      query.brandId = undefined;
       if (!query.sortBy) query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
 
       config.query = query;
@@ -997,6 +1026,15 @@ export default function HomepageSectionsPage() {
     }
   };
 
+
+  const autoHideRiskyEmptySections = () => {
+    if (!riskyPreviewSectionIds.size) {
+      toast.message("No hay secciones de riesgo con preview vacío");
+      return;
+    }
+    setSections((prev) => prev.map((section) => (riskyPreviewSectionIds.has(section.id) ? { ...section, enabled: false } : section)));
+    toast.success(`Se ocultaron ${riskyPreviewSectionIds.size} sección(es) de riesgo en local. Guarda para publicar.`);
+  };
 
   const jumpToTabSection = (tab: "overview" | "builder" | "assets") => {
     setActiveWorkspaceTab(tab);
@@ -1309,6 +1347,7 @@ export default function HomepageSectionsPage() {
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
           <button className="px-3 py-2 rounded-lg border text-sm" onClick={autoFixSectionConfigs}>Autocorregir configs</button>
+          <button className="px-3 py-2 rounded-lg border text-sm" onClick={autoHideRiskyEmptySections}>Ocultar secciones en riesgo</button>
           <button className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1" onClick={() => setAllCollapsed(true)}><FoldVertical className="h-3.5 w-3.5" /> Colapsar todo</button>
           <button className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1" onClick={() => setAllCollapsed(false)}><UnfoldVertical className="h-3.5 w-3.5" /> Expandir todo</button>
         </div>
@@ -1319,11 +1358,12 @@ export default function HomepageSectionsPage() {
             { key: "enabled", label: "Visibles" },
             { key: "disabled", label: "Ocultas" },
             { key: "dirty", label: "Con cambios" },
+            { key: "risky", label: "En riesgo" },
           ].map((option) => (
             <button
               key={option.key}
               className={`rounded-full border px-3 py-1 text-xs ${statusFilter === option.key ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700"}`}
-              onClick={() => setStatusFilter(option.key as "all" | "enabled" | "disabled" | "dirty")}
+              onClick={() => setStatusFilter(option.key as "all" | "enabled" | "disabled" | "dirty" | "risky")}
             >
               {option.label}
             </button>
@@ -1528,6 +1568,11 @@ export default function HomepageSectionsPage() {
                 <div className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-700">
                   Calidad: {getSectionQuality(section).level} ({getSectionQuality(section).score}/100)
                 </div>
+                {riskyPreviewSectionIds.has(section.id) ? (
+                  <div className="mt-1 inline-flex rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-800">
+                    Riesgo: preview vacío
+                  </div>
+                ) : null}
                 {dirtySectionIds.has(section.id) ? (
                   <div className="mt-1 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
                     Sin guardar

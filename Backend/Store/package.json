@@ -25,7 +25,9 @@
     "prestart": "npm run prisma:generate",
     "prestart:prod": "npm run prisma:generate",
     "config:smoke": "node scripts/config-smoke.cjs",
-    "smoke:http": "node scripts/http-smoke.cjs"
+    "smoke:http": "node scripts/http-smoke.cjs",
+    "brands:logo:audit": "ts-node scripts/brand-logo-audit.ts",
+    "brands:logo:normalize": "ts-node scripts/brand-logo-audit.ts --apply"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

@@ -282,7 +282,7 @@ model Brand {
 
 model HomepageSection {
   id         String              @id @default(uuid())
-  type       HomepageSectionType @unique
+  type       HomepageSectionType
   enabled    Boolean             @default(true)
   position   Int
   title      String?
@@ -291,6 +291,7 @@ model HomepageSection {
   updatedAt  DateTime            @updatedAt @map("updated_at")
 
   @@index([enabled, position])
+  @@index([type])
   @@map("homepage_sections")
 }
 

@@ -384,17 +384,23 @@ function SectionShell({ sectionId, highlightedId, children }: SectionShellProps)
   );
 }
 
-export default function HomeDynamicSections() {
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+type HomeDynamicSectionsProps = {
+  initialSections?: Section[];
+};
+
+export default function HomeDynamicSections({ initialSections = [] }: HomeDynamicSectionsProps) {
+  const [sections, setSections] = useState<Section[]>(initialSections);
+  const [loading, setLoading] = useState(initialSections.length === 0);
   const searchParams = useSearchParams();
   const t = useTranslations("home");
   const highlightedSectionId = searchParams.get("highlightSection");
 
   useEffect(() => {
+    if (initialSections.length > 0) return;
+
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/homepage/sections`, { cache: "no-store" });
+        const res = await fetch(`${API_URL}/homepage/sections`, { cache: "force-cache" });
         const json = await res.json();
         setSections((json.data || []) as Section[]);
       } catch {
@@ -404,7 +410,7 @@ export default function HomeDynamicSections() {
       }
     };
     load();
-  }, []);
+  }, [initialSections]);
 
   if (loading) return <div className="w-full px-4 sm:px-6 py-8 text-sm text-slate-500">{t("dynamic.loading")}</div>;
 

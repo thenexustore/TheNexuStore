@@ -75,9 +75,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const userData = await getMe();
         if (userData) {
+          const firstName = userData.firstName ?? userData.first_name ?? "";
+          const lastName = userData.lastName ?? userData.last_name ?? "";
+
           setUser({
             ...userData,
-            name: `${userData.first_name} ${userData.last_name}`,
+            firstName,
+            lastName,
+            name: `${firstName} ${lastName}`.trim(),
           });
         }
       } catch (error) {

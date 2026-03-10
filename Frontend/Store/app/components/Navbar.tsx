@@ -17,6 +17,8 @@ type User = {
   id: string;
   firstName?: string;
   lastName?: string;
+  first_name?: string;
+  last_name?: string;
   email?: string;
   profile_image?: string;
 };
@@ -103,10 +105,15 @@ export default function Navbar() {
 
   useEffect(() => {
     if (authUser) {
+      const firstName = authUser.firstName ?? (authUser as User).first_name;
+      const lastName = authUser.lastName ?? (authUser as User).last_name;
+
       setUser({
         id: authUser.id,
-        firstName: authUser.firstName,
-        lastName: authUser.lastName,
+        firstName,
+        lastName,
+        first_name: (authUser as User).first_name,
+        last_name: (authUser as User).last_name,
         email: authUser.email,
         profile_image: authUser.profile_image,
       });
@@ -247,6 +254,8 @@ export default function Navbar() {
   }, [categorySearch]);
 
   const displayCartCount = cartLoading ? legacyCartCount : cartCount;
+
+  const userInitial = ((user?.firstName ?? user?.first_name ?? user?.email ?? "U").trim().charAt(0) || "U").toUpperCase();
 
   return (
     <>
@@ -487,7 +496,7 @@ export default function Navbar() {
                     />
                   ) : (
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B123A] text-sm font-bold text-white hover:bg-[#1a245a] transition-colors">
-                      {user.firstName?.[0] ?? "U"}
+                      {userInitial}
                     </div>
                   )}
                 </Link>

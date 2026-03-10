@@ -1,5 +1,4 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
 import * as crypto from 'crypto';
 
 export interface RedsysPaymentRequest {
@@ -28,16 +27,7 @@ export interface RedsysNotification {
 }
 
 export interface RedsysDecodedParams {
-  Ds_Order: string;
-  Ds_MerchantCode: string;
-  Ds_Terminal: string;
-  Ds_Response: string;
-  Ds_Amount: string;
-  Ds_Currency: string;
-  Ds_AuthorisationCode?: string;
-  Ds_TransactionType: string;
-  Ds_Date?: string;
-  Ds_Hour?: string;
+  [key: string]: string | undefined;
 }
 
 @Injectable()
@@ -48,21 +38,24 @@ export class RedsysService {
   private readonly SECRET_KEY = process.env.REDSYS_SECRET_KEY || 'sq7HjrUOBfKmC576ILgskD5srU870gJ7';
   private readonly CURRENCY = '978'; // EUR
 
-  constructor(private prisma: PrismaService) {}
+  createMerchantOrderReference(sourceId: string): string {
+    const hash = crypto.createHash('sha256').update(sourceId).digest('hex').slice(0, 15);
+    const numeric = (BigInt(`0x${hash}`) % 1_000_000_000_000n).toString().padStart(12, '0');
+    return numeric;
+  }
 
   createPaymentForm(
-    orderId: string,
+    merchantOrderReference: string,
     amount: number,
     merchantUrl: string,
     urlOk: string,
     urlKo: string,
   ): RedsysFormData {
     const amountInCents = Math.round(amount * 100);
-    const orderNumber = this.formatOrderNumber(orderId);
 
     const merchantParams = {
       DS_MERCHANT_AMOUNT: amountInCents.toString(),
-      DS_MERCHANT_ORDER: orderNumber,
+      DS_MERCHANT_ORDER: merchantOrderReference,
       DS_MERCHANT_MERCHANTCODE: this.MERCHANT_CODE,
       DS_MERCHANT_CURRENCY: this.CURRENCY,
       DS_MERCHANT_TRANSACTIONTYPE: '0',
@@ -73,7 +66,7 @@ export class RedsysService {
     };
 
     const merchantParamsBase64 = this.encodeBase64(JSON.stringify(merchantParams));
-    const signature = this.generateSignature(merchantParamsBase64, orderNumber);
+    const signature = this.generateSignature(merchantParamsBase64, merchantOrderReference);
 
     return {
       Ds_SignatureVersion: 'HMAC_SHA256_V1',
@@ -85,7 +78,7 @@ export class RedsysService {
 
   async processNotification(notification: RedsysNotification): Promise<{
     success: boolean;
-    orderId: string;
+    merchantOrderReference: string;
     authCode?: string;
     responseCode: string;
   }> {
@@ -99,27 +92,23 @@ export class RedsysService {
     }
 
     const params = this.decodeMerchantParams(notification.Ds_MerchantParameters);
-    const responseCode = parseInt(params.Ds_Response, 10);
-    const orderId = this.extractOrderId(params.Ds_Order);
+    const responseCodeRaw = this.getParam(params, ['Ds_Response', 'DS_RESPONSE']);
+    const merchantOrderReference = this.getParam(params, ['Ds_Order', 'DS_ORDER']);
+    const authCode = this.getOptionalParam(params, ['Ds_AuthorisationCode', 'DS_AUTHORISATIONCODE']);
+
+    const responseCode = Number.parseInt(responseCodeRaw, 10);
+    if (!Number.isFinite(responseCode)) {
+      throw new BadRequestException('Invalid REDSYS response code');
+    }
 
     const success = responseCode >= 0 && responseCode <= 99;
 
     return {
       success,
-      orderId,
-      authCode: params.Ds_AuthorisationCode,
-      responseCode: params.Ds_Response,
+      merchantOrderReference,
+      authCode,
+      responseCode: responseCodeRaw,
     };
-  }
-
-  private formatOrderNumber(orderId: string): string {
-    const timestamp = Date.now().toString().slice(-8);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(4, '0');
-    return `${timestamp}${random}`;
-  }
-
-  private extractOrderId(dsOrder: string): string {
-    return dsOrder;
   }
 
   private encodeBase64(data: string): string {
@@ -140,16 +129,25 @@ export class RedsysService {
 
   private verifySignature(merchantParamsBase64: string, receivedSignature: string): boolean {
     const params = this.decodeMerchantParams(merchantParamsBase64);
-    const expectedSignature = this.generateSignature(merchantParamsBase64, params.Ds_Order);
-    
-    const normalizedReceived = receivedSignature.replace(/-/g, '+').replace(/_/g, '/');
-    const normalizedExpected = expectedSignature.replace(/-/g, '+').replace(/_/g, '/');
-    
-    return normalizedReceived === normalizedExpected;
+    const dsOrder = this.getParam(params, ['Ds_Order', 'DS_ORDER']);
+    const expectedSignature = this.generateSignature(merchantParamsBase64, dsOrder);
+
+    const normalizedReceived = this.normalizeBase64(receivedSignature);
+    const normalizedExpected = this.normalizeBase64(expectedSignature);
+
+    const receivedBuffer = Buffer.from(normalizedReceived, 'base64');
+    const expectedBuffer = Buffer.from(normalizedExpected, 'base64');
+    if (receivedBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
   }
 
   private encrypt3DES(data: string, key: Buffer): Buffer {
-    const paddedData = data.padEnd(8, '\0');
+    const blockSize = 8;
+    const remainder = data.length % blockSize;
+    const paddedData =
+      remainder === 0 ? data : data.padEnd(data.length + (blockSize - remainder), '\0');
     const cipher = crypto.createCipheriv('des-ede3-cbc', key.slice(0, 24), Buffer.alloc(8));
     cipher.setAutoPadding(false);
     const encrypted = Buffer.concat([cipher.update(paddedData, 'utf8'), cipher.final()]);
@@ -159,6 +157,41 @@ export class RedsysService {
   private decodeMerchantParams(merchantParamsBase64: string): RedsysDecodedParams {
     const decoded = this.decodeBase64(merchantParamsBase64);
     return JSON.parse(decoded);
+  }
+
+  private normalizeBase64(value: string): string {
+    const normalized = value
+      .replace(/\s/g, '+')
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    const missingPadding = normalized.length % 4;
+    if (missingPadding === 0) {
+      return normalized;
+    }
+    return normalized.padEnd(normalized.length + (4 - missingPadding), '=');
+  }
+
+  private getParam(params: RedsysDecodedParams, keys: string[]): string {
+    for (const key of keys) {
+      const value = params[key];
+      if (typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+    }
+    throw new BadRequestException(`Missing REDSYS field: ${keys.join(' or ')}`);
+  }
+
+  private getOptionalParam(
+    params: RedsysDecodedParams,
+    keys: string[],
+  ): string | undefined {
+    for (const key of keys) {
+      const value = params[key];
+      if (typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+    }
+    return undefined;
   }
 
   getResponseMessage(responseCode: string): string {

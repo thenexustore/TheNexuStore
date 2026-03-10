@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { RedsysService, RedsysFormData, RedsysNotification } from './redsys.service';
-import { PaymentProvider, PaymentStatus, OrderStatus } from '@prisma/client';
+import { PaymentProvider, PaymentStatus, OrderStatus, Prisma } from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { RetryService } from '../../common/retry.service';
 
@@ -27,7 +27,7 @@ export interface PaymentResult {
 
 @Injectable()
 export class PaymentService {
-  private readonly BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
+  private readonly BASE_URL = process.env.BASE_URL || 'http://localhost:4000';
   private readonly FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
   constructor(
@@ -57,7 +57,7 @@ export class PaymentService {
       case 'COD':
         return this.processCOD(order.id, amount);
       case 'REDSYS':
-        return this.processRedsys(order.id, amount, dto.returnUrl);
+        return this.processRedsys(order.id, order.tracking_token, amount, dto.returnUrl);
       default:
         throw new BadRequestException(`Payment provider ${dto.provider} not supported`);
     }
@@ -107,31 +107,54 @@ export class PaymentService {
 
   private async processRedsys(
     orderId: string,
+    trackingToken: string,
     amount: number,
     returnUrl?: string,
   ): Promise<PaymentResult> {
-    const merchantUrl = `${this.BASE_URL}/api/payment/redsys/notification`;
-    const urlOk = returnUrl || `${this.FRONTEND_URL}/checkout/success?orderId=${orderId}`;
-    const urlKo = returnUrl || `${this.FRONTEND_URL}/checkout/failed?orderId=${orderId}`;
+    const merchantUrl = `${this.BASE_URL}/payment/redsys/notification`;
+    const fallbackReturnUrl = `${this.FRONTEND_URL}/order/track/${trackingToken}`;
+    const baseReturnUrl = returnUrl || fallbackReturnUrl;
+    const urlOk = this.withPaymentStatus(baseReturnUrl, 'success');
+    const urlKo = this.withPaymentStatus(baseReturnUrl, 'failed');
+
+    let payment = await this.prisma.payment.findFirst({
+      where: {
+        order_id: orderId,
+        provider: 'REDSYS',
+        status: 'INITIATED',
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!payment) {
+      payment = await this.prisma.payment.create({
+        data: {
+          order_id: orderId,
+          provider: 'REDSYS',
+          status: 'INITIATED',
+          amount,
+          currency: 'EUR',
+          provider_payment_id: null,
+        },
+      });
+    }
+
+    const merchantOrderReference =
+      payment.provider_payment_id || this.redsysService.createMerchantOrderReference(payment.id);
+    if (!payment.provider_payment_id) {
+      payment = await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { provider_payment_id: merchantOrderReference },
+      });
+    }
 
     const formData = this.redsysService.createPaymentForm(
-      orderId,
+      merchantOrderReference,
       amount,
       merchantUrl,
       urlOk,
       urlKo,
     );
-
-    const payment = await this.prisma.payment.create({
-      data: {
-        order_id: orderId,
-        provider: 'REDSYS',
-        status: 'INITIATED',
-        amount,
-        currency: 'EUR',
-        provider_payment_id: null,
-      },
-    });
 
     return {
       success: true,
@@ -152,17 +175,24 @@ export class PaymentService {
 
     const payment = await this.prisma.payment.findFirst({
       where: {
-        order: {
-          order_number: { contains: result.orderId },
-        },
+        provider_payment_id: result.merchantOrderReference,
         provider: 'REDSYS',
-        status: 'INITIATED',
       },
       include: { order: true },
     });
 
     if (!payment) {
-      this.logger.warn('Payment not found for REDSYS order', 'PaymentService', { orderId: result.orderId });
+      this.logger.warn('Payment not found for REDSYS notification', 'PaymentService', {
+        merchantOrderReference: result.merchantOrderReference,
+      });
+      return;
+    }
+
+    if (payment.status !== 'INITIATED') {
+      this.logger.log('Ignoring already-processed REDSYS notification', 'PaymentService', {
+        paymentId: payment.id,
+        status: payment.status,
+      });
       return;
     }
 
@@ -172,8 +202,14 @@ export class PaymentService {
           where: { id: payment.id },
           data: {
             status: 'CAPTURED',
-            provider_payment_id: result.authCode,
-            raw_response: notification as any,
+            raw_response: {
+              notification,
+              redsys: {
+                responseCode: result.responseCode,
+                authCode: result.authCode ?? null,
+                merchantOrderReference: result.merchantOrderReference,
+              },
+            } as any,
           },
         });
 
@@ -208,9 +244,18 @@ export class PaymentService {
           where: { id: payment.id },
           data: {
             status: 'FAILED',
-            raw_response: notification as any,
+            raw_response: {
+              notification,
+              redsys: {
+                responseCode: result.responseCode,
+                authCode: result.authCode ?? null,
+                merchantOrderReference: result.merchantOrderReference,
+              },
+            } as any,
           },
         });
+
+        await this.releaseReservedStockForOrder(payment.order_id, tx);
 
         await tx.order.update({
           where: { id: payment.order_id },
@@ -282,5 +327,75 @@ export class PaymentService {
         amount: Number(p.amount),
       })),
     };
+  }
+
+  private withPaymentStatus(baseUrl: string, status: 'success' | 'failed'): string {
+    try {
+      const parsed = new URL(baseUrl);
+      parsed.searchParams.set('payment', status);
+      return parsed.toString();
+    } catch {
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      return `${baseUrl}${separator}payment=${status}`;
+    }
+  }
+
+  private async releaseReservedStockForOrder(
+    orderId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const orderItems = await tx.orderItem.findMany({
+      where: { order_id: orderId },
+      select: { sku_id: true, qty: true },
+    });
+
+    for (const item of orderItems) {
+      let remainingToRelease = item.qty;
+
+      const inventoryLevels = await tx.inventoryLevel.findMany({
+        where: {
+          sku_id: item.sku_id,
+          qty_reserved: { gt: 0 },
+        },
+        orderBy: { qty_reserved: 'desc' },
+      });
+
+      for (const level of inventoryLevels) {
+        if (remainingToRelease <= 0) {
+          break;
+        }
+
+        const releaseQty = Math.min(level.qty_reserved, remainingToRelease);
+        if (releaseQty <= 0) {
+          continue;
+        }
+
+        await tx.inventoryLevel.update({
+          where: {
+            warehouse_id_sku_id: {
+              warehouse_id: level.warehouse_id,
+              sku_id: level.sku_id,
+            },
+          },
+          data: {
+            qty_reserved: { decrement: releaseQty },
+          },
+        });
+
+        remainingToRelease -= releaseQty;
+      }
+
+      if (remainingToRelease > 0) {
+        this.logger.warn(
+          'Unable to fully release reserved stock for failed order item',
+          'PaymentService',
+          {
+            orderId,
+            skuId: item.sku_id,
+            unreleasedQty: remainingToRelease,
+          },
+        );
+      }
+    }
   }
 }

@@ -10,6 +10,7 @@ import {
 import { CheckoutService } from './checkout.service';
 import { CreateOrderDto } from './dto/checkout.dto';
 import { AuthGuard } from '../../auth/auth.guard';
+import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 
@@ -18,7 +19,7 @@ export class CheckoutController {
   constructor(private readonly checkoutService: CheckoutService) {}
 
   @Post('create-order')
-  @UseGuards(CsrfGuard, RateLimitGuard)
+  @UseGuards(OptionalAuthGuard, CsrfGuard, RateLimitGuard)
   async createOrder(@Request() req, @Body() dto: CreateOrderDto) {
     const customerId = req.user?.id;
     const sessionId =

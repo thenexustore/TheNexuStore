@@ -55,6 +55,14 @@ export interface PaymentIntent {
   amount: number;
   currency: string;
   status: string;
+  provider?: "REDSYS" | "COD" | "STRIPE" | "PAYPAL";
+  redirect_url?: string;
+  form_data?: {
+    Ds_SignatureVersion: string;
+    Ds_MerchantParameters: string;
+    Ds_Signature: string;
+    formUrl: string;
+  };
 }
 
 export interface CreateOrderResponse {

@@ -43,4 +43,22 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('Invalid environment variable: REDIS_URL');
   });
+
+  it('throws when REDSYS_URL is invalid', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        REDSYS_URL: 'not-url',
+      }),
+    ).toThrow('Invalid environment variable: REDSYS_URL');
+  });
+
+  it('throws when REDSYS_SECRET_KEY is missing in production', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        NODE_ENV: 'production',
+      }),
+    ).toThrow('Missing required environment variable: REDSYS_SECRET_KEY');
+  });
 });

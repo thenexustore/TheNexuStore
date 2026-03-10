@@ -13,6 +13,7 @@ import { PaymentProvider, Prisma } from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { MailService } from '../../auth/mail/mail.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
+import { RedsysService } from '../payment/redsys.service';
 
 @Injectable()
 export class CheckoutService {
@@ -22,11 +23,13 @@ export class CheckoutService {
     private couponService: CouponService,
     private mailService: MailService,
     private shippingTaxService: ShippingTaxService,
+    private redsysService: RedsysService,
     private readonly logger: AppLogger,
   ) {}
 
   private readonly FRONTEND_URL =
     process.env.FRONTEND_URL || 'http://localhost:3000';
+  private readonly BASE_URL = process.env.BASE_URL || 'http://localhost:4000';
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
@@ -203,6 +206,7 @@ export class CheckoutService {
         order.id,
         total,
         paymentMethod as PaymentProvider,
+        trackingToken,
         tx,
       );
 
@@ -222,6 +226,7 @@ export class CheckoutService {
       order: {
         id: result.order.id,
         order_number: result.order.order_number,
+        tracking_token: result.order.tracking_token,
         status: result.order.status,
         total_amount: Number(result.order.total_amount),
         currency: result.order.currency,
@@ -235,39 +240,30 @@ export class CheckoutService {
     orderId: string,
     amount: number,
     provider: PaymentProvider = 'REDSYS',
+    trackingToken?: string,
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<PaymentIntentDto> {
-    let status = 'requires_payment_method';
-    let paymentStatus: 'INITIATED' | 'AUTHORIZED' = 'INITIATED';
-
     if (provider === 'COD') {
-      status = 'cod_pending';
-      paymentStatus = 'AUTHORIZED';
-    }
-
-    const paymentIntent = {
-      id: `pi_${provider.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      client_secret: provider === 'COD' 
-        ? '' 
-        : `secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`,
-      amount,
-      currency: 'EUR',
-      status,
-      provider,
-    };
-
-    await tx.payment.create({
-      data: {
-        order_id: orderId,
-        provider,
-        status: paymentStatus,
+      const paymentIntent = {
+        id: `pi_cod_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+        client_secret: '',
         amount,
         currency: 'EUR',
-        provider_payment_id: paymentIntent.id,
-      },
-    });
+        status: 'cod_pending',
+        provider,
+      };
 
-    if (provider === 'COD') {
+      await tx.payment.create({
+        data: {
+          order_id: orderId,
+          provider,
+          status: 'AUTHORIZED',
+          amount,
+          currency: 'EUR',
+          provider_payment_id: paymentIntent.id,
+        },
+      });
+
       await tx.order.update({
         where: { id: orderId },
         data: { status: 'PROCESSING' },
@@ -283,9 +279,60 @@ export class CheckoutService {
           await tx.coupon.update({ where: { id: discount.coupon_id }, data: { usage_count: { increment: 1 } } });
         }
       }
+
+      return paymentIntent;
     }
 
-    return paymentIntent;
+    if (provider === 'REDSYS') {
+      const payment = await tx.payment.create({
+        data: {
+          order_id: orderId,
+          provider: 'REDSYS',
+          status: 'INITIATED',
+          amount,
+          currency: 'EUR',
+          provider_payment_id: null,
+        },
+      });
+
+      const merchantOrderReference =
+        this.redsysService.createMerchantOrderReference(payment.id);
+      const merchantUrl = `${this.BASE_URL}/payment/redsys/notification`;
+      const trackingUrl = `${this.FRONTEND_URL}/order/track/${trackingToken ?? orderId}`;
+      const urlOk = `${trackingUrl}?payment=success`;
+      const urlKo = `${trackingUrl}?payment=failed`;
+
+      const formData = this.redsysService.createPaymentForm(
+        merchantOrderReference,
+        amount,
+        merchantUrl,
+        urlOk,
+        urlKo,
+      );
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          provider_payment_id: merchantOrderReference,
+          raw_response: {
+            redsysMerchantOrder: merchantOrderReference,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return {
+        id: payment.id,
+        client_secret: '',
+        provider,
+        amount,
+        currency: 'EUR',
+        status: 'requires_action',
+        redirect_url: formData.formUrl,
+        form_data: formData,
+      } as PaymentIntentDto;
+    }
+
+    throw new BadRequestException(`Payment provider ${provider} not supported`);
   }
 
   private async generateTrackingToken(): Promise<string> {

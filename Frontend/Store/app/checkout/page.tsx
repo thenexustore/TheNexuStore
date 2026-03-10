@@ -191,10 +191,42 @@ export default function CheckoutPage() {
               ...formData.billing_address,
               vat_id: formData.billing_address.vat_id || undefined,
             },
+        payment_method: "REDSYS" as const,
         notes: formData.notes || undefined,
       };
 
       const response = await createOrder(orderData, getSessionId());
+      const redsysForm = response.payment_intent?.form_data;
+      if (
+        response.payment_intent?.provider === "REDSYS" &&
+        redsysForm?.formUrl &&
+        redsysForm.Ds_MerchantParameters &&
+        redsysForm.Ds_Signature &&
+        redsysForm.Ds_SignatureVersion
+      ) {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = redsysForm.formUrl;
+
+        const fields = [
+          ["Ds_SignatureVersion", redsysForm.Ds_SignatureVersion],
+          ["Ds_MerchantParameters", redsysForm.Ds_MerchantParameters],
+          ["Ds_Signature", redsysForm.Ds_Signature],
+        ];
+
+        for (const [name, value] of fields) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }
+
       const trackingToken =
         response.order.tracking_token || response.order.id;
       router.push(`/order/track/${trackingToken}`);

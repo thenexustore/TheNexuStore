@@ -7,6 +7,9 @@ type ApiEnvelope<T> = {
   error?: string;
 };
 
+let csrfTokenCache: string | null = null;
+let csrfRequestInFlight: Promise<string> | null = null;
+
 function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
   return (
     typeof value === "object" &&
@@ -16,15 +19,60 @@ function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
   );
 }
 
+const isMutationMethod = (method: string) =>
+  ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+
+async function fetchCsrfToken(): Promise<string> {
+  if (csrfTokenCache) {
+    return csrfTokenCache;
+  }
+
+  if (!csrfRequestInFlight) {
+    csrfRequestInFlight = (async () => {
+      const response = await fetch(`${API_URL}/auth/csrf-token`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error("Failed to fetch CSRF token");
+      }
+
+      const token =
+        (isApiEnvelope(payload) ? (payload.data as { csrfToken?: string })?.csrfToken : null) ||
+        ((payload as { csrfToken?: string } | null)?.csrfToken ?? null);
+
+      if (!token) {
+        throw new Error("CSRF token missing from backend response");
+      }
+
+      csrfTokenCache = token;
+      return token;
+    })().finally(() => {
+      csrfRequestInFlight = null;
+    });
+  }
+
+  return csrfRequestInFlight;
+}
+
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const url = `${API_URL}${endpoint}`;
+  const method = (options.method || "GET").toUpperCase();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  if (isMutationMethod(method)) {
+    headers["x-csrf-token"] = await fetchCsrfToken();
+  }
 
   const response = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    method,
+    headers,
     credentials: "include",
   });
 

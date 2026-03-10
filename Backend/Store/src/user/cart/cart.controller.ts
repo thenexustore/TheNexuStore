@@ -13,9 +13,11 @@ import {
 import { CartService } from './cart.service';
 import { AddToCartDto, UpdateCartItemDto, CartQueryDto, ApplyCouponDto, CartTotalsQueryDto } from './dto/cart.dto';
 import { AuthGuard } from '../../auth/auth.guard';
+import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
 import { PrismaService } from 'src/common/prisma.service';
 
 @Controller('cart')
+@UseGuards(OptionalAuthGuard)
 export class CartController {
   constructor(
     private readonly cartService: CartService,

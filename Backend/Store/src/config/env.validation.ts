@@ -41,6 +41,23 @@ export function validateEnvironment(env = process.env) {
     );
   }
 
+  if (env.REDSYS_URL) {
+    assertValidUrl('REDSYS_URL', env.REDSYS_URL);
+  }
+
+  const isProduction = (env.NODE_ENV ?? '').toLowerCase() === 'production';
+  if (isProduction && !env.REDSYS_SECRET_KEY) {
+    throw new Error(
+      'Missing required environment variable: REDSYS_SECRET_KEY. Set it in production before enabling checkout payments.',
+    );
+  }
+
+  if (!env.REDSYS_SECRET_KEY) {
+    logger.warn(
+      'REDSYS_SECRET_KEY is not configured. Redsys payments may fail outside test mode.',
+    );
+  }
+
   const hasGoogleClientId = Boolean(env.GOOGLE_CLIENT_ID);
   const hasGoogleClientSecret = Boolean(env.GOOGLE_CLIENT_SECRET);
 

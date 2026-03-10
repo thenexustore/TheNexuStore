@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Menu, Search, ShoppingCart, MessageCircle, X } from "lucide-react";
+import { Menu, Search, ShoppingCart, MessageCircle, User, X } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
@@ -17,6 +17,8 @@ type User = {
   id: string;
   firstName?: string;
   lastName?: string;
+  first_name?: string;
+  last_name?: string;
   email?: string;
   profile_image?: string;
 };
@@ -103,10 +105,15 @@ export default function Navbar() {
 
   useEffect(() => {
     if (authUser) {
+      const firstName = authUser.firstName ?? (authUser as User).first_name;
+      const lastName = authUser.lastName ?? (authUser as User).last_name;
+
       setUser({
         id: authUser.id,
-        firstName: authUser.firstName,
-        lastName: authUser.lastName,
+        firstName,
+        lastName,
+        first_name: (authUser as User).first_name,
+        last_name: (authUser as User).last_name,
         email: authUser.email,
         profile_image: authUser.profile_image,
       });
@@ -248,12 +255,14 @@ export default function Navbar() {
 
   const displayCartCount = cartLoading ? legacyCartCount : cartCount;
 
+  const userInitial = ((user?.firstName ?? user?.first_name ?? user?.email ?? "U").trim().charAt(0) || "U").toUpperCase();
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white text-black">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 md:min-h-[74px] md:flex-nowrap md:gap-4">
           <button
-            onClick={() => setCategoryPanelOpen((v) => !v)}
+            onClick={() => setSidebarOpen(true)}
             className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Menu size={24} />
@@ -449,7 +458,16 @@ export default function Navbar() {
               <MessageCircle className="w-5 h-5 text-gray-700" />
             </Link>
             {!user ? (
-              <div className="hidden items-center gap-2 md:flex md:gap-3">
+              <>
+                <Link
+                  href="/login"
+                  onClick={closeMobilePanels}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 md:hidden"
+                  title={t("signIn")}
+                >
+                  <User className="h-5 w-5 text-gray-700" />
+                </Link>
+                <div className="hidden items-center gap-2 md:flex md:gap-3">
                 <Link
                   href="/login"
                   onClick={closeMobilePanels}
@@ -465,6 +483,7 @@ export default function Navbar() {
                   {t("signUp")}
                 </Link>
               </div>
+              </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link href="/account" onClick={closeMobilePanels}>
@@ -477,7 +496,7 @@ export default function Navbar() {
                     />
                   ) : (
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B123A] text-sm font-bold text-white hover:bg-[#1a245a] transition-colors">
-                      {user.firstName?.[0] ?? "U"}
+                      {userInitial}
                     </div>
                   )}
                 </Link>
@@ -489,6 +508,17 @@ export default function Navbar() {
                 </button>
               </div>
             )}
+
+            <button
+              className="flex h-9 min-w-10 items-center justify-center rounded-lg border border-gray-200 px-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-100 sm:hidden"
+              onClick={() => {
+                const nextLocale = locale === "en" ? "es" : "en";
+                router.replace(pathname, { locale: nextLocale });
+              }}
+              aria-label={locale === "en" ? "Cambiar a español" : "Switch to English"}
+            >
+              {locale.toUpperCase()}
+            </button>
 
             <button
               className="relative hidden h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-cover bg-center transition-opacity hover:opacity-90 sm:flex sm:h-10 sm:w-10"
@@ -541,6 +571,14 @@ export default function Navbar() {
         onNavigate={handleCategoryClick}
       />
 
+      {sidebarOpen && (
+        <button
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close menu"
+        />
+      )}
+
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-[90vw] max-w-80 bg-white shadow-xl transform transition-transform duration-300 sm:w-[86vw] ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -575,9 +613,9 @@ export default function Navbar() {
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
               </div>
-            ) : filteredCategories.length > 0 ? (
+            ) : (categorySearch.trim().length >= 2 ? categorySearchResults : filteredCategories).length > 0 ? (
               <div className="space-y-1">
-                {filteredCategories.map((category: NavbarCategory) => (
+                {(categorySearch.trim().length >= 2 ? categorySearchResults : filteredCategories).map((category: NavbarCategory) => (
                   <button
                     key={category.id}
                     onClick={() => handleCategoryClick(category.slug)}

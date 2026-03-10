@@ -20,6 +20,14 @@ type Scope = "GLOBAL" | "CATEGORY" | "BRAND" | "SKU";
 
 const ROUNDING = ["NONE", "X_99", "X_95", "NEAREST_0_05", "CEIL_1"] as const;
 
+const ROUNDING_LABELS: Record<(typeof ROUNDING)[number], string> = {
+  NONE: "Sin redondeo",
+  X_99: "Terminar en .99",
+  X_95: "Terminar en .95",
+  NEAREST_0_05: "Al 0,05 más cercano",
+  CEIL_1: "Redondear al € superior",
+};
+
 const emptyForm = {
   scope: "GLOBAL" as Scope,
   margin_pct: 10,
@@ -139,6 +147,18 @@ export default function PricingPage() {
     setEditing(null);
   }
 
+  function normalizeDecimalInput(value: string) {
+    return value.replace(",", ".").trim();
+  }
+
+  function toNumberOrNull(value: string | number) {
+    if (value === "" || value == null) return null;
+    const normalized = normalizeDecimalInput(String(value));
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   function openEdit(rule: PricingRule) {
     setEditing(rule);
     setForm({
@@ -159,8 +179,13 @@ export default function PricingPage() {
   }
 
   function validateForm(): string | null {
-    if (form.margin_pct < 0 || form.margin_pct > 500) return isEn ? "Margin must be between 0 and 500" : "Margen debe estar entre 0 y 500";
-    if (form.discount_pct < 0 || form.discount_pct > 90) return isEn ? "Discount must be between 0 and 90" : "Descuento debe estar entre 0 y 90";
+    const margin = toNumberOrNull(form.margin_pct);
+    const discount = toNumberOrNull(form.discount_pct);
+
+    if (margin == null) return isEn ? "Margin is required" : "El margen es obligatorio";
+    if (margin < 0 || margin > 500) return isEn ? "Margin must be between 0 and 500" : "Margen debe estar entre 0 y 500";
+    if (discount == null) return isEn ? "Discount is required" : "El descuento es obligatorio";
+    if (discount < 0 || discount > 90) return isEn ? "Discount must be between 0 and 90" : "Descuento debe estar entre 0 y 90";
     if (form.scope === "CATEGORY" && !form.category_id) return isEn ? "Select a category" : "Selecciona una categoría";
     if (form.scope === "BRAND" && !form.brand_id) return isEn ? "Select a brand" : "Selecciona una marca";
     if (form.scope === "SKU" && !form.sku_code && !editing?.sku_id) return isEn ? "Provide SKU code" : "Indica el SKU code";
@@ -179,8 +204,11 @@ export default function PricingPage() {
 
     const payload = {
       ...form,
-      min_margin_pct: form.min_margin_pct === "" ? null : Number(form.min_margin_pct),
-      min_margin_amount: form.min_margin_amount === "" ? null : Number(form.min_margin_amount),
+      margin_pct: toNumberOrNull(form.margin_pct),
+      discount_pct: toNumberOrNull(form.discount_pct),
+      priority: Number(toNumberOrNull(form.priority) ?? 0),
+      min_margin_pct: toNumberOrNull(form.min_margin_pct),
+      min_margin_amount: toNumberOrNull(form.min_margin_amount),
       starts_at: form.starts_at || null,
       ends_at: form.ends_at || null,
       category_id: form.category_id || null,
@@ -305,18 +333,50 @@ export default function PricingPage() {
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              <input className="border rounded-lg p-2" type="number" placeholder={isEn ? "Margin %" : "Margen %"} value={form.margin_pct} onChange={(e) => setForm({ ...form, margin_pct: Number(e.target.value) })} />
-              <input className="border rounded-lg p-2" type="number" placeholder={isEn ? "Discount %" : "Descuento %"} value={form.discount_pct} onChange={(e) => setForm({ ...form, discount_pct: Number(e.target.value) })} />
+              <label className="text-xs text-zinc-600 space-y-1">
+                <span>{isEn ? "Margin % (markup over cost)" : "Margen % (subida sobre el coste)"}</span>
+                <input
+                  className="border rounded-lg p-2 w-full text-sm"
+                  inputMode="decimal"
+                  type="text"
+                  placeholder={isEn ? "e.g. 30" : "ej. 30"}
+                  value={form.margin_pct}
+                  onChange={(e) => setForm({ ...form, margin_pct: e.target.value })}
+                />
+              </label>
+              <label className="text-xs text-zinc-600 space-y-1">
+                <span>{isEn ? "Discount % (applied to final price)" : "Descuento % (sobre el precio final)"}</span>
+                <input
+                  className="border rounded-lg p-2 w-full text-sm"
+                  inputMode="decimal"
+                  type="text"
+                  placeholder={isEn ? "e.g. 15" : "ej. 15"}
+                  value={form.discount_pct}
+                  onChange={(e) => setForm({ ...form, discount_pct: e.target.value })}
+                />
+              </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <select className="border rounded-lg p-2" value={form.rounding_mode} onChange={(e) => setForm({ ...form, rounding_mode: e.target.value })}>
-                {ROUNDING.map((r) => <option key={r}>{r}</option>)}
-              </select>
-              <input className="border rounded-lg p-2" type="number" placeholder="Prioridad" value={form.priority} onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })} />
+              <label className="text-xs text-zinc-600 space-y-1">
+                <span>{isEn ? "Rounding mode" : "Tipo de redondeo"}</span>
+                <select className="border rounded-lg p-2 w-full text-sm" value={form.rounding_mode} onChange={(e) => setForm({ ...form, rounding_mode: e.target.value })}>
+                  {ROUNDING.map((r) => <option key={r} value={r}>{r} · {ROUNDING_LABELS[r]}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-zinc-600 space-y-1">
+                <span>{isEn ? "Priority (higher wins)" : "Prioridad (gana la más alta)"}</span>
+                <input className="border rounded-lg p-2 w-full text-sm" inputMode="numeric" type="text" placeholder="0" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} />
+              </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <input className="border rounded-lg p-2" type="number" placeholder="Min margin %" value={form.min_margin_pct} onChange={(e) => setForm({ ...form, min_margin_pct: e.target.value })} />
-              <input className="border rounded-lg p-2" type="number" placeholder="Min margin €" value={form.min_margin_amount} onChange={(e) => setForm({ ...form, min_margin_amount: e.target.value })} />
+              <label className="text-xs text-zinc-600 space-y-1">
+                <span>{isEn ? "Min margin % (optional floor)" : "Margen mínimo % (suelo opcional)"}</span>
+                <input className="border rounded-lg p-2 w-full text-sm" inputMode="decimal" type="text" placeholder="Min margin %" value={form.min_margin_pct} onChange={(e) => setForm({ ...form, min_margin_pct: e.target.value })} />
+              </label>
+              <label className="text-xs text-zinc-600 space-y-1">
+                <span>{isEn ? "Min margin € (optional floor)" : "Margen mínimo € (suelo opcional)"}</span>
+                <input className="border rounded-lg p-2 w-full text-sm" inputMode="decimal" type="text" placeholder="Min margin €" value={form.min_margin_amount} onChange={(e) => setForm({ ...form, min_margin_amount: e.target.value })} />
+              </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input className="border rounded-lg p-2" type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
@@ -351,7 +411,7 @@ export default function PricingPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-sm">
-                <thead className="bg-zinc-50"><tr><th className="p-3 text-left">Scope</th><th className="p-3 text-left">Target</th><th className="p-3 text-left">M%</th><th className="p-3 text-left">D%</th><th className="p-3 text-left">Rounding</th><th className="p-3 text-left">Priority</th><th className="p-3 text-left">{isEn ? "Status" : "Estado"}</th><th className="p-3 text-left">{isEn ? "Actions" : "Acciones"}</th></tr></thead>
+                <thead className="bg-zinc-50"><tr><th className="p-3 text-left">Scope</th><th className="p-3 text-left">Target</th><th className="p-3 text-left">{isEn ? "Margin %" : "Margen %"}</th><th className="p-3 text-left">{isEn ? "Discount %" : "Descuento %"}</th><th className="p-3 text-left">Rounding</th><th className="p-3 text-left">Priority</th><th className="p-3 text-left">{isEn ? "Status" : "Estado"}</th><th className="p-3 text-left">{isEn ? "Actions" : "Acciones"}</th></tr></thead>
                 <tbody>
                   {rules.map((r) => (
                     <tr key={r.id} className="border-t hover:bg-zinc-50">

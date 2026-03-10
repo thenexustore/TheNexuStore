@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Menu, Search, ShoppingCart, MessageCircle, X } from "lucide-react";
+import { Menu, Search, ShoppingCart, MessageCircle, User, X } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
@@ -449,7 +449,16 @@ export default function Navbar() {
               <MessageCircle className="w-5 h-5 text-gray-700" />
             </Link>
             {!user ? (
-              <div className="hidden items-center gap-2 md:flex md:gap-3">
+              <>
+                <Link
+                  href="/login"
+                  onClick={closeMobilePanels}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 md:hidden"
+                  title={t("signIn")}
+                >
+                  <User className="h-5 w-5 text-gray-700" />
+                </Link>
+                <div className="hidden items-center gap-2 md:flex md:gap-3">
                 <Link
                   href="/login"
                   onClick={closeMobilePanels}
@@ -465,6 +474,7 @@ export default function Navbar() {
                   {t("signUp")}
                 </Link>
               </div>
+              </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link href="/account" onClick={closeMobilePanels}>

@@ -142,9 +142,11 @@ export default function HomeProductSection({
         <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{product.brand_name}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-base font-bold text-red-600">{eur.format(product.price)}</span>
+          <span className={`text-base font-bold ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
+            {eur.format(product.price)}
+          </span>
           {hasDeal && product.compare_at_price ? (
-            <span className="text-xs text-black/70 line-through">
+            <span className="text-xs text-slate-500 line-through">
               {eur.format(product.compare_at_price)}
             </span>
           ) : null}

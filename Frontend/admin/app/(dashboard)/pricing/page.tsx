@@ -202,18 +202,25 @@ export default function PricingPage() {
     setSaving(true);
     setError(null);
 
-    const payload = {
-      ...form,
+    const payload: any = {
+      scope: form.scope,
       margin_pct: toNumberOrNull(form.margin_pct),
       discount_pct: toNumberOrNull(form.discount_pct),
+      rounding_mode: form.rounding_mode,
       priority: Number(toNumberOrNull(form.priority) ?? 0),
       min_margin_pct: toNumberOrNull(form.min_margin_pct),
       min_margin_amount: toNumberOrNull(form.min_margin_amount),
       starts_at: form.starts_at || null,
       ends_at: form.ends_at || null,
+      is_active: Boolean(form.is_active),
       category_id: form.category_id || null,
       brand_id: form.brand_id || null,
     };
+
+    if (form.scope === "SKU") {
+      const trimmedSkuCode = String(form.sku_code || "").trim();
+      if (trimmedSkuCode) payload.sku_code = trimmedSkuCode;
+    }
 
     try {
       if (editing) await updatePricingRule(editing.id, payload);

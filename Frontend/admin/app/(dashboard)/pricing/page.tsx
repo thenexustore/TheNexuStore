@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "next-intl";
 import { fetchBrands } from "@/lib/api/brands";
 import { fetchCategories } from "@/lib/api/categories";
 import {
@@ -45,6 +46,8 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 }
 
 export default function PricingPage() {
+  const locale = useLocale();
+  const isEn = locale === "en";
   const [tab, setTab] = useState<TabKey>("rules");
   const [rules, setRules] = useState<PricingRule[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
@@ -88,7 +91,7 @@ export default function PricingPage() {
       setBrands(b);
       setCategories(c);
     } catch (e: any) {
-      setError(e.message || "No se pudo cargar Pricing");
+      setError(e.message || (isEn ? "Could not load Pricing" : "No se pudo cargar Pricing"));
     } finally {
       setLoading(false);
     }
@@ -156,11 +159,11 @@ export default function PricingPage() {
   }
 
   function validateForm(): string | null {
-    if (form.margin_pct < 0 || form.margin_pct > 500) return "Margen debe estar entre 0 y 500";
-    if (form.discount_pct < 0 || form.discount_pct > 90) return "Descuento debe estar entre 0 y 90";
-    if (form.scope === "CATEGORY" && !form.category_id) return "Selecciona una categoría";
-    if (form.scope === "BRAND" && !form.brand_id) return "Selecciona una marca";
-    if (form.scope === "SKU" && !form.sku_code && !editing?.sku_id) return "Indica el SKU code";
+    if (form.margin_pct < 0 || form.margin_pct > 500) return isEn ? "Margin must be between 0 and 500" : "Margen debe estar entre 0 y 500";
+    if (form.discount_pct < 0 || form.discount_pct > 90) return isEn ? "Discount must be between 0 and 90" : "Descuento debe estar entre 0 y 90";
+    if (form.scope === "CATEGORY" && !form.category_id) return isEn ? "Select a category" : "Selecciona una categoría";
+    if (form.scope === "BRAND" && !form.brand_id) return isEn ? "Select a brand" : "Selecciona una marca";
+    if (form.scope === "SKU" && !form.sku_code && !editing?.sku_id) return isEn ? "Provide SKU code" : "Indica el SKU code";
     return null;
   }
 
@@ -190,7 +193,7 @@ export default function PricingPage() {
       resetForm();
       await load();
     } catch (e: any) {
-      setError(e.message || "No se pudo guardar");
+      setError(e.message || (isEn ? "Could not save" : "No se pudo guardar"));
     } finally {
       setSaving(false);
     }
@@ -201,7 +204,7 @@ export default function PricingPage() {
     setPreview(null);
     try {
       if (!skuCode.trim()) {
-        setPreviewError("Introduce un SKU code para preview");
+        setPreviewError(isEn ? "Enter a SKU code for preview" : "Introduce un SKU code para preview");
         return;
       }
       const result = await previewPricing({
@@ -210,7 +213,7 @@ export default function PricingPage() {
       });
       setPreview(result);
     } catch (e: any) {
-      setPreviewError(e.message || "No se pudo calcular preview");
+      setPreviewError(e.message || (isEn ? "Could not calculate preview" : "No se pudo calcular preview"));
     }
   }
 
@@ -246,20 +249,20 @@ export default function PricingPage() {
     <div className="space-y-6">
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-r from-zinc-900 to-zinc-700 text-white p-6">
         <h1 className="text-2xl font-semibold">Pricing / PVP Control Center</h1>
-        <p className="text-zinc-200 text-sm mt-1">Panel visual, claro y rápido para gestionar reglas de precio sin perder control.</p>
+        <p className="text-zinc-200 text-sm mt-1">{isEn ? "Visual, fast panel to manage pricing rules with full control." : "Panel visual, claro y rápido para gestionar reglas de precio sin perder control."}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Reglas cargadas" value={stats.total} />
-        <StatCard label="Activas" value={stats.active} />
-        <StatCard label="Inactivas" value={stats.inactive} />
-        <StatCard label="Margen medio" value={stats.avgMargin} />
+        <StatCard label={isEn ? "Loaded rules" : "Reglas cargadas"} value={stats.total} />
+        <StatCard label={isEn ? "Active" : "Activas"} value={stats.active} />
+        <StatCard label={isEn ? "Inactive" : "Inactivas"} value={stats.inactive} />
+        <StatCard label={isEn ? "Average margin" : "Margen medio"} value={stats.avgMargin} />
       </div>
 
       <div className="flex flex-wrap gap-2">
         {([
-          { key: "rules", label: "Reglas" },
-          { key: "preview", label: "Preview" },
+          { key: "rules", label: isEn ? "Rules" : "Reglas" },
+          { key: "preview", label: isEn ? "Preview" : "Preview" },
           { key: "bulk", label: "Bulk Recalculate" },
         ] as const).map((item) => (
           <button
@@ -278,7 +281,7 @@ export default function PricingPage() {
       {tab === "rules" && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
           <div className="xl:col-span-1 rounded-2xl border bg-white p-5 space-y-3">
-            <h2 className="font-semibold">{editing ? "Editar regla" : "Crear regla"}</h2>
+            <h2 className="font-semibold">{editing ? (isEn ? "Edit rule" : "Editar regla") : (isEn ? "Create rule" : "Crear regla")}</h2>
             <p className="text-xs text-zinc-500">Tip: usa prioridad alta en reglas SKU y baja en global.</p>
 
             <select className="w-full border rounded-lg p-2" value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })}>
@@ -287,13 +290,13 @@ export default function PricingPage() {
 
             {form.scope === "CATEGORY" && (
               <select className="w-full border rounded-lg p-2" value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
-                <option value="">Categoría...</option>
+                <option value="">{isEn ? "Category..." : "Categoría..."}</option>
                 {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
             {form.scope === "BRAND" && (
               <select className="w-full border rounded-lg p-2" value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })}>
-                <option value="">Marca...</option>
+                <option value="">{isEn ? "Brand..." : "Marca..."}</option>
                 {brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             )}
@@ -302,8 +305,8 @@ export default function PricingPage() {
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              <input className="border rounded-lg p-2" type="number" placeholder="Margen %" value={form.margin_pct} onChange={(e) => setForm({ ...form, margin_pct: Number(e.target.value) })} />
-              <input className="border rounded-lg p-2" type="number" placeholder="Descuento %" value={form.discount_pct} onChange={(e) => setForm({ ...form, discount_pct: Number(e.target.value) })} />
+              <input className="border rounded-lg p-2" type="number" placeholder={isEn ? "Margin %" : "Margen %"} value={form.margin_pct} onChange={(e) => setForm({ ...form, margin_pct: Number(e.target.value) })} />
+              <input className="border rounded-lg p-2" type="number" placeholder={isEn ? "Discount %" : "Descuento %"} value={form.discount_pct} onChange={(e) => setForm({ ...form, discount_pct: Number(e.target.value) })} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <select className="border rounded-lg p-2" value={form.rounding_mode} onChange={(e) => setForm({ ...form, rounding_mode: e.target.value })}>
@@ -324,13 +327,13 @@ export default function PricingPage() {
 
             <div className="flex gap-2">
               <button className="flex-1 rounded-xl bg-black text-white px-4 py-2" onClick={saveRule} disabled={saving}>{saving ? "Guardando..." : editing ? "Actualizar" : "Crear"}</button>
-              {editing && <button className="rounded-xl border px-4 py-2" onClick={resetForm}>Cancelar</button>}
+              {editing && <button className="rounded-xl border px-4 py-2" onClick={resetForm}>{isEn ? "Cancel" : "Cancelar"}</button>}
             </div>
           </div>
 
           <div className="xl:col-span-2 rounded-2xl border bg-white overflow-hidden">
             <div className="px-4 py-3 border-b bg-zinc-50 flex flex-wrap gap-2 items-center justify-between">
-              <div className="text-sm font-medium">Reglas</div>
+              <div className="text-sm font-medium">{isEn ? "Rules" : "Reglas"}</div>
               <div className="flex gap-2">
                 <select className="border rounded-lg p-2 text-sm" value={ruleScopeFilter} onChange={(e) => setRuleScopeFilter(e.target.value as any)}>
                   <option value="ALL">Todos los scopes</option>
@@ -340,28 +343,28 @@ export default function PricingPage() {
                   <option value="SKU">SKU</option>
                 </select>
                 <select className="border rounded-lg p-2 text-sm" value={ruleActiveFilter} onChange={(e) => setRuleActiveFilter(e.target.value as any)}>
-                  <option value="all">Todas</option>
-                  <option value="true">Activas</option>
-                  <option value="false">Inactivas</option>
+                  <option value="all">{isEn ? "All" : "Todas"}</option>
+                  <option value="true">{isEn ? "Active" : "Activas"}</option>
+                  <option value="false">{isEn ? "Inactive" : "Inactivas"}</option>
                 </select>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-sm">
-                <thead className="bg-zinc-50"><tr><th className="p-3 text-left">Scope</th><th className="p-3 text-left">Target</th><th className="p-3 text-left">M%</th><th className="p-3 text-left">D%</th><th className="p-3 text-left">Rounding</th><th className="p-3 text-left">Priority</th><th className="p-3 text-left">Estado</th><th className="p-3 text-left">Acciones</th></tr></thead>
+                <thead className="bg-zinc-50"><tr><th className="p-3 text-left">Scope</th><th className="p-3 text-left">Target</th><th className="p-3 text-left">M%</th><th className="p-3 text-left">D%</th><th className="p-3 text-left">Rounding</th><th className="p-3 text-left">Priority</th><th className="p-3 text-left">{isEn ? "Status" : "Estado"}</th><th className="p-3 text-left">{isEn ? "Actions" : "Acciones"}</th></tr></thead>
                 <tbody>
                   {rules.map((r) => (
                     <tr key={r.id} className="border-t hover:bg-zinc-50">
                       <td className="p-3">{r.scope}</td>
-                      <td className="p-3">{r.scope === "CATEGORY" ? targetLabel.CATEGORY(r.category_id || "") : r.scope === "BRAND" ? targetLabel.BRAND(r.brand_id || "") : r.scope === "SKU" ? r.sku_id : "Global"}</td>
+                      <td className="p-3">{r.scope === "CATEGORY" ? targetLabel.CATEGORY(r.category_id || "") : r.scope === "BRAND" ? targetLabel.BRAND(r.brand_id || "") : r.scope === "SKU" ? r.sku_id : (isEn ? "Global" : "Global")}</td>
                       <td className="p-3">{r.margin_pct}%</td>
                       <td className="p-3">{r.discount_pct}%</td>
                       <td className="p-3">{r.rounding_mode}</td>
                       <td className="p-3">{r.priority}</td>
-                      <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs ${r.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"}`}>{r.is_active ? "Activa" : "Inactiva"}</span></td>
+                      <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs ${r.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"}`}>{r.is_active ? (isEn ? "Active" : "Activa") : (isEn ? "Inactive" : "Inactiva")}</span></td>
                       <td className="p-3 space-x-2">
-                        <button className="border rounded-lg px-2 py-1" onClick={() => openEdit(r)}>Editar</button>
-                        <button className="border rounded-lg px-2 py-1 text-rose-600" onClick={async () => { if (!window.confirm("Eliminar regla?")) return; await deletePricingRule(r.id); await load(); }}>Eliminar</button>
+                        <button className="border rounded-lg px-2 py-1" onClick={() => openEdit(r)}>{isEn ? "Edit" : "Editar"}</button>
+                        <button className="border rounded-lg px-2 py-1 text-rose-600" onClick={async () => { if (!window.confirm(isEn ? "Delete rule?" : "Eliminar regla?")) return; await deletePricingRule(r.id); await load(); }}>{isEn ? "Delete" : "Eliminar"}</button>
                       </td>
                     </tr>
                   ))}
@@ -374,11 +377,11 @@ export default function PricingPage() {
 
       {tab === "preview" && (
         <div className="rounded-2xl border bg-white p-5 space-y-4">
-          <h2 className="font-semibold">Preview profesional</h2>
+          <h2 className="font-semibold">{isEn ? "Professional preview" : "Preview profesional"}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <input className="border rounded-xl p-3" placeholder="SKU code" value={skuCode} onChange={(e) => setSkuCode(e.target.value)} />
-            <input className="border rounded-xl p-3" placeholder="Cost override (opcional)" type="number" value={costOverride} onChange={(e) => setCostOverride(e.target.value)} />
-            <button className="bg-black text-white rounded-xl px-4 py-3" onClick={runPreview}>Calcular preview</button>
+            <input className="border rounded-xl p-3" placeholder={isEn ? "Cost override (optional)" : "Cost override (opcional)"} type="number" value={costOverride} onChange={(e) => setCostOverride(e.target.value)} />
+            <button className="bg-black text-white rounded-xl px-4 py-3" onClick={runPreview}>{isEn ? "Calculate preview" : "Calcular preview"}</button>
           </div>
           {previewError && <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3">{previewError}</div>}
           {preview && (
@@ -391,8 +394,8 @@ export default function PricingPage() {
                 <StatCard label="Floor" value={`${preview.floor ?? "-"} €`} />
               </div>
               <div className="flex gap-2">
-                <button className="border rounded-xl px-3 py-2 text-sm" onClick={copyPreview}>Copiar resultado</button>
-                <a className="border rounded-xl px-3 py-2 text-sm" href="/products" target="_blank" rel="noreferrer">Abrir productos</a>
+                <button className="border rounded-xl px-3 py-2 text-sm" onClick={copyPreview}>{isEn ? "Copy result" : "Copiar resultado"}</button>
+                <a className="border rounded-xl px-3 py-2 text-sm" href="/products" target="_blank" rel="noreferrer">{isEn ? "Open products" : "Abrir productos"}</a>
               </div>
               {preview.warnings?.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
@@ -409,25 +412,25 @@ export default function PricingPage() {
 
       {tab === "bulk" && (
         <div className="rounded-2xl border bg-white p-5 space-y-4">
-          <h2 className="font-semibold">Bulk Recalculate</h2>
+          <h2 className="font-semibold">{isEn ? "Bulk recalculate" : "Recálculo masivo"}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <select className="border rounded-lg p-2" value={recalcForm.scope} onChange={(e) => setRecalcForm({ ...recalcForm, scope: e.target.value as any })}>
-              <option value="all">Todo el catálogo</option>
-              <option value="brand">Solo marca</option>
-              <option value="category">Solo categoría</option>
+              <option value="all">{isEn ? "Whole catalog" : "Todo el catálogo"}</option>
+              <option value="brand">{isEn ? "Brand only" : "Solo marca"}</option>
+              <option value="category">{isEn ? "Category only" : "Solo categoría"}</option>
               <option value="sku">SKUs concretos</option>
             </select>
             <label className="inline-flex items-center gap-2 text-sm border rounded-lg p-2"><input type="checkbox" checked={recalcForm.dryRun} onChange={(e) => setRecalcForm({ ...recalcForm, dryRun: e.target.checked })} />Dry run</label>
           </div>
           {recalcForm.scope === "brand" && (
             <select className="border rounded-lg p-2 w-full" value={recalcForm.brandId} onChange={(e) => setRecalcForm({ ...recalcForm, brandId: e.target.value })}>
-              <option value="">Selecciona marca...</option>
+              <option value="">{isEn ? "Select brand..." : "Selecciona marca..."}</option>
               {brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
           {recalcForm.scope === "category" && (
             <select className="border rounded-lg p-2 w-full" value={recalcForm.categoryId} onChange={(e) => setRecalcForm({ ...recalcForm, categoryId: e.target.value })}>
-              <option value="">Selecciona categoría...</option>
+              <option value="">{isEn ? "Select category..." : "Selecciona categoría..."}</option>
               {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
@@ -435,14 +438,14 @@ export default function PricingPage() {
             <textarea className="border rounded-lg p-2 w-full min-h-[90px]" placeholder="sku-id-1, sku-id-2, sku-id-3" value={recalcForm.skuIdsText} onChange={(e) => setRecalcForm({ ...recalcForm, skuIdsText: e.target.value })} />
           )}
 
-          <button disabled={recalcRunning} className="bg-black text-white rounded-xl px-4 py-2.5 disabled:opacity-60" onClick={runRecalc}>{recalcRunning ? "Lanzado..." : "Lanzar recálculo"}</button>
+          <button disabled={recalcRunning} className="bg-black text-white rounded-xl px-4 py-2.5 disabled:opacity-60" onClick={runRecalc}>{recalcRunning ? (isEn ? "Started..." : "Lanzado...") : (isEn ? "Start recalculation" : "Lanzar recálculo")}</button>
 
           {job && (
             <div className="rounded-xl border border-zinc-200 p-4 space-y-3">
-              <div className="flex items-center justify-between text-sm"><span>Estado: {job.status}</span><span>{progress}%</span></div>
+              <div className="flex items-center justify-between text-sm"><span>{isEn ? "Status" : "Estado"}: {job.status}</span><span>{progress}%</span></div>
               <div className="w-full bg-zinc-200 rounded-full h-2 overflow-hidden"><div className="h-2 bg-black" style={{ width: `${progress}%` }} /></div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <StatCard label="Procesados" value={`${job.processed}/${job.total}`} />
+                <StatCard label={isEn ? "Processed" : "Procesados"} value={`${job.processed}/${job.total}`} />
                 <StatCard label="Updated" value={job.updated_count} />
                 <StatCard label="Warnings" value={job.warning_count} />
                 <StatCard label="Failed" value={job.failed_count} />
@@ -456,7 +459,7 @@ export default function PricingPage() {
                   a.download = `pricing-job-${job.id}-errors.json`;
                   a.click();
                   URL.revokeObjectURL(url);
-                }}>Descargar errores JSON</button>
+                }}>{isEn ? "Download JSON errors" : "Descargar errores JSON"}</button>
               )}
             </div>
           )}

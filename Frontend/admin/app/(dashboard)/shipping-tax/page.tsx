@@ -25,6 +25,7 @@ import {
   type TaxZone,
 } from '@/lib/api';
 import { toast } from 'sonner';
+import { useLocale } from 'next-intl';
 
 const ZONE_ORDER = [
   'ES_PENINSULA_BALEARES',
@@ -41,6 +42,8 @@ type EditableShippingRule = ShippingRule;
 type EditableTaxZone = TaxZone;
 
 export default function ShippingTaxPage() {
+  const locale = useLocale();
+  const isEn = locale === 'en';
   const [shippingZones, setShippingZones] = useState<ShippingZone[]>([]);
   const [shippingRules, setShippingRules] = useState<ShippingRule[]>([]);
   const [taxZones, setTaxZones] = useState<TaxZone[]>([]);
@@ -105,7 +108,7 @@ export default function ShippingTaxPage() {
       setDraftShippingRules(normalizedRules);
       setDraftTaxZones(normalizedTax);
     } catch (err: any) {
-      toast.error(err.message || 'No se pudieron cargar los valores de shipping/tax');
+      toast.error(err.message || (isEn ? 'Could not load shipping/tax values' : 'No se pudieron cargar los valores de shipping/tax'));
     } finally {
       setLoading(false);
     }
@@ -149,11 +152,15 @@ export default function ShippingTaxPage() {
       const priorities = new Set<number>();
       for (const r of zoneRules) {
         if (r.max_base_excl_tax != null && r.max_base_excl_tax <= r.min_base_excl_tax) {
-          return `En ${zoneCode}, el máximo debe ser mayor que el mínimo.`;
+          return isEn
+            ? `In ${zoneCode}, max must be greater than min.`
+            : `En ${zoneCode}, el máximo debe ser mayor que el mínimo.`;
         }
 
         if (priorities.has(r.priority)) {
-          return `En ${zoneCode}, hay prioridades duplicadas.`;
+          return isEn
+            ? `In ${zoneCode}, there are duplicated priorities.`
+            : `En ${zoneCode}, hay prioridades duplicadas.`;
         }
         priorities.add(r.priority);
       }
@@ -167,7 +174,9 @@ export default function ShippingTaxPage() {
 
           const overlap = a.min_base_excl_tax < bMax && b.min_base_excl_tax < aMax;
           if (overlap) {
-            return `En ${zoneCode}, hay tramos solapados.`;
+            return isEn
+              ? `In ${zoneCode}, there are overlapping ranges.`
+              : `En ${zoneCode}, hay tramos solapados.`;
           }
         }
       }
@@ -193,9 +202,9 @@ export default function ShippingTaxPage() {
       setShippingZones(updated);
       setDraftShippingZones(updated);
       setEditingZones(false);
-      toast.success('Destinos de envío guardados');
+      toast.success(isEn ? 'Shipping destinations saved' : 'Destinos de envío guardados');
     } catch (err: any) {
-      toast.error(err.message || 'No se pudieron guardar zonas de envío');
+      toast.error(err.message || (isEn ? 'Could not save shipping zones' : 'No se pudieron guardar zonas de envío'));
     } finally {
       setSavingShipping(false);
     }
@@ -253,9 +262,9 @@ export default function ShippingTaxPage() {
       setShippingRules(normalized);
       setDraftShippingRules(normalized);
       setEditingRules(false);
-      toast.success('Tramos de envío guardados');
+      toast.success(isEn ? 'Shipping ranges saved' : 'Tramos de envío guardados');
     } catch (err: any) {
-      toast.error(err.message || 'No se pudieron guardar los tramos de envío');
+      toast.error(err.message || (isEn ? 'Could not save shipping ranges' : 'No se pudieron guardar los tramos de envío'));
     } finally {
       setSavingRules(false);
     }
@@ -289,9 +298,9 @@ export default function ShippingTaxPage() {
       setTaxZones(normalized);
       setDraftTaxZones(normalized);
       setEditingTax(false);
-      toast.success('Zonas fiscales y aduanas guardadas');
+      toast.success(isEn ? 'Tax and customs zones saved' : 'Zonas fiscales y aduanas guardadas');
     } catch (err: any) {
-      toast.error(err.message || 'No se pudieron guardar zonas fiscales');
+      toast.error(err.message || (isEn ? 'Could not save tax zones' : 'No se pudieron guardar zonas fiscales'));
     } finally {
       setSavingTax(false);
     }
@@ -316,14 +325,14 @@ export default function ShippingTaxPage() {
   };
 
   const removeRule = (zoneCode: string, priority: number) => {
-    if (!confirm('¿Eliminar este tramo de envío?')) return;
+    if (!confirm(isEn ? 'Delete this shipping range?' : '¿Eliminar este tramo de envío?')) return;
     setDraftShippingRules((prev) =>
       prev.filter((r) => !(r.zone_code === zoneCode && r.priority === priority)),
     );
   };
 
   const removeAllZoneRules = (zoneCode: string) => {
-    if (!confirm(`¿Eliminar todos los tramos de ${zoneCode}?`)) return;
+    if (!confirm(isEn ? `Delete all ranges for ${zoneCode}?` : `¿Eliminar todos los tramos de ${zoneCode}?`)) return;
     setDraftShippingRules((prev) => prev.filter((r) => r.zone_code !== zoneCode));
   };
 
@@ -340,7 +349,9 @@ export default function ShippingTaxPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Shipping & Tax Regimes</h1>
         <p className="text-sm text-zinc-500">
-          Gestión completa ecommerce: editar, guardar, cancelar y eliminar tramos.
+          {isEn
+            ? 'Full ecommerce management: edit, save, cancel and delete ranges.'
+            : 'Gestión completa ecommerce: editar, guardar, cancelar y eliminar tramos.'}
         </p>
       </div>
 
@@ -348,7 +359,7 @@ export default function ShippingTaxPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-zinc-500" />
-            <h2 className="text-base font-semibold">Disponibilidad de envío por destino</h2>
+            <h2 className="text-base font-semibold">{isEn ? 'Shipping availability by destination' : 'Disponibilidad de envío por destino'}</h2>
           </div>
 
           {!editingZones ? (
@@ -356,7 +367,7 @@ export default function ShippingTaxPage() {
               onClick={startEditZones}
               className="inline-flex items-center gap-2 rounded-lg border text-sm px-4 py-2 hover:bg-zinc-50"
             >
-              <Pencil className="w-4 h-4" /> Editar
+              <Pencil className="w-4 h-4" /> {isEn ? 'Edit' : 'Editar'}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -364,7 +375,7 @@ export default function ShippingTaxPage() {
                 onClick={cancelEditZones}
                 className="inline-flex items-center gap-2 rounded-lg border text-sm px-4 py-2 hover:bg-zinc-50"
               >
-                <X className="w-4 h-4" /> Cancelar
+                <X className="w-4 h-4" /> {isEn ? 'Cancel' : 'Cancelar'}
               </button>
               <button
                 onClick={saveShipping}
@@ -372,7 +383,7 @@ export default function ShippingTaxPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-black text-white text-sm px-4 py-2 disabled:opacity-60"
               >
                 {savingShipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Guardar
+                {isEn ? 'Save' : 'Guardar'}
               </button>
             </div>
           )}
@@ -382,9 +393,9 @@ export default function ShippingTaxPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-zinc-50">
-                <th className="px-3 py-2 text-left">Zona</th>
-                <th className="px-3 py-2 text-left">Descripción</th>
-                <th className="px-3 py-2 text-left">Envío habilitado</th>
+                <th className="px-3 py-2 text-left">{isEn ? "Zone" : "Zona"}</th>
+                <th className="px-3 py-2 text-left">{isEn ? 'Description' : 'Descripción'}</th>
+                <th className="px-3 py-2 text-left">{isEn ? 'Shipping enabled' : 'Envío habilitado'}</th>
               </tr>
             </thead>
             <tbody>
@@ -414,14 +425,14 @@ export default function ShippingTaxPage() {
 
       <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Tramos de envío</h2>
+          <h2 className="text-base font-semibold">{isEn ? 'Shipping ranges' : 'Tramos de envío'}</h2>
 
           {!editingRules ? (
             <button
               onClick={startEditRules}
               className="inline-flex items-center gap-2 rounded-lg border text-sm px-4 py-2 hover:bg-zinc-50"
             >
-              <Pencil className="w-4 h-4" /> Editar
+              <Pencil className="w-4 h-4" /> {isEn ? 'Edit' : 'Editar'}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -437,7 +448,7 @@ export default function ShippingTaxPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-black text-white text-sm px-4 py-2 disabled:opacity-60"
               >
                 {savingRules ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Guardar
+                {isEn ? 'Save' : 'Guardar'}
               </button>
             </div>
           )}
@@ -445,7 +456,7 @@ export default function ShippingTaxPage() {
 
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
           <AlertTriangle className="w-4 h-4" />
-          Validamos solapes de tramos y prioridades duplicadas antes de guardar.
+          {isEn ? 'We validate overlapping ranges and duplicated priorities before saving.' : 'Validamos solapes de tramos y prioridades duplicadas antes de guardar.'}
         </div>
 
         <div className="space-y-5">
@@ -461,20 +472,20 @@ export default function ShippingTaxPage() {
                       disabled={!editingRules || zoneRules.length === 0}
                       className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
-                      <Trash2 className="w-3 h-3" /> Eliminar todos
+                      <Trash2 className="w-3 h-3" /> {isEn ? 'Delete all' : 'Eliminar todos'}
                     </button>
                     <button
                       onClick={() => addRule(zoneCode)}
                       disabled={!editingRules}
                       className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-zinc-50 disabled:opacity-50"
                     >
-                      <Plus className="w-3 h-3" /> Añadir tramo
+                      <Plus className="w-3 h-3" /> {isEn ? "Add range" : "Añadir tramo"}
                     </button>
                   </div>
                 </div>
 
                 {zoneRules.length === 0 ? (
-                  <p className="text-xs text-zinc-500">Sin tramos definidos.</p>
+                  <p className="text-xs text-zinc-500">{isEn ? 'No ranges defined.' : 'Sin tramos definidos.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {zoneRules.map((rule, idx) => (
@@ -516,7 +527,7 @@ export default function ShippingTaxPage() {
                             );
                           }}
                           className="col-span-2 border rounded px-2 py-1 text-sm"
-                          placeholder="Max (vacío = infinito)"
+                          placeholder={isEn ? 'Max (empty = infinite)' : 'Max (vacío = infinito)'}
                         />
                         <input
                           type="number"
@@ -577,7 +588,7 @@ export default function ShippingTaxPage() {
                           disabled={!editingRules}
                           className="col-span-2 inline-flex items-center justify-center gap-1 text-xs px-2 py-1 rounded border text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >
-                          <Trash2 className="w-3 h-3" /> Borrar
+                          <Trash2 className="w-3 h-3" /> {isEn ? 'Delete' : 'Borrar'}
                         </button>
                       </div>
                     ))}
@@ -593,7 +604,7 @@ export default function ShippingTaxPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Landmark className="w-5 h-5 text-zinc-500" />
-            <h2 className="text-base font-semibold">Impuestos y aduanas por destino</h2>
+            <h2 className="text-base font-semibold">{isEn ? 'Taxes and customs by destination' : 'Impuestos y aduanas por destino'}</h2>
           </div>
 
           {!editingTax ? (
@@ -601,7 +612,7 @@ export default function ShippingTaxPage() {
               onClick={startEditTax}
               className="inline-flex items-center gap-2 rounded-lg border text-sm px-4 py-2 hover:bg-zinc-50"
             >
-              <Pencil className="w-4 h-4" /> Editar
+              <Pencil className="w-4 h-4" /> {isEn ? 'Edit' : 'Editar'}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -609,7 +620,7 @@ export default function ShippingTaxPage() {
                 onClick={cancelEditTax}
                 className="inline-flex items-center gap-2 rounded-lg border text-sm px-4 py-2 hover:bg-zinc-50"
               >
-                <X className="w-4 h-4" /> Cancelar
+                <X className="w-4 h-4" /> {isEn ? 'Cancel' : 'Cancelar'}
               </button>
               <button
                 onClick={saveTax}
@@ -617,7 +628,7 @@ export default function ShippingTaxPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-black text-white text-sm px-4 py-2 disabled:opacity-60"
               >
                 {savingTax ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Guardar
+                {isEn ? 'Save' : 'Guardar'}
               </button>
             </div>
           )}
@@ -627,12 +638,12 @@ export default function ShippingTaxPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-zinc-50">
-                <th className="px-3 py-2 text-left">Zona</th>
+                <th className="px-3 py-2 text-left">{isEn ? "Zone" : "Zona"}</th>
                 <th className="px-3 py-2 text-left">Enabled</th>
-                <th className="px-3 py-2 text-left">Modo</th>
+                <th className="px-3 py-2 text-left">{isEn ? 'Mode' : 'Modo'}</th>
                 <th className="px-3 py-2 text-left">Tax rate (%)</th>
                 <th className="px-3 py-2 text-left">Customs duty (%)</th>
-                <th className="px-3 py-2 text-left">Notas</th>
+                <th className="px-3 py-2 text-left">{isEn ? 'Notes' : 'Notas'}</th>
               </tr>
             </thead>
             <tbody>

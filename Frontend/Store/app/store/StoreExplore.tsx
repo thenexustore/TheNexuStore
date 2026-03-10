@@ -1,8 +1,7 @@
 "use client";
 
-import NextLink from "next/link";
+import { Link as NextLink } from "@/i18n/navigation";
 import React, { useEffect, useState } from "react";
-import { Link } from "@/i18n/navigation";
 import ProductCard from "../components/ProductCard";
 import { productAPI, Product } from "../lib/products";
 

@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import {
   loadAdminSettings,
+  saveAdminSettings,
   subscribeAdminSettings,
   type AdminSettings,
 } from "@/lib/admin-settings";
@@ -140,6 +141,14 @@ export default function DashboardLayout({
     })
     .filter((item): item is NavItem => item !== null);
 
+
+
+  const toggleAdminLanguage = () => {
+    const nextLocale = locale === "en" ? "es" : "en";
+    saveAdminSettings({ ...dashboardSettings, adminLanguage: nextLocale });
+    router.replace(pathname, { locale: nextLocale });
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
     localStorage.removeItem("admin_user");
@@ -239,7 +248,7 @@ export default function DashboardLayout({
         <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={28} />
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.replace(pathname, { locale: locale === "en" ? "es" : "en" })}
+            onClick={toggleAdminLanguage}
             className="px-3 py-1 text-xs rounded-full border border-zinc-300"
           >
             {locale.toUpperCase()}
@@ -312,6 +321,14 @@ export default function DashboardLayout({
       </motion.aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden pt-16 lg:pt-0">
+        <div className="hidden lg:flex items-center justify-end px-6 pt-4 bg-zinc-50">
+          <button
+            onClick={toggleAdminLanguage}
+            className="px-3 py-1.5 text-xs rounded-full border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 transition"
+          >
+            {locale === "en" ? "EN → ES" : "ES → EN"}
+          </button>
+        </div>
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-zinc-50">{children}</div>
       </main>
     </div>

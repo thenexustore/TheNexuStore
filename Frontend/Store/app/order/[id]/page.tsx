@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { getOrder } from "@/app/lib/checkout";
 
 const formatCurrency = (amount: number) => {

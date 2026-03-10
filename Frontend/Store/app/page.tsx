@@ -1,22 +1,6 @@
-"use client";
-
-import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from '@/i18n/navigation';
+import { routing } from '@/i18n/routing';
 
 export default function HomePage() {
-  const router = useRouter();
-  const hasRedirected = useRef(false);
-
-  useEffect(() => {
-    if (!hasRedirected.current) {
-      hasRedirected.current = true;
-
-      const { origin, pathname } = window.location;
-      if (pathname === "/") {
-        router.replace("/store");
-      }
-    }
-  }, [router]);
-
-  return null;
+  redirect({ href: '/store', locale: routing.defaultLocale });
 }

@@ -142,8 +142,10 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
               <p className="mt-0.5 text-xs uppercase tracking-wide text-slate-400">{asText(product.brand_name)}</p>
 
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-base font-bold text-red-600 sm:text-lg">{eur.format(Number(product.price || 0))}</span>
-                {hasDeal ? <span className="text-xs text-slate-400 line-through">{eur.format(Number(product.compare_at_price || 0))}</span> : null}
+                <span className={`text-base font-bold sm:text-lg ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
+                  {eur.format(Number(product.price || 0))}
+                </span>
+                {hasDeal ? <span className="text-xs text-slate-500 line-through">{eur.format(Number(product.compare_at_price || 0))}</span> : null}
               </div>
 
               {Number(product.stock_quantity || 0) > 0 && Number(product.stock_quantity || 0) <= 8 ? (

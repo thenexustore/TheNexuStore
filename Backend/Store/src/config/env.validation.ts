@@ -45,16 +45,50 @@ export function validateEnvironment(env = process.env) {
     assertValidUrl('REDSYS_URL', env.REDSYS_URL);
   }
 
-  const isProduction = (env.NODE_ENV ?? '').toLowerCase() === 'production';
-  if (isProduction && !env.REDSYS_SECRET_KEY) {
-    throw new Error(
-      'Missing required environment variable: REDSYS_SECRET_KEY. Set it in production before enabling checkout payments.',
-    );
+  if (env.REDSYS_NOTIFY_URL) {
+    assertValidUrl('REDSYS_NOTIFY_URL', env.REDSYS_NOTIFY_URL);
   }
 
-  if (!env.REDSYS_SECRET_KEY) {
+  if (env.REDSYS_OK_URL) {
+    assertValidUrl('REDSYS_OK_URL', env.REDSYS_OK_URL);
+  }
+
+  if (env.REDSYS_KO_URL) {
+    assertValidUrl('REDSYS_KO_URL', env.REDSYS_KO_URL);
+  }
+
+  if (env.REDSYS_ENV) {
+    const mode = env.REDSYS_ENV.toLowerCase();
+    if (mode !== 'test' && mode !== 'prod') {
+      throw new Error(
+        `Invalid environment variable: REDSYS_ENV must be "test" or "prod". Received "${env.REDSYS_ENV}".`,
+      );
+    }
+  }
+
+  const isProduction = (env.NODE_ENV ?? '').toLowerCase() === 'production';
+  if (isProduction) {
+    const requiredRedsysVars = [
+      'REDSYS_MERCHANT_CODE',
+      'REDSYS_TERMINAL',
+      'REDSYS_SECRET_KEY',
+      'REDSYS_NOTIFY_URL',
+      'REDSYS_OK_URL',
+      'REDSYS_KO_URL',
+    ] as const;
+
+    for (const variableName of requiredRedsysVars) {
+      if (!env[variableName]) {
+        throw new Error(
+          `Missing required environment variable: ${variableName}. Configure Redsys production values before enabling checkout payments.`,
+        );
+      }
+    }
+  }
+
+  if (!env.REDSYS_MERCHANT_CODE || !env.REDSYS_TERMINAL || !env.REDSYS_SECRET_KEY) {
     logger.warn(
-      'REDSYS_SECRET_KEY is not configured. Redsys payments may fail outside test mode.',
+      'REDSYS merchant configuration is incomplete. Set REDSYS_MERCHANT_CODE, REDSYS_TERMINAL and REDSYS_SECRET_KEY.',
     );
   }
 

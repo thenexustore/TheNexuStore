@@ -5,7 +5,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
-import { createOrder } from "../lib/checkout";
+import { createOrder, createRedsysPayment } from "../lib/checkout";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("es-ES", {
@@ -24,6 +24,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"REDSYS" | "BIZUM" | "COD">("REDSYS");
   const checkoutFormRef = useRef<HTMLFormElement>(null);
 
   const freeShippingRemaining = useMemo(
@@ -191,19 +192,34 @@ export default function CheckoutPage() {
               ...formData.billing_address,
               vat_id: formData.billing_address.vat_id || undefined,
             },
-        payment_method: "REDSYS" as const,
+        payment_method: paymentMethod,
         notes: formData.notes || undefined,
       };
 
       const response = await createOrder(orderData, getSessionId());
-      const redsysForm = response.payment_intent?.form_data;
-      if (
-        response.payment_intent?.provider === "REDSYS" &&
-        redsysForm?.formUrl &&
-        redsysForm.Ds_MerchantParameters &&
-        redsysForm.Ds_Signature &&
-        redsysForm.Ds_SignatureVersion
-      ) {
+      if (paymentMethod === "REDSYS" || paymentMethod === "BIZUM") {
+        const redsysIntent = await createRedsysPayment(
+          {
+            order_id: response.order.id,
+            payment_method: paymentMethod,
+            tracking_token: response.order.tracking_token || response.order.id,
+            phone: formData.shipping_address.phone || undefined,
+          },
+          getSessionId(),
+        );
+        const redsysForm = redsysIntent?.formData || {
+          Ds_SignatureVersion: redsysIntent?.Ds_SignatureVersion || "",
+          Ds_MerchantParameters: redsysIntent?.Ds_MerchantParameters || "",
+          Ds_Signature: redsysIntent?.Ds_Signature || "",
+          formUrl: redsysIntent?.formUrl || "",
+        };
+
+        if (
+          redsysForm?.formUrl &&
+          redsysForm.Ds_MerchantParameters &&
+          redsysForm.Ds_Signature &&
+          redsysForm.Ds_SignatureVersion
+        ) {
         const form = document.createElement("form");
         form.method = "POST";
         form.action = redsysForm.formUrl;
@@ -225,6 +241,9 @@ export default function CheckoutPage() {
         document.body.appendChild(form);
         form.submit();
         return;
+        }
+
+        throw new Error("Redsys payment form was not generated");
       }
 
       const trackingToken =
@@ -475,6 +494,54 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-4">{t("paymentMethod")}</h2>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="REDSYS"
+                      checked={paymentMethod === "REDSYS"}
+                      onChange={() => setPaymentMethod("REDSYS")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium">{t("payByCard")}</p>
+                      <p className="text-sm text-gray-500">{t("payByCardHint")}</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="BIZUM"
+                      checked={paymentMethod === "BIZUM"}
+                      onChange={() => setPaymentMethod("BIZUM")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium">{t("payByBizum")}</p>
+                      <p className="text-sm text-gray-500">{t("payByBizumHint")}</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="COD"
+                      checked={paymentMethod === "COD"}
+                      onChange={() => setPaymentMethod("COD")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium">{t("payOnDelivery")}</p>
+                      <p className="text-sm text-gray-500">{t("payOnDeliveryHint")}</p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="bg-white rounded-xl shadow-sm p-6">

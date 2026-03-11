@@ -1,6 +1,6 @@
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
-const SUPPORTED_PAYMENT_PROVIDERS = ['REDSYS', 'COD'] as const;
+const SUPPORTED_PAYMENT_PROVIDERS = ['REDSYS', 'COD', 'BIZUM'] as const;
 export type SupportedPaymentProvider =
   (typeof SUPPORTED_PAYMENT_PROVIDERS)[number];
 

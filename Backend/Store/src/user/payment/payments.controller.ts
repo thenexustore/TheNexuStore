@@ -1,43 +1,26 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
-  Param,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
   Query,
   Req,
   Res,
   UseGuards,
-  HttpCode,
-  HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PaymentService } from './payment.service';
 import { RedsysNotification } from './redsys.service';
-import { AuthGuard } from '../../auth/auth.guard';
-import { InitiatePaymentDto } from './dto/payment.dto';
 import { CreateRedsysPaymentDto } from './dto/create-redsys-payment.dto';
+import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
-import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
 
-@Controller('payment')
-export class PaymentController {
+@Controller('payments')
+export class PaymentsController {
   constructor(private readonly paymentService: PaymentService) {}
-
-  @Post('initiate')
-  @UseGuards(AuthGuard, CsrfGuard, RateLimitGuard)
-  async initiatePayment(
-    @Req() req: Request & { user?: { id?: string } },
-    @Body() dto: InitiatePaymentDto,
-  ) {
-    return this.paymentService.createPayment({
-      orderId: dto.order_id,
-      provider: dto.provider,
-      returnUrl: dto.return_url,
-      customerId: req.user?.id,
-    });
-  }
 
   @Post('redsys/create')
   @UseGuards(OptionalAuthGuard, CsrfGuard, RateLimitGuard)
@@ -66,19 +49,9 @@ export class PaymentController {
     };
   }
 
-  @Post('redsys/notification')
-  @HttpCode(HttpStatus.OK)
-  async handleRedsysNotification(
-    @Body() notification: RedsysNotification,
-    @Res() res: Response,
-  ) {
-    await this.paymentService.handleRedsysNotification(notification);
-    res.status(HttpStatus.OK).send('OK');
-  }
-
   @Post('redsys/notify')
   @HttpCode(HttpStatus.OK)
-  async handleRedsysNotifyAlias(
+  async handleRedsysNotification(
     @Body() notification: RedsysNotification,
     @Res() res: Response,
   ) {
@@ -110,18 +83,5 @@ export class PaymentController {
       orderRef || dsOrder,
     );
     res.redirect(302, redirectUrl);
-  }
-
-  @Post('cod/confirm/:orderId')
-  @UseGuards(AuthGuard, CsrfGuard)
-  async confirmCODPayment(@Param('orderId') orderId: string) {
-    await this.paymentService.confirmCODDelivery(orderId);
-    return { success: true, message: 'COD payment confirmed' };
-  }
-
-  @Get('status/:orderId')
-  @UseGuards(AuthGuard)
-  async getPaymentStatus(@Param('orderId') orderId: string) {
-    return this.paymentService.getPaymentStatus(orderId);
   }
 }

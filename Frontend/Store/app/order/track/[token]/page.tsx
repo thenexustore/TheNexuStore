@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { getOrderByTrackingToken } from "@/app/lib/checkout";
 
@@ -14,7 +14,9 @@ const formatCurrency = (amount: number) => {
 
 export default function OrderTrackingPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params.token as string;
+  const paymentStatus = searchParams.get("payment");
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,16 @@ export default function OrderTrackingPage() {
               {order.status.replace("_", " ")}
             </span>
           </p>
+          {paymentStatus === "success" && (
+            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              Payment return received. Final confirmation is based on secure bank notification.
+            </p>
+          )}
+          {paymentStatus === "failed" && (
+            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              Payment was declined or canceled. You can retry payment from support/admin.
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -212,4 +224,3 @@ export default function OrderTrackingPage() {
     </div>
   );
 }
-

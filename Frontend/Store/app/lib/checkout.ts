@@ -20,7 +20,7 @@ export interface CreateOrderData {
   shipping_address: ShippingAddress;
   billing_address: BillingAddress;
   notes?: string;
-  payment_method?: "REDSYS" | "COD" | "STRIPE" | "PAYPAL";
+  payment_method?: "REDSYS" | "BIZUM" | "COD";
 }
 
 export interface OrderItem {
@@ -55,9 +55,25 @@ export interface PaymentIntent {
   amount: number;
   currency: string;
   status: string;
-  provider?: "REDSYS" | "COD" | "STRIPE" | "PAYPAL";
+  provider?: "REDSYS" | "BIZUM" | "COD";
   redirect_url?: string;
   form_data?: {
+    Ds_SignatureVersion: string;
+    Ds_MerchantParameters: string;
+    Ds_Signature: string;
+    formUrl: string;
+  };
+}
+
+export interface RedsysCreateResponse {
+  payment_id: string;
+  order_id: string;
+  provider: "REDSYS" | "BIZUM" | "COD";
+  formUrl?: string;
+  Ds_SignatureVersion?: string;
+  Ds_MerchantParameters?: string;
+  Ds_Signature?: string;
+  formData?: {
     Ds_SignatureVersion: string;
     Ds_MerchantParameters: string;
     Ds_Signature: string;
@@ -79,6 +95,25 @@ export const createOrder = async (
     {
       method: "POST",
       body: JSON.stringify(orderData),
+    },
+    sessionId,
+  );
+};
+
+export const createRedsysPayment = async (
+  payload: {
+    order_id: string;
+    payment_method?: "REDSYS" | "BIZUM";
+    tracking_token?: string;
+    phone?: string;
+  },
+  sessionId?: string,
+): Promise<RedsysCreateResponse> => {
+  return apiRequestWithSession(
+    "/payments/redsys/create",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
     },
     sessionId,
   );

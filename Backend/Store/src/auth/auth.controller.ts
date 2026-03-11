@@ -16,6 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import {
   ForgotPasswordDto,
+  ResendOtpDto,
   ResetPasswordDto,
   UpdateProfileDto,
   VerifyOtpDto,
@@ -48,6 +49,12 @@ export class AuthController {
   @Post('verify-otp')
   verifyOtp(@Body() body: VerifyOtpDto) {
     return this.auth.verifyOtp(body.email, body.otp);
+  }
+
+  @Post('resend-otp')
+  @UseGuards(RateLimitGuard)
+  resendOtp(@Body() body: ResendOtpDto) {
+    return this.auth.resendOtp(body.email);
   }
 
   @Post('login')
@@ -109,6 +116,10 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
     });
-    res.redirect(`${process.env.FRONTEND_URL}/store`);
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    res.redirect(`${frontendUrl}/store`);
   }
 }

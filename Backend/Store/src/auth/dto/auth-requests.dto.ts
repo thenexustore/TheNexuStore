@@ -19,6 +19,11 @@ export class VerifyOtpDto {
   otp!: string;
 }
 
+export class ResendOtpDto {
+  @IsEmail()
+  email!: string;
+}
+
 export class ForgotPasswordDto {
   @IsEmail()
   email!: string;

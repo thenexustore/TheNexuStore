@@ -27,39 +27,58 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async register(data: RegisterDto) {
-    const exists = await this.prisma.customer.findUnique({
-      where: { email: data.email },
-    });
-
-    if (exists) throw new BadRequestException('Email already exists');
-
-    const hash = await bcrypt.hash(data.password, 10);
-    const otp = this.generateOtp();
-
+  private async sendOtpOrThrow(email: string, otp: string, context: string) {
     try {
-      await this.mail.sendOtp(data.email, otp);
+      await this.mail.sendOtp(email, otp);
     } catch (error) {
       this.logger.error(
-        `Failed to send registration OTP to ${data.email}`,
+        `Failed to send ${context} OTP to ${email}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new ServiceUnavailableException(
         'Unable to send OTP email right now. Please try again later.',
       );
     }
+  }
 
-    await this.prisma.customer.create({
-      data: {
-        email: data.email,
-        password_hash: hash,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        profile_image: data.profile_image || null,
-        otp_code: otp,
-        otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
-      },
+  async register(data: RegisterDto) {
+    const existingUser = await this.prisma.customer.findUnique({
+      where: { email: data.email },
     });
+
+    if (existingUser?.is_active) {
+      throw new BadRequestException('Email already exists');
+    }
+
+    const hash = await bcrypt.hash(data.password, 10);
+    const otp = this.generateOtp();
+    await this.sendOtpOrThrow(data.email, otp, 'registration');
+
+    if (existingUser) {
+      await this.prisma.customer.update({
+        where: { email: data.email },
+        data: {
+          password_hash: hash,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          profile_image: data.profile_image || null,
+          otp_code: otp,
+          otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+    } else {
+      await this.prisma.customer.create({
+        data: {
+          email: data.email,
+          password_hash: hash,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          profile_image: data.profile_image || null,
+          otp_code: otp,
+          otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+    }
 
     return { success: true };
   }
@@ -88,6 +107,33 @@ export class AuthService {
     return { success: true };
   }
 
+  async resendOtp(email: string) {
+    const user = await this.prisma.customer.findUnique({ where: { email } });
+
+    if (!user) {
+      return { success: true };
+    }
+
+    if (user.is_active) {
+      throw new BadRequestException(
+        'Account already verified. Please login instead.',
+      );
+    }
+
+    const otp = this.generateOtp();
+    await this.sendOtpOrThrow(email, otp, 'registration-resend');
+
+    await this.prisma.customer.update({
+      where: { email },
+      data: {
+        otp_code: otp,
+        otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    });
+
+    return { success: true };
+  }
+
   async login(data: LoginDto) {
     const user = await this.prisma.customer.findUnique({
       where: { email: data.email },
@@ -106,20 +152,10 @@ export class AuthService {
 
   async forgotPassword(email: string) {
     const user = await this.prisma.customer.findUnique({ where: { email } });
-    if (!user) return { success: true };
+    if (!user || !user.is_active) return { success: true };
 
     const otp = this.generateOtp();
-    try {
-      await this.mail.sendOtp(email, otp);
-    } catch (error) {
-      this.logger.error(
-        `Failed to send forgot-password OTP to ${email}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-      throw new ServiceUnavailableException(
-        'Unable to send OTP email right now. Please try again later.',
-      );
-    }
+    await this.sendOtpOrThrow(email, otp, 'forgot-password');
 
     await this.prisma.customer.update({
       where: { email },

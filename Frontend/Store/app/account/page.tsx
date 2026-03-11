@@ -70,10 +70,66 @@ export default function AccountPage() {
   }, [router]);
 
   const handleSave = async () => {
+    if (loading) return;
+
+    const normalizedProfile = {
+      first_name: profile.first_name.trim(),
+      last_name: profile.last_name.trim(),
+      ...(profile.profile_image.trim()
+        ? { profile_image: profile.profile_image.trim() }
+        : {}),
+    };
+
+    if (!normalizedProfile.first_name || !normalizedProfile.last_name) {
+      setError("First and last name are required");
+      return;
+    }
+
+    const normalizedAddress = {
+      company: address.company.trim(),
+      address_line1: address.address_line1.trim(),
+      address_line2: address.address_line2.trim(),
+      city: address.city.trim(),
+      postal_code: address.postal_code.trim(),
+      region: address.region.trim(),
+      country: address.country.trim(),
+      phone: address.phone.trim(),
+      is_default: Boolean(address.is_default),
+    };
+
+    const hasAnyAddressField = [
+      normalizedAddress.company,
+      normalizedAddress.address_line1,
+      normalizedAddress.address_line2,
+      normalizedAddress.city,
+      normalizedAddress.postal_code,
+      normalizedAddress.region,
+      normalizedAddress.country,
+      normalizedAddress.phone,
+    ].some((value) => value.length > 0);
+
+    if (hasAnyAddressField) {
+      const requiredAddressFields = [
+        normalizedAddress.address_line1,
+        normalizedAddress.city,
+        normalizedAddress.postal_code,
+        normalizedAddress.region,
+        normalizedAddress.country,
+      ];
+
+      if (requiredAddressFields.some((value) => value.length === 0)) {
+        setError("Complete address line 1, city, postal code, region, and country");
+        return;
+      }
+    }
+
     setLoading(true);
     setError("");
     try {
-      await updateProfile({ profile, address });
+      await updateProfile({
+        profile: normalizedProfile,
+        ...(hasAnyAddressField ? { address: normalizedAddress } : {}),
+      });
       const fresh = await getMe();
       setUser(fresh);
       setEdit(false);

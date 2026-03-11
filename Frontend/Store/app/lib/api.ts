@@ -128,7 +128,11 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
       throw new Error(getApiErrorMessage(payload, "Unknown API error"));
     }
 
-    return payload.data;
+    if ("data" in payload) {
+      return payload.data;
+    }
+
+    return payload;
   }
 
   return payload;

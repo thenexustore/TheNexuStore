@@ -6,7 +6,7 @@ import {
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
-import { OrderStatus, StaffRole } from '@prisma/client';
+import { OrderStatus, Prisma, StaffRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
@@ -260,6 +260,12 @@ export class AdminService {
           skip,
           take: limit,
           orderBy: { created_at: 'desc' },
+          include: {
+            payments: {
+              orderBy: { created_at: 'desc' },
+              take: 1,
+            },
+          },
         }),
         this.prisma.order.count({ where }),
       ]);
@@ -272,11 +278,17 @@ export class AdminService {
         status: string;
         amount: any;
         createdAt: Date;
+        paymentStatus: string | null;
+        paymentProvider: string | null;
+        redsysResponseCode: string | null;
+        redsysAuthorizationCode: string | null;
       }> = [];
 
       for (const order of orders) {
         let customerEmail = order.email || 'Guest';
         let customerName = 'Guest';
+        const latestPayment = order.payments[0] || null;
+        const redsys = this.extractRedsysPayload(latestPayment?.raw_response ?? null);
 
         if (order.customer_id) {
           const customer = await this.prisma.customer.findUnique({
@@ -298,6 +310,10 @@ export class AdminService {
           status: order.status,
           amount: order.total_amount,
           createdAt: order.created_at,
+          paymentStatus: latestPayment?.status ?? null,
+          paymentProvider: latestPayment?.provider ?? null,
+          redsysResponseCode: redsys?.responseCode ?? null,
+          redsysAuthorizationCode: redsys?.authCode ?? null,
         });
       }
 
@@ -317,6 +333,11 @@ export class AdminService {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
+        include: {
+          payments: {
+            orderBy: { created_at: 'desc' },
+          },
+        },
       });
 
       if (!order) {
@@ -344,6 +365,15 @@ export class AdminService {
         ...order,
         customer,
         items,
+        payments: order.payments.map((payment) => {
+          const redsys = this.extractRedsysPayload(payment.raw_response);
+          return {
+            ...payment,
+            redsys_response_code: redsys?.responseCode ?? null,
+            redsys_authorization_code: redsys?.authCode ?? null,
+            redsys_payment_method: redsys?.payMethod ?? null,
+          };
+        }),
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -383,6 +413,30 @@ export class AdminService {
       affected: result.count,
       ids: uniqueIds,
       status,
+    };
+  }
+
+  private extractRedsysPayload(rawResponse: Prisma.JsonValue | null): {
+    responseCode?: string;
+    authCode?: string;
+    payMethod?: string;
+  } | null {
+    if (!rawResponse || typeof rawResponse !== 'object' || Array.isArray(rawResponse)) {
+      return null;
+    }
+
+    const container = rawResponse as Record<string, unknown>;
+    const redsys = container.redsys;
+    if (!redsys || typeof redsys !== 'object' || Array.isArray(redsys)) {
+      return null;
+    }
+
+    const parsed = redsys as Record<string, unknown>;
+    return {
+      responseCode:
+        typeof parsed.responseCode === 'string' ? parsed.responseCode : undefined,
+      authCode: typeof parsed.authCode === 'string' ? parsed.authCode : undefined,
+      payMethod: typeof parsed.payMethod === 'string' ? parsed.payMethod : undefined,
     };
   }
 

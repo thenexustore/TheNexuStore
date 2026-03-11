@@ -162,7 +162,7 @@ cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
-npm run build
+NODE_ENV=production npm run build
 pm2 delete nexus-frontend >/dev/null 2>&1 || true
 pm2 delete nexus-store >/dev/null 2>&1 || true
 pm2 start npm --name nexus-store --cwd "$REPO_DIR/Frontend/Store" -- start -- -p 3000
@@ -175,7 +175,7 @@ cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
-npm run build
+NODE_ENV=production npm run build
 pm2 delete nexus-admin >/dev/null 2>&1 || true
 pm2 start npm --name nexus-admin --cwd "$REPO_DIR/Frontend/admin" -- start -- -p 3001
 

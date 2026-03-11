@@ -8,6 +8,10 @@ export interface Order {
   status: string;
   amount: number;
   createdAt: string;
+  paymentStatus?: string | null;
+  paymentProvider?: string | null;
+  redsysResponseCode?: string | null;
+  redsysAuthorizationCode?: string | null;
 }
 
 export interface OrderTimelineEntry {
@@ -43,6 +47,18 @@ export interface OrderDetail {
         title: string;
       };
     };
+  }>;
+  payments: Array<{
+    id: string;
+    provider: string;
+    status: string;
+    amount: number;
+    currency: string;
+    provider_payment_id?: string | null;
+    raw_response?: unknown;
+    redsys_response_code?: string | null;
+    redsys_authorization_code?: string | null;
+    redsys_payment_method?: string | null;
   }>;
 }
 

@@ -60,6 +60,21 @@ INFORTISA_API_TOKEN=<token>
 FRONTEND_URL=https://www.thenexustore.com
 ```
 
+If customer auth features are enabled, include:
+
+```dotenv
+GOOGLE_CLIENT_ID=<google-client-id>
+GOOGLE_CLIENT_SECRET=<google-client-secret>
+GOOGLE_CALLBACK_URL=https://api.thenexustore.com/auth/google/callback
+MAIL_USER=<smtp-user>
+MAIL_PASS=<smtp-password-or-app-password>
+MAIL_HOST=<smtp-host> # optional, defaults to smtp.gmail.com
+MAIL_PORT=<smtp-port> # optional, defaults to 465
+MAIL_SECURE=<true|false> # optional, defaults by port
+MAIL_FROM=<optional-from-address>
+MAIL_FROM_NAME=NEXUS
+```
+
 Frontend env files:
 
 - `/opt/TheNexuStore/Frontend/Store/.env.production`

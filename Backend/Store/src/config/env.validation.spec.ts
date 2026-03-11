@@ -79,4 +79,24 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('Missing required environment variable: REDSYS_MERCHANT_CODE');
   });
+
+  it('throws when only MAIL_USER is provided', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        MAIL_USER: 'alerts@example.com',
+      }),
+    ).toThrow('Mail misconfiguration');
+  });
+
+  it('throws when MAIL_PORT is invalid', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        MAIL_USER: 'alerts@example.com',
+        MAIL_PASS: 'secret',
+        MAIL_PORT: 'not-a-port',
+      }),
+    ).toThrow('Invalid environment variable: MAIL_PORT');
+  });
 });

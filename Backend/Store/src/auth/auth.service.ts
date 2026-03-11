@@ -2,6 +2,8 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
+  ServiceUnavailableException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -13,6 +15,8 @@ import { UpdateProfileDto } from './dto/auth-requests.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
@@ -33,7 +37,17 @@ export class AuthService {
     const hash = await bcrypt.hash(data.password, 10);
     const otp = this.generateOtp();
 
-    await this.mail.sendOtp(data.email, otp);
+    try {
+      await this.mail.sendOtp(data.email, otp);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send registration OTP to ${data.email}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Unable to send OTP email right now. Please try again later.',
+      );
+    }
 
     await this.prisma.customer.create({
       data: {
@@ -95,7 +109,17 @@ export class AuthService {
     if (!user) return { success: true };
 
     const otp = this.generateOtp();
-    await this.mail.sendOtp(email, otp);
+    try {
+      await this.mail.sendOtp(email, otp);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send forgot-password OTP to ${email}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Unable to send OTP email right now. Please try again later.',
+      );
+    }
 
     await this.prisma.customer.update({
       where: { email },

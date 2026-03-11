@@ -230,7 +230,19 @@ export class CheckoutService {
     });
 
     const trackingUrl = `${this.FRONTEND_URL}/order/track/${result.order.tracking_token}`;
-    await this.mailService.sendOrderConfirmation(dto.email, result.order.order_number, trackingUrl);
+    try {
+      await this.mailService.sendOrderConfirmation(
+        dto.email,
+        result.order.order_number,
+        trackingUrl,
+      );
+    } catch (error) {
+      this.logger.warn('Failed to send order confirmation email', 'CheckoutService', {
+        orderId: result.order.id,
+        email: dto.email,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     this.logger.log('Checkout transaction completed', 'CheckoutService', {
       orderId: result.order.id,

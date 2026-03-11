@@ -76,8 +76,8 @@ export function loadStoreBranding(): StoreBranding {
 
   const cookieRaw = decodeCookieBranding(document.cookie);
   const merged: BrandingSettings = {
-    ...cookieRaw,
     ...raw,
+    ...cookieRaw,
   };
 
   return {

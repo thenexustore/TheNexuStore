@@ -110,6 +110,16 @@ export default function PricingPage() {
   }, [ruleScopeFilter, ruleActiveFilter]);
 
   useEffect(() => {
+    setForm((prev: any) => {
+      if (prev.scope === "GLOBAL") return { ...prev, category_id: "", brand_id: "", sku_code: "" };
+      if (prev.scope === "CATEGORY") return { ...prev, brand_id: "", sku_code: "" };
+      if (prev.scope === "BRAND") return { ...prev, category_id: "", sku_code: "" };
+      if (prev.scope === "SKU") return { ...prev, category_id: "", brand_id: "" };
+      return prev;
+    });
+  }, [form.scope]);
+
+  useEffect(() => {
     if (!jobId) return;
     const iv = setInterval(async () => {
       const next = await getRecalculateJob(jobId);
@@ -178,6 +188,14 @@ export default function PricingPage() {
     });
   }
 
+
+  function localDateTimeToIso(value: string) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  }
+
   function validateForm(): string | null {
     const margin = toNumberOrNull(form.margin_pct);
     const discount = toNumberOrNull(form.discount_pct);
@@ -186,6 +204,23 @@ export default function PricingPage() {
     if (margin < 0 || margin > 500) return isEn ? "Margin must be between 0 and 500" : "Margen debe estar entre 0 y 500";
     if (discount == null) return isEn ? "Discount is required" : "El descuento es obligatorio";
     if (discount < 0 || discount > 90) return isEn ? "Discount must be between 0 and 90" : "Descuento debe estar entre 0 y 90";
+
+    const priority = toNumberOrNull(form.priority);
+    if (priority == null || !Number.isInteger(priority)) return isEn ? "Priority must be an integer" : "La prioridad debe ser un número entero";
+    if (priority < -999 || priority > 999) return isEn ? "Priority must be between -999 and 999" : "La prioridad debe estar entre -999 y 999";
+
+    const minMarginPct = toNumberOrNull(form.min_margin_pct);
+    if (minMarginPct != null && (minMarginPct < 0 || minMarginPct > 500)) return isEn ? "Min margin % must be between 0 and 500" : "Margen mínimo % debe estar entre 0 y 500";
+
+    const minMarginAmount = toNumberOrNull(form.min_margin_amount);
+    if (minMarginAmount != null && (minMarginAmount < 0 || minMarginAmount > 1000000)) return isEn ? "Min margin € must be between 0 and 1000000" : "Margen mínimo € debe estar entre 0 y 1000000";
+
+    const startsAtIso = localDateTimeToIso(form.starts_at);
+    const endsAtIso = localDateTimeToIso(form.ends_at);
+    if (form.starts_at && !startsAtIso) return isEn ? "Invalid start date" : "Fecha de inicio inválida";
+    if (form.ends_at && !endsAtIso) return isEn ? "Invalid end date" : "Fecha de fin inválida";
+    if (startsAtIso && endsAtIso && startsAtIso > endsAtIso) return isEn ? "Start date must be before end date" : "La fecha de inicio debe ser anterior a la fecha de fin";
+
     if (form.scope === "CATEGORY" && !form.category_id) return isEn ? "Select a category" : "Selecciona una categoría";
     if (form.scope === "BRAND" && !form.brand_id) return isEn ? "Select a brand" : "Selecciona una marca";
     if (form.scope === "SKU" && !form.sku_code && !editing?.sku_id) return isEn ? "Provide SKU code" : "Indica el SKU code";
@@ -210,8 +245,8 @@ export default function PricingPage() {
       priority: Number(toNumberOrNull(form.priority) ?? 0),
       min_margin_pct: toNumberOrNull(form.min_margin_pct),
       min_margin_amount: toNumberOrNull(form.min_margin_amount),
-      starts_at: form.starts_at || null,
-      ends_at: form.ends_at || null,
+      starts_at: localDateTimeToIso(form.starts_at),
+      ends_at: localDateTimeToIso(form.ends_at),
       is_active: Boolean(form.is_active),
       category_id: form.category_id || null,
       brand_id: form.brand_id || null,
@@ -228,7 +263,14 @@ export default function PricingPage() {
       resetForm();
       await load();
     } catch (e: any) {
-      setError(e.message || (isEn ? "Could not save" : "No se pudo guardar"));
+      const message = e.message || (isEn ? "Could not save" : "No se pudo guardar");
+      if (message.toLowerCase().includes("rule not found")) {
+        resetForm();
+        await load();
+        setError(isEn ? "Rule no longer exists. List has been refreshed." : "La regla ya no existe. La lista se ha recargado.");
+        return;
+      }
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -431,7 +473,15 @@ export default function PricingPage() {
                       <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs ${r.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"}`}>{r.is_active ? (isEn ? "Active" : "Activa") : (isEn ? "Inactive" : "Inactiva")}</span></td>
                       <td className="p-3 space-x-2">
                         <button className="border rounded-lg px-2 py-1" onClick={() => openEdit(r)}>{isEn ? "Edit" : "Editar"}</button>
-                        <button className="border rounded-lg px-2 py-1 text-rose-600" onClick={async () => { if (!window.confirm(isEn ? "Delete rule?" : "Eliminar regla?")) return; await deletePricingRule(r.id); await load(); }}>{isEn ? "Delete" : "Eliminar"}</button>
+                        <button className="border rounded-lg px-2 py-1 text-rose-600" onClick={async () => {
+                          if (!window.confirm(isEn ? "Delete rule?" : "Eliminar regla?")) return;
+                          try {
+                            await deletePricingRule(r.id);
+                            await load();
+                          } catch (e: any) {
+                            setError(e.message || (isEn ? "Could not delete" : "No se pudo eliminar"));
+                          }
+                        }}>{isEn ? "Delete" : "Eliminar"}</button>
                       </td>
                     </tr>
                   ))}

@@ -1,4 +1,14 @@
 import { API_URL } from "./env";
+import { apiRequest } from "./api";
+
+async function getApiErrorMessage(res: Response, fallback: string): Promise<string> {
+  const err = await res.json().catch(() => null);
+  return (
+    err?.error?.message ||
+    err?.message ||
+    fallback
+  );
+}
 
 export async function registerUser(data: {
   first_name: string;
@@ -14,8 +24,7 @@ export async function registerUser(data: {
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || "Registration failed");
+    throw new Error(await getApiErrorMessage(res, "Registration failed"));
   }
 
   return res.json();
@@ -29,8 +38,7 @@ export async function verifyOtp(data: { email: string; otp: string }) {
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || "OTP verification failed");
+    throw new Error(await getApiErrorMessage(res, "OTP verification failed"));
   }
 
   return res.json();
@@ -45,7 +53,7 @@ export async function loginUser(data: { email: string; password: string }) {
   });
 
   if (!res.ok) {
-    throw new Error("Invalid credentials");
+    throw new Error(await getApiErrorMessage(res, "Invalid credentials"));
   }
 
   return res.json();
@@ -75,7 +83,7 @@ export async function forgotPassword(data: { email: string }) {
   });
 
   if (!res.ok) {
-    throw new Error("Failed to send OTP");
+    throw new Error(await getApiErrorMessage(res, "Failed to send OTP"));
   }
 
   return res.json();
@@ -93,7 +101,7 @@ export async function resetPassword(data: {
   });
 
   if (!res.ok) {
-    throw new Error("Reset failed");
+    throw new Error(await getApiErrorMessage(res, "Reset failed"));
   }
 
   return res.json();
@@ -118,17 +126,8 @@ export async function updateProfile(data: {
     is_default?: boolean;
   };
 }) {
-  const res = await fetch(`${API_URL}/auth/profile`, {
+  return apiRequest("/auth/profile", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
     body: JSON.stringify(data),
   });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || "Profile update failed");
-  }
-
-  return res.json();
 }

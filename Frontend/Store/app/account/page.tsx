@@ -9,6 +9,7 @@ export default function AccountPage() {
   const [user, setUser] = useState(null as any);
   const [edit, setEdit] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [profile, setProfile] = useState({
     first_name: "",
@@ -70,11 +71,17 @@ export default function AccountPage() {
 
   const handleSave = async () => {
     setLoading(true);
-    await updateProfile({ profile, address });
-    const fresh = await getMe();
-    setUser(fresh);
-    setEdit(false);
-    setLoading(false);
+    setError("");
+    try {
+      await updateProfile({ profile, address });
+      const fresh = await getMe();
+      setUser(fresh);
+      setEdit(false);
+    } catch (err: any) {
+      setError(err?.message || "Failed to update profile");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!user) return null;
@@ -121,6 +128,12 @@ export default function AccountPage() {
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Avatar & Basic Info */}

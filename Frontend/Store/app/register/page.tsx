@@ -18,6 +18,16 @@ import { registerUser, verifyOtp } from "../lib/auth";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "../components/StoreBrandLogo";
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+  return fallback;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState("register");
@@ -59,8 +69,8 @@ export default function RegisterPage() {
       const profile_image = image ? String(await toBase64(image)) : null;
       await registerUser({ ...form, profile_image });
       setStep("verify");
-    } catch (err: any) {
-      setError(err?.message || "Registration failed");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -73,8 +83,8 @@ export default function RegisterPage() {
     try {
       await verifyOtp({ email: form.email, otp });
       router.replace("/login");
-    } catch (err: any) {
-      setError(err?.message || "Invalid verification code");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Invalid verification code"));
     } finally {
       setLoading(false);
     }
@@ -100,7 +110,7 @@ export default function RegisterPage() {
 
         <div className="bg-white border-[3px] border-black p-8 md:p-12 shadow-[16px_16px_0px_0px_rgba(0,0,0,1)]">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 text-red-600 text-[10px] font-black uppercase tracking-widest">
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 text-red-600 text-[10px] font-black uppercase tracking-widest whitespace-pre-wrap break-words">
               {error}
             </div>
           )}

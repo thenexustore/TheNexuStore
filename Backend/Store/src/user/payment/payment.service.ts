@@ -500,10 +500,29 @@ export class PaymentService {
       return this.withPaymentStatus(this.FRONTEND_URL, status);
     }
 
+    const resolvedStatus = this.resolveRedsysReturnStatus(payment.status, status);
     return this.withPaymentStatus(
       `${this.FRONTEND_URL}/order/track/${payment.order.tracking_token}`,
-      status,
+      resolvedStatus,
     );
+  }
+
+  private resolveRedsysReturnStatus(
+    paymentStatus: PaymentStatus,
+    fallbackStatus: 'success' | 'failed',
+  ): 'success' | 'failed' | 'pending' {
+    switch (paymentStatus) {
+      case 'CAPTURED':
+      case 'AUTHORIZED':
+      case 'REFUNDED':
+      case 'PARTIAL_REFUND':
+        return 'success';
+      case 'FAILED':
+        return 'failed';
+      case 'INITIATED':
+      default:
+        return fallbackStatus === 'failed' ? 'failed' : 'pending';
+    }
   }
 
   private withPaymentStatus(

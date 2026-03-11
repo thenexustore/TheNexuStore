@@ -16,6 +16,13 @@ const formatCurrency = (amount: number) => {
 
 const CHECKOUT_FORM_ID = "checkout-form";
 
+type RedsysRedirectFormData = {
+  Ds_SignatureVersion: string;
+  Ds_MerchantParameters: string;
+  Ds_Signature: string;
+  formUrl: string;
+};
+
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();
@@ -26,6 +33,9 @@ export default function CheckoutPage() {
   const [hasRedirected, setHasRedirected] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"REDSYS" | "BIZUM" | "COD">("REDSYS");
   const checkoutFormRef = useRef<HTMLFormElement>(null);
+  const redsysRedirectFormRef = useRef<HTMLFormElement>(null);
+  const [redsysRedirectForm, setRedsysRedirectForm] =
+    useState<RedsysRedirectFormData | null>(null);
 
   const freeShippingRemaining = useMemo(
     () => Math.max(0, 100 - (cart?.summary.subtotal || 0)),
@@ -120,6 +130,11 @@ export default function CheckoutPage() {
     refreshCartWithDestination,
   ]);
 
+  useEffect(() => {
+    if (!redsysRedirectForm) return;
+    redsysRedirectFormRef.current?.submit();
+  }, [redsysRedirectForm]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -207,7 +222,7 @@ export default function CheckoutPage() {
           },
           getSessionId(),
         );
-        const redsysForm = redsysIntent?.formData || {
+        const redsysForm: RedsysRedirectFormData = redsysIntent?.formData || {
           Ds_SignatureVersion: redsysIntent?.Ds_SignatureVersion || "",
           Ds_MerchantParameters: redsysIntent?.Ds_MerchantParameters || "",
           Ds_Signature: redsysIntent?.Ds_Signature || "",
@@ -220,27 +235,8 @@ export default function CheckoutPage() {
           redsysForm.Ds_Signature &&
           redsysForm.Ds_SignatureVersion
         ) {
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = redsysForm.formUrl;
-
-        const fields = [
-          ["Ds_SignatureVersion", redsysForm.Ds_SignatureVersion],
-          ["Ds_MerchantParameters", redsysForm.Ds_MerchantParameters],
-          ["Ds_Signature", redsysForm.Ds_Signature],
-        ];
-
-        for (const [name, value] of fields) {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = name;
-          input.value = value;
-          form.appendChild(input);
-        }
-
-        document.body.appendChild(form);
-        form.submit();
-        return;
+          setRedsysRedirectForm(redsysForm);
+          return;
         }
 
         throw new Error("Redsys payment form was not generated");
@@ -694,6 +690,29 @@ export default function CheckoutPage() {
           {loading ? t("processing") : `${t("placeOrder")} · ${formatCurrency(cart.summary.total)}`}
         </button>
       </div>
+
+      <form
+        ref={redsysRedirectFormRef}
+        method="POST"
+        action={redsysRedirectForm?.formUrl || ""}
+        className="hidden"
+      >
+        <input
+          type="hidden"
+          name="Ds_SignatureVersion"
+          value={redsysRedirectForm?.Ds_SignatureVersion || ""}
+        />
+        <input
+          type="hidden"
+          name="Ds_MerchantParameters"
+          value={redsysRedirectForm?.Ds_MerchantParameters || ""}
+        />
+        <input
+          type="hidden"
+          name="Ds_Signature"
+          value={redsysRedirectForm?.Ds_Signature || ""}
+        />
+      </form>
 
     </div>
   );

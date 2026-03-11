@@ -3,8 +3,8 @@ import { API_URL } from "./env";
 type ApiEnvelope<T> = {
   success: boolean;
   data?: T;
-  message?: string;
-  error?: string;
+  message?: unknown;
+  error?: unknown;
 };
 
 let csrfTokenCache: string | null = null;
@@ -17,6 +17,45 @@ function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
     "success" in value &&
     typeof (value as ApiEnvelope<unknown>).success === "boolean"
   );
+}
+
+function toErrorMessage(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => toErrorMessage(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(", ") : null;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const candidates = [
+      record.message,
+      record.error,
+      record.detail,
+      record.title,
+      record.reason,
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = toErrorMessage(candidate);
+      if (parsed) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getApiErrorMessage(payload: unknown, fallback: string): string {
+  const parsed = toErrorMessage(payload);
+  return parsed ?? fallback;
 }
 
 const isMutationMethod = (method: string) =>
@@ -79,25 +118,14 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    if (isApiEnvelope(payload)) {
-      throw new Error(
-        payload.message || payload.error || `API error: ${response.statusText}`,
-      );
-    }
-
-    if (payload && typeof payload === "object" && "message" in payload) {
-      throw new Error(
-        String((payload as { message?: string }).message) ||
-          `API error: ${response.statusText}`,
-      );
-    }
-
-    throw new Error(`API error: ${response.statusText}`);
+    throw new Error(
+      getApiErrorMessage(payload, `API error: ${response.statusText}`),
+    );
   }
 
   if (isApiEnvelope(payload)) {
     if (!payload.success) {
-      throw new Error(payload.message || payload.error || "Unknown API error");
+      throw new Error(getApiErrorMessage(payload, "Unknown API error"));
     }
 
     return payload.data;

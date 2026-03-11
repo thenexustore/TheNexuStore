@@ -25,11 +25,32 @@ export interface CreateOrderData {
 
 export interface OrderItem {
   id: string;
-  title: string;
-  sku_code: string;
-  quantity: number;
+  title?: string;
+  title_snapshot?: string;
+  sku_code?: string;
+  quantity?: number;
+  qty?: number;
   unit_price: number;
   line_total: number;
+}
+
+export interface OrderPayment {
+  id: string;
+  provider: "REDSYS" | "BIZUM" | "COD" | "STRIPE" | "PAYPAL";
+  status: string;
+  amount: number;
+  currency: string;
+  created_at?: string;
+}
+
+export interface Shipment {
+  id: string;
+  carrier: string;
+  status: string;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  shipped_at?: string | null;
+  delivered_at?: string | null;
 }
 
 export interface Order {
@@ -45,6 +66,8 @@ export interface Order {
   currency: string;
   created_at: string;
   items?: OrderItem[];
+  payments?: OrderPayment[];
+  shipments?: Shipment[];
   shipping_address: ShippingAddress;
   billing_address: BillingAddress;
 }
@@ -144,7 +167,7 @@ export const createPaymentIntent = async (
 export const confirmPayment = async (
   paymentIntentId: string,
   paymentMethodId: string,
-): Promise<any> => {
+): Promise<unknown> => {
   return apiRequest("/checkout/confirm-payment", {
     method: "POST",
     body: JSON.stringify({

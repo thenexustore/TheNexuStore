@@ -24,37 +24,71 @@ export class HomepageSectionsService {
     private readonly bannersService: BannersService,
   ) {}
 
-  private validateConfig(type: HomepageSectionType, config: Record<string, any>) {
+  private validateConfig(
+    type: HomepageSectionType,
+    config: Record<string, any>,
+  ) {
     if (!config || typeof config !== 'object') {
       throw new BadRequestException('config_json must be an object');
     }
 
     const source = config.source || 'query';
     if (!['manual', 'query'].includes(source)) {
-      throw new BadRequestException('config_json.source must be manual or query');
+      throw new BadRequestException(
+        'config_json.source must be manual or query',
+      );
     }
 
     const limit = config.limit ?? config?.query?.limit;
-    if (limit !== undefined && (typeof limit !== 'number' || limit < 1 || limit > 24)) {
+    if (
+      limit !== undefined &&
+      (typeof limit !== 'number' || limit < 1 || limit > 24)
+    ) {
       throw new BadRequestException('limit must be a number between 1 and 24');
     }
 
     if (source === 'manual' && !Array.isArray(config.ids)) {
-      throw new BadRequestException('manual source requires config_json.ids array');
+      throw new BadRequestException(
+        'manual source requires config_json.ids array',
+      );
     }
 
     if (source === 'query') {
       const query = config.query;
       if (query && typeof query === 'object') {
-        if (![HomepageQueryType.PRODUCTS, HomepageQueryType.CATEGORIES, HomepageQueryType.BRANDS].includes(query.type)) {
-          throw new BadRequestException('query.type must be products, categories or brands');
+        if (
+          ![
+            HomepageQueryType.PRODUCTS,
+            HomepageQueryType.CATEGORIES,
+            HomepageQueryType.BRANDS,
+          ].includes(query.type)
+        ) {
+          throw new BadRequestException(
+            'query.type must be products, categories or brands',
+          );
         }
 
-        if (query.type !== HomepageQueryType.PRODUCTS && (query.categoryId || query.brandId || query.priceMin !== undefined || query.priceMax !== undefined)) {
-          throw new BadRequestException('category/brand/price filters are valid only for products query');
+        if (
+          query.type !== HomepageQueryType.PRODUCTS &&
+          (query.categoryId ||
+            query.brandId ||
+            query.priceMin !== undefined ||
+            query.priceMax !== undefined)
+        ) {
+          throw new BadRequestException(
+            'category/brand/price filters are valid only for products query',
+          );
         }
 
-        if (query.sortBy && ![HomepageQuerySortBy.NEWEST, HomepageQuerySortBy.PRICE_ASC, HomepageQuerySortBy.PRICE_DESC, HomepageQuerySortBy.DISCOUNT_DESC].includes(query.sortBy)) {
+        if (
+          query.sortBy &&
+          ![
+            HomepageQuerySortBy.NEWEST,
+            HomepageQuerySortBy.PRICE_ASC,
+            HomepageQuerySortBy.PRICE_DESC,
+            HomepageQuerySortBy.DISCOUNT_DESC,
+          ].includes(query.sortBy)
+        ) {
           throw new BadRequestException('Invalid query.sortBy');
         }
 
@@ -63,16 +97,22 @@ export class HomepageSectionsService {
           query.priceMax !== undefined &&
           Number(query.priceMin) > Number(query.priceMax)
         ) {
-          throw new BadRequestException('query.priceMin cannot be greater than query.priceMax');
+          throw new BadRequestException(
+            'query.priceMin cannot be greater than query.priceMax',
+          );
         }
       }
     }
 
-    if (type === HomepageSectionType.TRUST_BAR && !Array.isArray(config.items)) {
-      throw new BadRequestException('TRUST_BAR config_json.items must be an array');
+    if (
+      type === HomepageSectionType.TRUST_BAR &&
+      !Array.isArray(config.items)
+    ) {
+      throw new BadRequestException(
+        'TRUST_BAR config_json.items must be an array',
+      );
     }
   }
-
 
   private normalizeConfigBySectionType(
     type: HomepageSectionType,
@@ -102,13 +142,24 @@ export class HomepageSectionsService {
     return next;
   }
 
-  private clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  private clampNumber(
+    value: unknown,
+    min: number,
+    max: number,
+    fallback: number,
+  ) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return fallback;
     return Math.min(max, Math.max(min, Math.round(numeric)));
   }
 
-  private getSectionConfigIssues(section: { id: string; type: string; enabled: boolean; title: string | null; config_json: unknown }) {
+  private getSectionConfigIssues(section: {
+    id: string;
+    type: string;
+    enabled: boolean;
+    title: string | null;
+    config_json: unknown;
+  }) {
     const config = ((section.config_json || {}) as Record<string, any>) || {};
     const issues: string[] = [];
 
@@ -128,26 +179,50 @@ export class HomepageSectionsService {
     if (source === 'query') {
       const query = (config.query || {}) as Record<string, any>;
       const limit = query.limit ?? config.limit;
-      if (limit !== undefined && (typeof limit !== 'number' || limit < 1 || limit > 24)) {
+      if (
+        limit !== undefined &&
+        (typeof limit !== 'number' || limit < 1 || limit > 24)
+      ) {
         issues.push('query.limit debe estar entre 1 y 24.');
       }
 
       if (
-        [HomepageSectionType.BEST_DEALS, HomepageSectionType.NEW_ARRIVALS, HomepageSectionType.FEATURED_PICKS].includes(section.type as HomepageSectionType)
+        [
+          HomepageSectionType.PRODUCT_CAROUSEL,
+          HomepageSectionType.BEST_DEALS,
+          HomepageSectionType.NEW_ARRIVALS,
+          HomepageSectionType.FEATURED_PICKS,
+        ].includes(section.type as HomepageSectionType)
       ) {
         if (query.type && query.type !== HomepageQueryType.PRODUCTS) {
-          issues.push('Las secciones de productos deben usar query.type="products".');
+          issues.push(
+            'Las secciones de productos deben usar query.type="products".',
+          );
         }
 
-        if (config.carousel_interval_ms !== undefined && (typeof config.carousel_interval_ms !== 'number' || config.carousel_interval_ms < 2000)) {
+        if (
+          config.carousel_interval_ms !== undefined &&
+          (typeof config.carousel_interval_ms !== 'number' ||
+            config.carousel_interval_ms < 2000)
+        ) {
           issues.push('carousel_interval_ms debe ser >= 2000 ms.');
         }
 
-        if (config.carousel_items_desktop !== undefined && (typeof config.carousel_items_desktop !== 'number' || config.carousel_items_desktop < 2 || config.carousel_items_desktop > 6)) {
+        if (
+          config.carousel_items_desktop !== undefined &&
+          (typeof config.carousel_items_desktop !== 'number' ||
+            config.carousel_items_desktop < 2 ||
+            config.carousel_items_desktop > 6)
+        ) {
           issues.push('carousel_items_desktop debe estar entre 2 y 6.');
         }
 
-        if (config.carousel_items_mobile !== undefined && (typeof config.carousel_items_mobile !== 'number' || config.carousel_items_mobile < 1 || config.carousel_items_mobile > 3)) {
+        if (
+          config.carousel_items_mobile !== undefined &&
+          (typeof config.carousel_items_mobile !== 'number' ||
+            config.carousel_items_mobile < 1 ||
+            config.carousel_items_mobile > 3)
+        ) {
           issues.push('carousel_items_mobile debe estar entre 1 y 3.');
         }
       }
@@ -156,8 +231,18 @@ export class HomepageSectionsService {
     return issues;
   }
 
-  private normalizeProductCarouselConfig(type: HomepageSectionType, config: Record<string, any>) {
-    if (![HomepageSectionType.BEST_DEALS, HomepageSectionType.NEW_ARRIVALS, HomepageSectionType.FEATURED_PICKS].includes(type)) {
+  private normalizeProductCarouselConfig(
+    type: HomepageSectionType,
+    config: Record<string, any>,
+  ) {
+    if (
+      ![
+        HomepageSectionType.PRODUCT_CAROUSEL,
+        HomepageSectionType.BEST_DEALS,
+        HomepageSectionType.NEW_ARRIVALS,
+        HomepageSectionType.FEATURED_PICKS,
+      ].includes(type)
+    ) {
       return config;
     }
 
@@ -165,9 +250,24 @@ export class HomepageSectionsService {
       ...config,
       carousel_enabled: Boolean(config.carousel_enabled ?? true),
       carousel_autoplay: Boolean(config.carousel_autoplay ?? true),
-      carousel_interval_ms: this.clampNumber(config.carousel_interval_ms, 2000, 15000, 4500),
-      carousel_items_desktop: this.clampNumber(config.carousel_items_desktop, 2, 6, 4),
-      carousel_items_mobile: this.clampNumber(config.carousel_items_mobile, 1, 3, 2),
+      carousel_interval_ms: this.clampNumber(
+        config.carousel_interval_ms,
+        2000,
+        15000,
+        4500,
+      ),
+      carousel_items_desktop: this.clampNumber(
+        config.carousel_items_desktop,
+        2,
+        6,
+        4,
+      ),
+      carousel_items_mobile: this.clampNumber(
+        config.carousel_items_mobile,
+        1,
+        3,
+        2,
+      ),
     };
   }
 
@@ -176,10 +276,17 @@ export class HomepageSectionsService {
     config: Record<string, any>,
   ) {
     if (type === HomepageSectionType.FEATURED_PICKS) {
-      return (config.source || 'query') === 'manual' && Array.isArray(config.ids) && config.ids.length === 0;
+      return (
+        (config.source || 'query') === 'manual' &&
+        Array.isArray(config.ids) &&
+        config.ids.length === 0
+      );
     }
 
-    if (type === HomepageSectionType.TOP_CATEGORIES_GRID || type === HomepageSectionType.BRANDS_STRIP) {
+    if (
+      type === HomepageSectionType.TOP_CATEGORIES_GRID ||
+      type === HomepageSectionType.BRANDS_STRIP
+    ) {
       return !config.source || !config.query;
     }
 
@@ -211,7 +318,9 @@ export class HomepageSectionsService {
       return;
     }
 
-    const sectionByType = new Map(existingSections.map((section) => [section.type, section]));
+    const sectionByType = new Map(
+      existingSections.map((section) => [section.type, section]),
+    );
 
     let nextPosition = existingSections.length
       ? Math.max(...existingSections.map((item) => item.position || 0))
@@ -235,7 +344,10 @@ export class HomepageSectionsService {
         continue;
       }
 
-      const existingConfig = (existing.config_json || {}) as Record<string, any>;
+      const existingConfig = (existing.config_json || {}) as Record<
+        string,
+        any
+      >;
       if (this.shouldBackfillLegacyConfig(section.type, existingConfig)) {
         await this.prisma.homepageSection.update({
           where: { id: existing.id },
@@ -247,13 +359,14 @@ export class HomepageSectionsService {
 
   async getAdminSections() {
     await this.ensureDefaultSections();
-    return this.prisma.homepageSection.findMany({ orderBy: { position: 'asc' } });
+    return this.prisma.homepageSection.findMany({
+      orderBy: { position: 'asc' },
+    });
   }
-
-
 
   private isProductSectionType(type: string) {
     return [
+      HomepageSectionType.PRODUCT_CAROUSEL,
       HomepageSectionType.BEST_DEALS,
       HomepageSectionType.NEW_ARRIVALS,
       HomepageSectionType.FEATURED_PICKS,
@@ -281,27 +394,44 @@ export class HomepageSectionsService {
       .map(([type, count]) => ({ type, count }));
 
     const publicSections = await this.getPublicSections();
-    const failedPublicSections = publicSections.filter((section) => (section as any).failed === true).length;
+    const failedPublicSections = publicSections.filter(
+      (section) => (section as any).failed === true,
+    ).length;
     const emptyPublicSections = publicSections.filter((section) => {
       const data = (section as any).data;
       return Array.isArray(data) ? data.length === 0 : !data;
     }).length;
 
-    const activeBanners = await this.prisma.banner.count({ where: { is_active: true } });
-    const activeFeaturedProducts = await this.prisma.featuredProduct.count({ where: { is_active: true } });
+    const activeBanners = await this.prisma.banner.count({
+      where: { is_active: true },
+    });
+    const activeFeaturedProducts = await this.prisma.featuredProduct.count({
+      where: { is_active: true },
+    });
     const [totalBrands, brandsWithLogo] = await Promise.all([
       this.prisma.brand.count({ where: { is_active: true } }),
-      this.prisma.brand.count({ where: { is_active: true, NOT: [{ logo_url: null }, { logo_url: '' }] } }),
+      this.prisma.brand.count({
+        where: { is_active: true, NOT: [{ logo_url: null }, { logo_url: '' }] },
+      }),
     ]);
     const brandsMissingLogo = totalBrands - brandsWithLogo;
 
-    const heroSections = sections.filter((section) => section.type === HomepageSectionType.HERO_BANNER_SLIDER);
-    const heroEnabledSections = heroSections.filter((section) => section.enabled).length;
+    const heroSections = sections.filter(
+      (section) => section.type === HomepageSectionType.HERO_BANNER_SLIDER,
+    );
+    const heroEnabledSections = heroSections.filter(
+      (section) => section.enabled,
+    ).length;
 
-    const featuredPicksSections = sections.filter((section) => section.type === HomepageSectionType.FEATURED_PICKS);
+    const featuredPicksSections = sections.filter(
+      (section) => section.type === HomepageSectionType.FEATURED_PICKS,
+    );
     const featuredManualLinked = featuredPicksSections.some((section) => {
       const config = (section.config_json || {}) as Record<string, any>;
-      return section.enabled && (config.source === 'manual' || Array.isArray(config.ids));
+      return (
+        section.enabled &&
+        (config.source === 'manual' || Array.isArray(config.ids))
+      );
     });
 
     const invalidConfigSections = sections
@@ -314,6 +444,7 @@ export class HomepageSectionsService {
       .filter((section) => section.issues.length > 0);
 
     const productSectionTypes = new Set([
+      HomepageSectionType.PRODUCT_CAROUSEL,
       HomepageSectionType.BEST_DEALS,
       HomepageSectionType.NEW_ARRIVALS,
       HomepageSectionType.FEATURED_PICKS,
@@ -321,22 +452,39 @@ export class HomepageSectionsService {
 
     const emptyEnabledProductSections = publicSections
       .filter((section) => productSectionTypes.has((section as any).type))
-      .filter((section) => Array.isArray((section as any).data) && (section as any).data.length === 0)
+      .filter(
+        (section) =>
+          Array.isArray((section as any).data) &&
+          (section as any).data.length === 0,
+      )
       .map((section) => ({
         id: (section as any).id,
         type: (section as any).type,
         title: (section as any).title,
       }));
 
-    const productSectionsPublic = publicSections.filter((section: any) => this.isProductSectionType(section.type));
+    const productSectionsPublic = publicSections.filter((section: any) =>
+      this.isProductSectionType(section.type),
+    );
     const sectionSkus = productSectionsPublic.map((section: any) => ({
       id: section.id,
       title: section.title,
       type: section.type,
-      skus: new Set((Array.isArray(section.data) ? section.data : []).map((p: any) => String(p.id))),
+      skus: new Set(
+        (Array.isArray(section.data) ? section.data : []).map((p: any) =>
+          String(p.id),
+        ),
+      ),
     }));
 
-    const overlaps: Array<{ aId: string; aTitle?: string; bId: string; bTitle?: string; overlapPct: number; shared: number }> = [];
+    const overlaps: Array<{
+      aId: string;
+      aTitle?: string;
+      bId: string;
+      bTitle?: string;
+      overlapPct: number;
+      shared: number;
+    }> = [];
     for (let i = 0; i < sectionSkus.length; i++) {
       for (let j = i + 1; j < sectionSkus.length; j++) {
         const a = sectionSkus[i];
@@ -344,25 +492,40 @@ export class HomepageSectionsService {
         if (!a.skus.size || !b.skus.size) continue;
         let shared = 0;
         for (const id of a.skus) if (b.skus.has(id)) shared++;
-        const overlapPct = Math.round((shared / Math.max(1, Math.min(a.skus.size, b.skus.size))) * 100);
+        const overlapPct = Math.round(
+          (shared / Math.max(1, Math.min(a.skus.size, b.skus.size))) * 100,
+        );
         if (overlapPct >= 70) {
-          overlaps.push({ aId: a.id, aTitle: a.title || a.type, bId: b.id, bTitle: b.title || b.type, overlapPct, shared });
+          overlaps.push({
+            aId: a.id,
+            aTitle: a.title || a.type,
+            bId: b.id,
+            bTitle: b.title || b.type,
+            overlapPct,
+            shared,
+          });
         }
       }
     }
 
     const requiredVisibleTypes: HomepageSectionType[] = [
       HomepageSectionType.HERO_BANNER_SLIDER,
-      HomepageSectionType.TOP_CATEGORIES_GRID,
+      HomepageSectionType.PRODUCT_CAROUSEL,
       HomepageSectionType.BRANDS_STRIP,
+      HomepageSectionType.TRUST_BAR,
     ];
-    const missingVisibleTypes = requiredVisibleTypes.filter((type) => !sections.some((s) => s.type === type && s.enabled));
+    const missingVisibleTypes = requiredVisibleTypes.filter(
+      (type) => !sections.some((s) => s.type === type && s.enabled),
+    );
 
     const healthDeductions = [
       Math.min(30, emptyEnabledProductSections.length * 12),
       Math.min(20, invalidConfigSections.length * 8),
       Math.min(15, overlaps.length * 8),
-      Math.min(15, Math.round((brandsMissingLogo / Math.max(1, totalBrands)) * 15)),
+      Math.min(
+        15,
+        Math.round((brandsMissingLogo / Math.max(1, totalBrands)) * 15),
+      ),
       Math.min(20, missingVisibleTypes.length * 7),
     ].reduce((a, b) => a + b, 0);
     const healthScore = Math.max(0, 100 - healthDeductions);
@@ -393,7 +556,8 @@ export class HomepageSectionsService {
         hasVisibleSections: enabled > 0,
         storePayloadOk: failedPublicSections === 0,
         bannersLinkedToHome: activeBanners === 0 || heroEnabledSections > 0,
-        featuredLinkedToHome: activeFeaturedProducts === 0 || featuredManualLinked,
+        featuredLinkedToHome:
+          activeFeaturedProducts === 0 || featuredManualLinked,
         configsValid: invalidConfigSections.length === 0,
         brandLogosHealthy: totalBrands === 0 || brandsMissingLogo === 0,
         productSectionsHaveData: emptyEnabledProductSections.length === 0,
@@ -401,16 +565,24 @@ export class HomepageSectionsService {
       overlapWarnings: overlaps,
       missingVisibleTypes,
       healthScore,
-      publishReadiness: healthScore >= 75 && failedPublicSections === 0 && invalidConfigSections.length === 0,
+      publishReadiness:
+        healthScore >= 75 &&
+        failedPublicSections === 0 &&
+        invalidConfigSections.length === 0,
     };
   }
 
   async getSectionPreview(sectionId: string) {
-    const section = await this.prisma.homepageSection.findUnique({ where: { id: sectionId } });
+    const section = await this.prisma.homepageSection.findUnique({
+      where: { id: sectionId },
+    });
     if (!section) throw new BadRequestException('Section not found');
 
     const config = (section.config_json || {}) as Record<string, any>;
-    const data = await this.resolveSectionData(section.type as HomepageSectionType, config);
+    const data = await this.resolveSectionData(
+      section.type as HomepageSectionType,
+      config,
+    );
 
     if (!this.isProductSectionType(section.type)) {
       return {
@@ -423,8 +595,13 @@ export class HomepageSectionsService {
     }
 
     const products = Array.isArray(data) ? data : [];
-    const inStockCount = products.filter((p: any) => Number(p.stock_quantity || 0) > 0 || p.stock_status === 'IN_STOCK').length;
-    const withDiscountCount = products.filter((p: any) => Number(p.discount_percentage || p.discount_pct || 0) > 0).length;
+    const inStockCount = products.filter(
+      (p: any) =>
+        Number(p.stock_quantity || 0) > 0 || p.stock_status === 'IN_STOCK',
+    ).length;
+    const withDiscountCount = products.filter(
+      (p: any) => Number(p.discount_percentage || p.discount_pct || 0) > 0,
+    ).length;
 
     const brandsMap = new Map<string, number>();
     for (const p of products) {
@@ -480,7 +657,11 @@ export class HomepageSectionsService {
       include: {
         brand: true,
         main_category: true,
-        media: { where: { sku_id: null }, orderBy: { sort_order: 'asc' }, take: 1 },
+        media: {
+          where: { sku_id: null },
+          orderBy: { sort_order: 'asc' },
+          take: 1,
+        },
         skus: {
           include: { prices: true, inventory: true },
           orderBy: { created_at: 'asc' },
@@ -492,9 +673,14 @@ export class HomepageSectionsService {
     const order = new Map(ids.map((id, index) => [id, index]));
 
     return products
-      .sort((a, b) => Number(order.get(a.id) ?? 10_000) - Number(order.get(b.id) ?? 10_000))
+      .sort(
+        (a, b) =>
+          Number(order.get(a.id) ?? 10_000) - Number(order.get(b.id) ?? 10_000),
+      )
       .map((p) => {
-        const sku = p.skus.find((candidate) => (candidate.prices || []).length > 0) || p.skus[0];
+        const sku =
+          p.skus.find((candidate) => (candidate.prices || []).length > 0) ||
+          p.skus[0];
         const price = sku?.prices?.[0];
         const priceValue = Number(price?.sale_price || 0);
         const compareAt = price?.compare_at_price
@@ -526,17 +712,26 @@ export class HomepageSectionsService {
       .filter(Boolean);
   }
 
-  private async executeProductsQuery(config: Record<string, any>, sectionType: HomepageSectionType) {
+  private async executeProductsQuery(
+    config: Record<string, any>,
+    sectionType: HomepageSectionType,
+  ) {
     const query = config.query || {};
     const categoryId = query.categoryId;
     const brandId = query.brandId;
 
     const [category, brand] = await Promise.all([
       categoryId
-        ? this.prisma.category.findUnique({ where: { id: categoryId }, select: { slug: true } })
+        ? this.prisma.category.findUnique({
+            where: { id: categoryId },
+            select: { slug: true },
+          })
         : Promise.resolve(null),
       brandId
-        ? this.prisma.brand.findUnique({ where: { id: brandId }, select: { slug: true } })
+        ? this.prisma.brand.findUnique({
+            where: { id: brandId },
+            select: { slug: true },
+          })
         : Promise.resolve(null),
     ]);
 
@@ -546,7 +741,9 @@ export class HomepageSectionsService {
       [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
     };
 
-    const featuredOnly = Boolean(query.featuredOnly ?? config.featured_only ?? false);
+    const featuredOnly = Boolean(
+      query.featuredOnly ?? config.featured_only ?? false,
+    );
     const selectedSort = query.sortBy || config.sort_by || ProductSortBy.NEWEST;
 
     if (
@@ -556,9 +753,15 @@ export class HomepageSectionsService {
       query.priceMin === undefined &&
       query.priceMax === undefined
     ) {
-      const deals = await this.productsService.getDealsProducts(query.limit || config.limit || 12, query.inStockOnly ?? true);
+      const deals = await this.productsService.getDealsProducts(
+        query.limit || config.limit || 12,
+        query.inStockOnly ?? true,
+      );
       if (deals.length || !(query.inStockOnly ?? true)) return deals;
-      return this.productsService.getDealsProducts(query.limit || config.limit || 12, false);
+      return this.productsService.getDealsProducts(
+        query.limit || config.limit || 12,
+        false,
+      );
     }
 
     const baseRequest = {
@@ -588,7 +791,8 @@ export class HomepageSectionsService {
         if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
           return [...relaxed.products].sort(
             (a: any, b: any) =>
-              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+              Number(b.discount_percentage || b.discount_pct || 0) -
+              Number(a.discount_percentage || a.discount_pct || 0),
           );
         }
         return relaxed.products;
@@ -606,14 +810,21 @@ export class HomepageSectionsService {
         if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
           return [...withoutFeaturedConstraint.products].sort(
             (a: any, b: any) =>
-              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+              Number(b.discount_percentage || b.discount_pct || 0) -
+              Number(a.discount_percentage || a.discount_pct || 0),
           );
         }
         return withoutFeaturedConstraint.products;
       }
     }
 
-    if (!result.products.length && (category?.slug || brand?.slug || query.priceMin !== undefined || query.priceMax !== undefined)) {
+    if (
+      !result.products.length &&
+      (category?.slug ||
+        brand?.slug ||
+        query.priceMin !== undefined ||
+        query.priceMax !== undefined)
+    ) {
       const broadFallback = await this.productsService.getProducts({
         ...baseRequest,
         categories: undefined,
@@ -628,7 +839,8 @@ export class HomepageSectionsService {
         if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
           return [...broadFallback.products].sort(
             (a: any, b: any) =>
-              Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+              Number(b.discount_percentage || b.discount_pct || 0) -
+              Number(a.discount_percentage || a.discount_pct || 0),
           );
         }
         return broadFallback.products;
@@ -638,28 +850,42 @@ export class HomepageSectionsService {
     if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
       return [...result.products].sort(
         (a: any, b: any) =>
-          Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+          Number(b.discount_percentage || b.discount_pct || 0) -
+          Number(a.discount_percentage || a.discount_pct || 0),
       );
     }
 
     return result.products;
   }
 
-  private async resolveSectionData(type: HomepageSectionType, config: Record<string, any>) {
+  private async resolveSectionData(
+    type: HomepageSectionType,
+    config: Record<string, any>,
+  ) {
     const source = config.source || 'query';
 
     switch (type) {
       case HomepageSectionType.HERO_BANNER_SLIDER:
         return this.bannersService.findAll();
       case HomepageSectionType.BEST_DEALS:
-        if (source === 'query' && config.query?.type === HomepageQueryType.PRODUCTS) {
+        if (
+          source === 'query' &&
+          config.query?.type === HomepageQueryType.PRODUCTS
+        ) {
           return this.executeProductsQuery(config, type);
         }
         {
-          const deals = await this.productsService.getDealsProducts(config.limit || 12, true);
+          const deals = await this.productsService.getDealsProducts(
+            config.limit || 12,
+            true,
+          );
           if (deals.length) return deals;
-          return this.productsService.getDealsProducts(config.limit || 12, false);
+          return this.productsService.getDealsProducts(
+            config.limit || 12,
+            false,
+          );
         }
+      case HomepageSectionType.PRODUCT_CAROUSEL:
       case HomepageSectionType.NEW_ARRIVALS:
       case HomepageSectionType.FEATURED_PICKS:
         if (source === 'manual') {
@@ -669,12 +895,18 @@ export class HomepageSectionsService {
       case HomepageSectionType.TOP_CATEGORIES_GRID:
         if (source === 'manual') {
           const ids = config.ids || [];
-          const order = new Map(ids.map((id: string, index: number) => [id, index]));
+          const order = new Map(
+            ids.map((id: string, index: number) => [id, index]),
+          );
           const categories = await this.prisma.category.findMany({
             where: { id: { in: ids }, is_active: true },
             orderBy: { sort_order: 'asc' },
           });
-          return categories.sort((a, b) => Number(order.get(a.id) ?? 10_000) - Number(order.get(b.id) ?? 10_000));
+          return categories.sort(
+            (a, b) =>
+              Number(order.get(a.id) ?? 10_000) -
+              Number(order.get(b.id) ?? 10_000),
+          );
         }
         return this.prisma.category.findMany({
           where: { is_active: true },
@@ -684,12 +916,18 @@ export class HomepageSectionsService {
       case HomepageSectionType.BRANDS_STRIP:
         if (source === 'manual') {
           const ids = config.ids || [];
-          const order = new Map(ids.map((id: string, index: number) => [id, index]));
+          const order = new Map(
+            ids.map((id: string, index: number) => [id, index]),
+          );
           const brands = await this.prisma.brand.findMany({
             where: { id: { in: ids }, is_active: true },
             orderBy: { name: 'asc' },
           });
-          return brands.sort((a, b) => Number(order.get(a.id) ?? 10_000) - Number(order.get(b.id) ?? 10_000));
+          return brands.sort(
+            (a, b) =>
+              Number(order.get(a.id) ?? 10_000) -
+              Number(order.get(b.id) ?? 10_000),
+          );
         }
         return this.prisma.brand.findMany({
           where: { is_active: true },
@@ -706,7 +944,8 @@ export class HomepageSectionsService {
   async getOptions(query: HomepageSectionOptionsQueryDto) {
     const limit = query.limit || 10;
     const q = query.q || '';
-    const target = query.target ||
+    const target =
+      query.target ||
       (query.type === HomepageSectionType.BRANDS_STRIP
         ? 'brands'
         : query.type === HomepageSectionType.TOP_CATEGORIES_GRID
@@ -716,10 +955,16 @@ export class HomepageSectionsService {
     if (target === 'products') {
       const [category, brand] = await Promise.all([
         query.categoryId
-          ? this.prisma.category.findUnique({ where: { id: query.categoryId }, select: { slug: true } })
+          ? this.prisma.category.findUnique({
+              where: { id: query.categoryId },
+              select: { slug: true },
+            })
           : Promise.resolve(null),
         query.brandId
-          ? this.prisma.brand.findUnique({ where: { id: query.brandId }, select: { slug: true } })
+          ? this.prisma.brand.findUnique({
+              where: { id: query.brandId },
+              select: { slug: true },
+            })
           : Promise.resolve(null),
       ]);
 
@@ -767,16 +1012,23 @@ export class HomepageSectionsService {
       if (selectedSort === HomepageQuerySortBy.DISCOUNT_DESC) {
         products = [...products].sort(
           (a: any, b: any) =>
-            Number(b.discount_percentage || b.discount_pct || 0) - Number(a.discount_percentage || a.discount_pct || 0),
+            Number(b.discount_percentage || b.discount_pct || 0) -
+            Number(a.discount_percentage || a.discount_pct || 0),
         );
       }
 
       if (q) {
         const nq = q.toLowerCase();
-        products = products.filter((item: any) => String(item.title || '').toLowerCase().includes(nq));
+        products = products.filter((item: any) =>
+          String(item.title || '')
+            .toLowerCase()
+            .includes(nq),
+        );
       }
 
-      return products.slice(0, limit).map((x: any) => ({ id: x.id, label: x.title, subtitle: x.slug }));
+      return products
+        .slice(0, limit)
+        .map((x: any) => ({ id: x.id, label: x.title, subtitle: x.slug }));
     }
 
     if (target === 'categories') {
@@ -796,7 +1048,12 @@ export class HomepageSectionsService {
         take: limit,
         orderBy: { name: 'asc' },
       });
-      return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug, image: x.logo_url || undefined }));
+      return res.map((x) => ({
+        id: x.id,
+        label: x.name,
+        subtitle: x.slug,
+        image: x.logo_url || undefined,
+      }));
     }
 
     return [];
@@ -823,18 +1080,17 @@ export class HomepageSectionsService {
   }
 
   async update(id: string, dto: UpdateHomepageSectionDto) {
-    const existing = await this.prisma.homepageSection.findUnique({ where: { id } });
+    const existing = await this.prisma.homepageSection.findUnique({
+      where: { id },
+    });
     if (!existing) throw new BadRequestException('Section not found');
 
     const mergedConfig = this.normalizeProductCarouselConfig(
       existing.type as HomepageSectionType,
-      this.normalizeConfigBySectionType(
-        existing.type as HomepageSectionType,
-        {
-          ...(existing.config_json as Record<string, any>),
-          ...(dto.config_json || {}),
-        },
-      ),
+      this.normalizeConfigBySectionType(existing.type as HomepageSectionType, {
+        ...(existing.config_json as Record<string, any>),
+        ...(dto.config_json || {}),
+      }),
     );
     this.validateConfig(existing.type as HomepageSectionType, mergedConfig);
 

@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
-import { ChevronLeft, ChevronRight, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
+import { BadgeCheck, ChevronLeft, ChevronRight, CreditCard, Headset, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
 
 type Section = {
   id: string;
@@ -114,43 +114,6 @@ function BannerSection({ banners }: { banners: any[] }) {
             ))}
           </div>
         ) : null}
-      </div>
-    </section>
-  );
-}
-
-function SimpleListSection({
-  title,
-  items,
-  buildHref,
-}: {
-  title: string;
-  items: Array<{ id: string; name: string; slug?: string }>;
-  buildHref?: (slug?: string) => string;
-}) {
-  if (!items.length) return null;
-
-  return (
-    <section className="w-full px-4 sm:px-6">
-      <h2 className="mb-4 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        {items.map((item) => {
-          const card = (
-            <div className="flex min-h-[64px] items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm">
-              {item.name}
-            </div>
-          );
-
-          if (!buildHref || !item.slug) {
-            return <div key={item.id}>{card}</div>;
-          }
-
-          return (
-            <Link key={item.id} href={buildHref(item.slug)}>
-              {card}
-            </Link>
-          );
-        })}
       </div>
     </section>
   );
@@ -339,17 +302,20 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
     if (normalized.includes("truck")) return Truck;
     if (normalized.includes("shield")) return ShieldCheck;
     if (normalized.includes("refresh")) return RefreshCcw;
+    if (normalized.includes("headset") || normalized.includes("support")) return Headset;
+    if (normalized.includes("card") || normalized.includes("payment")) return CreditCard;
+    if (normalized.includes("badge") || normalized.includes("quality")) return BadgeCheck;
     return ShieldCheck;
   };
 
   return (
     <section className="w-full px-4 sm:px-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {items.map((item, i) => {
           const Icon = resolveIcon(item.icon);
           return (
-            <div key={i} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-              <Icon className="h-4 w-4 text-slate-500" />
+            <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+              <Icon className="h-4 w-4 shrink-0 text-slate-500" />
               <span>{item.text}</span>
             </div>
           );
@@ -363,7 +329,7 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
 function isEmptyRenderableSection(section: Section) {
   const list = Array.isArray(section.data) ? section.data : [];
   if (section.type === "TRUST_BAR") return list.length === 0;
-  if (["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP", "HERO_BANNER_SLIDER"].includes(section.type)) {
+  if (["PRODUCT_CAROUSEL", "BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP", "HERO_BANNER_SLIDER"].includes(section.type)) {
     return list.length === 0;
   }
   return false;
@@ -437,6 +403,7 @@ export default function HomeDynamicSections({ initialSections = [] }: HomeDynami
         switch (section.type) {
           case "HERO_BANNER_SLIDER":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BannerSection banners={section.data || []} /></SectionShell>;
+          case "PRODUCT_CAROUSEL":
           case "BEST_DEALS":
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS":
@@ -448,9 +415,9 @@ export default function HomeDynamicSections({ initialSections = [] }: HomeDynami
               itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2),
             }} /></SectionShell>;
           case "TOP_CATEGORIES_GRID":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><SimpleListSection title={section.title || t("dynamic.topCategories")} buildHref={(slug) => `/products?categories=${slug || ""}`} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug }))} /></SectionShell>;
+            return null;
           case "BRANDS_STRIP":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} logoOverrides={(sectionConfig.logo_overrides || {}) as Record<string, string>} carouselConfig={{ enabled: Boolean(sectionConfig.carousel_enabled ?? true), autoplay: Boolean(sectionConfig.carousel_autoplay ?? false), autoplayIntervalMs: Number(sectionConfig.carousel_interval_ms || 5000), itemsPerViewDesktop: Number(sectionConfig.carousel_items_desktop || 8), itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2) }} /></SectionShell>;
+            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} logoOverrides={(sectionConfig.logo_overrides || {}) as Record<string, string>} carouselConfig={{ enabled: Boolean(sectionConfig.carousel_enabled ?? true), autoplay: Boolean(sectionConfig.carousel_autoplay ?? true), autoplayIntervalMs: Number(sectionConfig.carousel_interval_ms || 5000), itemsPerViewDesktop: Number(sectionConfig.carousel_items_desktop || 8), itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2) }} /></SectionShell>;
           case "TRUST_BAR":
             return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
           default:

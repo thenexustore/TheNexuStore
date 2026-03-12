@@ -44,14 +44,11 @@ import {
   UnfoldVertical,
 } from "lucide-react";
 
-const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
-const PRODUCT_QUERY_TYPES = ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
+const MANUAL_TYPES = ["PRODUCT_CAROUSEL", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
+const PRODUCT_QUERY_TYPES = ["PRODUCT_CAROUSEL", "BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
 const SECTION_TYPES = [
   "HERO_BANNER_SLIDER",
-  "TOP_CATEGORIES_GRID",
-  "BEST_DEALS",
-  "NEW_ARRIVALS",
-  "FEATURED_PICKS",
+  "PRODUCT_CAROUSEL",
   "BRANDS_STRIP",
   "TRUST_BAR",
 ] as const;
@@ -65,6 +62,7 @@ const SORT_OPTIONS = [
 
 const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
   HERO_BANNER_SLIDER: { items_per_carousel: 1 },
+  PRODUCT_CAROUSEL: { source: "query", query: { type: "products", featuredOnly: true, inStockOnly: true, sortBy: "newest", limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
   TOP_CATEGORIES_GRID: { source: "query", query: { type: "categories", limit: 10 } },
   BEST_DEALS: { source: "query", query: { type: "products", sortBy: "discount_desc", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
   NEW_ARRIVALS: { source: "query", query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
@@ -157,7 +155,7 @@ export default function HomepageSectionsPage() {
   const [options, setOptions] = useState<Record<string, HomepageOption[]>>({});
   const [queryCatalogs, setQueryCatalogs] = useState<{ categories: HomepageOption[]; brands: HomepageOption[] }>({ categories: [], brands: [] });
   const [menuTree, setMenuTree] = useState<CategoryMenuTreeNode[]>([]);
-  const [newType, setNewType] = useState<SectionType>("TOP_CATEGORIES_GRID");
+  const [newType, setNewType] = useState<SectionType>("PRODUCT_CAROUSEL");
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -175,7 +173,7 @@ export default function HomepageSectionsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty" | "risky">("all");
   const [autoFixingEmpty, setAutoFixingEmpty] = useState(false);
   const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] = useState("");
-  const [categoryCarouselType, setCategoryCarouselType] = useState<"FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("FEATURED_PICKS");
+  const [categoryCarouselType, setCategoryCarouselType] = useState<"PRODUCT_CAROUSEL" | "FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("PRODUCT_CAROUSEL");
   const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<"discount_desc" | "newest">("discount_desc");
   const [creatingType, setCreatingType] = useState<string | null>(null);
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
@@ -574,7 +572,7 @@ export default function HomepageSectionsPage() {
     try {
       const categoryId = findPresetCategoryId(preset.matcher, menuTree);
       await homepageSectionsApi.create({
-        type: "FEATURED_PICKS",
+        type: "PRODUCT_CAROUSEL",
         position: sorted.length + 1,
         enabled: true,
         title: preset.title,
@@ -808,7 +806,7 @@ export default function HomepageSectionsPage() {
   };
 
   const autoFixSectionConfigs = () => {
-    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    const productTypes = new Set(["PRODUCT_CAROUSEL", "BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
     setSections((prev) =>
       prev.map((section) => {
         const config = { ...(section.config_json || {}) } as Record<string, unknown>;
@@ -871,7 +869,7 @@ export default function HomepageSectionsPage() {
     }
 
     const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
-    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    const productTypes = new Set(["PRODUCT_CAROUSEL", "BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
 
     setSections((prev) =>
       prev.map((section) => {
@@ -886,7 +884,7 @@ export default function HomepageSectionsPage() {
   const buildAutoFixedSections = (sourceSections: HomepageSection[]) => {
     if (!diagnostics?.emptyEnabledProductSections?.length) return sourceSections;
     const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
-    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    const productTypes = new Set(["PRODUCT_CAROUSEL", "BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
 
     return sourceSections.map((section) => {
       if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
@@ -1008,7 +1006,7 @@ export default function HomepageSectionsPage() {
         });
       } else {
         await homepageSectionsApi.create({
-          type: "FEATURED_PICKS",
+          type: "PRODUCT_CAROUSEL",
           position: sorted.length + 1,
           enabled: true,
           title: "Productos Destacados",
@@ -1554,11 +1552,12 @@ export default function HomepageSectionsPage() {
             className="border rounded-lg px-3 py-2"
             value={categoryCarouselType}
             onChange={(e) => {
-              const nextType = e.target.value as "FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS";
+              const nextType = e.target.value as "PRODUCT_CAROUSEL" | "FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS";
               setCategoryCarouselType(nextType);
-              setCategoryCarouselSortBy(nextType === "NEW_ARRIVALS" ? "newest" : "discount_desc");
+              setCategoryCarouselSortBy(nextType === "NEW_ARRIVALS" || nextType === "PRODUCT_CAROUSEL" ? "newest" : "discount_desc");
             }}
           >
+            <option value="PRODUCT_CAROUSEL">PRODUCT_CAROUSEL</option>
             <option value="FEATURED_PICKS">FEATURED_PICKS</option>
             <option value="BEST_DEALS">BEST_DEALS</option>
             <option value="NEW_ARRIVALS">NEW_ARRIVALS</option>

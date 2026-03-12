@@ -13,6 +13,9 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
 import { AppLogger } from './common/app-logger.service';
 import { RequestContextService } from './common/request-context.service';
 import { RequestMetricsService } from './common/request-metrics.service';
+import { join } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import express from 'express';
 
 async function bootstrap() {
   loadEnv();
@@ -24,6 +27,12 @@ async function bootstrap() {
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
   app.use(cookieParser());
+
+  const brandingAssetsDir = join(process.cwd(), 'storage', 'branding', 'assets');
+  if (!existsSync(brandingAssetsDir)) {
+    mkdirSync(brandingAssetsDir, { recursive: true });
+  }
+  app.use('/branding-assets', express.static(brandingAssetsDir));
 
   const logger = app.get(AppLogger);
   const requestContext = app.get(RequestContextService);

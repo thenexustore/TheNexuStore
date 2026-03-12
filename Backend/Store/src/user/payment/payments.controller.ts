@@ -59,6 +59,16 @@ export class PaymentsController {
     res.status(HttpStatus.OK).send('OK');
   }
 
+  @Post('redsys/notification')
+  @HttpCode(HttpStatus.OK)
+  async handleRedsysNotificationAlias(
+    @Body() notification: RedsysNotification,
+    @Res() res: Response,
+  ) {
+    await this.paymentService.handleRedsysNotification(notification);
+    res.status(HttpStatus.OK).send('OK');
+  }
+
   @Get('redsys/ok')
   async redsysOk(
     @Query('orderRef') orderRef: string | undefined,

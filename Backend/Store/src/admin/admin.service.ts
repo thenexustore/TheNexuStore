@@ -436,7 +436,12 @@ export class AdminService {
       responseCode:
         typeof parsed.responseCode === 'string' ? parsed.responseCode : undefined,
       authCode: typeof parsed.authCode === 'string' ? parsed.authCode : undefined,
-      payMethod: typeof parsed.payMethod === 'string' ? parsed.payMethod : undefined,
+      payMethod:
+        typeof parsed.payMethod === 'string'
+          ? parsed.payMethod
+          : typeof parsed.processedPayMethod === 'string'
+            ? parsed.processedPayMethod
+            : undefined,
     };
   }
 

@@ -262,8 +262,7 @@ export class PaymentService {
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
-        raw_response: {
-          ...rawResponse,
+        raw_response: this.mergeRawResponse(rawResponse, {
           redsysRequest: {
             merchantOrderReference,
             paymentMethod,
@@ -272,7 +271,7 @@ export class PaymentService {
             urlOk,
             urlKo,
           },
-        } as Prisma.InputJsonValue,
+        }),
       },
     });
 
@@ -322,6 +321,12 @@ export class PaymentService {
     });
 
     if (payment.status !== 'INITIATED') {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          raw_response: this.buildRedsysRawResponse(payment.raw_response, notification, result),
+        },
+      });
       this.logger.log('Ignoring already-processed REDSYS notification', 'PaymentService', {
         paymentId: payment.id,
         status: payment.status,
@@ -335,20 +340,11 @@ export class PaymentService {
           where: { id: payment.id },
           data: {
             status: 'CAPTURED',
-            raw_response: {
+            raw_response: this.buildRedsysRawResponse(
+              payment.raw_response,
               notification,
-              redsys: {
-                responseCode: result.responseCode,
-                authCode: result.authCode ?? null,
-                merchantOrderReference: result.merchantOrderReference,
-                payMethod: result.payMethod ?? null,
-                merchantCode: result.merchantCode,
-                terminal: result.terminal,
-                amountInCents: result.amountInCents,
-                currency: result.currency,
-                gatewayParams: result.rawParams,
-              },
-            } as any,
+              result,
+            ),
           },
         });
 
@@ -383,20 +379,11 @@ export class PaymentService {
           where: { id: payment.id },
           data: {
             status: 'FAILED',
-            raw_response: {
+            raw_response: this.buildRedsysRawResponse(
+              payment.raw_response,
               notification,
-              redsys: {
-                responseCode: result.responseCode,
-                authCode: result.authCode ?? null,
-                merchantOrderReference: result.merchantOrderReference,
-                payMethod: result.payMethod ?? null,
-                merchantCode: result.merchantCode,
-                terminal: result.terminal,
-                amountInCents: result.amountInCents,
-                currency: result.currency,
-                gatewayParams: result.rawParams,
-              },
-            } as any,
+              result,
+            ),
           },
         });
 
@@ -548,6 +535,68 @@ export class PaymentService {
       const separator = baseUrl.includes('?') ? '&' : '?';
       return `${baseUrl}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
     }
+  }
+
+  private buildRedsysRawResponse(
+    existing: Prisma.JsonValue | null,
+    notification: RedsysNotification,
+    result: {
+      signatureVersion: string;
+      merchantOrderReference: string;
+      responseCode: string;
+      authCode?: string;
+      payMethod?: string;
+      processedPayMethod?: string;
+      merchantCode: string;
+      terminal: string;
+      amountInCents: number;
+      currency: string;
+      merchantData?: string;
+      rawParams: Record<string, unknown>;
+    },
+  ): Prisma.InputJsonValue {
+    const existingObject = this.asRecord(existing);
+    const existingRedsys = this.asRecord(existingObject.redsys);
+
+    return this.mergeRawResponse(existingObject, {
+      notification,
+      redsys: {
+        ...existingRedsys,
+        responseCode: result.responseCode,
+        responseMessage: this.redsysService.getResponseMessage(result.responseCode),
+        authCode: result.authCode ?? null,
+        merchantOrderReference: result.merchantOrderReference,
+        payMethod: result.payMethod ?? existingRedsys.payMethod ?? null,
+        processedPayMethod:
+          result.processedPayMethod ?? existingRedsys.processedPayMethod ?? null,
+        merchantCode: result.merchantCode,
+        terminal: result.terminal,
+        amountInCents: result.amountInCents,
+        currency: result.currency,
+        merchantData: result.merchantData ?? existingRedsys.merchantData ?? null,
+        signatureVersion: result.signatureVersion,
+        gatewayParams: result.rawParams,
+        lastNotificationAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  private mergeRawResponse(
+    existing: Prisma.JsonValue | Record<string, unknown> | null,
+    patch: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    return {
+      ...this.asRecord(existing),
+      ...patch,
+    } as Prisma.InputJsonValue;
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as Record<string, unknown>;
   }
 
   private async releaseReservedStockForOrder(

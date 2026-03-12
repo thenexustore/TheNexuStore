@@ -48,6 +48,7 @@ export interface RedsysCreateFormInput {
 
 export interface RedsysNotificationResult {
   success: boolean;
+  signatureVersion: string;
   merchantOrderReference: string;
   authCode?: string;
   responseCode: string;
@@ -55,7 +56,9 @@ export interface RedsysNotificationResult {
   currency: string;
   merchantCode: string;
   terminal: string;
+  merchantData?: string;
   payMethod?: string;
+  processedPayMethod?: string;
   rawParams: RedsysDecodedParams;
 }
 
@@ -169,6 +172,10 @@ export class RedsysService {
       'Ds_AuthorisationCode',
       'DS_AUTHORISATIONCODE',
     ]);
+    const merchantData = this.getOptionalParam(params, [
+      'Ds_MerchantData',
+      'DS_MERCHANTDATA',
+    ]);
     const amountRaw = this.getParam(params, ['Ds_Amount', 'DS_AMOUNT']);
     const currency = this.getParam(params, ['Ds_Currency', 'DS_CURRENCY']);
     const merchantCode = this.getParam(params, [
@@ -176,7 +183,14 @@ export class RedsysService {
       'DS_MERCHANTCODE',
     ]);
     const terminal = this.getParam(params, ['Ds_Terminal', 'DS_TERMINAL']);
-    const payMethod = this.getOptionalParam(params, ['Ds_PayMethod', 'DS_PAYMETHOD']);
+    const processedPayMethod = this.getOptionalParam(params, [
+      'Ds_ProcessedPayMethod',
+      'DS_PROCESSEDPAYMETHOD',
+    ]);
+    const payMethod = this.normalizePayMethod(
+      processedPayMethod ??
+        this.getOptionalParam(params, ['Ds_PayMethod', 'DS_PAYMETHOD']),
+    );
 
     this.assertMerchantOrderReference(merchantOrderReference);
 
@@ -194,6 +208,7 @@ export class RedsysService {
 
     return {
       success,
+      signatureVersion,
       merchantOrderReference,
       authCode,
       responseCode: responseCodeRaw,
@@ -201,7 +216,9 @@ export class RedsysService {
       currency,
       merchantCode,
       terminal,
+      merchantData,
       payMethod,
+      processedPayMethod,
       rawParams: params,
     };
   }
@@ -385,6 +402,27 @@ export class RedsysService {
       }
     }
     return undefined;
+  }
+
+  private normalizePayMethod(payMethod?: string): string | undefined {
+    if (!payMethod) {
+      return undefined;
+    }
+
+    const normalized = payMethod.trim().toUpperCase();
+    if (!normalized) {
+      return undefined;
+    }
+
+    if (normalized === 'Z' || normalized === '68') {
+      return 'BIZUM';
+    }
+
+    if (/^\d+$/.test(normalized)) {
+      return `REDSYS_${normalized}`;
+    }
+
+    return normalized;
   }
 
   getResponseMessage(responseCode: string): string {

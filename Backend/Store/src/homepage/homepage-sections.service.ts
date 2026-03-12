@@ -291,6 +291,7 @@ export class HomepageSectionsService {
     }
 
     if (
+      type === HomepageSectionType.PRODUCT_CAROUSEL ||
       type === HomepageSectionType.BEST_DEALS ||
       type === HomepageSectionType.NEW_ARRIVALS
     ) {
@@ -423,14 +424,21 @@ export class HomepageSectionsService {
       (section) => section.enabled,
     ).length;
 
-    const featuredPicksSections = sections.filter(
-      (section) => section.type === HomepageSectionType.FEATURED_PICKS,
+    const featuredPicksSections = sections.filter((section) =>
+      [
+        HomepageSectionType.PRODUCT_CAROUSEL,
+        HomepageSectionType.FEATURED_PICKS,
+      ].includes(section.type as HomepageSectionType),
     );
     const featuredManualLinked = featuredPicksSections.some((section) => {
       const config = (section.config_json || {}) as Record<string, any>;
+      const query = (config.query || {}) as Record<string, any>;
       return (
         section.enabled &&
-        (config.source === 'manual' || Array.isArray(config.ids))
+        (config.source === 'manual' ||
+          Array.isArray(config.ids) ||
+          query.featuredOnly === true ||
+          config.featured_only === true)
       );
     });
 
@@ -508,15 +516,33 @@ export class HomepageSectionsService {
       }
     }
 
-    const requiredVisibleTypes: HomepageSectionType[] = [
-      HomepageSectionType.HERO_BANNER_SLIDER,
-      HomepageSectionType.PRODUCT_CAROUSEL,
-      HomepageSectionType.BRANDS_STRIP,
-      HomepageSectionType.TRUST_BAR,
-    ];
-    const missingVisibleTypes = requiredVisibleTypes.filter(
-      (type) => !sections.some((s) => s.type === type && s.enabled),
+    const hasEnabledProductCarousel = sections.some(
+      (section) => section.enabled && this.isProductSectionType(section.type),
     );
+
+    const missingVisibleTypes: HomepageSectionType[] = [];
+    if (!heroEnabledSections) {
+      missingVisibleTypes.push(HomepageSectionType.HERO_BANNER_SLIDER);
+    }
+    if (!hasEnabledProductCarousel) {
+      missingVisibleTypes.push(HomepageSectionType.PRODUCT_CAROUSEL);
+    }
+    if (
+      !sections.some(
+        (section) =>
+          section.type === HomepageSectionType.BRANDS_STRIP && section.enabled,
+      )
+    ) {
+      missingVisibleTypes.push(HomepageSectionType.BRANDS_STRIP);
+    }
+    if (
+      !sections.some(
+        (section) =>
+          section.type === HomepageSectionType.TRUST_BAR && section.enabled,
+      )
+    ) {
+      missingVisibleTypes.push(HomepageSectionType.TRUST_BAR);
+    }
 
     const healthDeductions = [
       Math.min(30, emptyEnabledProductSections.length * 12),

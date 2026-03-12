@@ -7,7 +7,16 @@ import { useTranslations } from "next-intl";
 import HomeProductSection from "./HomeProductSection";
 import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
-import { BadgeCheck, ChevronLeft, ChevronRight, CreditCard, Headset, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
+import {
+  BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Headset,
+  RefreshCcw,
+  ShieldCheck,
+  Truck,
+} from "lucide-react";
 
 type Section = {
   id: string;
@@ -19,7 +28,32 @@ type Section = {
 };
 
 const PRIORITY_BRANDS = [
-  "hp", "lenovo", "dell", "asus", "acer", "apple", "msi", "samsung", "lg", "sony", "philips", "xiaomi", "huawei", "tp-link", "aoc", "epson", "canon", "brother", "apc", "amd", "intel", "gigabyte", "zotac", "nvidia", "sandisk", "kingston"
+  "hp",
+  "lenovo",
+  "dell",
+  "asus",
+  "acer",
+  "apple",
+  "msi",
+  "samsung",
+  "lg",
+  "sony",
+  "philips",
+  "xiaomi",
+  "huawei",
+  "tp-link",
+  "aoc",
+  "epson",
+  "canon",
+  "brother",
+  "apc",
+  "amd",
+  "intel",
+  "gigabyte",
+  "zotac",
+  "nvidia",
+  "sandisk",
+  "kingston",
 ];
 
 function resolveAssetUrl(value?: string) {
@@ -38,7 +72,10 @@ function resolveAssetUrl(value?: string) {
 }
 
 function brandInitials(name?: string) {
-  const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+  const words = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (!words.length) return "BR";
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
@@ -49,14 +86,30 @@ function initialsSvgDataUri(name?: string) {
 }
 
 function isMissingLogoAsset(value?: string) {
-  const raw = String(value || "").trim().toLowerCase();
+  const raw = String(value || "")
+    .trim()
+    .toLowerCase();
   if (!raw) return true;
-  return ["no_image_available", "placeholder", "default-logo", "default_brand", "no-logo", "logo-missing"].some((token) => raw.includes(token));
+  return [
+    "no_image_available",
+    "placeholder",
+    "default-logo",
+    "default_brand",
+    "no-logo",
+    "logo-missing",
+  ].some((token) => raw.includes(token));
 }
 
-function resolveBrandOverrideLogo(brand: { id: string; name: string; slug?: string }, overrides?: Record<string, string>) {
+function resolveBrandOverrideLogo(
+  brand: { id: string; name: string; slug?: string },
+  overrides?: Record<string, string>,
+) {
   if (!overrides) return "";
-  const candidates = [brand.id, brand.slug || "", String(brand.name || "").toLowerCase()]
+  const candidates = [
+    brand.id,
+    brand.slug || "",
+    String(brand.name || "").toLowerCase(),
+  ]
     .map((value) => String(value || "").trim())
     .filter(Boolean);
   for (const key of candidates) {
@@ -97,12 +150,22 @@ function BannerSection({ banners }: { banners: any[] }) {
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/55 via-slate-900/25 to-transparent" />
-        <div className="absolute inset-0" style={{ background: banner.overlay }} />
+        <div
+          className="absolute inset-0"
+          style={{ background: banner.overlay }}
+        />
         <div className="absolute inset-0 flex flex-col justify-end gap-2 p-5 text-white sm:p-8">
-          <h2 className="text-2xl font-bold sm:text-4xl">{banner.title_text}</h2>
-          <p className="max-w-2xl text-sm sm:text-base">{banner.subtitle_text}</p>
+          <h2 className="text-2xl font-bold sm:text-4xl">
+            {banner.title_text}
+          </h2>
+          <p className="max-w-2xl text-sm sm:text-base">
+            {banner.subtitle_text}
+          </p>
           {banner.button_text ? (
-            <Link href={banner.button_link || "/products"} className="mt-2 w-fit rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow">
+            <Link
+              href={banner.button_link || "/products"}
+              className="mt-2 w-fit rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow"
+            >
               {banner.button_text}
             </Link>
           ) : null}
@@ -110,7 +173,12 @@ function BannerSection({ banners }: { banners: any[] }) {
         {safeBanners.length > 1 ? (
           <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/35 px-2 py-1">
             {safeBanners.map((_, idx) => (
-              <button key={idx} onClick={() => setIndex(idx)} className={`h-1.5 rounded-full transition-all ${idx === index ? "w-5 bg-white" : "w-1.5 bg-white/60"}`} aria-label={`Banner ${idx + 1}`} />
+              <button
+                key={idx}
+                onClick={() => setIndex(idx)}
+                className={`h-1.5 rounded-full transition-all ${idx === index ? "w-5 bg-white" : "w-1.5 bg-white/60"}`}
+                aria-label={`Banner ${idx + 1}`}
+              />
             ))}
           </div>
         ) : null}
@@ -126,7 +194,13 @@ function BrandLogoCarousel({
   carouselConfig,
 }: {
   title: string;
-  items: Array<{ id: string; name: string; slug?: string; logo_url?: string; image?: string }>;
+  items: Array<{
+    id: string;
+    name: string;
+    slug?: string;
+    logo_url?: string;
+    image?: string;
+  }>;
   logoOverrides?: Record<string, string>;
   carouselConfig?: {
     enabled?: boolean;
@@ -146,14 +220,24 @@ function BrandLogoCarousel({
 
   const carouselEnabled = Boolean(carouselConfig?.enabled ?? true);
   const autoplay = Boolean(carouselConfig?.autoplay ?? false);
-  const autoplayIntervalMs = Math.max(2000, Number(carouselConfig?.autoplayIntervalMs || 5000));
-  const mobileItems = Math.min(4, Math.max(1, Number(carouselConfig?.itemsPerViewMobile || 2)));
-  const desktopItems = Math.min(10, Math.max(2, Number(carouselConfig?.itemsPerViewDesktop || 8)));
+  const autoplayIntervalMs = Math.max(
+    2000,
+    Number(carouselConfig?.autoplayIntervalMs || 5000),
+  );
+  const mobileItems = Math.min(
+    4,
+    Math.max(1, Number(carouselConfig?.itemsPerViewMobile || 2)),
+  );
+  const desktopItems = Math.min(
+    10,
+    Math.max(2, Number(carouselConfig?.itemsPerViewDesktop || 8)),
+  );
 
   const sorted = [...items].sort((a, b) => {
     const ai = PRIORITY_BRANDS.indexOf(String(a.name || "").toLowerCase());
     const bi = PRIORITY_BRANDS.indexOf(String(b.name || "").toLowerCase());
-    if (ai === -1 && bi === -1) return String(a.name).localeCompare(String(b.name));
+    if (ai === -1 && bi === -1)
+      return String(a.name).localeCompare(String(b.name));
     if (ai === -1) return 1;
     if (bi === -1) return -1;
     return ai - bi;
@@ -169,7 +253,6 @@ function BrandLogoCarousel({
     window.addEventListener("resize", updateItemsPerView);
     return () => window.removeEventListener("resize", updateItemsPerView);
   }, [carouselEnabled, desktopItems, mobileItems]);
-
 
   useEffect(() => {
     const onVisibility = () => {
@@ -190,21 +273,47 @@ function BrandLogoCarousel({
     return Math.max(1, Math.ceil(sorted.length / Math.max(1, itemsPerView)));
   }, [carouselEnabled, itemsPerView, sorted.length]);
 
-  const scrollToPage = useCallback((page: number) => {
-    if (!scrollRef.current) return;
-    const targetPage = ((page % pageCount) + pageCount) % pageCount;
-    const pageWidth = scrollRef.current.clientWidth;
-    scrollRef.current.scrollTo({ left: targetPage * pageWidth, behavior: "smooth" });
-    setCurrentPage(targetPage);
-  }, [pageCount]);
+  const scrollToPage = useCallback(
+    (page: number) => {
+      if (!scrollRef.current) return;
+      const targetPage = ((page % pageCount) + pageCount) % pageCount;
+      const pageWidth = scrollRef.current.clientWidth;
+      scrollRef.current.scrollTo({
+        left: targetPage * pageWidth,
+        behavior: "smooth",
+      });
+      setCurrentPage(targetPage);
+    },
+    [pageCount],
+  );
 
   useEffect(() => {
-    if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || isFocusWithin || !isPageVisible) return;
+    if (
+      !carouselEnabled ||
+      !autoplay ||
+      pageCount <= 1 ||
+      isHovering ||
+      isInteracting ||
+      isFocusWithin ||
+      !isPageVisible
+    )
+      return;
     const timer = setInterval(() => {
       scrollToPage(currentPage + 1);
     }, autoplayIntervalMs);
     return () => clearInterval(timer);
-  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isFocusWithin, isPageVisible, pageCount, scrollToPage]);
+  }, [
+    autoplay,
+    autoplayIntervalMs,
+    carouselEnabled,
+    currentPage,
+    isHovering,
+    isInteracting,
+    isFocusWithin,
+    isPageVisible,
+    pageCount,
+    scrollToPage,
+  ]);
 
   useEffect(() => {
     if (!carouselEnabled || !scrollRef.current) return;
@@ -224,13 +333,29 @@ function BrandLogoCarousel({
   return (
     <section className="w-full px-4 sm:px-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+          {title}
+        </h2>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage - 1); }} aria-label="Anterior marcas">
+            <button
+              className="rounded-lg border bg-white p-2"
+              onClick={() => {
+                setIsInteracting(true);
+                scrollToPage(currentPage - 1);
+              }}
+              aria-label="Anterior marcas"
+            >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage + 1); }} aria-label="Siguiente marcas">
+            <button
+              className="rounded-lg border bg-white p-2"
+              onClick={() => {
+                setIsInteracting(true);
+                scrollToPage(currentPage + 1);
+              }}
+              aria-label="Siguiente marcas"
+            >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -240,61 +365,98 @@ function BrandLogoCarousel({
         className="space-y-2"
         onFocusCapture={() => setIsFocusWithin(true)}
         onKeyDownCapture={(event) => {
-          if (["Tab", "ArrowLeft", "ArrowRight", "Enter", " ", "Spacebar", "Home", "End"].includes(event.key)) setIsInteracting(true);
+          if (
+            [
+              "Tab",
+              "ArrowLeft",
+              "ArrowRight",
+              "Enter",
+              " ",
+              "Spacebar",
+              "Home",
+              "End",
+            ].includes(event.key)
+          )
+            setIsInteracting(true);
         }}
         onBlurCapture={(event) => {
           const nextTarget = event.relatedTarget as Node | null;
-          if (!event.currentTarget.contains(nextTarget)) setIsFocusWithin(false);
+          if (!event.currentTarget.contains(nextTarget))
+            setIsFocusWithin(false);
         }}
       >
-      <div
-        ref={carouselEnabled ? scrollRef : null}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        onTouchStart={() => setIsInteracting(true)}
-      >
-        {sorted.map((brand) => {
-          const overrideLogo = resolveBrandOverrideLogo(brand, logoOverrides);
-          const rawLogo = String(overrideLogo || brand.logo_url || brand.image || "").trim();
-          const logo = isMissingLogoAsset(rawLogo) ? initialsSvgDataUri(brand.name) : resolveAssetUrl(rawLogo);
-          return (
-            <Link
-              key={brand.id}
-              href={`/products?brand=${encodeURIComponent(brand.slug || "")}`}
-              className="group min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
-              title={brand.name}
-              style={carouselEnabled ? { flexBasis: `calc((100% - ${(itemsPerView - 1) * 12}px) / ${itemsPerView})` } : undefined}
-            >
-              <div className="flex h-16 items-center justify-center rounded-lg bg-slate-50">
-                <img
-                  src={logo}
-                  alt={brand.name}
-                  className="max-h-10 max-w-[120px] object-contain"
-                  onError={(event) => {
-                    event.currentTarget.onerror = null;
-                    event.currentTarget.src = initialsSvgDataUri(brand.name);
-                  }}
-                />
-              </div>
-              <div className="mt-2 line-clamp-1 text-center text-xs font-medium text-slate-600">{brand.name}</div>
-            </Link>
-          );
-        })}
-      </div>
-      {carouselEnabled && pageCount > 1 ? (
-        <div className="mt-3 flex items-center justify-center gap-2">
-          {Array.from({ length: pageCount }).map((_, idx) => (
-            <button key={idx} className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`} onClick={() => { setIsInteracting(true); scrollToPage(idx); }} aria-label={`Ir a página ${idx + 1}`} />
-          ))}
+        <div
+          ref={carouselEnabled ? scrollRef : null}
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+          onTouchStart={() => setIsInteracting(true)}
+        >
+          {sorted.map((brand) => {
+            const overrideLogo = resolveBrandOverrideLogo(brand, logoOverrides);
+            const rawLogo = String(
+              overrideLogo || brand.logo_url || brand.image || "",
+            ).trim();
+            const logo = isMissingLogoAsset(rawLogo)
+              ? initialsSvgDataUri(brand.name)
+              : resolveAssetUrl(rawLogo);
+            return (
+              <Link
+                key={brand.id}
+                href={`/products?brand=${encodeURIComponent(brand.slug || "")}`}
+                className="group min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
+                title={brand.name}
+                style={
+                  carouselEnabled
+                    ? {
+                        flexBasis: `calc((100% - ${(itemsPerView - 1) * 12}px) / ${itemsPerView})`,
+                      }
+                    : undefined
+                }
+              >
+                <div className="flex h-16 items-center justify-center rounded-lg bg-slate-50">
+                  <img
+                    src={logo}
+                    alt={brand.name}
+                    className="max-h-10 max-w-[120px] object-contain"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = initialsSvgDataUri(brand.name);
+                    }}
+                  />
+                </div>
+                <div className="mt-2 line-clamp-1 text-center text-xs font-medium text-slate-600">
+                  {brand.name}
+                </div>
+              </Link>
+            );
+          })}
         </div>
-      ) : null}
+        {carouselEnabled && pageCount > 1 ? (
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {Array.from({ length: pageCount }).map((_, idx) => (
+              <button
+                key={idx}
+                className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`}
+                onClick={() => {
+                  setIsInteracting(true);
+                  scrollToPage(idx);
+                }}
+                aria-label={`Ir a página ${idx + 1}`}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
 }
 
-function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) {
+function TrustBar({
+  items,
+}: {
+  items: Array<{ icon?: string; text: string }>;
+}) {
   if (!items.length) return null;
 
   const resolveIcon = (icon?: string) => {
@@ -302,9 +464,12 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
     if (normalized.includes("truck")) return Truck;
     if (normalized.includes("shield")) return ShieldCheck;
     if (normalized.includes("refresh")) return RefreshCcw;
-    if (normalized.includes("headset") || normalized.includes("support")) return Headset;
-    if (normalized.includes("card") || normalized.includes("payment")) return CreditCard;
-    if (normalized.includes("badge") || normalized.includes("quality")) return BadgeCheck;
+    if (normalized.includes("headset") || normalized.includes("support"))
+      return Headset;
+    if (normalized.includes("card") || normalized.includes("payment"))
+      return CreditCard;
+    if (normalized.includes("badge") || normalized.includes("quality"))
+      return BadgeCheck;
     return ShieldCheck;
   };
 
@@ -314,7 +479,10 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
         {items.map((item, i) => {
           const Icon = resolveIcon(item.icon);
           return (
-            <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+            <div
+              key={i}
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
+            >
               <Icon className="h-4 w-4 shrink-0 text-slate-500" />
               <span>{item.text}</span>
             </div>
@@ -325,11 +493,20 @@ function TrustBar({ items }: { items: Array<{ icon?: string; text: string }> }) 
   );
 }
 
-
 function isEmptyRenderableSection(section: Section) {
   const list = Array.isArray(section.data) ? section.data : [];
   if (section.type === "TRUST_BAR") return list.length === 0;
-  if (["PRODUCT_CAROUSEL", "BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP", "HERO_BANNER_SLIDER"].includes(section.type)) {
+  if (
+    [
+      "PRODUCT_CAROUSEL",
+      "BEST_DEALS",
+      "NEW_ARRIVALS",
+      "FEATURED_PICKS",
+      "TOP_CATEGORIES_GRID",
+      "BRANDS_STRIP",
+      "HERO_BANNER_SLIDER",
+    ].includes(section.type)
+  ) {
     return list.length === 0;
   }
   return false;
@@ -341,10 +518,16 @@ type SectionShellProps = {
   children: React.ReactNode;
 };
 
-function SectionShell({ sectionId, highlightedId, children }: SectionShellProps) {
+function SectionShell({
+  sectionId,
+  highlightedId,
+  children,
+}: SectionShellProps) {
   const highlighted = highlightedId === sectionId;
   return (
-    <div className={`w-full ${highlighted ? "rounded-2xl ring-2 ring-slate-900/20 bg-slate-100/50" : ""}`}>
+    <div
+      className={`w-full ${highlighted ? "rounded-2xl ring-2 ring-slate-900/20 bg-slate-100/50" : ""}`}
+    >
       {children}
     </div>
   );
@@ -354,7 +537,9 @@ type HomeDynamicSectionsProps = {
   initialSections?: Section[];
 };
 
-export default function HomeDynamicSections({ initialSections = [] }: HomeDynamicSectionsProps) {
+export default function HomeDynamicSections({
+  initialSections = [],
+}: HomeDynamicSectionsProps) {
   const [sections, setSections] = useState<Section[]>(initialSections);
   const [loading, setLoading] = useState(initialSections.length === 0);
   const searchParams = useSearchParams();
@@ -366,7 +551,9 @@ export default function HomeDynamicSections({ initialSections = [] }: HomeDynami
 
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/homepage/sections`, { cache: "force-cache" });
+        const res = await fetch(`${API_URL}/homepage/sections`, {
+          cache: "force-cache",
+        });
         const json = await res.json();
         setSections((json.data || []) as Section[]);
       } catch {
@@ -378,20 +565,38 @@ export default function HomeDynamicSections({ initialSections = [] }: HomeDynami
     load();
   }, [initialSections]);
 
-  if (loading) return <div className="w-full px-4 sm:px-6 py-8 text-sm text-slate-500">{t("dynamic.loading")}</div>;
+  if (loading)
+    return (
+      <div className="w-full px-4 sm:px-6 py-8 text-sm text-slate-500">
+        {t("dynamic.loading")}
+      </div>
+    );
 
   return (
     <>
       {highlightedSectionId ? (
         <section className="w-full px-4 sm:px-6 pt-2">
           <div className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs text-slate-600">
-            {t("dynamic.previewMode")} <span className="font-mono">{highlightedSectionId}</span>
+            {t("dynamic.previewMode")}{" "}
+            <span className="font-mono">{highlightedSectionId}</span>
           </div>
         </section>
       ) : null}
       {sections.map((section) => {
         if (section.failed) {
-          return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><section className="w-full px-4 sm:px-6"><div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">{t("dynamic.sectionUnavailable")}</div></section></SectionShell>;
+          return (
+            <SectionShell
+              key={section.id}
+              sectionId={section.id}
+              highlightedId={highlightedSectionId}
+            >
+              <section className="w-full px-4 sm:px-6">
+                <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">
+                  {t("dynamic.sectionUnavailable")}
+                </div>
+              </section>
+            </SectionShell>
+          );
         }
 
         if (!highlightedSectionId && isEmptyRenderableSection(section)) {
@@ -402,24 +607,108 @@ export default function HomeDynamicSections({ initialSections = [] }: HomeDynami
 
         switch (section.type) {
           case "HERO_BANNER_SLIDER":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BannerSection banners={section.data || []} /></SectionShell>;
+            return (
+              <SectionShell
+                key={section.id}
+                sectionId={section.id}
+                highlightedId={highlightedSectionId}
+              >
+                <BannerSection banners={section.data || []} />
+              </SectionShell>
+            );
           case "PRODUCT_CAROUSEL":
           case "BEST_DEALS":
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><HomeProductSection title={section.title || section.type} products={(section.data || []) as Product[]} loading={false} emptyMessage={t("dynamic.emptyProducts")} carouselConfig={{
-              enabled: Boolean(sectionConfig.carousel_enabled ?? true),
-              autoplay: Boolean(sectionConfig.carousel_autoplay ?? true),
-              autoplayIntervalMs: Number(sectionConfig.carousel_interval_ms || 5000),
-              itemsPerViewDesktop: Number(sectionConfig.carousel_items_desktop || 4),
-              itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2),
-            }} /></SectionShell>;
+            return (
+              <SectionShell
+                key={section.id}
+                sectionId={section.id}
+                highlightedId={highlightedSectionId}
+              >
+                <HomeProductSection
+                  title={section.title || section.type}
+                  products={(section.data || []) as Product[]}
+                  loading={false}
+                  emptyMessage={t("dynamic.emptyProducts")}
+                  carouselConfig={{
+                    enabled: Boolean(sectionConfig.carousel_enabled ?? true),
+                    autoplay: Boolean(sectionConfig.carousel_autoplay ?? true),
+                    autoplayIntervalMs: Number(
+                      sectionConfig.carousel_interval_ms || 5000,
+                    ),
+                    itemsPerViewDesktop: Number(
+                      sectionConfig.carousel_items_desktop || 4,
+                    ),
+                    itemsPerViewMobile: Number(
+                      sectionConfig.carousel_items_mobile || 2,
+                    ),
+                  }}
+                />
+              </SectionShell>
+            );
           case "TOP_CATEGORIES_GRID":
-            return null;
+            return highlightedSectionId ? (
+              <SectionShell
+                key={section.id}
+                sectionId={section.id}
+                highlightedId={highlightedSectionId}
+              >
+                <section className="w-full px-4 sm:px-6">
+                  <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">
+                    {t("dynamic.topCategories")} ({(section.data || []).length})
+                  </div>
+                </section>
+              </SectionShell>
+            ) : null;
           case "BRANDS_STRIP":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><BrandLogoCarousel title={section.title || t("dynamic.brands")} items={(section.data || []).map((x: any) => ({ id: x.id, name: x.name, slug: x.slug, logo_url: x.logo_url, image: x.image }))} logoOverrides={(sectionConfig.logo_overrides || {}) as Record<string, string>} carouselConfig={{ enabled: Boolean(sectionConfig.carousel_enabled ?? true), autoplay: Boolean(sectionConfig.carousel_autoplay ?? true), autoplayIntervalMs: Number(sectionConfig.carousel_interval_ms || 5000), itemsPerViewDesktop: Number(sectionConfig.carousel_items_desktop || 8), itemsPerViewMobile: Number(sectionConfig.carousel_items_mobile || 2) }} /></SectionShell>;
+            return (
+              <SectionShell
+                key={section.id}
+                sectionId={section.id}
+                highlightedId={highlightedSectionId}
+              >
+                <BrandLogoCarousel
+                  title={section.title || t("dynamic.brands")}
+                  items={(section.data || []).map((x: any) => ({
+                    id: x.id,
+                    name: x.name,
+                    slug: x.slug,
+                    logo_url: x.logo_url,
+                    image: x.image,
+                  }))}
+                  logoOverrides={
+                    (sectionConfig.logo_overrides || {}) as Record<
+                      string,
+                      string
+                    >
+                  }
+                  carouselConfig={{
+                    enabled: Boolean(sectionConfig.carousel_enabled ?? true),
+                    autoplay: Boolean(sectionConfig.carousel_autoplay ?? true),
+                    autoplayIntervalMs: Number(
+                      sectionConfig.carousel_interval_ms || 5000,
+                    ),
+                    itemsPerViewDesktop: Number(
+                      sectionConfig.carousel_items_desktop || 8,
+                    ),
+                    itemsPerViewMobile: Number(
+                      sectionConfig.carousel_items_mobile || 2,
+                    ),
+                  }}
+                />
+              </SectionShell>
+            );
           case "TRUST_BAR":
-            return <SectionShell key={section.id} sectionId={section.id} highlightedId={highlightedSectionId}><TrustBar items={section.data || []} /></SectionShell>;
+            return (
+              <SectionShell
+                key={section.id}
+                sectionId={section.id}
+                highlightedId={highlightedSectionId}
+              >
+                <TrustBar items={section.data || []} />
+              </SectionShell>
+            );
           default:
             return null;
         }

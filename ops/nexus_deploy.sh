@@ -133,11 +133,20 @@ ensure_pm2() {
 
 install_deps() {
   local app_dir="$1"
+  local include_dev="${2:-0}"
+  local install_cmd=""
+
   if [[ -f "$app_dir/package-lock.json" ]]; then
-    run "cd '$app_dir' && npm ci"
+    install_cmd="npm ci"
   else
-    run "cd '$app_dir' && npm install"
+    install_cmd="npm install"
   fi
+
+  if [[ "$include_dev" == "1" ]]; then
+    install_cmd="$install_cmd --include=dev"
+  fi
+
+  run "cd '$app_dir' && $install_cmd"
 }
 
 fix_next_proxy_conflict() {
@@ -257,7 +266,7 @@ else
 fi
 
 log "Building backend"
-install_deps "$BACKEND_DIR"
+install_deps "$BACKEND_DIR" 1
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma generate"
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate deploy"
 run "cd '$BACKEND_DIR' && npm run build"

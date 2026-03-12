@@ -49,6 +49,9 @@ export default function AdminBrandLogo({
         objectFit: fit ?? settings.brandLogoFit,
         filter,
         imageRendering: "-webkit-optimize-contrast",
+        maxWidth: "100%",
+        width: "auto",
+        display: "block",
       }}
     />
   );

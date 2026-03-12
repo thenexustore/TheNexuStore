@@ -1,3 +1,5 @@
+import { API_URL } from "./env";
+
 export const ADMIN_SETTINGS_KEY = "admin_settings";
 export const ADMIN_SETTINGS_EVENT = "admin-settings-updated";
 export const BRANDING_COOKIE_KEY = "tns_branding";
@@ -76,8 +78,8 @@ export function loadStoreBranding(): StoreBranding {
 
   const cookieRaw = decodeCookieBranding(document.cookie);
   const merged: BrandingSettings = {
-    ...cookieRaw,
     ...raw,
+    ...cookieRaw,
   };
 
   return {
@@ -90,12 +92,42 @@ export function loadStoreBranding(): StoreBranding {
   };
 }
 
+
+async function fetchRemoteBrandingSettings(): Promise<BrandingSettings | null> {
+  try {
+    const response = await fetch(`${API_URL}/branding/settings`, { credentials: "include", cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok || !payload?.success || !payload?.data) return null;
+    return payload.data as BrandingSettings;
+  } catch {
+    return null;
+  }
+}
+
+function persistBrandingSnapshot(next: BrandingSettings): void {
+  if (typeof window === "undefined") return;
+  try {
+    const current = JSON.parse(localStorage.getItem(ADMIN_SETTINGS_KEY) || "{}") as BrandingSettings;
+    const merged = { ...current, ...next };
+    localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(merged));
+  } catch {
+    localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(next));
+  }
+}
+
 export function subscribeStoreBranding(listener: (branding: StoreBranding) => void): () => void {
   if (typeof window === "undefined") return () => undefined;
 
   const sync = () => listener(loadStoreBranding());
   window.addEventListener("storage", sync);
   window.addEventListener(ADMIN_SETTINGS_EVENT, sync);
+
+  void (async () => {
+    const remote = await fetchRemoteBrandingSettings();
+    if (!remote) return;
+    persistBrandingSnapshot(remote);
+    window.dispatchEvent(new CustomEvent(ADMIN_SETTINGS_EVENT));
+  })();
 
   return () => {
     window.removeEventListener("storage", sync);

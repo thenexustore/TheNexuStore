@@ -45,6 +45,9 @@ export default function StoreBrandLogo({
         objectFit: resolved.fit,
         filter,
         imageRendering: "-webkit-optimize-contrast",
+        maxWidth: "100%",
+        width: "auto",
+        display: "block",
       }}
     />
   );

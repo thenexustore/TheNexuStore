@@ -14,6 +14,7 @@ import { HomepageSectionsModule } from './homepage/homepage-sections.module';
 import { HomeLayoutModule } from './homepage/home-layout.module';
 import { JwtAuthModule } from './auth/jwt-auth.module';
 import { PricingModule } from './pricing/pricing.module';
+import { BrandingModule } from './branding/branding.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PricingModule } from './pricing/pricing.module';
     ChatModule,
     HomepageSectionsModule,
     HomeLayoutModule,
+    BrandingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

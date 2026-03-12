@@ -1248,7 +1248,11 @@ export default function HomepageSectionsPage() {
           .filter(Boolean),
       ),
     );
-    if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
+    if (
+      (section.type === "FEATURED_PICKS" ||
+        section.type === "PRODUCT_CAROUSEL") &&
+      activeFeaturedIds.length
+    ) {
       config.source = "manual";
       config.ids = activeFeaturedIds;
       config.query = { type: "products" };
@@ -1443,18 +1447,19 @@ export default function HomepageSectionsPage() {
     }
 
     try {
-      const featuredSection = sections.find(
-        (section) => section.type === "FEATURED_PICKS",
-      );
+      const featuredSection =
+        sections.find((section) => section.type === "PRODUCT_CAROUSEL") ||
+        sections.find((section) => section.type === "FEATURED_PICKS");
 
       if (featuredSection) {
         await homepageSectionsApi.update(featuredSection.id, {
           enabled: true,
-          title: featuredSection.title || "Productos Destacados",
+          title: featuredSection.title || "Carrusel de productos",
           config_json: {
             ...featuredSection.config_json,
             source: "manual",
             ids: productIds,
+            query: { type: "products" },
           },
         });
       } else {
@@ -1466,6 +1471,7 @@ export default function HomepageSectionsPage() {
           config_json: {
             source: "manual",
             ids: productIds,
+            query: { type: "products" },
           },
         });
       }

@@ -1,3 +1,5 @@
+import { API_URL } from "./constants";
+
 export type AdminLanguage = "es" | "en";
 export type AdminLogoMode = "custom";
 export type AdminLogoFit = "contain" | "cover";
@@ -101,6 +103,18 @@ function writeBrandingCookie(settings: AdminSettings): void {
   const domainPart = domain ? `; Domain=${domain}` : "";
   document.cookie = `${BRANDING_COOKIE_KEY}=${toBrandingCookiePayload(settings)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${domainPart}${secure}`;
 }
+
+async function fetchRemoteBrandingSettings(): Promise<Partial<AdminSettings> | null> {
+  try {
+    const response = await fetch(`${API_URL}/branding/settings`, { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok || !payload?.success || !payload?.data) return null;
+    return payload.data as Partial<AdminSettings>;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeAdminSettings(input: Partial<AdminSettings>): AdminSettings {
   const language = input.adminLanguage === "en" ? "en" : "es";
   const logoMode: AdminLogoMode = "custom";
@@ -188,6 +202,16 @@ export function subscribeAdminSettings(listener: (settings: AdminSettings) => vo
 
   window.addEventListener("storage", sync);
   window.addEventListener(ADMIN_SETTINGS_EVENT, sync);
+
+  void (async () => {
+    const remote = await fetchRemoteBrandingSettings();
+    if (!remote) return;
+
+    const merged = normalizeAdminSettings({ ...loadAdminSettings(), ...remote });
+    localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(merged));
+    writeBrandingCookie(merged);
+    window.dispatchEvent(new CustomEvent(ADMIN_SETTINGS_EVENT, { detail: merged }));
+  })();
 
   return () => {
     window.removeEventListener("storage", sync);

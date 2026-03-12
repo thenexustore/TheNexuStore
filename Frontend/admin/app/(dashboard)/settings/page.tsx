@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Building2,
@@ -22,6 +22,7 @@ import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { updateAdminCredentials } from "@/lib/api";
+import { fetchRemoteBrandingSettings, saveRemoteBrandingSettings, uploadBrandingLogo } from "@/lib/api/branding";
 import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 import {
   defaultAdminSettings,
@@ -67,11 +68,11 @@ export default function SettingsPage() {
     normalizedCredentialEmail.length > 0 && normalizedCredentialEmail !== normalizedCurrentAdminEmail;
   const hasCredentialPasswordChange = credentials.newPassword.trim().length > 0;
 
-  const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
+  const applyLocaleIfNeeded = useCallback((nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
       router.replace(pathname, { locale: nextLanguage });
     }
-  };
+  }, [locale, pathname, router]);
 
   useEffect(() => {
     const adminUserRaw = localStorage.getItem("admin_user");
@@ -86,6 +87,28 @@ export default function SettingsPage() {
     } catch {
       // noop
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const remote = await fetchRemoteBrandingSettings();
+        if (cancelled) return;
+
+        const merged = { ...loadAdminSettings(), ...remote };
+        setSettings(merged);
+        setSavedSnapshot(merged);
+        saveAdminSettings(merged);
+      } catch {
+        // noop: fallback to local settings when API is unavailable
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function onSaveCredentials() {
@@ -153,7 +176,7 @@ export default function SettingsPage() {
     }
   }
 
-  function onSave() {
+  const onSave = useCallback(async () => {
     if (settingsSaving) return;
     if (!isSupportEmailValid) {
       toast.error(isEn ? "Support email format is invalid" : "El email de soporte no tiene formato válido");
@@ -181,16 +204,38 @@ export default function SettingsPage() {
 
     setSettingsSaving(true);
     try {
-      saveAdminSettings(nextSettings);
-      setSettings(nextSettings);
-      setSavedSnapshot(nextSettings);
+      const uploadedLight = nextSettings.brandLogoUrl.startsWith("data:image/")
+        ? await uploadBrandingLogo("light", nextSettings.brandLogoUrl)
+        : nextSettings.brandLogoUrl;
+      const uploadedDark = nextSettings.brandLogoDarkUrl.startsWith("data:image/")
+        ? await uploadBrandingLogo("dark", nextSettings.brandLogoDarkUrl)
+        : nextSettings.brandLogoDarkUrl;
+
+      const remoteReady = {
+        ...nextSettings,
+        brandLogoUrl: uploadedLight,
+        brandLogoDarkUrl: uploadedDark,
+      };
+
+      await saveRemoteBrandingSettings(remoteReady);
+      saveAdminSettings(remoteReady);
+      setSettings(remoteReady);
+      setSavedSnapshot(remoteReady);
       setSavedAt(new Date());
       applyLocaleIfNeeded(nextSettings.adminLanguage);
       toast.success(isEn ? "Settings saved and applied" : "Ajustes guardados y aplicados");
     } finally {
       setSettingsSaving(false);
     }
-  }
+  }, [
+    applyLocaleIfNeeded,
+    hasValidLightLogo,
+    isEn,
+    isSupportEmailValid,
+    savedSnapshot,
+    settings,
+    settingsSaving,
+  ]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -211,7 +256,7 @@ export default function SettingsPage() {
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [hasChanges, settings, settingsSaving]);
+  }, [hasChanges, settings, settingsSaving, onSave]);
 
   function onReset() {
     setSettings(defaultAdminSettings);

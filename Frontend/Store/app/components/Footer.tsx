@@ -7,12 +7,17 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import MailIcon from "@mui/icons-material/Mail";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import XIcon from "@mui/icons-material/X";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "@/app/lib/admin-branding";
+import StoreBrandLogo from "./StoreBrandLogo";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const t = useTranslations("footer");
+  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
+
+  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
   const socialLinks = [
     { Icon: FacebookIcon, url: "https://www.facebook.com/people/Nexus-SP-Solutions/61574722507921/?locale=es_ES" },
@@ -52,6 +57,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
           <div>
+            <StoreBrandLogo branding={storeBranding} alt="Logo" className="w-auto mb-4" height={36} />
             <h3 className="text-lg font-semibold mb-4">{t("title")}</h3>
             <form
               onSubmit={handleSubscribe}

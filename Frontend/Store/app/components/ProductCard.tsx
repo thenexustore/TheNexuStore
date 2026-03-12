@@ -440,7 +440,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
 
           <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-xl font-bold text-gray-900 sm:text-2xl">
+            <span
+              className={`text-xl font-bold sm:text-2xl ${
+                product.compare_at_price && product.compare_at_price > product.price
+                  ? "text-red-600"
+                  : "text-gray-900"
+              }`}
+            >
               €{product.price.toFixed(2)}
             </span>
 

@@ -128,7 +128,7 @@ fi
 
 log "Installing/building backend"
 cd "$REPO_DIR/Backend/Store"
-npm ci
+npm ci --include=dev
 DATABASE_URL="$DATABASE_URL" npx prisma generate
 DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
 npm run build

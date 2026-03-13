@@ -126,9 +126,10 @@ const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
   BRANDS_STRIP: { source: "query", query: { type: "brands", limit: 12 } },
   TRUST_BAR: {
     items: [
-      { icon: "truck", text: "Envío rápido" },
-      { icon: "shield", text: "Pago seguro" },
-      { icon: "refresh-ccw", text: "Devoluciones fáciles" },
+      { icon: "truck", text: "Entrega 24/48h en miles de referencias" },
+      { icon: "shield", text: "Pagos 100% seguros y cifrados" },
+      { icon: "refresh-ccw", text: "Devoluciones simples y soporte postventa" },
+      { icon: "headset", text: "Atención experta antes y después de comprar" },
     ],
   },
 };
@@ -2722,7 +2723,9 @@ export default function HomepageSectionsPage() {
                               />
                               Solo con stock
                             </label>
-                            {section.type === "FEATURED_PICKS" ? (
+                            {["FEATURED_PICKS", "PRODUCT_CAROUSEL"].includes(
+                              section.type,
+                            ) ? (
                               <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
                                 <input
                                   type="checkbox"
@@ -3005,7 +3008,9 @@ export default function HomepageSectionsPage() {
                               Solo con stock
                             </label>
 
-                            {section.type === "FEATURED_PICKS" ? (
+                            {["FEATURED_PICKS", "PRODUCT_CAROUSEL"].includes(
+                              section.type,
+                            ) ? (
                               <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
                                 <input
                                   type="checkbox"
@@ -3363,7 +3368,16 @@ export default function HomepageSectionsPage() {
                 {section.type === "TRUST_BAR" && (
                   <div className="rounded-lg border border-slate-200 p-3 space-y-2">
                     <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Items de confianza
+                      Items de confianza (
+                      {
+                        (
+                          (section.config_json.items || []) as Array<{
+                            icon?: string;
+                            text: string;
+                          }>
+                        ).length
+                      }
+                      /6)
                     </div>
                     {(
                       (section.config_json.items || []) as Array<{
@@ -3430,11 +3444,19 @@ export default function HomepageSectionsPage() {
                     <button
                       className="border rounded-lg px-3 py-2 text-sm"
                       onClick={() => {
+                        const current = (section.config_json.items ||
+                          []) as Array<{
+                          icon?: string;
+                          text: string;
+                        }>;
+                        if (current.length >= 6) {
+                          toast.error(
+                            "Máximo 6 items en la barra de confianza",
+                          );
+                          return;
+                        }
                         const arr = [
-                          ...((section.config_json.items || []) as Array<{
-                            icon?: string;
-                            text: string;
-                          }>),
+                          ...current,
                           { icon: "shield", text: "Nuevo item" },
                         ];
                         updateConfig(section, { items: arr });

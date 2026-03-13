@@ -17,7 +17,7 @@ export const DEFAULT_HOMEPAGE_SECTIONS: Array<{
 }> = [
   {
     type: HomepageSectionType.HERO_BANNER_SLIDER,
-    title: 'Hero Banner',
+    title: 'Banner principal',
     position: 1,
     config_json: { items_per_carousel: 1 },
   },
@@ -43,13 +43,13 @@ export const DEFAULT_HOMEPAGE_SECTIONS: Array<{
   },
   {
     type: HomepageSectionType.BRANDS_STRIP,
-    title: 'Top Brands',
+    title: 'Marcas destacadas',
     position: 3,
     config_json: { source: 'query', query: { type: 'brands', limit: 12 } },
   },
   {
     type: HomepageSectionType.TRUST_BAR,
-    title: 'Why shop with us',
+    title: 'Por qué comprar con nosotros',
     position: 4,
     config_json: {
       items: [

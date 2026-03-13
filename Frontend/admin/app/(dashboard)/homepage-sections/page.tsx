@@ -44,14 +44,21 @@ import {
   UnfoldVertical,
 } from "lucide-react";
 
-const MANUAL_TYPES = ["FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"];
-const PRODUCT_QUERY_TYPES = ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"];
-const SECTION_TYPES = [
-  "HERO_BANNER_SLIDER",
+const MANUAL_TYPES = [
+  "PRODUCT_CAROUSEL",
+  "FEATURED_PICKS",
   "TOP_CATEGORIES_GRID",
+  "BRANDS_STRIP",
+];
+const PRODUCT_QUERY_TYPES = [
+  "PRODUCT_CAROUSEL",
   "BEST_DEALS",
   "NEW_ARRIVALS",
   "FEATURED_PICKS",
+];
+const SECTION_TYPES = [
+  "HERO_BANNER_SLIDER",
+  "PRODUCT_CAROUSEL",
   "BRANDS_STRIP",
   "TRUST_BAR",
 ] as const;
@@ -65,16 +72,64 @@ const SORT_OPTIONS = [
 
 const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
   HERO_BANNER_SLIDER: { items_per_carousel: 1 },
-  TOP_CATEGORIES_GRID: { source: "query", query: { type: "categories", limit: 10 } },
-  BEST_DEALS: { source: "query", query: { type: "products", sortBy: "discount_desc", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
-  NEW_ARRIVALS: { source: "query", query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
-  FEATURED_PICKS: { source: "query", query: { type: "products", inStockOnly: true, limit: 12 }, carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
+  PRODUCT_CAROUSEL: {
+    source: "query",
+    query: {
+      type: "products",
+      featuredOnly: true,
+      inStockOnly: true,
+      sortBy: "newest",
+      limit: 12,
+    },
+    carousel_enabled: true,
+    carousel_autoplay: true,
+    carousel_interval_ms: 4500,
+    carousel_items_desktop: 4,
+    carousel_items_mobile: 2,
+  },
+  TOP_CATEGORIES_GRID: {
+    source: "query",
+    query: { type: "categories", limit: 10 },
+  },
+  BEST_DEALS: {
+    source: "query",
+    query: {
+      type: "products",
+      sortBy: "discount_desc",
+      inStockOnly: true,
+      limit: 12,
+    },
+    carousel_enabled: true,
+    carousel_autoplay: true,
+    carousel_interval_ms: 4500,
+    carousel_items_desktop: 4,
+    carousel_items_mobile: 2,
+  },
+  NEW_ARRIVALS: {
+    source: "query",
+    query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 },
+    carousel_enabled: true,
+    carousel_autoplay: true,
+    carousel_interval_ms: 4500,
+    carousel_items_desktop: 4,
+    carousel_items_mobile: 2,
+  },
+  FEATURED_PICKS: {
+    source: "query",
+    query: { type: "products", inStockOnly: true, limit: 12 },
+    carousel_enabled: true,
+    carousel_autoplay: true,
+    carousel_interval_ms: 4500,
+    carousel_items_desktop: 4,
+    carousel_items_mobile: 2,
+  },
   BRANDS_STRIP: { source: "query", query: { type: "brands", limit: 12 } },
   TRUST_BAR: {
     items: [
-      { icon: "truck", text: "Envío rápido" },
-      { icon: "shield", text: "Pago seguro" },
-      { icon: "refresh-ccw", text: "Devoluciones fáciles" },
+      { icon: "truck", text: "Entrega 24/48h en miles de referencias" },
+      { icon: "shield", text: "Pagos 100% seguros y cifrados" },
+      { icon: "refresh-ccw", text: "Devoluciones simples y soporte postventa" },
+      { icon: "headset", text: "Atención experta antes y después de comprar" },
     ],
   },
 };
@@ -83,12 +138,55 @@ type PresetKey = "tv" | "gaming" | "laptops" | "networking" | "cctv";
 
 type SectionType = (typeof SECTION_TYPES)[number];
 
-const PRESET_BUTTONS: Array<{ key: PresetKey; label: string; title: string; sortBy: "discount_desc" | "newest"; matcher: string[] }> = [
-  { key: "tv", label: "Añadir sección TV", title: "TV", sortBy: "discount_desc", matcher: ["tv, audio y vídeo", "tv", "audio", "video", "television"] },
-  { key: "gaming", label: "Añadir sección Gaming", title: "Gaming", sortBy: "discount_desc", matcher: ["gaming", "consola", "juego", "game"] },
-  { key: "laptops", label: "Añadir sección Laptops", title: "Laptops", sortBy: "newest", matcher: ["portátil", "portatiles", "laptop", "notebook"] },
-  { key: "networking", label: "Añadir sección Networking", title: "Networking", sortBy: "newest", matcher: ["network", "redes", "router", "switch", "wifi"] },
-  { key: "cctv", label: "Añadir sección CCTV", title: "CCTV", sortBy: "discount_desc", matcher: ["cctv", "videovigilancia", "vigilancia", "seguridad", "camara", "cámara"] },
+const PRESET_BUTTONS: Array<{
+  key: PresetKey;
+  label: string;
+  title: string;
+  sortBy: "discount_desc" | "newest";
+  matcher: string[];
+}> = [
+  {
+    key: "tv",
+    label: "Añadir sección TV",
+    title: "TV",
+    sortBy: "discount_desc",
+    matcher: ["tv, audio y vídeo", "tv", "audio", "video", "television"],
+  },
+  {
+    key: "gaming",
+    label: "Añadir sección Gaming",
+    title: "Gaming",
+    sortBy: "discount_desc",
+    matcher: ["gaming", "consola", "juego", "game"],
+  },
+  {
+    key: "laptops",
+    label: "Añadir sección Laptops",
+    title: "Laptops",
+    sortBy: "newest",
+    matcher: ["portátil", "portatiles", "laptop", "notebook"],
+  },
+  {
+    key: "networking",
+    label: "Añadir sección Networking",
+    title: "Networking",
+    sortBy: "newest",
+    matcher: ["network", "redes", "router", "switch", "wifi"],
+  },
+  {
+    key: "cctv",
+    label: "Añadir sección CCTV",
+    title: "CCTV",
+    sortBy: "discount_desc",
+    matcher: [
+      "cctv",
+      "videovigilancia",
+      "vigilancia",
+      "seguridad",
+      "camara",
+      "cámara",
+    ],
+  },
 ];
 
 function normalizeText(value?: string) {
@@ -102,7 +200,8 @@ function normalizeText(value?: string) {
 function resolveOptionImageSrc(src?: string) {
   const raw = String(src || "").trim();
   if (!raw) return "/No_Image_Available.png";
-  if (raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/")) return raw;
+  if (raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/"))
+    return raw;
   if (/^https?:\/\//i.test(raw)) return raw;
   return `${API_URL}/${raw.replace(/^\/+/, "")}`;
 }
@@ -112,29 +211,40 @@ function supportsSource(type: string) {
 }
 
 function defaultConfigFor(type: string): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(DEFAULT_CONFIG_BY_TYPE[type] || {})) as Record<string, unknown>;
+  return JSON.parse(
+    JSON.stringify(DEFAULT_CONFIG_BY_TYPE[type] || {}),
+  ) as Record<string, unknown>;
 }
 
-function findPresetCategoryId(presetMatchers: string[], tree: CategoryMenuTreeNode[]): string | undefined {
+function findPresetCategoryId(
+  presetMatchers: string[],
+  tree: CategoryMenuTreeNode[],
+): string | undefined {
   if (!tree.length) return undefined;
 
   const normalizedMatchers = presetMatchers.map(normalizeText);
 
   const byExactParent = tree.find((parent) =>
-    normalizedMatchers.some((matcher) => normalizeText(parent.name) === matcher),
+    normalizedMatchers.some(
+      (matcher) => normalizeText(parent.name) === matcher,
+    ),
   );
   if (byExactParent) return byExactParent.id;
 
   const byParentContains = tree.find((parent) => {
     const parentName = normalizeText(parent.name);
-    return normalizedMatchers.some((matcher) => parentName.includes(matcher) || matcher.includes(parentName));
+    return normalizedMatchers.some(
+      (matcher) => parentName.includes(matcher) || matcher.includes(parentName),
+    );
   });
   if (byParentContains) return byParentContains.id;
 
   for (const parent of tree) {
     const child = parent.children.find((node) => {
       const name = normalizeText(node.name);
-      return normalizedMatchers.some((matcher) => name.includes(matcher) || matcher.includes(name));
+      return normalizedMatchers.some(
+        (matcher) => name.includes(matcher) || matcher.includes(name),
+      );
     });
     if (child) return child.id;
   }
@@ -145,42 +255,71 @@ function findPresetCategoryId(presetMatchers: string[], tree: CategoryMenuTreeNo
 export default function HomepageSectionsPage() {
   const [sections, setSections] = useState<HomepageSection[]>([]);
   const [search, setSearch] = useState<Record<string, string>>({});
-  const [manualProductFilters, setManualProductFilters] = useState<Record<string, {
-    categoryId?: string;
-    brandId?: string;
-    sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
-    inStockOnly?: boolean;
-    featuredOnly?: boolean;
-    priceMin?: number;
-    priceMax?: number;
-  }>>({});
+  const [manualProductFilters, setManualProductFilters] = useState<
+    Record<
+      string,
+      {
+        categoryId?: string;
+        brandId?: string;
+        sortBy?: "newest" | "price_asc" | "price_desc" | "discount_desc";
+        inStockOnly?: boolean;
+        featuredOnly?: boolean;
+        priceMin?: number;
+        priceMax?: number;
+      }
+    >
+  >({});
   const [options, setOptions] = useState<Record<string, HomepageOption[]>>({});
-  const [queryCatalogs, setQueryCatalogs] = useState<{ categories: HomepageOption[]; brands: HomepageOption[] }>({ categories: [], brands: [] });
+  const [queryCatalogs, setQueryCatalogs] = useState<{
+    categories: HomepageOption[];
+    brands: HomepageOption[];
+  }>({ categories: [], brands: [] });
   const [menuTree, setMenuTree] = useState<CategoryMenuTreeNode[]>([]);
-  const [newType, setNewType] = useState<SectionType>("TOP_CATEGORIES_GRID");
+  const [newType, setNewType] = useState<SectionType>("PRODUCT_CAROUSEL");
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
-  const [diagnostics, setDiagnostics] = useState<HomepageSectionsDiagnostics | null>(null);
+  const [diagnostics, setDiagnostics] =
+    useState<HomepageSectionsDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
-  const [previewBySectionId, setPreviewBySectionId] = useState<Record<string, HomepageSectionPreview>>({});
+  const [previewBySectionId, setPreviewBySectionId] = useState<
+    Record<string, HomepageSectionPreview>
+  >({});
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
   const [dragSectionId, setDragSectionId] = useState<string | null>(null);
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"overview" | "builder" | "assets">("builder");
-  const [originalSections, setOriginalSections] = useState<HomepageSection[]>([]);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<
+    "overview" | "builder" | "assets"
+  >("builder");
+  const [originalSections, setOriginalSections] = useState<HomepageSection[]>(
+    [],
+  );
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty" | "risky">("all");
+  const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>(
+    [],
+  );
+  const [collapsedSections, setCollapsedSections] = useState<
+    Record<string, boolean>
+  >({});
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "enabled" | "disabled" | "dirty" | "risky"
+  >("all");
   const [autoFixingEmpty, setAutoFixingEmpty] = useState(false);
-  const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] = useState("");
-  const [categoryCarouselType, setCategoryCarouselType] = useState<"FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS">("FEATURED_PICKS");
-  const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<"discount_desc" | "newest">("discount_desc");
+  const [categoryCarouselCategoryId, setCategoryCarouselCategoryId] =
+    useState("");
+  const [categoryCarouselType, setCategoryCarouselType] = useState<
+    "PRODUCT_CAROUSEL" | "FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS"
+  >("PRODUCT_CAROUSEL");
+  const [categoryCarouselSortBy, setCategoryCarouselSortBy] = useState<
+    "discount_desc" | "newest"
+  >("discount_desc");
   const [creatingType, setCreatingType] = useState<string | null>(null);
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
 
-  const sorted = useMemo(() => [...sections].sort((a, b) => a.position - b.position), [sections]);
+  const sorted = useMemo(
+    () => [...sections].sort((a, b) => a.position - b.position),
+    [sections],
+  );
 
   const sectionSignature = useCallback((section: HomepageSection) => {
     return JSON.stringify({
@@ -212,20 +351,36 @@ export default function HomepageSectionsPage() {
       count: countByType.get(type) || 0,
     }));
   }, [sections]);
-  const isDirtySection = useCallback((section: HomepageSection) => {
-    const original = originalSections.find((item) => item.id === section.id);
-    if (!original) return true;
-    return sectionSignature(section) !== sectionSignature(original);
-  }, [originalSections, sectionSignature]);
+  const isDirtySection = useCallback(
+    (section: HomepageSection) => {
+      const original = originalSections.find((item) => item.id === section.id);
+      if (!original) return true;
+      return sectionSignature(section) !== sectionSignature(original);
+    },
+    [originalSections, sectionSignature],
+  );
 
   const dirtySectionIds = useMemo(() => {
-    return new Set(sections.filter((section) => isDirtySection(section)).map((section) => section.id));
+    return new Set(
+      sections
+        .filter((section) => isDirtySection(section))
+        .map((section) => section.id),
+    );
   }, [isDirtySection, sections]);
   const riskyPreviewSectionIds = useMemo(() => {
     const set = new Set<string>();
     for (const section of sections) {
       if (!section.enabled) continue;
-      if (!["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"].includes(section.type)) continue;
+      if (
+        ![
+          "BEST_DEALS",
+          "NEW_ARRIVALS",
+          "FEATURED_PICKS",
+          "TOP_CATEGORIES_GRID",
+          "BRANDS_STRIP",
+        ].includes(section.type)
+      )
+        continue;
       const preview = previewBySectionId[section.id];
       if (preview && preview.previewCount === 0) set.add(section.id);
     }
@@ -235,12 +390,16 @@ export default function HomepageSectionsPage() {
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return sorted.filter((section) => {
-      const textOk = !q || (section.title || "").toLowerCase().includes(q) || section.type.toLowerCase().includes(q);
+      const textOk =
+        !q ||
+        (section.title || "").toLowerCase().includes(q) ||
+        section.type.toLowerCase().includes(q);
       if (!textOk) return false;
       if (statusFilter === "enabled") return section.enabled;
       if (statusFilter === "disabled") return !section.enabled;
       if (statusFilter === "dirty") return isDirtySection(section);
-      if (statusFilter === "risky") return riskyPreviewSectionIds.has(section.id);
+      if (statusFilter === "risky")
+        return riskyPreviewSectionIds.has(section.id);
       return true;
     });
   }, [sorted, filter, statusFilter, isDirtySection, riskyPreviewSectionIds]);
@@ -255,10 +414,22 @@ export default function HomepageSectionsPage() {
     return map;
   }, [options, queryCatalogs.brands, queryCatalogs.categories]);
   const allCategoryOptions = useMemo(() => {
-    const map = new Map<string, HomepageOption>();
+    const byId = new Map<string, HomepageOption>();
+    const seenSlugs = new Set<string>();
+
+    const normalizeSlug = (value?: string) =>
+      String(value || "")
+        .trim()
+        .toLowerCase();
+
     const push = (id: string, label: string, subtitle?: string) => {
       if (!id) return;
-      if (!map.has(id)) map.set(id, { id, label, subtitle });
+      const slug = normalizeSlug(subtitle);
+      if (slug && seenSlugs.has(slug)) return;
+      if (!byId.has(id)) {
+        byId.set(id, { id, label, subtitle });
+        if (slug) seenSlugs.add(slug);
+      }
     };
 
     for (const item of queryCatalogs.categories) {
@@ -274,27 +445,33 @@ export default function HomepageSectionsPage() {
     };
 
     walk(menuTree || []);
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, "es", { sensitivity: "base" }),
+    );
   }, [menuTree, queryCatalogs.categories]);
-
 
   const load = useCallback(async () => {
     setIsLoading(true);
     setDiagnosticsLoading(true);
     try {
-      const [sectionsData, diagnosticsData, bannersData, featuredResponse] = await Promise.all([
-        homepageSectionsApi.list(),
-        homepageSectionsApi.diagnostics(),
-        getBanners(),
-        fetchFeaturedProducts({ take: 20 }),
-      ]);
+      const [sectionsData, diagnosticsData, bannersData, featuredResponse] =
+        await Promise.all([
+          homepageSectionsApi.list(),
+          homepageSectionsApi.diagnostics(),
+          getBanners(),
+          fetchFeaturedProducts({ take: 20 }),
+        ]);
       setSections(sectionsData);
       setOriginalSections(sectionsData);
       setDiagnostics(diagnosticsData);
       setBanners(bannersData);
       setFeaturedProducts(featuredResponse.data || []);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudieron cargar las secciones");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar las secciones",
+      );
     } finally {
       setIsLoading(false);
       setDiagnosticsLoading(false);
@@ -306,7 +483,12 @@ export default function HomepageSectionsPage() {
     (async () => {
       try {
         const [categories, brands, menuTreeResponse] = await Promise.all([
-          homepageSectionsApi.options("TOP_CATEGORIES_GRID", "", 500, "categories"),
+          homepageSectionsApi.options(
+            "TOP_CATEGORIES_GRID",
+            "",
+            500,
+            "categories",
+          ),
           homepageSectionsApi.options("BRANDS_STRIP", "", 500, "brands"),
           homepageSectionsApi.menuTree(),
         ]);
@@ -319,32 +501,49 @@ export default function HomepageSectionsPage() {
   }, [load]);
 
   const updateLocal = (id: string, patch: Partial<HomepageSection>) => {
-    setSections((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    setSections((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+    );
   };
 
-  const updateConfig = (section: HomepageSection, patch: Record<string, unknown>) => {
-    setSections((prev) => prev.map((item) => {
-      if (item.id !== section.id) return item;
-      return { ...item, config_json: { ...(item.config_json || {}), ...patch } };
-    }));
+  const updateConfig = (
+    section: HomepageSection,
+    patch: Record<string, unknown>,
+  ) => {
+    setSections((prev) =>
+      prev.map((item) => {
+        if (item.id !== section.id) return item;
+        return {
+          ...item,
+          config_json: { ...(item.config_json || {}), ...patch },
+        };
+      }),
+    );
   };
 
-  const updateQueryConfig = (section: HomepageSection, patch: Record<string, unknown>) => {
-    setSections((prev) => prev.map((item) => {
-      if (item.id !== section.id) return item;
-      const currentConfig = (item.config_json || {}) as Record<string, unknown>;
-      const query = (currentConfig.query || {}) as Record<string, unknown>;
-      return {
-        ...item,
-        config_json: {
-          ...currentConfig,
-          source: "query",
-          query: { ...query, ...patch },
-        },
-      };
-    }));
+  const updateQueryConfig = (
+    section: HomepageSection,
+    patch: Record<string, unknown>,
+  ) => {
+    setSections((prev) =>
+      prev.map((item) => {
+        if (item.id !== section.id) return item;
+        const currentConfig = (item.config_json || {}) as Record<
+          string,
+          unknown
+        >;
+        const query = (currentConfig.query || {}) as Record<string, unknown>;
+        return {
+          ...item,
+          config_json: {
+            ...currentConfig,
+            source: "query",
+            query: { ...query, ...patch },
+          },
+        };
+      }),
+    );
   };
-
 
   const normalizeLogoOverrides = (value: unknown): Record<string, string> => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -359,7 +558,11 @@ export default function HomepageSectionsPage() {
     return out;
   };
 
-  const updateBrandLogoOverride = (section: HomepageSection, brandKey: string, value: string) => {
+  const updateBrandLogoOverride = (
+    section: HomepageSection,
+    brandKey: string,
+    value: string,
+  ) => {
     const key = String(brandKey || "").trim();
     if (!key) return;
     const current = normalizeLogoOverrides(section.config_json.logo_overrides);
@@ -378,7 +581,8 @@ export default function HomepageSectionsPage() {
   };
 
   const save = async (sectionOrId: HomepageSection | string) => {
-    const sectionId = typeof sectionOrId === "string" ? sectionOrId : sectionOrId.id;
+    const sectionId =
+      typeof sectionOrId === "string" ? sectionOrId : sectionOrId.id;
     const section = sections.find((item) => item.id === sectionId);
     if (!section) {
       toast.error("No se encontró la sección a guardar");
@@ -396,7 +600,11 @@ export default function HomepageSectionsPage() {
       await load();
       return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar la sección");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la sección",
+      );
       return false;
     } finally {
       setSavingId(null);
@@ -406,7 +614,11 @@ export default function HomepageSectionsPage() {
   const saveAndOpenStore = async (sectionId: string) => {
     const ok = await save(sectionId);
     if (!ok) return;
-    window.open(`${SITE_URL}/store?highlightSection=${encodeURIComponent(sectionId)}`, "_blank", "noopener,noreferrer");
+    window.open(
+      `${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(sectionId)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   const runSectionPreview = async (sectionId: string) => {
@@ -416,7 +628,9 @@ export default function HomepageSectionsPage() {
       setPreviewBySectionId((prev) => ({ ...prev, [sectionId]: data }));
       toast.success("Preview actualizado");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo generar preview");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo generar preview",
+      );
     } finally {
       setPreviewLoadingId(null);
     }
@@ -424,7 +638,17 @@ export default function HomepageSectionsPage() {
 
   const runBulkPreviewVisibleSections = async () => {
     const ids = sections
-      .filter((section) => section.enabled && ["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS", "TOP_CATEGORIES_GRID", "BRANDS_STRIP"].includes(section.type))
+      .filter(
+        (section) =>
+          section.enabled &&
+          [
+            "BEST_DEALS",
+            "NEW_ARRIVALS",
+            "FEATURED_PICKS",
+            "TOP_CATEGORIES_GRID",
+            "BRANDS_STRIP",
+          ].includes(section.type),
+      )
       .map((section) => section.id);
 
     if (!ids.length) {
@@ -440,10 +664,17 @@ export default function HomepageSectionsPage() {
           return [id, data] as const;
         }),
       );
-      setPreviewBySectionId((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      setPreviewBySectionId((prev) => ({
+        ...prev,
+        ...Object.fromEntries(entries),
+      }));
       toast.success(`Preview actualizado para ${ids.length} secciones`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo analizar todas las secciones");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo analizar todas las secciones",
+      );
     } finally {
       setBulkPreviewLoading(false);
     }
@@ -458,13 +689,25 @@ export default function HomepageSectionsPage() {
     const preview = previewBySectionId[section.id];
     if (section.enabled && preview) {
       if (preview.previewCount === 0) score -= 35;
-      if (typeof preview.inStockCount === "number" && preview.previewCount > 0 && preview.inStockCount / Math.max(1, preview.previewCount) < 0.35) score -= 15;
+      if (
+        typeof preview.inStockCount === "number" &&
+        preview.previewCount > 0 &&
+        preview.inStockCount / Math.max(1, preview.previewCount) < 0.35
+      )
+        score -= 15;
     }
 
-    const overlap = (diagnostics?.overlapWarnings || []).some((item) => item.aId === section.id || item.bId === section.id);
+    const overlap = (diagnostics?.overlapWarnings || []).some(
+      (item) => item.aId === section.id || item.bId === section.id,
+    );
     if (overlap) score -= 20;
 
-    if ((diagnostics?.invalidConfigSections || []).some((item) => item.id === section.id)) score -= 20;
+    if (
+      (diagnostics?.invalidConfigSections || []).some(
+        (item) => item.id === section.id,
+      )
+    )
+      score -= 20;
 
     const safe = Math.max(0, Math.min(100, score));
     const level = safe >= 80 ? "Alta" : safe >= 60 ? "Media" : "Baja";
@@ -475,16 +718,30 @@ export default function HomepageSectionsPage() {
     const preview = previewBySectionId[section.id];
     if (!preview) return null;
 
-    const desktopItems = Number(section.config_json.carousel_items_desktop || 4);
+    const desktopItems = Number(
+      section.config_json.carousel_items_desktop || 4,
+    );
     if (preview.previewCount === 0) {
-      return { tone: "danger" as const, label: "Sin productos", hint: "Corre análisis/filtros o aplica autocorrección para evitar carrusel vacío." };
+      return {
+        tone: "danger" as const,
+        label: "Sin productos",
+        hint: "Corre análisis/filtros o aplica autocorrección para evitar carrusel vacío.",
+      };
     }
 
     if (preview.previewCount < desktopItems) {
-      return { tone: "warning" as const, label: "Cobertura corta", hint: `Hay ${preview.previewCount} item(s) para ${desktopItems} slots desktop; puede verse repetitivo.` };
+      return {
+        tone: "warning" as const,
+        label: "Cobertura corta",
+        hint: `Hay ${preview.previewCount} item(s) para ${desktopItems} slots desktop; puede verse repetitivo.`,
+      };
     }
 
-    return { tone: "ok" as const, label: "Cobertura OK", hint: `${preview.previewCount} item(s) disponibles para ${desktopItems} slots desktop.` };
+    return {
+      tone: "ok" as const,
+      label: "Cobertura OK",
+      hint: `${preview.previewCount} item(s) disponibles para ${desktopItems} slots desktop.`,
+    };
   };
 
   const create = async () => {
@@ -500,7 +757,9 @@ export default function HomepageSectionsPage() {
       toast.success("Sección creada");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear la sección");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo crear la sección",
+      );
     } finally {
       setCreatingType(null);
     }
@@ -519,14 +778,18 @@ export default function HomepageSectionsPage() {
       toast.success(`Sección ${type} creada`);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `No se pudo crear ${type}`);
+      toast.error(
+        error instanceof Error ? error.message : `No se pudo crear ${type}`,
+      );
     } finally {
       setCreatingType(null);
     }
   };
 
   const createMissingBaseSections = async () => {
-    const missing = sectionTypeStats.filter((item) => item.count === 0).map((item) => item.type);
+    const missing = sectionTypeStats
+      .filter((item) => item.count === 0)
+      .map((item) => item.type);
     if (!missing.length) {
       toast.message("No faltan tipos base de sección");
       return;
@@ -546,7 +809,11 @@ export default function HomepageSectionsPage() {
       toast.success(`Se añadieron ${missing.length} tipo(s) faltantes`);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudieron crear los faltantes");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron crear los faltantes",
+      );
     }
   };
 
@@ -557,12 +824,19 @@ export default function HomepageSectionsPage() {
         position: sorted.length + 1,
         enabled: section.enabled,
         title: `${section.title || section.type} (copia)`,
-        config_json: JSON.parse(JSON.stringify(section.config_json)) as Record<string, unknown>,
+        config_json: JSON.parse(JSON.stringify(section.config_json)) as Record<
+          string,
+          unknown
+        >,
       });
       toast.success("Sección duplicada");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo duplicar la sección");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo duplicar la sección",
+      );
     }
   };
 
@@ -574,7 +848,7 @@ export default function HomepageSectionsPage() {
     try {
       const categoryId = findPresetCategoryId(preset.matcher, menuTree);
       await homepageSectionsApi.create({
-        type: "FEATURED_PICKS",
+        type: "PRODUCT_CAROUSEL",
         position: sorted.length + 1,
         enabled: true,
         title: preset.title,
@@ -592,7 +866,11 @@ export default function HomepageSectionsPage() {
       toast.success(`Sección preset ${preset.title} añadida`);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `No se pudo crear el preset ${preset.title}`);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `No se pudo crear el preset ${preset.title}`,
+      );
     } finally {
       setCreatingType(null);
     }
@@ -604,35 +882,53 @@ export default function HomepageSectionsPage() {
       return;
     }
 
-    const category = allCategoryOptions.find((item) => item.id === categoryCarouselCategoryId);
+    const category = allCategoryOptions.find(
+      (item) => item.id === categoryCarouselCategoryId,
+    );
 
     setCreatingType("category-carousel");
     try {
-      const strictPreview = await homepageSectionsApi.options(categoryCarouselType, "", 6, "products", {
-        categoryId: categoryCarouselCategoryId,
-        sortBy: categoryCarouselSortBy,
-        inStockOnly: true,
-        featuredOnly: false,
-      });
+      const strictPreview = await homepageSectionsApi.options(
+        categoryCarouselType,
+        "",
+        6,
+        "products",
+        {
+          categoryId: categoryCarouselCategoryId,
+          sortBy: categoryCarouselSortBy,
+          inStockOnly: true,
+          featuredOnly: false,
+        },
+      );
 
       const hasStrictProducts = strictPreview.length > 0;
       let inStockOnly = true;
 
       if (!hasStrictProducts) {
-        const relaxedPreview = await homepageSectionsApi.options(categoryCarouselType, "", 6, "products", {
-          categoryId: categoryCarouselCategoryId,
-          sortBy: categoryCarouselSortBy,
-          inStockOnly: false,
-          featuredOnly: false,
-        });
+        const relaxedPreview = await homepageSectionsApi.options(
+          categoryCarouselType,
+          "",
+          6,
+          "products",
+          {
+            categoryId: categoryCarouselCategoryId,
+            sortBy: categoryCarouselSortBy,
+            inStockOnly: false,
+            featuredOnly: false,
+          },
+        );
 
         if (!relaxedPreview.length) {
-          toast.error("Esa categoría no tiene productos para carrusel (ni relajando stock). Elige otra categoría.");
+          toast.error(
+            "Esa categoría no tiene productos para carrusel (ni relajando stock). Elige otra categoría.",
+          );
           return;
         }
 
         inStockOnly = false;
-        toast.message("Categoría con stock bajo: se creó el carrusel con inStockOnly desactivado para evitar vacío.");
+        toast.message(
+          "Categoría con stock bajo: se creó el carrusel con inStockOnly desactivado para evitar vacío.",
+        );
       }
 
       const created = await homepageSectionsApi.create({
@@ -657,7 +953,9 @@ export default function HomepageSectionsPage() {
           carousel_items_mobile: 2,
         },
       });
-      toast.success(`Carrusel de categoría creado${category ? `: ${category.label}` : ""}`);
+      toast.success(
+        `Carrusel de categoría creado${category ? `: ${category.label}` : ""}`,
+      );
       setCategoryCarouselCategoryId("");
       await load();
       if (created?.id) {
@@ -665,7 +963,11 @@ export default function HomepageSectionsPage() {
         void runSectionPreview(created.id);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el carrusel por categoría");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear el carrusel por categoría",
+      );
     } finally {
       setCreatingType(null);
     }
@@ -678,7 +980,11 @@ export default function HomepageSectionsPage() {
       toast.success("Sección eliminada");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo eliminar la sección");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar la sección",
+      );
     }
   };
 
@@ -691,17 +997,23 @@ export default function HomepageSectionsPage() {
     arr.splice(next, 0, item);
     const payload = arr.map((x, i) => ({ id: x.id, position: i + 1 }));
 
-    setSections((prev) => prev.map((x) => ({ ...x, position: payload.find((p) => p.id === x.id)?.position || x.position })));
+    setSections((prev) =>
+      prev.map((x) => ({
+        ...x,
+        position: payload.find((p) => p.id === x.id)?.position || x.position,
+      })),
+    );
 
     try {
       await homepageSectionsApi.reorder(payload);
       toast.success("Orden actualizado");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo reordenar");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo reordenar",
+      );
     }
   };
-
 
   const moveBySectionIds = async (dragId: string, targetId: string) => {
     if (!dragId || !targetId || dragId === targetId) return;
@@ -714,14 +1026,21 @@ export default function HomepageSectionsPage() {
     arr.splice(to, 0, moved);
     const payload = arr.map((x, i) => ({ id: x.id, position: i + 1 }));
 
-    setSections((prev) => prev.map((x) => ({ ...x, position: payload.find((p) => p.id === x.id)?.position || x.position })));
+    setSections((prev) =>
+      prev.map((x) => ({
+        ...x,
+        position: payload.find((p) => p.id === x.id)?.position || x.position,
+      })),
+    );
 
     try {
       await homepageSectionsApi.reorder(payload);
       toast.success("Orden actualizado (drag & drop)");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo reordenar");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo reordenar",
+      );
     }
   };
 
@@ -730,18 +1049,41 @@ export default function HomepageSectionsPage() {
   };
 
   const setAllCollapsed = (collapsed: boolean) => {
-    setCollapsedSections(Object.fromEntries(sorted.map((section) => [section.id, collapsed])));
+    setCollapsedSections(
+      Object.fromEntries(sorted.map((section) => [section.id, collapsed])),
+    );
   };
 
   const toggleCollapsed = (id: string) => {
     setCollapsedSections((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const applyCarouselPreset = (section: HomepageSection, preset: "compact" | "balanced" | "showcase") => {
+  const applyCarouselPreset = (
+    section: HomepageSection,
+    preset: "compact" | "balanced" | "showcase",
+  ) => {
     const presets: Record<string, Record<string, unknown>> = {
-      compact: { carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 3500, carousel_items_desktop: 5, carousel_items_mobile: 2 },
-      balanced: { carousel_enabled: true, carousel_autoplay: true, carousel_interval_ms: 4500, carousel_items_desktop: 4, carousel_items_mobile: 2 },
-      showcase: { carousel_enabled: true, carousel_autoplay: false, carousel_interval_ms: 5500, carousel_items_desktop: 3, carousel_items_mobile: 1 },
+      compact: {
+        carousel_enabled: true,
+        carousel_autoplay: true,
+        carousel_interval_ms: 3500,
+        carousel_items_desktop: 5,
+        carousel_items_mobile: 2,
+      },
+      balanced: {
+        carousel_enabled: true,
+        carousel_autoplay: true,
+        carousel_interval_ms: 4500,
+        carousel_items_desktop: 4,
+        carousel_items_mobile: 2,
+      },
+      showcase: {
+        carousel_enabled: true,
+        carousel_autoplay: false,
+        carousel_interval_ms: 5500,
+        carousel_items_desktop: 3,
+        carousel_items_mobile: 1,
+      },
     };
     updateConfig(section, presets[preset]);
     toast.success(`Preset de carrusel aplicado: ${preset}`);
@@ -750,53 +1092,102 @@ export default function HomepageSectionsPage() {
   const applySmartCarouselTuning = (section: HomepageSection) => {
     const preview = previewBySectionId[section.id];
     if (!preview) {
-      toast.message("Primero analiza resultados para aplicar ajuste inteligente");
+      toast.message(
+        "Primero analiza resultados para aplicar ajuste inteligente",
+      );
       return;
     }
 
     if (preview.previewCount === 0) {
-      updateConfig(section, { carousel_enabled: true, carousel_autoplay: false, carousel_items_desktop: 2, carousel_items_mobile: 1 });
+      updateConfig(section, {
+        carousel_enabled: true,
+        carousel_autoplay: false,
+        carousel_items_desktop: 2,
+        carousel_items_mobile: 1,
+      });
       if (PRODUCT_QUERY_TYPES.includes(section.type)) {
-        updateQueryConfig(section, { type: "products", inStockOnly: false, featuredOnly: false });
+        updateQueryConfig(section, {
+          type: "products",
+          inStockOnly: false,
+          featuredOnly: false,
+        });
       }
-      toast.message("Preview vacío: se aplicó modo conservador y query más flexible");
+      toast.message(
+        "Preview vacío: se aplicó modo conservador y query más flexible",
+      );
       return;
     }
 
-    const preset = preview.previewCount <= 4 ? "showcase" : preview.previewCount <= 9 ? "balanced" : "compact";
+    const preset =
+      preview.previewCount <= 4
+        ? "showcase"
+        : preview.previewCount <= 9
+          ? "balanced"
+          : "compact";
     applyCarouselPreset(section, preset);
 
-    if (PRODUCT_QUERY_TYPES.includes(section.type) && typeof preview.inStockCount === "number" && preview.inStockCount / Math.max(1, preview.previewCount) < 0.5) {
+    if (
+      PRODUCT_QUERY_TYPES.includes(section.type) &&
+      typeof preview.inStockCount === "number" &&
+      preview.inStockCount / Math.max(1, preview.previewCount) < 0.5
+    ) {
       updateQueryConfig(section, { type: "products", inStockOnly: false });
-      toast.message("Stock ajustado: inStockOnly desactivado para ganar cobertura");
+      toast.message(
+        "Stock ajustado: inStockOnly desactivado para ganar cobertura",
+      );
     }
   };
 
-  const applyCatalogQuickSelection = (section: HomepageSection, mode: "append" | "replace") => {
-    const source = section.type === "TOP_CATEGORIES_GRID" ? queryCatalogs.categories : section.type === "BRANDS_STRIP" ? queryCatalogs.brands : [];
+  const applyCatalogQuickSelection = (
+    section: HomepageSection,
+    mode: "append" | "replace",
+  ) => {
+    const source =
+      section.type === "TOP_CATEGORIES_GRID"
+        ? queryCatalogs.categories
+        : section.type === "BRANDS_STRIP"
+          ? queryCatalogs.brands
+          : [];
     if (!source.length) {
       toast.message("No hay catálogo precargado para esta sección todavía");
       return;
     }
 
     const topIds = source.slice(0, 10).map((item) => item.id);
-    const currentIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
-    const nextIds = mode === "replace" ? topIds : Array.from(new Set([...currentIds, ...topIds]));
+    const currentIds = Array.isArray(section.config_json.ids)
+      ? (section.config_json.ids as string[])
+      : [];
+    const nextIds =
+      mode === "replace"
+        ? topIds
+        : Array.from(new Set([...currentIds, ...topIds]));
 
     updateConfig(section, { source: "manual", ids: nextIds });
-    toast.success(mode === "replace" ? "Selección reemplazada con top 10" : "Top 10 añadido a la selección");
+    toast.success(
+      mode === "replace"
+        ? "Selección reemplazada con top 10"
+        : "Top 10 añadido a la selección",
+    );
   };
 
   const toggleManualSelection = (section: HomepageSection, id: string) => {
-    const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+    const selectedIds = Array.isArray(section.config_json.ids)
+      ? (section.config_json.ids as string[])
+      : [];
     const nextIds = selectedIds.includes(id)
       ? selectedIds.filter((value) => value !== id)
       : [...selectedIds, id];
     updateConfig(section, { ids: nextIds });
   };
 
-  const moveSelectedId = (section: HomepageSection, id: string, delta: number) => {
-    const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+  const moveSelectedId = (
+    section: HomepageSection,
+    id: string,
+    delta: number,
+  ) => {
+    const selectedIds = Array.isArray(section.config_json.ids)
+      ? (section.config_json.ids as string[])
+      : [];
     const index = selectedIds.indexOf(id);
     if (index < 0) return;
     const next = index + delta;
@@ -808,11 +1199,19 @@ export default function HomepageSectionsPage() {
   };
 
   const autoFixSectionConfigs = () => {
-    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    const productTypes = new Set([
+      "PRODUCT_CAROUSEL",
+      "BEST_DEALS",
+      "NEW_ARRIVALS",
+      "FEATURED_PICKS",
+    ]);
     setSections((prev) =>
       prev.map((section) => {
-        const config = { ...(section.config_json || {}) } as Record<string, unknown>;
-        const query = ((config.query || {}) as Record<string, unknown>);
+        const config = { ...(section.config_json || {}) } as Record<
+          string,
+          unknown
+        >;
+        const query = (config.query || {}) as Record<string, unknown>;
 
         if (config.source !== "manual" && !query.type) {
           if (section.type === "TOP_CATEGORIES_GRID") query.type = "categories";
@@ -825,23 +1224,48 @@ export default function HomepageSectionsPage() {
         if (productTypes.has(section.type)) {
           config.carousel_enabled = Boolean(config.carousel_enabled ?? true);
           config.carousel_autoplay = Boolean(config.carousel_autoplay ?? true);
-          config.carousel_interval_ms = Math.min(15000, Math.max(2000, Number(config.carousel_interval_ms || 4500)));
-          config.carousel_items_desktop = Math.min(6, Math.max(2, Number(config.carousel_items_desktop || 4)));
-          config.carousel_items_mobile = Math.min(3, Math.max(1, Number(config.carousel_items_mobile || 2)));
+          config.carousel_interval_ms = Math.min(
+            15000,
+            Math.max(2000, Number(config.carousel_interval_ms || 4500)),
+          );
+          config.carousel_items_desktop = Math.min(
+            6,
+            Math.max(2, Number(config.carousel_items_desktop || 4)),
+          );
+          config.carousel_items_mobile = Math.min(
+            3,
+            Math.max(1, Number(config.carousel_items_mobile || 2)),
+          );
         }
 
         return { ...section, config_json: config };
       }),
     );
-    toast.success("Configuración normalizada localmente. Revisa y guarda cambios pendientes.");
+    toast.success(
+      "Configuración normalizada localmente. Revisa y guarda cambios pendientes.",
+    );
   };
 
   const applyEmptyProductSectionFallback = (section: HomepageSection) => {
-    const config = { ...(section.config_json || {}) } as Record<string, unknown>;
+    const config = { ...(section.config_json || {}) } as Record<
+      string,
+      unknown
+    >;
     const query = { ...((config.query || {}) as Record<string, unknown>) };
 
-    const activeFeaturedIds = Array.from(new Set(featuredProducts.filter((item) => item.is_active).map((item) => item.product_id).filter(Boolean)));
-    if (section.type === "FEATURED_PICKS" && activeFeaturedIds.length) {
+    const activeFeaturedIds = Array.from(
+      new Set(
+        featuredProducts
+          .filter((item) => item.is_active)
+          .map((item) => item.product_id)
+          .filter(Boolean),
+      ),
+    );
+    if (
+      (section.type === "FEATURED_PICKS" ||
+        section.type === "PRODUCT_CAROUSEL") &&
+      activeFeaturedIds.length
+    ) {
       config.source = "manual";
       config.ids = activeFeaturedIds;
       config.query = { type: "products" };
@@ -857,7 +1281,8 @@ export default function HomepageSectionsPage() {
     query.categoryId = undefined;
     query.brandId = undefined;
     if (!query.sortBy) {
-      query.sortBy = section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
+      query.sortBy =
+        section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc";
     }
 
     config.query = query;
@@ -870,26 +1295,45 @@ export default function HomepageSectionsPage() {
       return;
     }
 
-    const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
-    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    const emptyIds = new Set(
+      diagnostics.emptyEnabledProductSections.map((item) => item.id),
+    );
+    const productTypes = new Set([
+      "PRODUCT_CAROUSEL",
+      "BEST_DEALS",
+      "NEW_ARRIVALS",
+      "FEATURED_PICKS",
+    ]);
 
     setSections((prev) =>
       prev.map((section) => {
-        if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
+        if (!emptyIds.has(section.id) || !productTypes.has(section.type))
+          return section;
         return applyEmptyProductSectionFallback(section);
       }),
     );
 
-    toast.success("Autocorrección aplicada en carruseles vacíos (modo local). Guarda para publicar.");
+    toast.success(
+      "Autocorrección aplicada en carruseles vacíos (modo local). Guarda para publicar.",
+    );
   };
 
   const buildAutoFixedSections = (sourceSections: HomepageSection[]) => {
-    if (!diagnostics?.emptyEnabledProductSections?.length) return sourceSections;
-    const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
-    const productTypes = new Set(["BEST_DEALS", "NEW_ARRIVALS", "FEATURED_PICKS"]);
+    if (!diagnostics?.emptyEnabledProductSections?.length)
+      return sourceSections;
+    const emptyIds = new Set(
+      diagnostics.emptyEnabledProductSections.map((item) => item.id),
+    );
+    const productTypes = new Set([
+      "PRODUCT_CAROUSEL",
+      "BEST_DEALS",
+      "NEW_ARRIVALS",
+      "FEATURED_PICKS",
+    ]);
 
     return sourceSections.map((section) => {
-      if (!emptyIds.has(section.id) || !productTypes.has(section.type)) return section;
+      if (!emptyIds.has(section.id) || !productTypes.has(section.type))
+        return section;
       return applyEmptyProductSectionFallback(section);
     });
   };
@@ -900,9 +1344,13 @@ export default function HomepageSectionsPage() {
       return;
     }
 
-    const emptyIds = new Set(diagnostics.emptyEnabledProductSections.map((item) => item.id));
+    const emptyIds = new Set(
+      diagnostics.emptyEnabledProductSections.map((item) => item.id),
+    );
     const nextSections = buildAutoFixedSections(sections);
-    const toPersist = nextSections.filter((section) => emptyIds.has(section.id));
+    const toPersist = nextSections.filter((section) =>
+      emptyIds.has(section.id),
+    );
 
     if (!toPersist.length) {
       toast.message("No hay cambios para persistir");
@@ -921,10 +1369,16 @@ export default function HomepageSectionsPage() {
           }),
         ),
       );
-      toast.success(`Autocorrección aplicada y guardada en ${toPersist.length} sección(es)`);
+      toast.success(
+        `Autocorrección aplicada y guardada en ${toPersist.length} sección(es)`,
+      );
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar la autocorrección");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la autocorrección",
+      );
     } finally {
       setAutoFixingEmpty(false);
     }
@@ -933,7 +1387,9 @@ export default function HomepageSectionsPage() {
   const saveAll = async () => {
     if (!sections.length) return;
 
-    const pending = sections.filter((section) => dirtySectionIds.has(section.id));
+    const pending = sections.filter((section) =>
+      dirtySectionIds.has(section.id),
+    );
     if (!pending.length) {
       toast.message("No hay cambios pendientes por guardar");
       return;
@@ -952,7 +1408,9 @@ export default function HomepageSectionsPage() {
       toast.success(`${pending.length} sección(es) guardadas`);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo guardar todo');
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo guardar todo",
+      );
     }
   };
 
@@ -977,7 +1435,13 @@ export default function HomepageSectionsPage() {
   ) => {
     if (!supportsSource(section.type)) return;
     try {
-      const data = await homepageSectionsApi.options(section.type, q, 10, target, filters);
+      const data = await homepageSectionsApi.options(
+        section.type,
+        q,
+        10,
+        target,
+        filters,
+      );
       setOptions((prev) => ({ ...prev, [section.id]: data }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Búsqueda fallida");
@@ -986,7 +1450,9 @@ export default function HomepageSectionsPage() {
 
   const syncFeaturedProductsToHomepage = async () => {
     const activeFeatured = featuredProducts.filter((item) => item.is_active);
-    const productIds = Array.from(new Set(activeFeatured.map((item) => item.product_id).filter(Boolean)));
+    const productIds = Array.from(
+      new Set(activeFeatured.map((item) => item.product_id).filter(Boolean)),
+    );
 
     if (!productIds.length) {
       toast.message("No hay productos destacados activos para sincronizar");
@@ -994,35 +1460,45 @@ export default function HomepageSectionsPage() {
     }
 
     try {
-      const featuredSection = sections.find((section) => section.type === "FEATURED_PICKS");
+      const featuredSection =
+        sections.find((section) => section.type === "PRODUCT_CAROUSEL") ||
+        sections.find((section) => section.type === "FEATURED_PICKS");
 
       if (featuredSection) {
         await homepageSectionsApi.update(featuredSection.id, {
           enabled: true,
-          title: featuredSection.title || "Productos Destacados",
+          title: featuredSection.title || "Carrusel de productos",
           config_json: {
             ...featuredSection.config_json,
             source: "manual",
             ids: productIds,
+            query: { type: "products" },
           },
         });
       } else {
         await homepageSectionsApi.create({
-          type: "FEATURED_PICKS",
+          type: "PRODUCT_CAROUSEL",
           position: sorted.length + 1,
           enabled: true,
-          title: "Productos Destacados",
+          title: "Carrusel de productos",
           config_json: {
             source: "manual",
             ids: productIds,
+            query: { type: "products" },
           },
         });
       }
 
-      toast.success("Destacados sincronizados con la sección FEATURED_PICKS de portada");
+      toast.success(
+        "Destacados sincronizados con el carrusel de productos en portada",
+      );
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo sincronizar destacados con portada");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo sincronizar destacados con portada",
+      );
     }
   };
 
@@ -1040,7 +1516,9 @@ export default function HomepageSectionsPage() {
       toast.success("Orden de banners actualizado");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo reordenar banners");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo reordenar banners",
+      );
     }
   };
 
@@ -1049,7 +1527,9 @@ export default function HomepageSectionsPage() {
       await toggleBannerStatus(id);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo cambiar banner");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo cambiar banner",
+      );
     }
   };
 
@@ -1063,11 +1543,17 @@ export default function HomepageSectionsPage() {
     setFeaturedProducts(arr);
 
     try {
-      await updateFeaturedProductOrder(arr.map((x, i) => ({ id: x.id, sort_order: i + 1 })));
+      await updateFeaturedProductOrder(
+        arr.map((x, i) => ({ id: x.id, sort_order: i + 1 })),
+      );
       toast.success("Orden de destacados actualizado");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo reordenar destacados");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo reordenar destacados",
+      );
     }
   };
 
@@ -1076,34 +1562,55 @@ export default function HomepageSectionsPage() {
       await toggleFeaturedProductStatus(id);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo cambiar destacado");
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo cambiar destacado",
+      );
     }
   };
-
 
   const autoHideRiskyEmptySections = () => {
     if (!riskyPreviewSectionIds.size) {
       toast.message("No hay secciones de riesgo con preview vacío");
       return;
     }
-    setSections((prev) => prev.map((section) => (riskyPreviewSectionIds.has(section.id) ? { ...section, enabled: false } : section)));
-    toast.success(`Se ocultaron ${riskyPreviewSectionIds.size} sección(es) de riesgo en local. Guarda para publicar.`);
+    setSections((prev) =>
+      prev.map((section) =>
+        riskyPreviewSectionIds.has(section.id)
+          ? { ...section, enabled: false }
+          : section,
+      ),
+    );
+    toast.success(
+      `Se ocultaron ${riskyPreviewSectionIds.size} sección(es) de riesgo en local. Guarda para publicar.`,
+    );
   };
 
   const focusSectionCard = (sectionId: string) => {
     setFocusSectionId(sectionId);
     setCollapsedSections((prev) => ({ ...prev, [sectionId]: false }));
     setTimeout(() => {
-      document.getElementById(`section-card-${sectionId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document
+        .getElementById(`section-card-${sectionId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 80);
-    window.setTimeout(() => setFocusSectionId((prev) => (prev === sectionId ? null : prev)), 4200);
+    window.setTimeout(
+      () => setFocusSectionId((prev) => (prev === sectionId ? null : prev)),
+      4200,
+    );
   };
 
   const jumpToTabSection = (tab: "overview" | "builder" | "assets") => {
     setActiveWorkspaceTab(tab);
-    const id = tab === "overview" ? "homepage-overview" : tab === "builder" ? "homepage-builder" : "homepage-assets";
+    const id =
+      tab === "overview"
+        ? "homepage-overview"
+        : tab === "builder"
+          ? "homepage-builder"
+          : "homepage-assets";
     setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 30);
   };
 
@@ -1115,7 +1622,10 @@ export default function HomepageSectionsPage() {
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold">Página Principal</h1>
-            <p className="text-sm text-slate-200">Configura, valida y publica secciones para la Store desde un único panel fullstack.</p>
+            <p className="text-sm text-slate-200">
+              Configura, valida y publica secciones para la Store desde un único
+              panel fullstack.
+            </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs">
             <Sparkles className="h-3.5 w-3.5" />
@@ -1129,130 +1639,218 @@ export default function HomepageSectionsPage() {
           {[
             { key: "overview", label: "Resumen", hint: "Estado y diagnóstico" },
             { key: "builder", label: "Secciones", hint: "Editor principal" },
-            { key: "assets", label: "Integraciones", hint: "Banners y destacados" },
+            {
+              key: "assets",
+              label: "Integraciones",
+              hint: "Banners y destacados",
+            },
           ].map((tab) => (
             <button
               key={tab.key}
               className={`rounded-xl px-3 py-2 text-left transition ${activeWorkspaceTab === tab.key ? "bg-slate-900 text-white shadow" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
-              onClick={() => jumpToTabSection(tab.key as "overview" | "builder" | "assets")}
+              onClick={() =>
+                jumpToTabSection(tab.key as "overview" | "builder" | "assets")
+              }
             >
-              <div className="text-xs font-semibold leading-none">{tab.label}</div>
-              <div className={`mt-0.5 text-[11px] ${activeWorkspaceTab === tab.key ? "text-slate-200" : "text-slate-500"}`}>{tab.hint}</div>
+              <div className="text-xs font-semibold leading-none">
+                {tab.label}
+              </div>
+              <div
+                className={`mt-0.5 text-[11px] ${activeWorkspaceTab === tab.key ? "text-slate-200" : "text-slate-500"}`}
+              >
+                {tab.hint}
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      <div id="homepage-overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div
+        id="homepage-overview"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+      >
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Secciones</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Secciones
+          </div>
           <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.totals.total ?? sections.length}</div>
+            <div className="text-2xl font-semibold">
+              {diagnostics?.totals.total ?? sections.length}
+            </div>
             <Layers3 className="h-4 w-4 text-slate-400" />
           </div>
-          <div className="mt-1 text-xs text-slate-500">Total configuradas en admin</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Total configuradas en admin
+          </div>
         </div>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Visibilidad</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Visibilidad
+          </div>
           <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.totals.enabled ?? sections.filter((x) => x.enabled).length}</div>
+            <div className="text-2xl font-semibold">
+              {diagnostics?.totals.enabled ??
+                sections.filter((x) => x.enabled).length}
+            </div>
             <Eye className="h-4 w-4 text-slate-400" />
           </div>
           <div className="mt-1 text-xs text-slate-500">
-            {diagnostics?.totals.disabled ?? sections.filter((x) => !x.enabled).length} ocultas
+            {diagnostics?.totals.disabled ??
+              sections.filter((x) => !x.enabled).length}{" "}
+            ocultas
           </div>
         </div>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Duplicadas</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Duplicadas
+          </div>
           <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.totals.duplicatedTypes ?? duplicateTypeSummary.length}</div>
+            <div className="text-2xl font-semibold">
+              {diagnostics?.totals.duplicatedTypes ??
+                duplicateTypeSummary.length}
+            </div>
             <Copy className="h-4 w-4 text-slate-400" />
           </div>
-          <div className="mt-1 text-xs text-slate-500">Tipos que aparecen más de una vez</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Tipos que aparecen más de una vez
+          </div>
         </div>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Store payload</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Store payload
+          </div>
           <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.totals.failedPublicSections ?? 0}</div>
-            {diagnostics?.checks.storePayloadOk ?? true ? (
+            <div className="text-2xl font-semibold">
+              {diagnostics?.totals.failedPublicSections ?? 0}
+            </div>
+            {(diagnostics?.checks.storePayloadOk ?? true) ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             ) : (
               <ServerCrash className="h-4 w-4 text-red-500" />
             )}
           </div>
-          <div className="mt-1 text-xs text-slate-500">Secciones públicas con error al resolver</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Secciones públicas con error al resolver
+          </div>
         </div>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Config inválida</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Config inválida
+          </div>
           <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.totals.invalidConfigSections ?? 0}</div>
-            {diagnostics?.checks.configsValid ?? true ? (
+            <div className="text-2xl font-semibold">
+              {diagnostics?.totals.invalidConfigSections ?? 0}
+            </div>
+            {(diagnostics?.checks.configsValid ?? true) ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             ) : (
               <AlertTriangle className="h-4 w-4 text-amber-500" />
             )}
           </div>
-          <div className="mt-1 text-xs text-slate-500">Secciones con ajustes recomendados</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Secciones con ajustes recomendados
+          </div>
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Health score</div>
-          <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.healthScore ?? 0}/100</div>
-            {(diagnostics?.healthScore ?? 0) >= 80 ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Health score
           </div>
-          <div className="mt-1 text-xs text-slate-500">Basado en vacíos, configuración, logos y solapamiento.</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">
+              {diagnostics?.healthScore ?? 0}/100
+            </div>
+            {(diagnostics?.healthScore ?? 0) >= 80 ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            )}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            Basado en vacíos, configuración, logos y solapamiento.
+          </div>
         </div>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Publish readiness</div>
-          <div className="mt-2 flex items-end justify-between">
-            <div className="text-2xl font-semibold">{diagnostics?.publishReadiness ? "Ready" : "Review"}</div>
-            {diagnostics?.publishReadiness ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Publish readiness
           </div>
-          <div className="mt-1 text-xs text-slate-500">Listo para publicar cuando no hay fallos críticos.</div>
+          <div className="mt-2 flex items-end justify-between">
+            <div className="text-2xl font-semibold">
+              {diagnostics?.publishReadiness ? "Ready" : "Review"}
+            </div>
+            {diagnostics?.publishReadiness ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            )}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            Listo para publicar cuando no hay fallos críticos.
+          </div>
         </div>
       </div>
 
-      {!diagnosticsLoading && diagnostics && !diagnostics.checks.hasVisibleSections ? (
+      {!diagnosticsLoading &&
+      diagnostics &&
+      !diagnostics.checks.hasVisibleSections ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <CircleOff className="h-4 w-4 mt-0.5" />
-          No hay secciones visibles. La Store no mostrará contenido de Página Principal hasta activar alguna sección.
+          No hay secciones visibles. La Store no mostrará contenido de Página
+          Principal hasta activar alguna sección.
         </div>
       ) : null}
 
-      {!diagnosticsLoading && diagnostics && diagnostics.totals.failedPublicSections > 0 ? (
+      {!diagnosticsLoading &&
+      diagnostics &&
+      diagnostics.totals.failedPublicSections > 0 ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
-          Hay {diagnostics.totals.failedPublicSections} secciones con fallo en el endpoint público. Revisa su configuración y vuelve a guardar.
+          Hay {diagnostics.totals.failedPublicSections} secciones con fallo en
+          el endpoint público. Revisa su configuración y vuelve a guardar.
         </div>
       ) : null}
 
-      {!diagnosticsLoading && diagnostics && !diagnostics.checks.configsValid ? (
+      {!diagnosticsLoading &&
+      diagnostics &&
+      !diagnostics.checks.configsValid ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
           <div className="space-y-2">
-            <div>Hay {diagnostics.totals.invalidConfigSections} sección(es) con configuración mejorable o inconsistente.</div>
-            <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={autoFixSectionConfigs}>
+            <div>
+              Hay {diagnostics.totals.invalidConfigSections} sección(es) con
+              configuración mejorable o inconsistente.
+            </div>
+            <button
+              className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs"
+              onClick={autoFixSectionConfigs}
+            >
               Autocorregir configuración en local
             </button>
           </div>
         </div>
       ) : null}
 
-      {!diagnosticsLoading && diagnostics && !diagnostics.checks.bannersLinkedToHome ? (
+      {!diagnosticsLoading &&
+      diagnostics &&
+      !diagnostics.checks.bannersLinkedToHome ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
           <div>
-            Hay {diagnostics.totals.activeBanners} banner(s) activos pero no hay una sección HERO_BANNER_SLIDER visible en Página Principal. Crea/activa la sección HERO para que se muestren en la Store.
+            Hay {diagnostics.totals.activeBanners} banner(s) activos pero no hay
+            una sección HERO_BANNER_SLIDER visible en Página Principal.
+            Crea/activa la sección HERO para que se muestren en la Store.
             <div className="mt-2">
-              <Link className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" href="/banners">
+              <Link
+                className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs"
+                href="/banners"
+              >
                 Ir a Banners
               </Link>
             </div>
@@ -1260,13 +1858,20 @@ export default function HomepageSectionsPage() {
         </div>
       ) : null}
 
-      {!diagnosticsLoading && diagnostics && !diagnostics.checks.featuredLinkedToHome ? (
+      {!diagnosticsLoading &&
+      diagnostics &&
+      !diagnostics.checks.featuredLinkedToHome ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
           <div>
-            Hay {diagnostics.totals.activeFeaturedProducts} destacado(s) activos pero no están enlazados manualmente a FEATURED_PICKS en portada.
+            Hay {diagnostics.totals.activeFeaturedProducts} destacado(s) activos
+            pero no están enlazados a ningún carrusel de productos (manual o
+            featuredOnly) en portada.
             <div className="mt-2">
-              <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={() => void syncFeaturedProductsToHomepage()}>
+              <button
+                className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs"
+                onClick={() => void syncFeaturedProductsToHomepage()}
+              >
                 Sincronizar destacados con portada
               </button>
             </div>
@@ -1274,17 +1879,30 @@ export default function HomepageSectionsPage() {
         </div>
       ) : null}
 
-      {!diagnosticsLoading && diagnostics && !diagnostics.checks.productSectionsHaveData ? (
+      {!diagnosticsLoading &&
+      diagnostics &&
+      !diagnostics.checks.productSectionsHaveData ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 mt-0.5" />
           <div>
-            Hay {diagnostics.totals.emptyEnabledProductSections} sección(es) de productos visibles con resultado vacío en el endpoint público.
-            <div className="mt-1 text-xs">Revisa filtros de categoría/marca, límites y stock para que el carrusel tenga contenido.</div>
+            Hay {diagnostics.totals.emptyEnabledProductSections} sección(es) de
+            productos visibles con resultado vacío en el endpoint público.
+            <div className="mt-1 text-xs">
+              Revisa filtros de categoría/marca, límites y stock para que el
+              carrusel tenga contenido.
+            </div>
             <div className="mt-2">
-              <button className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs" onClick={autoFixEmptyProductSections}>
+              <button
+                className="inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs"
+                onClick={autoFixEmptyProductSections}
+              >
                 Autocorregir carruseles vacíos en local
               </button>
-              <button className="ml-2 inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs disabled:opacity-50" disabled={autoFixingEmpty} onClick={() => void autoFixAndSaveEmptyProductSections()}>
+              <button
+                className="ml-2 inline-flex px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs disabled:opacity-50"
+                disabled={autoFixingEmpty}
+                onClick={() => void autoFixAndSaveEmptyProductSections()}
+              >
                 {autoFixingEmpty ? "Aplicando..." : "Autocorregir y guardar"}
               </button>
             </div>
@@ -1293,14 +1911,30 @@ export default function HomepageSectionsPage() {
       ) : null}
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
-        <div className="text-sm font-medium text-slate-800">Estado end-to-end (Admin → Store)</div>
+        <div className="text-sm font-medium text-slate-800">
+          Estado end-to-end (Admin → Store)
+        </div>
         <p className="text-xs text-slate-600">
-          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver el layout moderno de <code>/home</code>. Banners activos: <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO visibles: <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong> · Destacados activos: <strong>{diagnostics?.totals.activeFeaturedProducts ?? 0}</strong> · Secciones FEATURED_PICKS: <strong>{diagnostics?.totals.featuredPicksSections ?? 0}</strong> · Carruseles vacíos: <strong>{diagnostics?.totals.emptyEnabledProductSections ?? 0}</strong>.
+          Esta pantalla alimenta <code>/homepage/sections</code> y se muestra
+          por defecto en la Store. Usa <code>useLayout=1</code> si quieres ver
+          el layout moderno de <code>/home</code>. Banners activos:{" "}
+          <strong>{diagnostics?.totals.activeBanners ?? 0}</strong> · HERO
+          visibles:{" "}
+          <strong>{diagnostics?.totals.heroEnabledSections ?? 0}</strong> ·
+          Destacados activos:{" "}
+          <strong>{diagnostics?.totals.activeFeaturedProducts ?? 0}</strong> ·
+          Carruseles de producto ligados a destacados:{" "}
+          <strong>{diagnostics?.totals.featuredPicksSections ?? 0}</strong> ·
+          Carruseles vacíos:{" "}
+          <strong>
+            {diagnostics?.totals.emptyEnabledProductSections ?? 0}
+          </strong>
+          .
         </p>
         <div className="flex flex-wrap gap-2">
           <a
             className="px-3 py-2 rounded-lg border text-sm"
-            href={`${SITE_URL}/store`}
+            href={`${SITE_URL}/store?forceDynamic=1`}
             target="_blank"
             rel="noreferrer"
           >
@@ -1319,23 +1953,32 @@ export default function HomepageSectionsPage() {
             onClick={() => void load()}
             disabled={diagnosticsLoading || isLoading || Boolean(creatingType)}
           >
-            <RotateCw className={`h-4 w-4 ${(diagnosticsLoading || isLoading) ? "animate-spin" : ""}`} />
+            <RotateCw
+              className={`h-4 w-4 ${diagnosticsLoading || isLoading ? "animate-spin" : ""}`}
+            />
             Recargar diagnóstico
           </button>
         </div>
         {duplicateTypeSummary.length > 0 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Tipos duplicados detectados: {duplicateTypeSummary.map(([type, count]) => `${type} (${count})`).join(", ")}. Esto puede ser válido, pero revisa que no sea contenido repetido.
+            Tipos duplicados detectados:{" "}
+            {duplicateTypeSummary
+              .map(([type, count]) => `${type} (${count})`)
+              .join(", ")}
+            . Esto puede ser válido, pero revisa que no sea contenido repetido.
           </div>
         ) : null}
 
         {diagnostics && diagnostics.invalidConfigSections.length > 0 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
-            <div className="font-semibold">Secciones con configuración a revisar</div>
+            <div className="font-semibold">
+              Secciones con configuración a revisar
+            </div>
             <ul className="list-disc pl-4 space-y-1">
               {diagnostics.invalidConfigSections.slice(0, 6).map((item) => (
                 <li key={item.id}>
-                  <span className="font-medium">{item.title || item.type}</span>: {item.issues.join(" · ")}
+                  <span className="font-medium">{item.title || item.type}</span>
+                  : {item.issues.join(" · ")}
                 </li>
               ))}
             </ul>
@@ -1347,39 +1990,59 @@ export default function HomepageSectionsPage() {
 
         {diagnostics && diagnostics.emptyEnabledProductSections.length > 0 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
-            <div className="font-semibold">Secciones de productos visibles sin resultados</div>
+            <div className="font-semibold">
+              Secciones de productos visibles sin resultados
+            </div>
             <ul className="list-disc pl-4 space-y-1">
-              {diagnostics.emptyEnabledProductSections.slice(0, 6).map((item) => (
-                <li key={item.id}>
-                  <span className="font-medium">{item.title || item.type}</span> ({item.type})
-                </li>
-              ))}
+              {diagnostics.emptyEnabledProductSections
+                .slice(0, 6)
+                .map((item) => (
+                  <li key={item.id}>
+                    <span className="font-medium">
+                      {item.title || item.type}
+                    </span>{" "}
+                    ({item.type})
+                  </li>
+                ))}
             </ul>
           </div>
         ) : null}
 
         {diagnostics && (diagnostics.overlapWarnings || []).length > 0 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
-            <div className="font-semibold">Riesgo de solapamiento entre carruseles</div>
+            <div className="font-semibold">
+              Riesgo de solapamiento entre carruseles
+            </div>
             <ul className="list-disc pl-4 space-y-1">
-              {(diagnostics.overlapWarnings || []).slice(0, 5).map((item, idx) => (
-                <li key={`${item.aId}-${item.bId}-${idx}`}>{item.aTitle || item.aId} ↔ {item.bTitle || item.bId}: {item.overlapPct}% ({item.shared} SKU compartidos)</li>
-              ))}
+              {(diagnostics.overlapWarnings || [])
+                .slice(0, 5)
+                .map((item, idx) => (
+                  <li key={`${item.aId}-${item.bId}-${idx}`}>
+                    {item.aTitle || item.aId} ↔ {item.bTitle || item.bId}:{" "}
+                    {item.overlapPct}% ({item.shared} SKU compartidos)
+                  </li>
+                ))}
             </ul>
           </div>
         ) : null}
 
         {diagnostics && (diagnostics.missingVisibleTypes || []).length > 0 ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-            Tipos clave ausentes en visible: {(diagnostics.missingVisibleTypes || []).join(', ')}.
+            Tipos clave ausentes en visible:{" "}
+            {(diagnostics.missingVisibleTypes || []).join(", ")}.
           </div>
         ) : null}
       </div>
 
-      <div id="homepage-builder" className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm">
+      <div
+        id="homepage-builder"
+        className="rounded-2xl border bg-white p-4 space-y-3 shadow-sm"
+      >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm text-slate-700">
-            Cambios pendientes: <span className="font-semibold">{dirtySectionIds.size}</span> · Mostrando: <span className="font-semibold">{filtered.length}</span>
+            Cambios pendientes:{" "}
+            <span className="font-semibold">{dirtySectionIds.size}</span> ·
+            Mostrando: <span className="font-semibold">{filtered.length}</span>
           </div>
           <div className="flex gap-2">
             <button
@@ -1405,14 +2068,46 @@ export default function HomepageSectionsPage() {
             </button>
           </div>
         </div>
-        <div className="text-xs text-slate-500">Tip: también puedes reordenar secciones arrastrando cada tarjeta.</div>
+        <div className="text-xs text-slate-500">
+          Tip: también puedes reordenar secciones arrastrando cada tarjeta.
+        </div>
         <div className="flex flex-wrap gap-2">
-          <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(true)}>Marcar todas visibles</button>
-          <button className="px-3 py-2 rounded-lg border text-sm" onClick={() => setAllVisibility(false)}>Ocultar todas</button>
-          <button className="px-3 py-2 rounded-lg border text-sm" onClick={autoFixSectionConfigs}>Autocorregir configs</button>
-          <button className="px-3 py-2 rounded-lg border text-sm" onClick={autoHideRiskyEmptySections}>Ocultar secciones en riesgo</button>
-          <button className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1" onClick={() => setAllCollapsed(true)}><FoldVertical className="h-3.5 w-3.5" /> Colapsar todo</button>
-          <button className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1" onClick={() => setAllCollapsed(false)}><UnfoldVertical className="h-3.5 w-3.5" /> Expandir todo</button>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm"
+            onClick={() => setAllVisibility(true)}
+          >
+            Marcar todas visibles
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm"
+            onClick={() => setAllVisibility(false)}
+          >
+            Ocultar todas
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm"
+            onClick={autoFixSectionConfigs}
+          >
+            Autocorregir configs
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm"
+            onClick={autoHideRiskyEmptySections}
+          >
+            Ocultar secciones en riesgo
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1"
+            onClick={() => setAllCollapsed(true)}
+          >
+            <FoldVertical className="h-3.5 w-3.5" /> Colapsar todo
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1"
+            onClick={() => setAllCollapsed(false)}
+          >
+            <UnfoldVertical className="h-3.5 w-3.5" /> Expandir todo
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">Filtro rápido:</span>
@@ -1426,20 +2121,44 @@ export default function HomepageSectionsPage() {
             <button
               key={option.key}
               className={`rounded-full border px-3 py-1 text-xs ${statusFilter === option.key ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700"}`}
-              onClick={() => setStatusFilter(option.key as "all" | "enabled" | "disabled" | "dirty" | "risky")}
+              onClick={() =>
+                setStatusFilter(
+                  option.key as
+                    | "all"
+                    | "enabled"
+                    | "disabled"
+                    | "dirty"
+                    | "risky",
+                )
+              }
             >
               {option.label}
             </button>
           ))}
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
-          <select className="border rounded-lg px-3 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={newType}
+            onChange={(e) => setNewType(e.target.value as SectionType)}
+          >
             {SECTION_TYPES.map((type) => (
-              <option key={type} value={type}>{type}</option>
+              <option key={type} value={type}>
+                {type}
+              </option>
             ))}
           </select>
-          <input className="border rounded-lg px-3 py-2" placeholder="Filtrar secciones por título/tipo" value={filter} onChange={(e) => setFilter(e.target.value)} />
-          <button onClick={() => void create()} disabled={Boolean(creatingType)} className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50">
+          <input
+            className="border rounded-lg px-3 py-2"
+            placeholder="Filtrar secciones por título/tipo"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <button
+            onClick={() => void create()}
+            disabled={Boolean(creatingType)}
+            className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
+          >
             {creatingType === newType ? "Creando..." : "Añadir sección"}
           </button>
         </div>
@@ -1447,7 +2166,9 @@ export default function HomepageSectionsPage() {
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm font-medium text-slate-700">Cobertura de tipos de sección</div>
+          <div className="text-sm font-medium text-slate-700">
+            Cobertura de tipos de sección
+          </div>
           <button
             className="px-3 py-2 rounded-lg border text-xs"
             onClick={() => void createMissingBaseSections()}
@@ -1460,9 +2181,15 @@ export default function HomepageSectionsPage() {
             <button
               key={item.type}
               className={`rounded-full border px-3 py-1.5 text-xs ${item.count === 0 ? "border-red-300 bg-red-50 text-red-700" : item.count > 1 ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-300 bg-emerald-50 text-emerald-700"}`}
-              onClick={() => item.count === 0 ? void createOfType(item.type) : setFilter(item.type)}
+              onClick={() =>
+                item.count === 0
+                  ? void createOfType(item.type)
+                  : setFilter(item.type)
+              }
               disabled={Boolean(creatingType)}
-              title={item.count === 0 ? "Crear este tipo" : "Filtrar por este tipo"}
+              title={
+                item.count === 0 ? "Crear este tipo" : "Filtrar por este tipo"
+              }
             >
               {item.type} · {item.count}
             </button>
@@ -1477,28 +2204,69 @@ export default function HomepageSectionsPage() {
               <Images className="h-4 w-4" />
               Banners (integrado) · {banners.length}
             </div>
-            <Link className="text-xs underline" href="/banners/new">Nuevo banner</Link>
+            <Link className="text-xs underline" href="/banners/new">
+              Nuevo banner
+            </Link>
           </div>
-          <div className="text-xs text-slate-500">Gestiona aquí el orden y visibilidad para la portada.</div>
+          <div className="text-xs text-slate-500">
+            Gestiona aquí el orden y visibilidad para la portada.
+          </div>
           <div className="space-y-2 max-h-64 overflow-auto">
             {banners.map((banner, index) => (
-              <div key={banner.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
+              <div
+                key={banner.id}
+                className="rounded-lg border p-2 flex items-center justify-between gap-2"
+              >
                 <div className="min-w-0 flex items-center gap-2">
-                  <img src={banner.image || "/No_Image_Available.png"} alt={banner.title_text || `Banner ${index + 1}`} className="h-10 w-16 rounded object-cover border" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/No_Image_Available.png"; }} />
+                  <img
+                    src={banner.image || "/No_Image_Available.png"}
+                    alt={banner.title_text || `Banner ${index + 1}`}
+                    className="h-10 w-16 rounded object-cover border"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "/No_Image_Available.png";
+                    }}
+                  />
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{banner.title_text || `Banner ${index + 1}`}</div>
-                    <div className="text-xs text-slate-500">#{index + 1} · {banner.is_active ? "Visible" : "Oculto"}</div>
+                    <div className="text-sm font-medium truncate">
+                      {banner.title_text || `Banner ${index + 1}`}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      #{index + 1} · {banner.is_active ? "Visible" : "Oculto"}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Link className="px-2 py-1 border rounded text-xs" href={`/banners/${banner.id}/edit`}>Editar</Link>
-                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, -1)}><ArrowUp className="h-3 w-3" /></button>
-                  <button className="p-1 border rounded" onClick={() => void moveBanner(index, 1)}><ArrowDown className="h-3 w-3" /></button>
-                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleBanner(banner.id)}>{banner.is_active ? "Activo" : "Inactivo"}</button>
+                  <Link
+                    className="px-2 py-1 border rounded text-xs"
+                    href={`/banners/${banner.id}/edit`}
+                  >
+                    Editar
+                  </Link>
+                  <button
+                    className="p-1 border rounded"
+                    onClick={() => void moveBanner(index, -1)}
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="p-1 border rounded"
+                    onClick={() => void moveBanner(index, 1)}
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="px-2 py-1 border rounded text-xs"
+                    onClick={() => void toggleBanner(banner.id)}
+                  >
+                    {banner.is_active ? "Activo" : "Inactivo"}
+                  </button>
                 </div>
               </div>
             ))}
-            {!banners.length ? <div className="text-xs text-slate-500">No hay banners</div> : null}
+            {!banners.length ? (
+              <div className="text-xs text-slate-500">No hay banners</div>
+            ) : null}
           </div>
         </div>
 
@@ -1509,37 +2277,78 @@ export default function HomepageSectionsPage() {
               Productos destacados (integrado) · {featuredProducts.length}
             </div>
             <div className="flex items-center gap-3">
-              <button className="text-xs underline" onClick={() => void syncFeaturedProductsToHomepage()}>
+              <button
+                className="text-xs underline"
+                onClick={() => void syncFeaturedProductsToHomepage()}
+              >
                 Sincronizar con portada
               </button>
-              <Link className="text-xs underline" href="/featured-products/new">Nuevo destacado</Link>
+              <Link className="text-xs underline" href="/featured-products/new">
+                Nuevo destacado
+              </Link>
             </div>
           </div>
-          <div className="text-xs text-slate-500">Controla orden/estado y sincroniza los activos en FEATURED_PICKS para que salgan en la Store.</div>
+          <div className="text-xs text-slate-500">
+            Controla orden/estado y sincroniza destacados para que salgan en tus
+            carruseles de producto de la Store.
+          </div>
           <div className="space-y-2 max-h-64 overflow-auto">
             {featuredProducts.map((item, index) => (
-              <div key={item.id} className="rounded-lg border p-2 flex items-center justify-between gap-2">
+              <div
+                key={item.id}
+                className="rounded-lg border p-2 flex items-center justify-between gap-2"
+              >
                 <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{item.title || item.product?.title || `Destacado ${index + 1}`}</div>
+                  <div className="text-sm font-medium truncate">
+                    {item.title ||
+                      item.product?.title ||
+                      `Destacado ${index + 1}`}
+                  </div>
                   <div className="text-xs text-slate-500">#{index + 1}</div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, -1)}><ArrowUp className="h-3 w-3" /></button>
-                  <button className="p-1 border rounded" onClick={() => void moveFeatured(index, 1)}><ArrowDown className="h-3 w-3" /></button>
-                  <button className="px-2 py-1 border rounded text-xs" onClick={() => void toggleFeatured(item.id)}>{item.is_active ? "Activo" : "Inactivo"}</button>
+                  <button
+                    className="p-1 border rounded"
+                    onClick={() => void moveFeatured(index, -1)}
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="p-1 border rounded"
+                    onClick={() => void moveFeatured(index, 1)}
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="px-2 py-1 border rounded text-xs"
+                    onClick={() => void toggleFeatured(item.id)}
+                  >
+                    {item.is_active ? "Activo" : "Inactivo"}
+                  </button>
                 </div>
               </div>
             ))}
-            {!featuredProducts.length ? <div className="text-xs text-slate-500">No hay productos destacados</div> : null}
+            {!featuredProducts.length ? (
+              <div className="text-xs text-slate-500">
+                No hay productos destacados
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm">
-        <div className="text-sm font-medium text-slate-700 mb-3">Presets rápidos</div>
+        <div className="text-sm font-medium text-slate-700 mb-3">
+          Presets rápidos
+        </div>
         <div className="flex flex-wrap gap-2">
           {PRESET_BUTTONS.map((preset) => (
-            <button key={preset.key} onClick={() => void createPresetSection(preset.key)} disabled={Boolean(creatingType)} className="px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-sm hover:bg-slate-100 disabled:opacity-50">
+            <button
+              key={preset.key}
+              onClick={() => void createPresetSection(preset.key)}
+              disabled={Boolean(creatingType)}
+              className="px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-sm hover:bg-slate-100 disabled:opacity-50"
+            >
               {preset.label}
             </button>
           ))}
@@ -1547,18 +2356,32 @@ export default function HomepageSectionsPage() {
       </div>
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="text-sm font-medium text-slate-700">Crear carrusel por categoría</div>
-        <p className="text-xs text-slate-500">Añade un carrusel por categoría eligiendo el tipo de sección que mejor encaje con tu estrategia comercial.</p>
+        <div className="text-sm font-medium text-slate-700">
+          Crear carrusel por categoría
+        </div>
+        <p className="text-xs text-slate-500">
+          Añade un carrusel por categoría eligiendo el tipo de sección que mejor
+          encaje con tu estrategia comercial.
+        </p>
         <div className="grid gap-2 md:grid-cols-4">
           <select
             className="border rounded-lg px-3 py-2"
             value={categoryCarouselType}
             onChange={(e) => {
-              const nextType = e.target.value as "FEATURED_PICKS" | "BEST_DEALS" | "NEW_ARRIVALS";
+              const nextType = e.target.value as
+                | "PRODUCT_CAROUSEL"
+                | "FEATURED_PICKS"
+                | "BEST_DEALS"
+                | "NEW_ARRIVALS";
               setCategoryCarouselType(nextType);
-              setCategoryCarouselSortBy(nextType === "NEW_ARRIVALS" ? "newest" : "discount_desc");
+              setCategoryCarouselSortBy(
+                nextType === "NEW_ARRIVALS" || nextType === "PRODUCT_CAROUSEL"
+                  ? "newest"
+                  : "discount_desc",
+              );
             }}
           >
+            <option value="PRODUCT_CAROUSEL">PRODUCT_CAROUSEL</option>
             <option value="FEATURED_PICKS">FEATURED_PICKS</option>
             <option value="BEST_DEALS">BEST_DEALS</option>
             <option value="NEW_ARRIVALS">NEW_ARRIVALS</option>
@@ -1570,43 +2393,72 @@ export default function HomepageSectionsPage() {
           >
             <option value="">Selecciona categoría</option>
             {allCategoryOptions.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.label}</option>
+              <option key={cat.id} value={cat.id}>
+                {cat.subtitle ? `${cat.label} (${cat.subtitle})` : cat.label}
+              </option>
             ))}
           </select>
           <select
             className="border rounded-lg px-3 py-2"
             value={categoryCarouselSortBy}
-            onChange={(e) => setCategoryCarouselSortBy(e.target.value as "discount_desc" | "newest")}
+            onChange={(e) =>
+              setCategoryCarouselSortBy(
+                e.target.value as "discount_desc" | "newest",
+              )
+            }
           >
             <option value="discount_desc">Mayor descuento</option>
             <option value="newest">Más recientes</option>
           </select>
-          <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={Boolean(creatingType)} onClick={() => void createCategoryCarousel()}>
-            {creatingType === "category-carousel" ? "Creando carrusel..." : "Añadir carrusel de categoría"}
+          <button
+            className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
+            disabled={Boolean(creatingType)}
+            onClick={() => void createCategoryCarousel()}
+          >
+            {creatingType === "category-carousel"
+              ? "Creando carrusel..."
+              : "Añadir carrusel de categoría"}
           </button>
         </div>
       </div>
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-2">
-        <div className="text-sm font-medium text-slate-700">Estado de logos de marcas</div>
+        <div className="text-sm font-medium text-slate-700">
+          Estado de logos de marcas
+        </div>
         <p className="text-xs text-slate-500">
-          Marcas activas: <strong>{diagnostics?.totals.totalBrands ?? 0}</strong> · Con logo: <strong>{diagnostics?.totals.brandsWithLogo ?? 0}</strong> · Sin logo: <strong>{diagnostics?.totals.brandsMissingLogo ?? 0}</strong>.
-          {" "}Si hay muchas sin logo, ejecuta <code>npm run brands:logo:audit</code> en Backend para auditar y <code>npm run brands:logo:normalize</code> para normalizar URLs.
+          Marcas activas:{" "}
+          <strong>{diagnostics?.totals.totalBrands ?? 0}</strong> · Con logo:{" "}
+          <strong>{diagnostics?.totals.brandsWithLogo ?? 0}</strong> · Sin logo:{" "}
+          <strong>{diagnostics?.totals.brandsMissingLogo ?? 0}</strong>. Si hay
+          muchas sin logo, ejecuta <code>npm run brands:logo:audit</code> en
+          Backend para auditar y <code>npm run brands:logo:normalize</code> para
+          normalizar URLs.
         </p>
         {diagnostics && !diagnostics.checks.brandLogosHealthy ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Hay marcas activas sin logo. El carrusel mostrará fallback de iniciales, pero se recomienda normalizar logos para un look premium.
+            Hay marcas activas sin logo. El carrusel mostrará fallback de
+            iniciales, pero se recomienda normalizar logos para un look premium.
           </div>
         ) : null}
       </div>
 
-      {isLoading ? <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">Cargando secciones...</div> : null}
+      {isLoading ? (
+        <div className="rounded-lg border bg-white p-4 text-sm text-slate-500">
+          Cargando secciones...
+        </div>
+      ) : null}
 
       {filtered.map((section) => {
         const source = String(section.config_json.source || "query");
-        const query = (section.config_json.query || {}) as Record<string, unknown>;
+        const query = (section.config_json.query || {}) as Record<
+          string,
+          unknown
+        >;
         const currentIndex = sorted.findIndex((x) => x.id === section.id);
-        const selectedIds = Array.isArray(section.config_json.ids) ? (section.config_json.ids as string[]) : [];
+        const selectedIds = Array.isArray(section.config_json.ids)
+          ? (section.config_json.ids as string[])
+          : [];
         const isCollapsed = Boolean(collapsedSections[section.id]);
         const quality = getSectionQuality(section);
         const carouselInsight = getCarouselInsight(section);
@@ -1629,8 +2481,12 @@ export default function HomepageSectionsPage() {
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold">{section.title || section.type}</div>
-                <div className="text-xs text-slate-500">↕ {section.type} · Posición #{section.position}</div>
+                <div className="font-semibold">
+                  {section.title || section.type}
+                </div>
+                <div className="text-xs text-slate-500">
+                  ↕ {section.type} · Posición #{section.position}
+                </div>
                 <div className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-700">
                   Calidad: {quality.level} ({quality.score}/100)
                 </div>
@@ -1649,438 +2505,1058 @@ export default function HomepageSectionsPage() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <a
                   className="px-2 py-1 border rounded text-xs"
-                  href={`${SITE_URL}/store?highlightSection=${encodeURIComponent(section.id)}`}
+                  href={`${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(section.id)}`}
                   target="_blank"
                   rel="noreferrer"
                 >
                   Ver en Store
                 </a>
-                <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, -1)}>↑</button>
-                <button className="px-2 py-1 border rounded" onClick={() => void move(currentIndex, 1)}>↓</button>
-                <button className="px-2 py-1 border rounded" onClick={() => void duplicate(section)}>Duplicar</button>
-                <button className="px-2 py-1 border rounded inline-flex items-center gap-1 text-xs" onClick={() => toggleCollapsed(section.id)}>
-                  {isCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                <button
+                  className="px-2 py-1 border rounded"
+                  onClick={() => void move(currentIndex, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  className="px-2 py-1 border rounded"
+                  onClick={() => void move(currentIndex, 1)}
+                >
+                  ↓
+                </button>
+                <button
+                  className="px-2 py-1 border rounded"
+                  onClick={() => void duplicate(section)}
+                >
+                  Duplicar
+                </button>
+                <button
+                  className="px-2 py-1 border rounded inline-flex items-center gap-1 text-xs"
+                  onClick={() => toggleCollapsed(section.id)}
+                >
+                  {isCollapsed ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  )}
                   {isCollapsed ? "Expandir" : "Colapsar"}
                 </button>
                 <label className="text-sm flex items-center gap-1">
-                  <input type="checkbox" checked={section.enabled} onChange={(e) => updateLocal(section.id, { enabled: e.target.checked })} />
+                  <input
+                    type="checkbox"
+                    checked={section.enabled}
+                    onChange={(e) =>
+                      updateLocal(section.id, { enabled: e.target.checked })
+                    }
+                  />
                   Visible
                 </label>
-                <button className="px-2 py-1 border rounded text-red-600" onClick={() => void remove(section)}>Eliminar</button>
+                <button
+                  className="px-2 py-1 border rounded text-red-600"
+                  onClick={() => void remove(section)}
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
 
             {!isCollapsed ? (
               <>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <input className="border rounded-lg px-3 py-2" value={section.title || ""} onChange={(e) => updateLocal(section.id, { title: e.target.value })} placeholder="Título de sección" />
-                  <button className="border rounded-lg px-3 py-2 text-sm" onClick={() => updateLocal(section.id, { config_json: defaultConfigFor(section.type) })}>Reset config por defecto</button>
+                  <input
+                    className="border rounded-lg px-3 py-2"
+                    value={section.title || ""}
+                    onChange={(e) =>
+                      updateLocal(section.id, { title: e.target.value })
+                    }
+                    placeholder="Título de sección"
+                  />
+                  <button
+                    className="border rounded-lg px-3 py-2 text-sm"
+                    onClick={() =>
+                      updateLocal(section.id, {
+                        config_json: defaultConfigFor(section.type),
+                      })
+                    }
+                  >
+                    Reset config por defecto
+                  </button>
                 </div>
 
-            {supportsSource(section.type) && (
-              <div className="space-y-2">
-                <select
-                  className="border rounded-lg px-3 py-2"
-                  value={source}
-                  onChange={(e) =>
-                    updateConfig(section, {
-                      source: e.target.value,
-                      ids: e.target.value === "manual" ? selectedIds : [],
-                      query: e.target.value === "query" ? (section.config_json.query || defaultConfigFor(section.type).query) : undefined,
-                    })
-                  }
-                >
-                  <option value="query">Por consulta</option>
-                  <option value="manual">Manual</option>
-                </select>
-
-                {source === "manual" && (
+                {supportsSource(section.type) && (
                   <div className="space-y-2">
-                    {(section.type === "TOP_CATEGORIES_GRID" || section.type === "BRANDS_STRIP") ? (
-                      <div className="flex flex-wrap gap-2">
-                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCatalogQuickSelection(section, "append")}>
-                          Añadir top 10
-                        </button>
-                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCatalogQuickSelection(section, "replace")}>
-                          Reemplazar por top 10
-                        </button>
+                    <select
+                      className="border rounded-lg px-3 py-2"
+                      value={source}
+                      onChange={(e) =>
+                        updateConfig(section, {
+                          source: e.target.value,
+                          ids: e.target.value === "manual" ? selectedIds : [],
+                          query:
+                            e.target.value === "query"
+                              ? section.config_json.query ||
+                                defaultConfigFor(section.type).query
+                              : undefined,
+                        })
+                      }
+                    >
+                      <option value="query">Por consulta</option>
+                      <option value="manual">Manual</option>
+                    </select>
+
+                    {source === "manual" && (
+                      <div className="space-y-2">
+                        {section.type === "TOP_CATEGORIES_GRID" ||
+                        section.type === "BRANDS_STRIP" ? (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className="rounded border px-2 py-1 text-[11px]"
+                              onClick={() =>
+                                applyCatalogQuickSelection(section, "append")
+                              }
+                            >
+                              Añadir top 10
+                            </button>
+                            <button
+                              className="rounded border px-2 py-1 text-[11px]"
+                              onClick={() =>
+                                applyCatalogQuickSelection(section, "replace")
+                              }
+                            >
+                              Reemplazar por top 10
+                            </button>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="text-xs text-slate-500">
+                            Seleccionados:{" "}
+                            <span className="font-semibold">
+                              {selectedIds.length}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {section.type === "TOP_CATEGORIES_GRID"
+                              ? "Categorías"
+                              : section.type === "BRANDS_STRIP"
+                                ? "Marcas"
+                                : "Productos"}
+                          </div>
+                        </div>
+                        {PRODUCT_QUERY_TYPES.includes(section.type) ? (
+                          <div className="grid gap-2 md:grid-cols-3">
+                            <select
+                              className="border rounded-lg px-3 py-2"
+                              value={String(
+                                manualProductFilters[section.id]?.categoryId ||
+                                  "",
+                              )}
+                              onChange={(e) =>
+                                setManualProductFilters((prev) => ({
+                                  ...prev,
+                                  [section.id]: {
+                                    ...prev[section.id],
+                                    categoryId: e.target.value || undefined,
+                                  },
+                                }))
+                              }
+                            >
+                              <option value="">Filtrar por categoría</option>
+                              {allCategoryOptions.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.subtitle
+                                    ? `${cat.label} (${cat.subtitle})`
+                                    : cat.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              className="border rounded-lg px-3 py-2"
+                              value={String(
+                                manualProductFilters[section.id]?.brandId || "",
+                              )}
+                              onChange={(e) =>
+                                setManualProductFilters((prev) => ({
+                                  ...prev,
+                                  [section.id]: {
+                                    ...prev[section.id],
+                                    brandId: e.target.value || undefined,
+                                  },
+                                }))
+                              }
+                            >
+                              <option value="">Filtrar por marca</option>
+                              {queryCatalogs.brands.map((brand) => (
+                                <option key={brand.id} value={brand.id}>
+                                  {brand.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              className="border rounded-lg px-3 py-2"
+                              value={String(
+                                manualProductFilters[section.id]?.sortBy ||
+                                  (section.type === "NEW_ARRIVALS"
+                                    ? "newest"
+                                    : "discount_desc"),
+                              )}
+                              onChange={(e) =>
+                                setManualProductFilters((prev) => ({
+                                  ...prev,
+                                  [section.id]: {
+                                    ...prev[section.id],
+                                    sortBy: e.target.value as
+                                      | "newest"
+                                      | "price_asc"
+                                      | "price_desc"
+                                      | "discount_desc",
+                                  },
+                                }))
+                              }
+                            >
+                              {SORT_OPTIONS.map((sort) => (
+                                <option key={sort.value} value={sort.value}>
+                                  {sort.label}
+                                </option>
+                              ))}
+                            </select>
+                            <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(
+                                  manualProductFilters[section.id]
+                                    ?.inStockOnly ?? true,
+                                )}
+                                onChange={(e) =>
+                                  setManualProductFilters((prev) => ({
+                                    ...prev,
+                                    [section.id]: {
+                                      ...prev[section.id],
+                                      inStockOnly: e.target.checked,
+                                    },
+                                  }))
+                                }
+                              />
+                              Solo con stock
+                            </label>
+                            {["FEATURED_PICKS", "PRODUCT_CAROUSEL"].includes(
+                              section.type,
+                            ) ? (
+                              <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(
+                                    manualProductFilters[section.id]
+                                      ?.featuredOnly ?? false,
+                                  )}
+                                  onChange={(e) =>
+                                    setManualProductFilters((prev) => ({
+                                      ...prev,
+                                      [section.id]: {
+                                        ...prev[section.id],
+                                        featuredOnly: e.target.checked,
+                                      },
+                                    }))
+                                  }
+                                />
+                                Solo destacados
+                              </label>
+                            ) : null}
+                            <input
+                              type="number"
+                              min={0}
+                              className="border rounded-lg px-3 py-2"
+                              value={
+                                typeof manualProductFilters[section.id]
+                                  ?.priceMin === "number"
+                                  ? manualProductFilters[section.id]?.priceMin
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                setManualProductFilters((prev) => ({
+                                  ...prev,
+                                  [section.id]: {
+                                    ...prev[section.id],
+                                    priceMin: e.target.value
+                                      ? Number(e.target.value)
+                                      : undefined,
+                                  },
+                                }))
+                              }
+                              placeholder="Precio mínimo"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              className="border rounded-lg px-3 py-2"
+                              value={
+                                typeof manualProductFilters[section.id]
+                                  ?.priceMax === "number"
+                                  ? manualProductFilters[section.id]?.priceMax
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                setManualProductFilters((prev) => ({
+                                  ...prev,
+                                  [section.id]: {
+                                    ...prev[section.id],
+                                    priceMax: e.target.value
+                                      ? Number(e.target.value)
+                                      : undefined,
+                                  },
+                                }))
+                              }
+                              placeholder="Precio máximo"
+                            />
+                          </div>
+                        ) : null}
+                        <div className="flex gap-2">
+                          <input
+                            className="border rounded-lg px-3 py-2 flex-1"
+                            value={search[section.id] || ""}
+                            onChange={(e) =>
+                              setSearch((prev) => ({
+                                ...prev,
+                                [section.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Buscar item"
+                          />
+                          <button
+                            className="px-3 py-2 border rounded-lg"
+                            onClick={() =>
+                              void loadOptions(
+                                section,
+                                search[section.id] || "",
+                                section.type === "TOP_CATEGORIES_GRID"
+                                  ? "categories"
+                                  : section.type === "BRANDS_STRIP"
+                                    ? "brands"
+                                    : "products",
+                                PRODUCT_QUERY_TYPES.includes(section.type)
+                                  ? manualProductFilters[section.id]
+                                  : undefined,
+                              )
+                            }
+                          >
+                            Buscar
+                          </button>
+                        </div>
+
+                        <div className="max-h-44 overflow-auto border rounded-lg divide-y">
+                          {(options[section.id] || []).map((opt) => {
+                            const selected = selectedIds.includes(opt.id);
+                            return (
+                              <button
+                                key={opt.id}
+                                onClick={() =>
+                                  toggleManualSelection(section, opt.id)
+                                }
+                                className={`block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${selected ? "bg-slate-50" : ""}`}
+                              >
+                                {section.type === "BRANDS_STRIP" ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <img
+                                      src={resolveOptionImageSrc(opt.image)}
+                                      alt={opt.label}
+                                      className="h-5 w-10 rounded border bg-white object-contain"
+                                      onError={(e) => {
+                                        e.currentTarget.onerror = null;
+                                        e.currentTarget.src =
+                                          "/No_Image_Available.png";
+                                      }}
+                                    />
+                                    <span className="font-medium">
+                                      {opt.label}
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="font-medium">
+                                    {opt.label}
+                                  </span>
+                                )}
+                                <span className="text-xs text-slate-400 ml-2">
+                                  {opt.subtitle}
+                                </span>
+                                <span
+                                  className={`ml-2 text-[11px] ${selected ? "text-emerald-600" : "text-slate-400"}`}
+                                >
+                                  {selected ? "Seleccionado" : "Seleccionar"}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {selectedIds.map((id) => (
+                            <div
+                              key={id}
+                              className="inline-flex items-center gap-1 rounded-full border bg-white px-2 py-1 text-xs"
+                              title={id}
+                            >
+                              <span>{optionLabelById.get(id) || id}</span>
+                              <button
+                                className="rounded border px-1"
+                                onClick={() => moveSelectedId(section, id, -1)}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                className="rounded border px-1"
+                                onClick={() => moveSelectedId(section, id, 1)}
+                              >
+                                ↓
+                              </button>
+                              <button
+                                className="rounded border px-1 text-red-600"
+                                onClick={() =>
+                                  updateConfig(section, {
+                                    ids: selectedIds.filter(
+                                      (value) => value !== id,
+                                    ),
+                                  })
+                                }
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          {selectedIds.length ? (
+                            <button
+                              className="rounded-full border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700"
+                              onClick={() => updateConfig(section, { ids: [] })}
+                            >
+                              Limpiar selección
+                            </button>
+                          ) : null}
+                          {!selectedIds.length ? (
+                            <div className="text-xs text-slate-500">
+                              Sin IDs seleccionados
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+
+                    {source === "query" && (
+                      <div className="grid md:grid-cols-2 gap-3">
+                        <input
+                          type="number"
+                          min={1}
+                          max={24}
+                          className="border rounded-lg px-3 py-2"
+                          value={Number(query.limit || 12)}
+                          onChange={(e) =>
+                            updateQueryConfig(section, {
+                              limit: Number(e.target.value) || 12,
+                            })
+                          }
+                          placeholder="Límite"
+                        />
+
+                        {PRODUCT_QUERY_TYPES.includes(section.type) ? (
+                          <>
+                            <select
+                              className="border rounded-lg px-3 py-2"
+                              value={String(query.categoryId || "")}
+                              onChange={(e) =>
+                                updateQueryConfig(section, {
+                                  type: "products",
+                                  categoryId: e.target.value || undefined,
+                                })
+                              }
+                            >
+                              <option value="">Todas las categorías</option>
+                              {allCategoryOptions.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.subtitle
+                                    ? `${cat.label} (${cat.subtitle})`
+                                    : cat.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            <select
+                              className="border rounded-lg px-3 py-2"
+                              value={String(query.brandId || "")}
+                              onChange={(e) =>
+                                updateQueryConfig(section, {
+                                  type: "products",
+                                  brandId: e.target.value || undefined,
+                                })
+                              }
+                            >
+                              <option value="">Todas las marcas</option>
+                              {queryCatalogs.brands.map((brand) => (
+                                <option key={brand.id} value={brand.id}>
+                                  {brand.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            <select
+                              className="border rounded-lg px-3 py-2"
+                              value={String(query.sortBy || "newest")}
+                              onChange={(e) =>
+                                updateQueryConfig(section, {
+                                  type: "products",
+                                  sortBy: e.target.value,
+                                })
+                              }
+                            >
+                              {SORT_OPTIONS.map((sort) => (
+                                <option key={sort.value} value={sort.value}>
+                                  {sort.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(query.inStockOnly ?? true)}
+                                onChange={(e) =>
+                                  updateQueryConfig(section, {
+                                    type: "products",
+                                    inStockOnly: e.target.checked,
+                                  })
+                                }
+                              />
+                              Solo con stock
+                            </label>
+
+                            {["FEATURED_PICKS", "PRODUCT_CAROUSEL"].includes(
+                              section.type,
+                            ) ? (
+                              <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(query.featuredOnly ?? false)}
+                                  onChange={(e) =>
+                                    updateQueryConfig(section, {
+                                      type: "products",
+                                      featuredOnly: e.target.checked,
+                                    })
+                                  }
+                                />
+                                Solo destacados
+                              </label>
+                            ) : null}
+
+                            <input
+                              type="number"
+                              min={0}
+                              className="border rounded-lg px-3 py-2"
+                              value={
+                                typeof query.priceMin === "number"
+                                  ? query.priceMin
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                updateQueryConfig(section, {
+                                  type: "products",
+                                  priceMin: e.target.value
+                                    ? Number(e.target.value)
+                                    : undefined,
+                                })
+                              }
+                              placeholder="Precio mínimo"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              className="border rounded-lg px-3 py-2"
+                              value={
+                                typeof query.priceMax === "number"
+                                  ? query.priceMax
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                updateQueryConfig(section, {
+                                  type: "products",
+                                  priceMax: e.target.value
+                                    ? Number(e.target.value)
+                                    : undefined,
+                                })
+                              }
+                              placeholder="Precio máximo"
+                            />
+                          </>
+                        ) : (
+                          <div className="text-xs text-slate-500 md:col-span-2">
+                            Esta sección usa consulta automática de
+                            categorías/marcas.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {section.type === "BRANDS_STRIP" ? (
+                      <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Logo overrides (manual)
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Si un logo sale en negro o incorrecto, pega aquí la
+                          URL correcta. Puedes usar id, slug o nombre de marca
+                          como clave.
+                        </p>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          {(
+                            (source === "manual"
+                              ? selectedIds
+                              : queryCatalogs.brands
+                                  .slice(0, 24)
+                                  .map((b) => b.id)) as string[]
+                          ).map((brandId) => {
+                            const brandLabel =
+                              optionLabelById.get(brandId) || brandId;
+                            const overrides = normalizeLogoOverrides(
+                              section.config_json.logo_overrides,
+                            );
+                            const value =
+                              overrides[brandId] ||
+                              overrides[brandId.toLowerCase()] ||
+                              "";
+                            return (
+                              <label key={brandId} className="space-y-1">
+                                <span className="text-xs text-slate-600">
+                                  {brandLabel}
+                                </span>
+                                <input
+                                  className="w-full border rounded-lg px-2 py-1.5 text-xs"
+                                  value={value}
+                                  placeholder="https://.../logo.png"
+                                  onChange={(e) =>
+                                    updateBrandLogoOverride(
+                                      section,
+                                      brandId,
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <textarea
+                          className="border rounded-lg px-3 py-2 w-full min-h-24 text-xs font-mono"
+                          value={JSON.stringify(
+                            normalizeLogoOverrides(
+                              section.config_json.logo_overrides,
+                            ),
+                            null,
+                            2,
+                          )}
+                          onChange={(e) => {
+                            try {
+                              const parsed = JSON.parse(
+                                e.target.value,
+                              ) as Record<string, unknown>;
+                              updateConfig(section, {
+                                logo_overrides: normalizeLogoOverrides(parsed),
+                              });
+                            } catch {
+                              // avoid noisy toasts while typing partial json
+                            }
+                          }}
+                        />
                       </div>
                     ) : null}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="text-xs text-slate-500">Seleccionados: <span className="font-semibold">{selectedIds.length}</span></div>
-                      <div className="text-xs text-slate-500">{section.type === "TOP_CATEGORIES_GRID" ? "Categorías" : section.type === "BRANDS_STRIP" ? "Marcas" : "Productos"}</div>
-                    </div>
-                    {PRODUCT_QUERY_TYPES.includes(section.type) ? (
-                      <div className="grid gap-2 md:grid-cols-3">
-                        <select
-                          className="border rounded-lg px-3 py-2"
-                          value={String(manualProductFilters[section.id]?.categoryId || "")}
-                          onChange={(e) => setManualProductFilters((prev) => ({
-                            ...prev,
-                            [section.id]: {
-                              ...prev[section.id],
-                              categoryId: e.target.value || undefined,
-                            },
-                          }))}
-                        >
-                          <option value="">Filtrar por categoría</option>
-                          {allCategoryOptions.map((cat) => (
-                            <option key={cat.id} value={cat.id}>{cat.label}</option>
-                          ))}
-                        </select>
-                        <select
-                          className="border rounded-lg px-3 py-2"
-                          value={String(manualProductFilters[section.id]?.brandId || "")}
-                          onChange={(e) => setManualProductFilters((prev) => ({
-                            ...prev,
-                            [section.id]: {
-                              ...prev[section.id],
-                              brandId: e.target.value || undefined,
-                            },
-                          }))}
-                        >
-                          <option value="">Filtrar por marca</option>
-                          {queryCatalogs.brands.map((brand) => (
-                            <option key={brand.id} value={brand.id}>{brand.label}</option>
-                          ))}
-                        </select>
-                        <select
-                          className="border rounded-lg px-3 py-2"
-                          value={String(manualProductFilters[section.id]?.sortBy || (section.type === "NEW_ARRIVALS" ? "newest" : "discount_desc"))}
-                          onChange={(e) => setManualProductFilters((prev) => ({
-                            ...prev,
-                            [section.id]: {
-                              ...prev[section.id],
-                              sortBy: e.target.value as "newest" | "price_asc" | "price_desc" | "discount_desc",
-                            },
-                          }))}
-                        >
-                          {SORT_OPTIONS.map((sort) => (
-                            <option key={sort.value} value={sort.value}>{sort.label}</option>
-                          ))}
-                        </select>
-                        <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(manualProductFilters[section.id]?.inStockOnly ?? true)}
-                            onChange={(e) => setManualProductFilters((prev) => ({
-                              ...prev,
-                              [section.id]: {
-                                ...prev[section.id],
-                                inStockOnly: e.target.checked,
-                              },
-                            }))}
-                          />
-                          Solo con stock
-                        </label>
-                        {section.type === "FEATURED_PICKS" ? (
+
+                    {section.type === "BRANDS_STRIP" ? (
+                      <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Carrusel de marcas en Store
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
                           <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
                             <input
                               type="checkbox"
-                              checked={Boolean(manualProductFilters[section.id]?.featuredOnly ?? false)}
-                              onChange={(e) => setManualProductFilters((prev) => ({
-                                ...prev,
-                                [section.id]: {
-                                  ...prev[section.id],
-                                  featuredOnly: e.target.checked,
-                                },
-                              }))}
+                              checked={Boolean(
+                                section.config_json.carousel_enabled ?? true,
+                              )}
+                              onChange={(e) =>
+                                updateConfig(section, {
+                                  carousel_enabled: e.target.checked,
+                                })
+                              }
                             />
-                            Solo destacados
+                            Activar carrusel horizontal
                           </label>
-                        ) : null}
-                        <input
-                          type="number"
-                          min={0}
-                          className="border rounded-lg px-3 py-2"
-                          value={typeof manualProductFilters[section.id]?.priceMin === "number" ? manualProductFilters[section.id]?.priceMin : ""}
-                          onChange={(e) => setManualProductFilters((prev) => ({
-                            ...prev,
-                            [section.id]: {
-                              ...prev[section.id],
-                              priceMin: e.target.value ? Number(e.target.value) : undefined,
-                            },
-                          }))}
-                          placeholder="Precio mínimo"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          className="border rounded-lg px-3 py-2"
-                          value={typeof manualProductFilters[section.id]?.priceMax === "number" ? manualProductFilters[section.id]?.priceMax : ""}
-                          onChange={(e) => setManualProductFilters((prev) => ({
-                            ...prev,
-                            [section.id]: {
-                              ...prev[section.id],
-                              priceMax: e.target.value ? Number(e.target.value) : undefined,
-                            },
-                          }))}
-                          placeholder="Precio máximo"
-                        />
+                          <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(
+                                section.config_json.carousel_autoplay ?? true,
+                              )}
+                              onChange={(e) =>
+                                updateConfig(section, {
+                                  carousel_autoplay: e.target.checked,
+                                })
+                              }
+                            />
+                            Autoplay
+                          </label>
+                          <input
+                            type="number"
+                            min={2000}
+                            step={500}
+                            className="border rounded-lg px-3 py-2"
+                            value={Number(
+                              section.config_json.carousel_interval_ms || 4500,
+                            )}
+                            onChange={(e) =>
+                              updateConfig(section, {
+                                carousel_interval_ms:
+                                  Number(e.target.value) || 4500,
+                              })
+                            }
+                            placeholder="Intervalo autoplay (ms)"
+                          />
+                          <input
+                            type="number"
+                            min={2}
+                            max={6}
+                            className="border rounded-lg px-3 py-2"
+                            value={Number(
+                              section.config_json.carousel_items_desktop || 4,
+                            )}
+                            onChange={(e) =>
+                              updateConfig(section, {
+                                carousel_items_desktop:
+                                  Number(e.target.value) || 4,
+                              })
+                            }
+                            placeholder="Items desktop"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            max={3}
+                            className="border rounded-lg px-3 py-2 md:col-span-2"
+                            value={Number(
+                              section.config_json.carousel_items_mobile || 2,
+                            )}
+                            onChange={(e) =>
+                              updateConfig(section, {
+                                carousel_items_mobile:
+                                  Number(e.target.value) || 2,
+                              })
+                            }
+                            placeholder="Items móvil"
+                          />
+                        </div>
                       </div>
                     ) : null}
-                    <div className="flex gap-2">
-                      <input className="border rounded-lg px-3 py-2 flex-1" value={search[section.id] || ""} onChange={(e) => setSearch((prev) => ({ ...prev, [section.id]: e.target.value }))} placeholder="Buscar item" />
-                      <button
-                        className="px-3 py-2 border rounded-lg"
-                        onClick={() =>
-                          void loadOptions(
-                            section,
-                            search[section.id] || "",
-                            section.type === "TOP_CATEGORIES_GRID" ? "categories" : section.type === "BRANDS_STRIP" ? "brands" : "products",
-                            PRODUCT_QUERY_TYPES.includes(section.type) ? manualProductFilters[section.id] : undefined,
-                          )
-                        }
-                      >
-                        Buscar
-                      </button>
-                    </div>
-
-                    <div className="max-h-44 overflow-auto border rounded-lg divide-y">
-                      {(options[section.id] || []).map((opt) => {
-                        const selected = selectedIds.includes(opt.id);
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => toggleManualSelection(section, opt.id)}
-                            className={`block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${selected ? "bg-slate-50" : ""}`}
-                          >
-                            {section.type === "BRANDS_STRIP" ? (
-                              <span className="inline-flex items-center gap-2">
-                                <img
-                                  src={resolveOptionImageSrc(opt.image)}
-                                  alt={opt.label}
-                                  className="h-5 w-10 rounded border bg-white object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src = "/No_Image_Available.png";
-                                  }}
-                                />
-                                <span className="font-medium">{opt.label}</span>
-                              </span>
-                            ) : (
-                              <span className="font-medium">{opt.label}</span>
-                            )}
-                            <span className="text-xs text-slate-400 ml-2">{opt.subtitle}</span>
-                            <span className={`ml-2 text-[11px] ${selected ? "text-emerald-600" : "text-slate-400"}`}>{selected ? "Seleccionado" : "Seleccionar"}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {selectedIds.map((id) => (
-                        <div key={id} className="inline-flex items-center gap-1 rounded-full border bg-white px-2 py-1 text-xs" title={id}>
-                          <span>{optionLabelById.get(id) || id}</span>
-                          <button className="rounded border px-1" onClick={() => moveSelectedId(section, id, -1)}>↑</button>
-                          <button className="rounded border px-1" onClick={() => moveSelectedId(section, id, 1)}>↓</button>
-                          <button className="rounded border px-1 text-red-600" onClick={() => updateConfig(section, { ids: selectedIds.filter((value) => value !== id) })}>✕</button>
-                        </div>
-                      ))}
-                      {selectedIds.length ? (
-                        <button className="rounded-full border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700" onClick={() => updateConfig(section, { ids: [] })}>
-                          Limpiar selección
-                        </button>
-                      ) : null}
-                      {!selectedIds.length ? <div className="text-xs text-slate-500">Sin IDs seleccionados</div> : null}
-                    </div>
-                  </div>
-                )}
-
-                {source === "query" && (
-                  <div className="grid md:grid-cols-2 gap-3">
-                    <input type="number" min={1} max={24} className="border rounded-lg px-3 py-2" value={Number(query.limit || 12)} onChange={(e) => updateQueryConfig(section, { limit: Number(e.target.value) || 12 })} placeholder="Límite" />
 
                     {PRODUCT_QUERY_TYPES.includes(section.type) ? (
-                      <>
-                        <select className="border rounded-lg px-3 py-2" value={String(query.categoryId || "")} onChange={(e) => updateQueryConfig(section, { type: "products", categoryId: e.target.value || undefined })}>
-                          <option value="">Todas las categorías</option>
-                          {allCategoryOptions.map((cat) => (
-                            <option key={cat.id} value={cat.id}>{cat.label}</option>
-                          ))}
-                        </select>
-
-                        <select className="border rounded-lg px-3 py-2" value={String(query.brandId || "")} onChange={(e) => updateQueryConfig(section, { type: "products", brandId: e.target.value || undefined })}>
-                          <option value="">Todas las marcas</option>
-                          {queryCatalogs.brands.map((brand) => (
-                            <option key={brand.id} value={brand.id}>{brand.label}</option>
-                          ))}
-                        </select>
-
-                        <select className="border rounded-lg px-3 py-2" value={String(query.sortBy || "newest")} onChange={(e) => updateQueryConfig(section, { type: "products", sortBy: e.target.value })}>
-                          {SORT_OPTIONS.map((sort) => (
-                            <option key={sort.value} value={sort.value}>{sort.label}</option>
-                          ))}
-                        </select>
-
-                        <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                          <input type="checkbox" checked={Boolean(query.inStockOnly ?? true)} onChange={(e) => updateQueryConfig(section, { type: "products", inStockOnly: e.target.checked })} />
-                          Solo con stock
-                        </label>
-
-                        {section.type === "FEATURED_PICKS" ? (
-                          <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                            <input type="checkbox" checked={Boolean(query.featuredOnly ?? false)} onChange={(e) => updateQueryConfig(section, { type: "products", featuredOnly: e.target.checked })} />
-                            Solo destacados
-                          </label>
+                      <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Carrusel en Store
+                          </div>
+                          <div className="flex gap-1 flex-wrap">
+                            <button
+                              className="rounded border px-2 py-1 text-[11px]"
+                              onClick={() =>
+                                applyCarouselPreset(section, "compact")
+                              }
+                            >
+                              Compacto
+                            </button>
+                            <button
+                              className="rounded border px-2 py-1 text-[11px]"
+                              onClick={() =>
+                                applyCarouselPreset(section, "balanced")
+                              }
+                            >
+                              Balanceado
+                            </button>
+                            <button
+                              className="rounded border px-2 py-1 text-[11px]"
+                              onClick={() =>
+                                applyCarouselPreset(section, "showcase")
+                              }
+                            >
+                              Escaparate
+                            </button>
+                            <button
+                              className="rounded border px-2 py-1 text-[11px]"
+                              onClick={() => applySmartCarouselTuning(section)}
+                            >
+                              Auto por preview
+                            </button>
+                          </div>
+                        </div>
+                        {carouselInsight ? (
+                          <div
+                            className={`rounded-lg border px-3 py-2 text-xs ${carouselInsight.tone === "danger" ? "border-red-200 bg-red-50 text-red-800" : carouselInsight.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+                          >
+                            <div className="font-semibold">
+                              Estado carrusel: {carouselInsight.label}
+                            </div>
+                            <div>{carouselInsight.hint}</div>
+                          </div>
                         ) : null}
-
-                        <input type="number" min={0} className="border rounded-lg px-3 py-2" value={typeof query.priceMin === "number" ? query.priceMin : ""} onChange={(e) => updateQueryConfig(section, { type: "products", priceMin: e.target.value ? Number(e.target.value) : undefined })} placeholder="Precio mínimo" />
-                        <input type="number" min={0} className="border rounded-lg px-3 py-2" value={typeof query.priceMax === "number" ? query.priceMax : ""} onChange={(e) => updateQueryConfig(section, { type: "products", priceMax: e.target.value ? Number(e.target.value) : undefined })} placeholder="Precio máximo" />
-                      </>
-                    ) : (
-                      <div className="text-xs text-slate-500 md:col-span-2">Esta sección usa consulta automática de categorías/marcas.</div>
-                    )}
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(
+                                section.config_json.carousel_enabled ?? true,
+                              )}
+                              onChange={(e) =>
+                                updateConfig(section, {
+                                  carousel_enabled: e.target.checked,
+                                })
+                              }
+                            />
+                            Activar carrusel horizontal
+                          </label>
+                          <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(
+                                section.config_json.carousel_autoplay ?? true,
+                              )}
+                              onChange={(e) =>
+                                updateConfig(section, {
+                                  carousel_autoplay: e.target.checked,
+                                })
+                              }
+                            />
+                            Autoplay
+                          </label>
+                          <input
+                            type="number"
+                            min={2000}
+                            step={500}
+                            className="border rounded-lg px-3 py-2"
+                            value={Number(
+                              section.config_json.carousel_interval_ms || 4500,
+                            )}
+                            onChange={(e) =>
+                              updateConfig(section, {
+                                carousel_interval_ms:
+                                  Number(e.target.value) || 4500,
+                              })
+                            }
+                            placeholder="Intervalo autoplay (ms)"
+                          />
+                          <input
+                            type="number"
+                            min={2}
+                            max={6}
+                            className="border rounded-lg px-3 py-2"
+                            value={Number(
+                              section.config_json.carousel_items_desktop || 4,
+                            )}
+                            onChange={(e) =>
+                              updateConfig(section, {
+                                carousel_items_desktop:
+                                  Number(e.target.value) || 4,
+                              })
+                            }
+                            placeholder="Items visibles desktop"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            max={3}
+                            className="border rounded-lg px-3 py-2 md:col-span-2"
+                            value={Number(
+                              section.config_json.carousel_items_mobile || 2,
+                            )}
+                            onChange={(e) =>
+                              updateConfig(section, {
+                                carousel_items_mobile:
+                                  Number(e.target.value) || 2,
+                              })
+                            }
+                            placeholder="Items visibles móvil"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )}
 
-                {section.type === "BRANDS_STRIP" ? (
-                  <div className="rounded-lg border border-slate-200 p-3 space-y-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Logo overrides (manual)</div>
-                    <p className="text-xs text-slate-500">Si un logo sale en negro o incorrecto, pega aquí la URL correcta. Puedes usar id, slug o nombre de marca como clave.</p>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {((source === "manual" ? selectedIds : queryCatalogs.brands.slice(0, 24).map((b) => b.id)) as string[]).map((brandId) => {
-                        const brandLabel = optionLabelById.get(brandId) || brandId;
-                        const overrides = normalizeLogoOverrides(section.config_json.logo_overrides);
-                        const value = overrides[brandId] || overrides[brandId.toLowerCase()] || "";
-                        return (
-                          <label key={brandId} className="space-y-1">
-                            <span className="text-xs text-slate-600">{brandLabel}</span>
-                            <input
-                              className="w-full border rounded-lg px-2 py-1.5 text-xs"
-                              value={value}
-                              placeholder="https://.../logo.png"
-                              onChange={(e) => updateBrandLogoOverride(section, brandId, e.target.value)}
-                            />
-                          </label>
-                        );
-                      })}
+                {section.type === "TRUST_BAR" && (
+                  <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Items de confianza (
+                      {
+                        (
+                          (section.config_json.items || []) as Array<{
+                            icon?: string;
+                            text: string;
+                          }>
+                        ).length
+                      }
+                      /6)
                     </div>
-                    <textarea
-                      className="border rounded-lg px-3 py-2 w-full min-h-24 text-xs font-mono"
-                      value={JSON.stringify(normalizeLogoOverrides(section.config_json.logo_overrides), null, 2)}
-                      onChange={(e) => {
-                        try {
-                          const parsed = JSON.parse(e.target.value) as Record<string, unknown>;
-                          updateConfig(section, { logo_overrides: normalizeLogoOverrides(parsed) });
-                        } catch {
-                          // avoid noisy toasts while typing partial json
-                        }
-                      }}
-                    />
-                  </div>
-                ) : null}
-
-                {section.type === "BRANDS_STRIP" ? (
-                  <div className="rounded-lg border border-slate-200 p-3 space-y-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel de marcas en Store</div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                        <input type="checkbox" checked={Boolean(section.config_json.carousel_enabled ?? true)} onChange={(e) => updateConfig(section, { carousel_enabled: e.target.checked })} />
-                        Activar carrusel horizontal
-                      </label>
-                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                        <input type="checkbox" checked={Boolean(section.config_json.carousel_autoplay ?? true)} onChange={(e) => updateConfig(section, { carousel_autoplay: e.target.checked })} />
-                        Autoplay
-                      </label>
-                      <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 4500)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 4500 })} placeholder="Intervalo autoplay (ms)" />
-                      <input type="number" min={2} max={6} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 4)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 4 })} placeholder="Items desktop" />
-                      <input type="number" min={1} max={3} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items móvil" />
-                    </div>
-                  </div>
-                ) : null}
-
-                {PRODUCT_QUERY_TYPES.includes(section.type) ? (
-                  <div className="rounded-lg border border-slate-200 p-3 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carrusel en Store</div>
-                      <div className="flex gap-1 flex-wrap">
-                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "compact")}>Compacto</button>
-                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "balanced")}>Balanceado</button>
-                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applyCarouselPreset(section, "showcase")}>Escaparate</button>
-                        <button className="rounded border px-2 py-1 text-[11px]" onClick={() => applySmartCarouselTuning(section)}>Auto por preview</button>
-                      </div>
-                    </div>
-                    {carouselInsight ? (
+                    {(
+                      (section.config_json.items || []) as Array<{
+                        icon?: string;
+                        text: string;
+                      }>
+                    ).map((item, idx) => (
                       <div
-                        className={`rounded-lg border px-3 py-2 text-xs ${carouselInsight.tone === "danger" ? "border-red-200 bg-red-50 text-red-800" : carouselInsight.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+                        key={idx}
+                        className="grid gap-2 md:grid-cols-[160px_1fr_auto]"
                       >
-                        <div className="font-semibold">Estado carrusel: {carouselInsight.label}</div>
-                        <div>{carouselInsight.hint}</div>
+                        <select
+                          className="border rounded-lg px-3 py-2"
+                          value={String(item.icon || "shield")}
+                          onChange={(e) => {
+                            const arr = [
+                              ...((section.config_json.items || []) as Array<{
+                                icon?: string;
+                                text: string;
+                              }>),
+                            ];
+                            arr[idx] = { ...arr[idx], icon: e.target.value };
+                            updateConfig(section, { items: arr });
+                          }}
+                        >
+                          <option value="truck">truck</option>
+                          <option value="shield">shield</option>
+                          <option value="refresh-ccw">refresh-ccw</option>
+                          <option value="headset">headset</option>
+                          <option value="payment">payment</option>
+                          <option value="badge">badge</option>
+                        </select>
+                        <input
+                          className="border rounded-lg px-3 py-2"
+                          value={String(item.text || "")}
+                          placeholder="Texto"
+                          onChange={(e) => {
+                            const arr = [
+                              ...((section.config_json.items || []) as Array<{
+                                icon?: string;
+                                text: string;
+                              }>),
+                            ];
+                            arr[idx] = { ...arr[idx], text: e.target.value };
+                            updateConfig(section, { items: arr });
+                          }}
+                        />
+                        <button
+                          className="border rounded-lg px-3 py-2 text-red-600"
+                          onClick={() => {
+                            const arr = [
+                              ...((section.config_json.items || []) as Array<{
+                                icon?: string;
+                                text: string;
+                              }>),
+                            ].filter((_, i) => i !== idx);
+                            updateConfig(section, { items: arr });
+                          }}
+                        >
+                          Eliminar
+                        </button>
                       </div>
-                    ) : null}
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                        <input type="checkbox" checked={Boolean(section.config_json.carousel_enabled ?? true)} onChange={(e) => updateConfig(section, { carousel_enabled: e.target.checked })} />
-                        Activar carrusel horizontal
-                      </label>
-                      <label className="text-sm flex items-center gap-2 border rounded-lg px-3 py-2">
-                        <input type="checkbox" checked={Boolean(section.config_json.carousel_autoplay ?? true)} onChange={(e) => updateConfig(section, { carousel_autoplay: e.target.checked })} />
-                        Autoplay
-                      </label>
-                      <input type="number" min={2000} step={500} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_interval_ms || 4500)} onChange={(e) => updateConfig(section, { carousel_interval_ms: Number(e.target.value) || 4500 })} placeholder="Intervalo autoplay (ms)" />
-                      <input type="number" min={2} max={6} className="border rounded-lg px-3 py-2" value={Number(section.config_json.carousel_items_desktop || 4)} onChange={(e) => updateConfig(section, { carousel_items_desktop: Number(e.target.value) || 4 })} placeholder="Items visibles desktop" />
-                      <input type="number" min={1} max={3} className="border rounded-lg px-3 py-2 md:col-span-2" value={Number(section.config_json.carousel_items_mobile || 2)} onChange={(e) => updateConfig(section, { carousel_items_mobile: Number(e.target.value) || 2 })} placeholder="Items visibles móvil" />
-                    </div>
+                    ))}
+                    <button
+                      className="border rounded-lg px-3 py-2 text-sm"
+                      onClick={() => {
+                        const current = (section.config_json.items ||
+                          []) as Array<{
+                          icon?: string;
+                          text: string;
+                        }>;
+                        if (current.length >= 6) {
+                          toast.error(
+                            "Máximo 6 items en la barra de confianza",
+                          );
+                          return;
+                        }
+                        const arr = [
+                          ...current,
+                          { icon: "shield", text: "Nuevo item" },
+                        ];
+                        updateConfig(section, { items: arr });
+                      }}
+                    >
+                      Añadir item
+                    </button>
                   </div>
-                ) : null}
-              </div>
-            )}
-
-            {section.type === "TRUST_BAR" && (
-              <div className="rounded-lg border border-slate-200 p-3 space-y-2">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Items de confianza</div>
-                {((section.config_json.items || []) as Array<{ icon?: string; text: string }>).map((item, idx) => (
-                  <div key={idx} className="grid gap-2 md:grid-cols-[160px_1fr_auto]">
-                    <select className="border rounded-lg px-3 py-2" value={String(item.icon || "shield")} onChange={(e) => {
-                      const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>)];
-                      arr[idx] = { ...arr[idx], icon: e.target.value };
-                      updateConfig(section, { items: arr });
-                    }}>
-                      <option value="truck">truck</option>
-                      <option value="shield">shield</option>
-                      <option value="refresh-ccw">refresh-ccw</option>
-                    </select>
-                    <input className="border rounded-lg px-3 py-2" value={String(item.text || "")} placeholder="Texto" onChange={(e) => {
-                      const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>)];
-                      arr[idx] = { ...arr[idx], text: e.target.value };
-                      updateConfig(section, { items: arr });
-                    }} />
-                    <button className="border rounded-lg px-3 py-2 text-red-600" onClick={() => {
-                      const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>)].filter((_, i) => i !== idx);
-                      updateConfig(section, { items: arr });
-                    }}>Eliminar</button>
-                  </div>
-                ))}
-                <button className="border rounded-lg px-3 py-2 text-sm" onClick={() => {
-                  const arr = [...((section.config_json.items || []) as Array<{ icon?: string; text: string }>), { icon: "shield", text: "Nuevo item" }];
-                  updateConfig(section, { items: arr });
-                }}>Añadir item</button>
-              </div>
-            )}
+                )}
 
                 {previewBySectionId[section.id] ? (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
                     <div className="font-semibold">Preview sección</div>
-                    <div>Total estimado: <strong>{previewBySectionId[section.id].previewCount}</strong>{typeof previewBySectionId[section.id].inStockCount === "number" ? <> · Con stock: <strong>{previewBySectionId[section.id].inStockCount}</strong></> : null}{typeof previewBySectionId[section.id].withDiscountCount === "number" ? <> · Con descuento: <strong>{previewBySectionId[section.id].withDiscountCount}</strong></> : null}</div>
-                    {(previewBySectionId[section.id].topBrands || []).length ? <div>Top marcas: {(previewBySectionId[section.id].topBrands || []).map((x) => `${x.name} (${x.count})`).join(", ")}</div> : null}
+                    <div>
+                      Total estimado:{" "}
+                      <strong>
+                        {previewBySectionId[section.id].previewCount}
+                      </strong>
+                      {typeof previewBySectionId[section.id].inStockCount ===
+                      "number" ? (
+                        <>
+                          {" "}
+                          · Con stock:{" "}
+                          <strong>
+                            {previewBySectionId[section.id].inStockCount}
+                          </strong>
+                        </>
+                      ) : null}
+                      {typeof previewBySectionId[section.id]
+                        .withDiscountCount === "number" ? (
+                        <>
+                          {" "}
+                          · Con descuento:{" "}
+                          <strong>
+                            {previewBySectionId[section.id].withDiscountCount}
+                          </strong>
+                        </>
+                      ) : null}
+                    </div>
+                    {(previewBySectionId[section.id].topBrands || []).length ? (
+                      <div>
+                        Top marcas:{" "}
+                        {(previewBySectionId[section.id].topBrands || [])
+                          .map((x) => `${x.name} (${x.count})`)
+                          .join(", ")}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 
                 <div className="flex flex-wrap gap-2">
-                  <button className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50" disabled={previewLoadingId === section.id} onClick={() => void runSectionPreview(section.id)}>
-                    {previewLoadingId === section.id ? "Analizando..." : "Analizar resultados"}
+                  <button
+                    className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50"
+                    disabled={previewLoadingId === section.id}
+                    onClick={() => void runSectionPreview(section.id)}
+                  >
+                    {previewLoadingId === section.id
+                      ? "Analizando..."
+                      : "Analizar resultados"}
                   </button>
-                  <button className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void saveAndOpenStore(section.id)}>
-                    {savingId === section.id ? "Guardando..." : "Guardar y ver en Store"}
+                  <button
+                    className="px-3 py-2 rounded-lg border text-sm disabled:opacity-50"
+                    disabled={savingId === section.id}
+                    onClick={() => void saveAndOpenStore(section.id)}
+                  >
+                    {savingId === section.id
+                      ? "Guardando..."
+                      : "Guardar y ver en Store"}
                   </button>
-                  <button className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50" disabled={savingId === section.id} onClick={() => void save(section.id)}>
-                    {savingId === section.id ? "Guardando..." : "Guardar cambios"}
+                  <button
+                    className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
+                    disabled={savingId === section.id}
+                    onClick={() => void save(section.id)}
+                  >
+                    {savingId === section.id
+                      ? "Guardando..."
+                      : "Guardar cambios"}
                   </button>
                 </div>
               </>
             ) : (
-              <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">Sección colapsada. Expándela para editar su configuración.</div>
+              <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">
+                Sección colapsada. Expándela para editar su configuración.
+              </div>
             )}
           </div>
         );
@@ -2090,7 +3566,12 @@ export default function HomepageSectionsPage() {
         <div className="rounded-lg border bg-white p-4 text-sm text-slate-500 flex flex-wrap items-center justify-between gap-3">
           <span>No hay secciones para el filtro actual.</span>
           {filter ? (
-            <button className="px-3 py-1.5 border rounded-lg text-xs" onClick={() => setFilter("")}>Limpiar filtro</button>
+            <button
+              className="px-3 py-1.5 border rounded-lg text-xs"
+              onClick={() => setFilter("")}
+            >
+              Limpiar filtro
+            </button>
           ) : null}
         </div>
       ) : null}

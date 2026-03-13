@@ -414,10 +414,22 @@ export default function HomepageSectionsPage() {
     return map;
   }, [options, queryCatalogs.brands, queryCatalogs.categories]);
   const allCategoryOptions = useMemo(() => {
-    const map = new Map<string, HomepageOption>();
+    const byId = new Map<string, HomepageOption>();
+    const seenSlugs = new Set<string>();
+
+    const normalizeSlug = (value?: string) =>
+      String(value || "")
+        .trim()
+        .toLowerCase();
+
     const push = (id: string, label: string, subtitle?: string) => {
       if (!id) return;
-      if (!map.has(id)) map.set(id, { id, label, subtitle });
+      const slug = normalizeSlug(subtitle);
+      if (slug && seenSlugs.has(slug)) return;
+      if (!byId.has(id)) {
+        byId.set(id, { id, label, subtitle });
+        if (slug) seenSlugs.add(slug);
+      }
     };
 
     for (const item of queryCatalogs.categories) {
@@ -433,7 +445,7 @@ export default function HomepageSectionsPage() {
     };
 
     walk(menuTree || []);
-    return Array.from(map.values()).sort((a, b) =>
+    return Array.from(byId.values()).sort((a, b) =>
       a.label.localeCompare(b.label, "es", { sensitivity: "base" }),
     );
   }, [menuTree, queryCatalogs.categories]);
@@ -2382,7 +2394,7 @@ export default function HomepageSectionsPage() {
             <option value="">Selecciona categoría</option>
             {allCategoryOptions.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.label}
+                {cat.subtitle ? `${cat.label} (${cat.subtitle})` : cat.label}
               </option>
             ))}
           </select>
@@ -2650,7 +2662,9 @@ export default function HomepageSectionsPage() {
                               <option value="">Filtrar por categoría</option>
                               {allCategoryOptions.map((cat) => (
                                 <option key={cat.id} value={cat.id}>
-                                  {cat.label}
+                                  {cat.subtitle
+                                    ? `${cat.label} (${cat.subtitle})`
+                                    : cat.label}
                                 </option>
                               ))}
                             </select>
@@ -2954,7 +2968,9 @@ export default function HomepageSectionsPage() {
                               <option value="">Todas las categorías</option>
                               {allCategoryOptions.map((cat) => (
                                 <option key={cat.id} value={cat.id}>
-                                  {cat.label}
+                                  {cat.subtitle
+                                    ? `${cat.label} (${cat.subtitle})`
+                                    : cat.label}
                                 </option>
                               ))}
                             </select>

@@ -1117,9 +1117,25 @@ export class HomepageSectionsService {
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true },
         take: limit,
-        orderBy: { sort_order: 'asc' },
+        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       });
-      return res.map((x) => ({ id: x.id, label: x.name, subtitle: x.slug }));
+
+      const seen = new Set<string>();
+      const deduped = res.filter((item) => {
+        const slug = String(item.slug || '')
+          .trim()
+          .toLowerCase();
+        if (!slug) return true;
+        if (seen.has(slug)) return false;
+        seen.add(slug);
+        return true;
+      });
+
+      return deduped.map((x) => ({
+        id: x.id,
+        label: x.name,
+        subtitle: x.slug,
+      }));
     }
 
     if (target === 'brands') {

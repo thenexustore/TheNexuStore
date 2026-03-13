@@ -3368,7 +3368,16 @@ export default function HomepageSectionsPage() {
                 {section.type === "TRUST_BAR" && (
                   <div className="rounded-lg border border-slate-200 p-3 space-y-2">
                     <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Items de confianza
+                      Items de confianza (
+                      {
+                        (
+                          (section.config_json.items || []) as Array<{
+                            icon?: string;
+                            text: string;
+                          }>
+                        ).length
+                      }
+                      /6)
                     </div>
                     {(
                       (section.config_json.items || []) as Array<{
@@ -3435,11 +3444,19 @@ export default function HomepageSectionsPage() {
                     <button
                       className="border rounded-lg px-3 py-2 text-sm"
                       onClick={() => {
+                        const current = (section.config_json.items ||
+                          []) as Array<{
+                          icon?: string;
+                          text: string;
+                        }>;
+                        if (current.length >= 6) {
+                          toast.error(
+                            "Máximo 6 items en la barra de confianza",
+                          );
+                          return;
+                        }
                         const arr = [
-                          ...((section.config_json.items || []) as Array<{
-                            icon?: string;
-                            text: string;
-                          }>),
+                          ...current,
                           { icon: "shield", text: "Nuevo item" },
                         ];
                         updateConfig(section, { items: arr });

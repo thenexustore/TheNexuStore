@@ -121,6 +121,10 @@ export class HomepageSectionsService {
           'TRUST_BAR items must include non-empty text',
         );
       }
+
+      if (config.items.length > 6) {
+        throw new BadRequestException('TRUST_BAR supports up to 6 items');
+      }
     }
   }
 
@@ -197,6 +201,25 @@ export class HomepageSectionsService {
 
     if (section.enabled && !String(section.title || '').trim()) {
       issues.push('La sección está visible pero no tiene título.');
+    }
+
+    if (section.type === HomepageSectionType.TRUST_BAR) {
+      const items = Array.isArray(config.items) ? config.items : [];
+      if (!items.length) {
+        issues.push('TRUST_BAR debe incluir al menos 1 item.');
+      }
+      if (items.length > 6) {
+        issues.push('TRUST_BAR admite un máximo de 6 items.');
+      }
+      const invalidItem = items.find(
+        (item) =>
+          !item ||
+          typeof item !== 'object' ||
+          !String((item as any).text || '').trim(),
+      );
+      if (invalidItem) {
+        issues.push('Todos los items de TRUST_BAR deben tener texto.');
+      }
     }
 
     const source = config.source || 'query';

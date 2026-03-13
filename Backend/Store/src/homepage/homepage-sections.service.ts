@@ -104,13 +104,23 @@ export class HomepageSectionsService {
       }
     }
 
-    if (
-      type === HomepageSectionType.TRUST_BAR &&
-      !Array.isArray(config.items)
-    ) {
-      throw new BadRequestException(
-        'TRUST_BAR config_json.items must be an array',
-      );
+    if (type === HomepageSectionType.TRUST_BAR) {
+      if (!Array.isArray(config.items)) {
+        throw new BadRequestException(
+          'TRUST_BAR config_json.items must be an array',
+        );
+      }
+
+      const hasInvalidItems = config.items.some((item: unknown) => {
+        if (!item || typeof item !== 'object') return true;
+        return !String((item as any).text || '').trim();
+      });
+
+      if (hasInvalidItems) {
+        throw new BadRequestException(
+          'TRUST_BAR items must include non-empty text',
+        );
+      }
     }
   }
 
@@ -119,6 +129,14 @@ export class HomepageSectionsService {
     config: Record<string, any>,
   ): Record<string, any> {
     const next = { ...config };
+
+    if (type === HomepageSectionType.TRUST_BAR) {
+      return {
+        ...next,
+        items: this.normalizeTrustBarItems(next.items),
+      };
+    }
+
     if ((next.source || 'query') !== 'query') return next;
 
     const query = { ...(next.query || {}) };
@@ -140,6 +158,20 @@ export class HomepageSectionsService {
     next.query = query;
     next.source = 'query';
     return next;
+  }
+
+  private normalizeTrustBarItems(items: unknown) {
+    const raw = Array.isArray(items) ? items : [];
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const icon = String((item as any).icon || 'shield').trim();
+        const text = String((item as any).text || '').trim();
+        if (!text) return null;
+        return { icon: icon || 'shield', text };
+      })
+      .filter((item): item is { icon: string; text: string } => Boolean(item))
+      .slice(0, 6);
   }
 
   private clampNumber(

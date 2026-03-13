@@ -126,9 +126,10 @@ const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
   BRANDS_STRIP: { source: "query", query: { type: "brands", limit: 12 } },
   TRUST_BAR: {
     items: [
-      { icon: "truck", text: "Envío rápido" },
-      { icon: "shield", text: "Pago seguro" },
-      { icon: "refresh-ccw", text: "Devoluciones fáciles" },
+      { icon: "truck", text: "Entrega 24/48h en miles de referencias" },
+      { icon: "shield", text: "Pagos 100% seguros y cifrados" },
+      { icon: "refresh-ccw", text: "Devoluciones simples y soporte postventa" },
+      { icon: "headset", text: "Atención experta antes y después de comprar" },
     ],
   },
 };

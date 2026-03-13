@@ -496,19 +496,28 @@ function TrustBar({
 function isEmptyRenderableSection(section: Section) {
   const list = Array.isArray(section.data) ? section.data : [];
   if (section.type === "TRUST_BAR") return list.length === 0;
+
+  // Product sections must still render when empty so the UI can show
+  // explicit empty-state messaging instead of silently disappearing.
   if (
     [
       "PRODUCT_CAROUSEL",
       "BEST_DEALS",
       "NEW_ARRIVALS",
       "FEATURED_PICKS",
-      "TOP_CATEGORIES_GRID",
-      "BRANDS_STRIP",
-      "HERO_BANNER_SLIDER",
     ].includes(section.type)
+  ) {
+    return false;
+  }
+
+  if (
+    ["TOP_CATEGORIES_GRID", "BRANDS_STRIP", "HERO_BANNER_SLIDER"].includes(
+      section.type,
+    )
   ) {
     return list.length === 0;
   }
+
   return false;
 }
 

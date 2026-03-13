@@ -384,6 +384,7 @@ export default function HomepageSectionsPage() {
       if (!section.enabled) continue;
       if (
         ![
+          "PRODUCT_CAROUSEL",
           "BEST_DEALS",
           "NEW_ARRIVALS",
           "FEATURED_PICKS",
@@ -649,6 +650,7 @@ export default function HomepageSectionsPage() {
         (section) =>
           section.enabled &&
           [
+            "PRODUCT_CAROUSEL",
             "BEST_DEALS",
             "NEW_ARRIVALS",
             "FEATURED_PICKS",

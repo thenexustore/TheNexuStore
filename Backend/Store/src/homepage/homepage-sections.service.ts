@@ -1116,7 +1116,7 @@ export class HomepageSectionsService {
       const res = await this.prisma.category.findMany({
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true },
-        take: limit,
+        take: Math.max(limit * 3, 30),
         orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       });
 
@@ -1131,7 +1131,7 @@ export class HomepageSectionsService {
         return true;
       });
 
-      return deduped.map((x) => ({
+      return deduped.slice(0, limit).map((x) => ({
         id: x.id,
         label: x.name,
         subtitle: x.slug,
@@ -1142,10 +1142,22 @@ export class HomepageSectionsService {
       const res = await this.prisma.brand.findMany({
         where: { is_active: true, name: { contains: q, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true, logo_url: true },
-        take: limit,
+        take: Math.max(limit * 3, 30),
         orderBy: { name: 'asc' },
       });
-      return res.map((x) => ({
+
+      const seen = new Set<string>();
+      const deduped = res.filter((item) => {
+        const slug = String(item.slug || '')
+          .trim()
+          .toLowerCase();
+        if (!slug) return true;
+        if (seen.has(slug)) return false;
+        seen.add(slug);
+        return true;
+      });
+
+      return deduped.slice(0, limit).map((x) => ({
         id: x.id,
         label: x.name,
         subtitle: x.slug,

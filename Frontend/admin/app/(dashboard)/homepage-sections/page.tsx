@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { toast } from "sonner";
+import { useLocale } from "next-intl";
 import {
   CategoryMenuTreeNode,
   HomepageOption,
@@ -315,6 +316,16 @@ export default function HomepageSectionsPage() {
   >("discount_desc");
   const [creatingType, setCreatingType] = useState<string | null>(null);
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
+  const locale = useLocale();
+
+  const buildStoreUrl = useCallback(
+    (sectionId?: string) => {
+      const params = new URLSearchParams({ forceDynamic: "1" });
+      if (sectionId) params.set("highlightSection", sectionId);
+      return `${SITE_URL}/${locale}/store?${params.toString()}`;
+    },
+    [locale],
+  );
 
   const sorted = useMemo(
     () => [...sections].sort((a, b) => a.position - b.position),
@@ -373,6 +384,7 @@ export default function HomepageSectionsPage() {
       if (!section.enabled) continue;
       if (
         ![
+          "PRODUCT_CAROUSEL",
           "BEST_DEALS",
           "NEW_ARRIVALS",
           "FEATURED_PICKS",
@@ -614,11 +626,7 @@ export default function HomepageSectionsPage() {
   const saveAndOpenStore = async (sectionId: string) => {
     const ok = await save(sectionId);
     if (!ok) return;
-    window.open(
-      `${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(sectionId)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    window.open(buildStoreUrl(sectionId), "_blank", "noopener,noreferrer");
   };
 
   const runSectionPreview = async (sectionId: string) => {
@@ -642,6 +650,7 @@ export default function HomepageSectionsPage() {
         (section) =>
           section.enabled &&
           [
+            "PRODUCT_CAROUSEL",
             "BEST_DEALS",
             "NEW_ARRIVALS",
             "FEATURED_PICKS",
@@ -1934,7 +1943,7 @@ export default function HomepageSectionsPage() {
         <div className="flex flex-wrap gap-2">
           <a
             className="px-3 py-2 rounded-lg border text-sm"
-            href={`${SITE_URL}/store?forceDynamic=1`}
+            href={buildStoreUrl()}
             target="_blank"
             rel="noreferrer"
           >
@@ -2505,7 +2514,7 @@ export default function HomepageSectionsPage() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <a
                   className="px-2 py-1 border rounded text-xs"
-                  href={`${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(section.id)}`}
+                  href={buildStoreUrl(section.id)}
                   target="_blank"
                   rel="noreferrer"
                 >

@@ -615,7 +615,7 @@ export default function HomepageSectionsPage() {
     const ok = await save(sectionId);
     if (!ok) return;
     window.open(
-      `${SITE_URL}/store?highlightSection=${encodeURIComponent(sectionId)}`,
+      `${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(sectionId)}`,
       "_blank",
       "noopener,noreferrer",
     );
@@ -1934,7 +1934,7 @@ export default function HomepageSectionsPage() {
         <div className="flex flex-wrap gap-2">
           <a
             className="px-3 py-2 rounded-lg border text-sm"
-            href={`${SITE_URL}/store`}
+            href={`${SITE_URL}/store?forceDynamic=1`}
             target="_blank"
             rel="noreferrer"
           >
@@ -2505,7 +2505,7 @@ export default function HomepageSectionsPage() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <a
                   className="px-2 py-1 border rounded text-xs"
-                  href={`${SITE_URL}/store?highlightSection=${encodeURIComponent(section.id)}`}
+                  href={`${SITE_URL}/store?forceDynamic=1&highlightSection=${encodeURIComponent(section.id)}`}
                   target="_blank"
                   rel="noreferrer"
                 >

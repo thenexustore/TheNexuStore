@@ -7,6 +7,7 @@ export enum HomepageSectionType {
   TOP_CATEGORIES_GRID = 'TOP_CATEGORIES_GRID',
   BRANDS_STRIP = 'BRANDS_STRIP',
   TRUST_BAR = 'TRUST_BAR',
+  NEWSLETTER = 'NEWSLETTER',
 }
 
 export const DEFAULT_HOMEPAGE_SECTIONS: Array<{
@@ -64,6 +65,19 @@ export const DEFAULT_HOMEPAGE_SECTIONS: Array<{
           text: 'Atención experta antes y después de comprar',
         },
       ],
+    },
+  },
+
+  {
+    type: HomepageSectionType.NEWSLETTER,
+    title: 'Suscríbete a nuestra newsletter',
+    position: 5,
+    config_json: {
+      title: 'Suscríbete a nuestra newsletter',
+      subtitle: 'Recibe ofertas, novedades y lanzamientos antes que nadie.',
+      placeholder: 'Tu email',
+      button_text: 'Suscribirme',
+      button_link: '/register',
     },
   },
 ];

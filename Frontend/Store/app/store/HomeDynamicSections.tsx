@@ -1,22 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import HomeProductSection from "./HomeProductSection";
+import GenericCarousel from "./components/GenericCarousel";
+import BrandCarousel from "./components/BrandCarousel";
+import TrustBarSection from "./components/TrustBar";
 import { API_URL } from "../lib/env";
 import { Product } from "../lib/products";
-import {
-  BadgeCheck,
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  Headset,
-  RefreshCcw,
-  ShieldCheck,
-  Truck,
-} from "lucide-react";
 
 type Section = {
   id: string;
@@ -26,100 +18,6 @@ type Section = {
   data: any;
   failed?: boolean;
 };
-
-const PRIORITY_BRANDS = [
-  "hp",
-  "lenovo",
-  "dell",
-  "asus",
-  "acer",
-  "apple",
-  "msi",
-  "samsung",
-  "lg",
-  "sony",
-  "philips",
-  "xiaomi",
-  "huawei",
-  "tp-link",
-  "aoc",
-  "epson",
-  "canon",
-  "brother",
-  "apc",
-  "amd",
-  "intel",
-  "gigabyte",
-  "zotac",
-  "nvidia",
-  "sandisk",
-  "kingston",
-];
-
-function resolveAssetUrl(value?: string) {
-  const raw = String(value || "").trim();
-  if (!raw) return "/No_Image_Available.png";
-  if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
-  if (raw.startsWith("//")) return `https:${raw}`;
-  if (raw.startsWith("/")) {
-    if (raw === "/No_Image_Available.png") return raw;
-    return `${API_URL}${raw}`;
-  }
-  if (/^https?:\/\//i.test(raw)) return raw.replace(/^http:\/\//i, "https://");
-  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return `https://${raw}`;
-  const normalized = raw.replace(/^\/+/, "");
-  return `${API_URL}/${normalized}`;
-}
-
-function brandInitials(name?: string) {
-  const words = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!words.length) return "BR";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
-}
-
-function initialsSvgDataUri(name?: string) {
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="48"><rect width="100%" height="100%" rx="8" fill="%23ffffff" stroke="%23e2e8f0"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" fill="%23475569">${brandInitials(name)}</text></svg>`)}`;
-}
-
-function isMissingLogoAsset(value?: string) {
-  const raw = String(value || "")
-    .trim()
-    .toLowerCase();
-  if (!raw) return true;
-  return [
-    "no_image_available",
-    "placeholder",
-    "default-logo",
-    "default_brand",
-    "no-logo",
-    "logo-missing",
-  ].some((token) => raw.includes(token));
-}
-
-function resolveBrandOverrideLogo(
-  brand: { id: string; name: string; slug?: string },
-  overrides?: Record<string, string>,
-) {
-  if (!overrides) return "";
-  const candidates = [
-    brand.id,
-    brand.slug || "",
-    String(brand.name || "").toLowerCase(),
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean);
-  for (const key of candidates) {
-    const exact = overrides[key];
-    if (String(exact || "").trim()) return String(exact).trim();
-    const lower = overrides[key.toLowerCase()];
-    if (String(lower || "").trim()) return String(lower).trim();
-  }
-  return "";
-}
 
 function BannerSection({ banners }: { banners: any[] }) {
   const [index, setIndex] = useState(0);
@@ -187,310 +85,66 @@ function BannerSection({ banners }: { banners: any[] }) {
   );
 }
 
-function BrandLogoCarousel({
-  title,
-  items,
-  logoOverrides,
-  carouselConfig,
+
+
+function NewsletterSection({
+  config,
+  payload,
 }: {
-  title: string;
-  items: Array<{
-    id: string;
-    name: string;
-    slug?: string;
-    logo_url?: string;
-    image?: string;
-  }>;
-  logoOverrides?: Record<string, string>;
-  carouselConfig?: {
-    enabled?: boolean;
-    autoplay?: boolean;
-    autoplayIntervalMs?: number;
-    itemsPerViewDesktop?: number;
-    itemsPerViewMobile?: number;
-  };
+  config: Record<string, any>;
+  payload: Record<string, any>;
 }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [itemsPerView, setItemsPerView] = useState(3);
-  const [isPageVisible, setIsPageVisible] = useState(true);
-  const [isInteracting, setIsInteracting] = useState(false);
-  const [isFocusWithin, setIsFocusWithin] = useState(false);
-
-  const carouselEnabled = Boolean(carouselConfig?.enabled ?? true);
-  const autoplay = Boolean(carouselConfig?.autoplay ?? false);
-  const autoplayIntervalMs = Math.max(
-    2000,
-    Number(carouselConfig?.autoplayIntervalMs || 5000),
+  const title = String(
+    payload?.title || config?.title || 'Suscríbete a nuestra newsletter',
   );
-  const mobileItems = Math.min(
-    4,
-    Math.max(1, Number(carouselConfig?.itemsPerViewMobile || 2)),
+  const subtitle = String(
+    payload?.subtitle ||
+      config?.subtitle ||
+      'Recibe ofertas, novedades y lanzamientos antes que nadie.',
   );
-  const desktopItems = Math.min(
-    10,
-    Math.max(2, Number(carouselConfig?.itemsPerViewDesktop || 8)),
-  );
-
-  const sorted = [...items].sort((a, b) => {
-    const ai = PRIORITY_BRANDS.indexOf(String(a.name || "").toLowerCase());
-    const bi = PRIORITY_BRANDS.indexOf(String(b.name || "").toLowerCase());
-    if (ai === -1 && bi === -1)
-      return String(a.name).localeCompare(String(b.name));
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
-
-  useEffect(() => {
-    if (!carouselEnabled) return;
-    const updateItemsPerView = () => {
-      const next = window.innerWidth >= 1024 ? desktopItems : mobileItems;
-      setItemsPerView(next);
-    };
-    updateItemsPerView();
-    window.addEventListener("resize", updateItemsPerView);
-    return () => window.removeEventListener("resize", updateItemsPerView);
-  }, [carouselEnabled, desktopItems, mobileItems]);
-
-  useEffect(() => {
-    const onVisibility = () => {
-      setIsPageVisible(document.visibilityState === "visible");
-    };
-    onVisibility();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
-
-  useEffect(() => {
-    if (!isInteracting) return;
-    const timer = window.setTimeout(() => setIsInteracting(false), 3500);
-    return () => window.clearTimeout(timer);
-  }, [isInteracting]);
-  const pageCount = useMemo(() => {
-    if (!carouselEnabled) return 1;
-    return Math.max(1, Math.ceil(sorted.length / Math.max(1, itemsPerView)));
-  }, [carouselEnabled, itemsPerView, sorted.length]);
-
-  const scrollToPage = useCallback(
-    (page: number) => {
-      if (!scrollRef.current) return;
-      const targetPage = ((page % pageCount) + pageCount) % pageCount;
-      const pageWidth = scrollRef.current.clientWidth;
-      scrollRef.current.scrollTo({
-        left: targetPage * pageWidth,
-        behavior: "smooth",
-      });
-      setCurrentPage(targetPage);
-    },
-    [pageCount],
-  );
-
-  useEffect(() => {
-    if (
-      !carouselEnabled ||
-      !autoplay ||
-      pageCount <= 1 ||
-      isHovering ||
-      isInteracting ||
-      isFocusWithin ||
-      !isPageVisible
-    )
-      return;
-    const timer = setInterval(() => {
-      scrollToPage(currentPage + 1);
-    }, autoplayIntervalMs);
-    return () => clearInterval(timer);
-  }, [
-    autoplay,
-    autoplayIntervalMs,
-    carouselEnabled,
-    currentPage,
-    isHovering,
-    isInteracting,
-    isFocusWithin,
-    isPageVisible,
-    pageCount,
-    scrollToPage,
-  ]);
-
-  useEffect(() => {
-    if (!carouselEnabled || !scrollRef.current) return;
-    const el = scrollRef.current;
-    const onScroll = () => {
-      const pageWidth = el.clientWidth;
-      if (!pageWidth) return;
-      const page = Math.round(el.scrollLeft / pageWidth);
-      if (page !== currentPage) setCurrentPage(page);
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [carouselEnabled, currentPage, scrollToPage]);
-
-  if (!sorted.length) return null;
+  const placeholder = String(payload?.placeholder || config?.placeholder || 'Tu email');
+  const buttonText = String(payload?.button_text || config?.button_text || 'Suscribirme');
+  const buttonLink = String(payload?.button_link || config?.button_link || '/register');
 
   return (
-    <section className="w-full px-4 sm:px-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-          {title}
-        </h2>
-        {carouselEnabled && pageCount > 1 ? (
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded-lg border bg-white p-2"
-              onClick={() => {
-                setIsInteracting(true);
-                scrollToPage(currentPage - 1);
-              }}
-              aria-label="Anterior marcas"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              className="rounded-lg border bg-white p-2"
-              onClick={() => {
-                setIsInteracting(true);
-                scrollToPage(currentPage + 1);
-              }}
-              aria-label="Siguiente marcas"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        ) : null}
-      </div>
-      <div
-        className="space-y-2"
-        onFocusCapture={() => setIsFocusWithin(true)}
-        onKeyDownCapture={(event) => {
-          if (
-            [
-              "Tab",
-              "ArrowLeft",
-              "ArrowRight",
-              "Enter",
-              " ",
-              "Spacebar",
-              "Home",
-              "End",
-            ].includes(event.key)
-          )
-            setIsInteracting(true);
-        }}
-        onBlurCapture={(event) => {
-          const nextTarget = event.relatedTarget as Node | null;
-          if (!event.currentTarget.contains(nextTarget))
-            setIsFocusWithin(false);
-        }}
-      >
-        <div
-          ref={carouselEnabled ? scrollRef : null}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
-          onTouchStart={() => setIsInteracting(true)}
-        >
-          {sorted.map((brand) => {
-            const overrideLogo = resolveBrandOverrideLogo(brand, logoOverrides);
-            const rawLogo = String(
-              overrideLogo || brand.logo_url || brand.image || "",
-            ).trim();
-            const logo = isMissingLogoAsset(rawLogo)
-              ? initialsSvgDataUri(brand.name)
-              : resolveAssetUrl(rawLogo);
-            return (
-              <Link
-                key={brand.id}
-                href={`/products?brand=${encodeURIComponent(brand.slug || "")}`}
-                className="group min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
-                title={brand.name}
-                style={
-                  carouselEnabled
-                    ? {
-                        flexBasis: `calc((100% - ${(itemsPerView - 1) * 12}px) / ${itemsPerView})`,
-                      }
-                    : undefined
-                }
-              >
-                <div className="flex h-16 items-center justify-center rounded-lg bg-slate-50">
-                  <img
-                    src={logo}
-                    alt={brand.name}
-                    className="max-h-10 max-w-[120px] object-contain"
-                    onError={(event) => {
-                      event.currentTarget.onerror = null;
-                      event.currentTarget.src = initialsSvgDataUri(brand.name);
-                    }}
-                  />
-                </div>
-                <div className="mt-2 line-clamp-1 text-center text-xs font-medium text-slate-600">
-                  {brand.name}
-                </div>
-              </Link>
-            );
-          })}
+    <section className="w-full px-4 sm:px-6 py-6">
+      <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-700 p-6 sm:p-8 text-white">
+        <h3 className="text-xl sm:text-2xl font-bold">{title}</h3>
+        <p className="mt-2 text-sm sm:text-base text-slate-200 max-w-2xl">{subtitle}</p>
+        <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input
+            type="email"
+            placeholder={placeholder}
+            className="w-full sm:max-w-sm rounded-full border border-white/30 bg-white/10 px-4 py-2 text-white placeholder:text-slate-300 outline-none"
+            readOnly
+            aria-label={placeholder}
+          />
+          <Link
+            href={buttonLink || '/register'}
+            className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900"
+          >
+            {buttonText}
+          </Link>
         </div>
-        {carouselEnabled && pageCount > 1 ? (
-          <div className="mt-3 flex items-center justify-center gap-2">
-            {Array.from({ length: pageCount }).map((_, idx) => (
-              <button
-                key={idx}
-                className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`}
-                onClick={() => {
-                  setIsInteracting(true);
-                  scrollToPage(idx);
-                }}
-                aria-label={`Ir a página ${idx + 1}`}
-              />
-            ))}
-          </div>
-        ) : null}
       </div>
     </section>
   );
 }
 
-function TrustBar({
-  items,
-}: {
-  items: Array<{ icon?: string; text: string }>;
-}) {
-  if (!items.length) return null;
+function extractSectionsFromPayload(payload: unknown): Section[] {
+  if (!payload || typeof payload !== "object") return [];
+  const root = payload as Record<string, unknown>;
 
-  const resolveIcon = (icon?: string) => {
-    const normalized = String(icon || "").toLowerCase();
-    if (normalized.includes("truck")) return Truck;
-    if (normalized.includes("shield")) return ShieldCheck;
-    if (normalized.includes("refresh")) return RefreshCcw;
-    if (normalized.includes("headset") || normalized.includes("support"))
-      return Headset;
-    if (normalized.includes("card") || normalized.includes("payment"))
-      return CreditCard;
-    if (normalized.includes("badge") || normalized.includes("quality"))
-      return BadgeCheck;
-    return ShieldCheck;
-  };
+  if (Array.isArray(root.data)) return root.data as Section[];
+  if (Array.isArray(root.sections)) return root.sections as Section[];
 
-  return (
-    <section className="w-full px-4 sm:px-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((item, i) => {
-          const Icon = resolveIcon(item.icon);
-          return (
-            <div
-              key={i}
-              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
-            >
-              <Icon className="h-4 w-4 shrink-0 text-slate-500" />
-              <span>{item.text}</span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
+  if (root.data && typeof root.data === "object") {
+    const nested = root.data as Record<string, unknown>;
+    if (Array.isArray(nested.sections)) return nested.sections as Section[];
+    if (Array.isArray(nested.data)) return nested.data as Section[];
+  }
+
+  return [];
 }
 
 function isEmptyRenderableSection(section: Section) {
@@ -556,23 +210,85 @@ export default function HomeDynamicSections({
   const highlightedSectionId = searchParams.get("highlightSection");
 
   useEffect(() => {
-    if (initialSections.length > 0) return;
+    const shouldForceRefresh = Boolean(highlightedSectionId);
+
+    if (initialSections.length > 0 && !shouldForceRefresh) {
+      setSections(initialSections);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
 
     const load = async () => {
       try {
         const res = await fetch(`${API_URL}/homepage/sections`, {
-          cache: "force-cache",
+          cache: highlightedSectionId ? "no-store" : "force-cache",
         });
-        const json = await res.json();
-        setSections((json.data || []) as Section[]);
+
+        const json = res.ok ? await res.json().catch(() => null) : null;
+        const primarySections = extractSectionsFromPayload(json);
+
+        if (primarySections.length) {
+          if (isMounted) setSections(primarySections);
+          return;
+        }
+
+        const fallbackRes = await fetch(`${API_URL}/api/carousels/config`, {
+          cache: "no-store",
+        });
+        const fallbackJson = fallbackRes.ok
+          ? await fallbackRes.json().catch(() => null)
+          : null;
+        const fallbackSections = extractSectionsFromPayload(fallbackJson).map(
+          (section) => ({
+            id: String(section.id || ""),
+            type: String(section.type || ""),
+            title: section.title,
+            config_json: ((section as Record<string, unknown>).config as Record<string, unknown>) || section.config_json || {},
+            data: section.data ?? [],
+          }),
+        );
+
+        if (isMounted) setSections(fallbackSections as Section[]);
       } catch {
-        setSections([]);
+        if (isMounted) setSections([]);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+
     load();
-  }, [initialSections]);
+
+    const refreshInterval = highlightedSectionId
+      ? window.setInterval(() => {
+          if (document.visibilityState !== "visible") return;
+          if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+          void load();
+        }, 5000)
+      : null;
+
+    const livePreviewStream = highlightedSectionId
+      ? new EventSource(`${API_URL}/homepage/sections/stream`)
+      : null;
+
+    if (livePreviewStream) {
+      livePreviewStream.onmessage = () => {
+        if (document.visibilityState !== "visible") return;
+        void load();
+      };
+
+      livePreviewStream.onerror = () => {
+        // Keep polling as resilience fallback if stream is interrupted.
+      };
+    }
+
+    return () => {
+      isMounted = false;
+      if (refreshInterval) window.clearInterval(refreshInterval);
+      if (livePreviewStream) livePreviewStream.close();
+    };
+  }, [highlightedSectionId, initialSections]);
 
   if (loading)
     return (
@@ -635,41 +351,69 @@ export default function HomeDynamicSections({
                 sectionId={section.id}
                 highlightedId={highlightedSectionId}
               >
-                <HomeProductSection
+                <GenericCarousel
+                  type="products"
+                  filterType={
+                    section.type === "NEW_ARRIVALS"
+                      ? "recent"
+                      : section.type === "FEATURED_PICKS"
+                        ? "featured"
+                        : sectionConfig?.query?.brandId
+                          ? "brand"
+                          : "category"
+                  }
                   title={section.title || section.type}
-                  products={(section.data || []) as Product[]}
-                  loading={false}
-                  emptyMessage={t("dynamic.emptyProducts")}
-                  carouselConfig={{
-                    enabled: Boolean(sectionConfig.carousel_enabled ?? true),
-                    autoplay: Boolean(sectionConfig.carousel_autoplay ?? true),
-                    autoplayIntervalMs: Number(
-                      sectionConfig.carousel_interval_ms || 5000,
+                  filterId={
+                    String(
+                      sectionConfig?.query?.brandId ||
+                        sectionConfig?.query?.categoryId ||
+                        "",
+                    ) || undefined
+                  }
+                  items={(section.data || []) as Product[]}
+                  autoplay={Boolean(sectionConfig.carousel_autoplay ?? true)}
+                  autoplayIntervalMs={Number(
+                    sectionConfig.carousel_interval_ms || 4500,
+                  )}
+                  itemsPerView={{
+                    mobile: Number(sectionConfig.carousel_items_mobile || 2),
+                    tablet: Math.max(
+                      Number(sectionConfig.carousel_items_mobile || 2),
+                      Number(sectionConfig.carousel_items_mobile || 2) + 1,
                     ),
-                    itemsPerViewDesktop: Number(
-                      sectionConfig.carousel_items_desktop || 4,
-                    ),
-                    itemsPerViewMobile: Number(
-                      sectionConfig.carousel_items_mobile || 2,
-                    ),
+                    desktop: Number(sectionConfig.carousel_items_desktop || 4),
                   }}
+                  maxItems={Number(
+                    sectionConfig.limit || sectionConfig?.query?.limit || 20,
+                  )}
                 />
               </SectionShell>
             );
           case "TOP_CATEGORIES_GRID":
-            return highlightedSectionId ? (
+            return (
               <SectionShell
                 key={section.id}
                 sectionId={section.id}
                 highlightedId={highlightedSectionId}
               >
-                <section className="w-full px-4 sm:px-6">
-                  <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">
-                    {t("dynamic.topCategories")} ({(section.data || []).length})
-                  </div>
-                </section>
+                <GenericCarousel
+                  type="categories"
+                  filterType="category"
+                  title={section.title || t("dynamic.topCategories")}
+                  filterId={String(sectionConfig?.query?.categoryId || "") || undefined}
+                  items={(section.data || []) as Array<{
+                    id: string;
+                    name: string;
+                    slug: string;
+                  }>}
+                  autoplay={false}
+                  itemsPerView={{ mobile: 2, tablet: 3, desktop: 6 }}
+                  maxItems={Number(
+                    sectionConfig.limit || sectionConfig?.query?.limit || 12,
+                  )}
+                />
               </SectionShell>
-            ) : null;
+            );
           case "BRANDS_STRIP":
             return (
               <SectionShell
@@ -677,34 +421,20 @@ export default function HomeDynamicSections({
                 sectionId={section.id}
                 highlightedId={highlightedSectionId}
               >
-                <BrandLogoCarousel
+                <BrandCarousel
                   title={section.title || t("dynamic.brands")}
+                  autoplay={Boolean(sectionConfig.carousel_autoplay ?? true)}
+                  autoplayIntervalMs={Number(
+                    sectionConfig.carousel_interval_ms || 4500,
+                  )}
                   items={(section.data || []).map((x: any) => ({
                     id: x.id,
                     name: x.name,
                     slug: x.slug,
                     logo_url: x.logo_url,
                     image: x.image,
+                    product_count: x.product_count,
                   }))}
-                  logoOverrides={
-                    (sectionConfig.logo_overrides || {}) as Record<
-                      string,
-                      string
-                    >
-                  }
-                  carouselConfig={{
-                    enabled: Boolean(sectionConfig.carousel_enabled ?? true),
-                    autoplay: Boolean(sectionConfig.carousel_autoplay ?? true),
-                    autoplayIntervalMs: Number(
-                      sectionConfig.carousel_interval_ms || 5000,
-                    ),
-                    itemsPerViewDesktop: Number(
-                      sectionConfig.carousel_items_desktop || 8,
-                    ),
-                    itemsPerViewMobile: Number(
-                      sectionConfig.carousel_items_mobile || 2,
-                    ),
-                  }}
                 />
               </SectionShell>
             );
@@ -715,7 +445,24 @@ export default function HomeDynamicSections({
                 sectionId={section.id}
                 highlightedId={highlightedSectionId}
               >
-                <TrustBar items={section.data || []} />
+                <TrustBarSection items={section.data || []} />
+              </SectionShell>
+            );
+          case "NEWSLETTER":
+            return (
+              <SectionShell
+                key={section.id}
+                sectionId={section.id}
+                highlightedId={highlightedSectionId}
+              >
+                <NewsletterSection
+                  config={sectionConfig}
+                  payload={
+                    section.data && typeof section.data === "object"
+                      ? (section.data as Record<string, any>)
+                      : {}
+                  }
+                />
               </SectionShell>
             );
           default:

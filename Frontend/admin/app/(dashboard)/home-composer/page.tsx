@@ -531,7 +531,7 @@ export default function HomeComposerPage() {
     : `${SITE_URL}/${locale}/store`;
 
   if (loading) {
-    return <div className="p-6 text-sm text-zinc-600">Cargando Home Composer...</div>;
+    return <div className="p-6 text-sm text-zinc-600">Cargando Compositor de Inicio...</div>;
   }
 
   const config = parsedDraftConfig || {};
@@ -541,7 +541,7 @@ export default function HomeComposerPage() {
       <div className="rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900">Home Composer</h1>
+            <h1 className="text-2xl font-semibold text-zinc-900">Compositor de Inicio</h1>
             <p className="text-sm text-zinc-500">
               Gestiona layouts de home, secciones y publicación por idioma.
             </p>
@@ -582,7 +582,7 @@ export default function HomeComposerPage() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <label className="text-sm">
-            <span className="mb-1 block text-zinc-500">Layout</span>
+            <span className="mb-1 block text-zinc-500">Diseño</span>
             <select
               value={activeLayoutId}
               onChange={(event) => setActiveLayoutId(event.target.value)}
@@ -696,7 +696,7 @@ export default function HomeComposerPage() {
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Variant (opcional)</span>
+                <span className="mb-1 block text-zinc-500">Variante (opcional)</span>
                 <input
                   value={draft.variant}
                   onChange={(event) => setDraft({ ...draft, variant: event.target.value })}
@@ -720,10 +720,10 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "PRODUCT_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
-                  <div className="mb-3 text-sm font-medium">Controles rápidos: Product Carousel</div>
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de productos</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Source</span>
+                      <span className="mb-1 block text-zinc-500">Fuente</span>
                       <select
                         value={String(config.source || "NEW_ARRIVALS")}
                         onChange={(event) =>
@@ -743,7 +743,7 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Limit</span>
+                      <span className="mb-1 block text-zinc-500">Límite</span>
                       <input
                         type="number"
                         value={asNumber(config.limit, 12)}
@@ -758,7 +758,7 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Category ID</span>
+                      <span className="mb-1 block text-zinc-500">ID de categoría</span>
                       <input
                         value={String(config.categoryId || "")}
                         onChange={(event) =>
@@ -772,7 +772,7 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Brand ID</span>
+                      <span className="mb-1 block text-zinc-500">ID de marca</span>
                       <input
                         value={String(config.brandId || "")}
                         onChange={(event) =>
@@ -786,7 +786,7 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Items desktop</span>
+                      <span className="mb-1 block text-zinc-500">Ítems en desktop</span>
                       <input
                         type="number"
                         value={asNumber(config.items_desktop, 4)}
@@ -801,7 +801,7 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Items mobile</span>
+                      <span className="mb-1 block text-zinc-500">Ítems en móvil</span>
                       <input
                         type="number"
                         value={asNumber(config.items_mobile, 2)}
@@ -820,10 +820,10 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "BRAND_STRIP" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
-                  <div className="mb-3 text-sm font-medium">Controles rápidos: Brand Strip</div>
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de marcas</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Mode</span>
+                      <span className="mb-1 block text-zinc-500">Modo</span>
                       <select
                         value={String(config.mode || "auto")}
                         onChange={(event) =>
@@ -839,7 +839,7 @@ export default function HomeComposerPage() {
                       </select>
                     </label>
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Limit</span>
+                      <span className="mb-1 block text-zinc-500">Límite</span>
                       <input
                         type="number"
                         value={asNumber(config.limit, 12)}
@@ -858,10 +858,10 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "CATEGORY_STRIP" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
-                  <div className="mb-3 text-sm font-medium">Controles rápidos: Category Strip</div>
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de categorías</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Mode</span>
+                      <span className="mb-1 block text-zinc-500">Modo</span>
                       <select
                         value={String(config.mode || "auto")}
                         onChange={(event) =>
@@ -877,7 +877,7 @@ export default function HomeComposerPage() {
                       </select>
                     </label>
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Limit</span>
+                      <span className="mb-1 block text-zinc-500">Límite</span>
                       <input
                         type="number"
                         value={asNumber(config.limit, 10)}

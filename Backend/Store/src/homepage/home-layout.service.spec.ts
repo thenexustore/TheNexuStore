@@ -186,4 +186,41 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(productsService.getDealsProducts).toHaveBeenCalled();
     expect(prisma.featuredProduct.findMany).toHaveBeenCalled();
   });
+
+  it('uses query.categoryId source config for CATEGORY product sections', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-sec',
+            type: 'PRODUCT_CAROUSEL',
+            title: 'Category picks',
+            subtitle: null,
+            variant: null,
+            config: { source: 'CATEGORY', query: { categoryId: 'cat-123' }, limit: 8 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      featuredProduct: { findMany: jest.fn().mockResolvedValue([]) },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [{ id: 'p1' }] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-category',
+      locale: 'es',
+      name: 'Category layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    expect((payload.sections[0] as any).resolved).toHaveLength(1);
+    expect(productsService.getProducts).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'cat-123', limit: 8 }),
+    );
+  });
 });

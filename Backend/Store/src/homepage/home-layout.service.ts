@@ -71,6 +71,32 @@ export class HomeLayoutService {
     return next;
   }
 
+
+
+  private toProductCard(p: any) {
+    const sku = p.skus?.[0];
+    const price = sku?.prices?.[0];
+    const compare = price?.compare_at_price
+      ? Number(price.compare_at_price)
+      : undefined;
+    const sale = Number(price?.sale_price || 0);
+
+    return {
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      brand_name: p.brand?.name || '',
+      price: sale,
+      compare_at_price: compare,
+      discount_percentage:
+        compare && compare > sale
+          ? Math.round(((compare - sale) / compare) * 100)
+          : 0,
+      stock_quantity: sku?.inventory?.[0]?.qty_on_hand || 0,
+      thumbnail: p.media?.[0]?.url || '/No_Image_Available.png',
+    };
+  }
+
   private async getActiveLayout(locale?: string) {
     const layout = await this.prisma.homePageLayout.findFirst({
       where: { is_active: true, locale: locale || null },
@@ -371,6 +397,9 @@ export class HomeLayoutService {
     const source = config.source || 'NEW_ARRIVALS';
     const limit = this.clampLimit(config.limit, 12);
     const inStockOnly = config.inStockOnly ?? true;
+    const categoryId = String(config.categoryId || config.query?.categoryId || '').trim();
+    const brandId = String(config.brandId || config.query?.brandId || '').trim();
+    const sortBy = (config.sortBy || config.query?.sortBy || 'newest') as any;
 
     const toCard = (p: any) => {
       const sku = p.skus?.[0];
@@ -414,7 +443,7 @@ export class HomeLayoutService {
       const order = new Map(ids.map((id, idx) => [id, idx]));
       return products
         .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
-        .map(toCard);
+        .map((product) => this.toProductCard(product));
     }
 
     if (source === 'FEATURED') {
@@ -437,7 +466,7 @@ export class HomeLayoutService {
         take: limit,
       });
 
-      return featured
+      const featuredCards = featured
         .map((entry) => entry.product)
         .filter((p) => p?.status === 'ACTIVE')
         .filter((p) =>
@@ -445,27 +474,29 @@ export class HomeLayoutService {
             ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0
             : true,
         )
-        .map(toCard);
+        .map((product) => this.toProductCard(product));
+
+      if (featuredCards.length) return featuredCards;
     }
 
-    if (source === 'CATEGORY' && config.categoryId) {
+    if (source === 'CATEGORY' && categoryId) {
       const result = await this.productsService.getProducts({
         page: 1,
         limit,
-        category: String(config.categoryId),
+        category: categoryId,
         in_stock_only: inStockOnly,
-        sort_by: config.sortBy || 'newest',
+        sort_by: sortBy,
       });
       return result.products;
     }
 
-    if (source === 'BRAND' && config.brandId) {
+    if (source === 'BRAND' && brandId) {
       const result = await this.productsService.getProducts({
         page: 1,
         limit,
-        brand: String(config.brandId),
+        brand: brandId,
         in_stock_only: inStockOnly,
-        sort_by: config.sortBy || 'newest',
+        sort_by: sortBy,
       });
       return result.products;
     }
@@ -499,7 +530,7 @@ export class HomeLayoutService {
         .map((entry) => entry.product)
         .filter((p) => p?.status === 'ACTIVE')
         .filter((p) => (inStockOnly ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0 : true))
-        .map(toCard);
+        .map((product) => this.toProductCard(product));
       if (featuredCards.length) return featuredCards;
     }
 
@@ -507,7 +538,7 @@ export class HomeLayoutService {
       page: 1,
       limit,
       in_stock_only: inStockOnly,
-      sort_by: 'newest' as any,
+      sort_by: sortBy,
     });
     return result.products;
   }

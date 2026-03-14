@@ -20,6 +20,11 @@ const fallbackData = {
   ],
 };
 
+type HomeResolvedSection = {
+  type?: string;
+  resolved?: unknown;
+};
+
 async function getHome({
   previewLayoutId,
   locale,
@@ -86,7 +91,36 @@ export default async function StorePage({
     Boolean(data?.layout) &&
     Array.isArray(data?.sections) &&
     data.sections.length > 0;
-  const shouldRenderDynamic = forceDynamic || !(useLayout && hasLayoutSections);
+
+  const hasEmptyHeroInLayout =
+    hasLayoutSections &&
+    data.sections.some(
+      (section: HomeResolvedSection) =>
+        section?.type === "HERO_CAROUSEL" &&
+        Array.isArray(section?.resolved) &&
+        section.resolved.length === 0,
+    );
+
+  const allProductSectionsEmpty =
+    hasLayoutSections &&
+    (() => {
+      const productSections = data.sections.filter(
+        (section: HomeResolvedSection) => section?.type === "PRODUCT_CAROUSEL",
+      );
+      if (!productSections.length) return false;
+      return productSections.every(
+        (section: HomeResolvedSection) =>
+          Array.isArray(section?.resolved) && section.resolved.length === 0,
+      );
+    })();
+
+  // During migration, fallback to legacy dynamic source when layout payload
+  // is structurally present but key sections are empty.
+  const shouldRenderDynamic =
+    forceDynamic ||
+    !(useLayout && hasLayoutSections) ||
+    hasEmptyHeroInLayout ||
+    allProductSectionsEmpty;
 
   const initialDynamicSections = shouldRenderDynamic
     ? await getDynamicSections(Boolean(sp.highlightSection) || forceDynamic)

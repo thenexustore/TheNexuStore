@@ -96,7 +96,7 @@ export default function CuratedItemsPanel({
       <div className="rounded-lg border border-zinc-200 p-2">
         <div className="mb-2 text-xs font-medium text-zinc-500">Orden actual</div>
         {itemsLoading ? (
-          <div className="text-xs text-zinc-500">Cargando items...</div>
+          <div className="text-xs text-zinc-500">Cargando ítems...</div>
         ) : items.length ? (
           <div className="space-y-1">
             {items.map((item, index) => (
@@ -137,13 +137,13 @@ export default function CuratedItemsPanel({
             ))}
           </div>
         ) : (
-          <div className="text-xs text-zinc-500">No hay items curados todavía.</div>
+          <div className="text-xs text-zinc-500">No hay ítems curados todavía.</div>
         )}
       </div>
 
       {!itemsLoading && items.length === 0 ? (
         <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-          Este bloque está en modo curated pero no tiene contenido; añade elementos antes de publicar.
+          Este bloque está en modo curado pero no tiene contenido; añade elementos antes de publicar.
         </div>
       ) : null}
     </div>

@@ -40,7 +40,7 @@ export default function CuratedItemsPanel({
   onDelete,
 }: Props) {
   return (
-    <div className="rounded-xl border border-zinc-200 p-3">
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3">
       <div className="mb-1 text-sm font-medium">Selección manual ({TARGET_LABEL[currentTarget]})</div>
       <p className="mb-3 text-xs text-zinc-500">
         Añade elementos y ordénalos. El orden aquí será el orden de visualización en tienda.
@@ -62,9 +62,9 @@ export default function CuratedItemsPanel({
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={`Buscar ${TARGET_LABEL[currentTarget]}...`}
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm"
         />
-        <div className="max-h-40 space-y-1 overflow-auto rounded-lg border border-zinc-200 p-2">
+        <div className="max-h-44 space-y-1 overflow-auto rounded-lg border border-zinc-200 bg-white p-2">
           {optionsLoading ? (
             <div className="text-xs text-zinc-500">Buscando...</div>
           ) : searchOptions.length ? (
@@ -93,7 +93,7 @@ export default function CuratedItemsPanel({
         </div>
       </div>
 
-      <div className="rounded-lg border border-zinc-200 p-2">
+      <div className="rounded-lg border border-zinc-200 bg-white p-2">
         <div className="mb-2 text-xs font-medium text-zinc-500">Orden actual</div>
         {itemsLoading ? (
           <div className="text-xs text-zinc-500">Cargando ítems...</div>
@@ -111,7 +111,7 @@ export default function CuratedItemsPanel({
                   <button
                     disabled={saving || index === 0}
                     onClick={() => onMove(item, -1)}
-                    className="rounded border border-zinc-300 px-1 disabled:opacity-50"
+                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
                     title="Subir"
                   >
                     ↑
@@ -119,7 +119,7 @@ export default function CuratedItemsPanel({
                   <button
                     disabled={saving || index === items.length - 1}
                     onClick={() => onMove(item, 1)}
-                    className="rounded border border-zinc-300 px-1 disabled:opacity-50"
+                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
                     title="Bajar"
                   >
                     ↓
@@ -127,7 +127,7 @@ export default function CuratedItemsPanel({
                   <button
                     disabled={saving}
                     onClick={() => onDelete(item.id)}
-                    className="rounded border border-rose-300 px-1 text-rose-700 disabled:opacity-50"
+                    className="rounded border border-rose-300 bg-rose-50 px-1 text-rose-700 disabled:opacity-50"
                     title="Eliminar"
                   >
                     x

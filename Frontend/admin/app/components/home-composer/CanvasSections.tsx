@@ -23,7 +23,7 @@ export default function CanvasSections({
 }: Props) {
   if (!sections.length) {
     return (
-      <div className="mt-4 rounded-xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500">
+      <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-500">
         Este diseño aún no tiene secciones. Empieza añadiendo un bloque arriba.
       </div>
     );
@@ -39,10 +39,10 @@ export default function CanvasSections({
           <button
             key={section.id}
             onClick={() => onSelect(section.id)}
-            className={`w-full rounded-xl border p-4 text-left transition ${
+            className={`w-full rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-zinc-300 ${
               selectedSectionId === section.id
-                ? "border-black bg-zinc-50 shadow-sm"
-                : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/40"
+                ? "border-black bg-zinc-50 shadow"
+                : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/70"
             }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -63,7 +63,7 @@ export default function CanvasSections({
                   ) : null}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 md:justify-end">
                 <span
                   className={`rounded-full px-2 py-1 text-xs ${
                     section.is_enabled
@@ -79,7 +79,7 @@ export default function CanvasSections({
                     onMove(section, -1);
                   }}
                   disabled={saving || section.position === 1}
-                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50"
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-50"
                   title="Mover arriba"
                 >
                   ↑
@@ -90,7 +90,7 @@ export default function CanvasSections({
                     onMove(section, 1);
                   }}
                   disabled={saving || section.position === sections.length}
-                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50"
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-50"
                   title="Mover abajo"
                 >
                   ↓
@@ -101,7 +101,7 @@ export default function CanvasSections({
                     onToggle(section);
                   }}
                   disabled={saving}
-                  className="rounded-lg border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50"
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-50"
                 >
                   {section.is_enabled ? "Ocultar" : "Mostrar"}
                 </button>
@@ -111,7 +111,7 @@ export default function CanvasSections({
                     onDelete(section.id);
                   }}
                   disabled={saving}
-                  className="rounded-lg border border-rose-300 px-2 py-1 text-xs text-rose-700 disabled:opacity-50"
+                  className="rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 disabled:opacity-50"
                 >
                   Eliminar
                 </button>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
+import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
 import CanvasSections from "@/app/components/home-composer/CanvasSections";
 import CuratedItemsPanel from "@/app/components/home-composer/CuratedItemsPanel";
 import { HomeOption, HomeSection, HomeSectionItem, HomeSectionType } from "@/app/components/home-composer/types";
@@ -531,33 +532,33 @@ export default function HomeComposerPage() {
     : `${SITE_URL}/${locale}/store`;
 
   if (loading) {
-    return <div className="p-6 text-sm text-zinc-600">Cargando Compositor de Inicio...</div>;
+    return <div className="p-6 text-sm text-zinc-600">Cargando Compositor de Inicio…</div>;
   }
 
   const config = parsedDraftConfig || {};
 
   return (
     <div className="space-y-6 p-6">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+      <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900">Compositor de Inicio</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900"><Sparkles className="h-5 w-5 text-indigo-500" />Compositor de Inicio</h1>
             <p className="text-sm text-zinc-500">
-              Gestiona diseños de inicio, secciones y publicación por idioma.
+              Gestiona diseños de inicio, secciones y publicación por idioma desde un flujo más visual.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={createLayout}
               disabled={saving}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
             >
               + Nuevo diseño
             </button>
             <button
               onClick={publishLayout}
               disabled={saving || !activeLayout}
-              className="rounded-lg bg-black px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60"
+              className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
             >
               Publicar diseño
             </button>
@@ -565,7 +566,7 @@ export default function HomeComposerPage() {
               href={previewLink}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50"
             >
               Abrir vista previa
             </a>
@@ -573,7 +574,7 @@ export default function HomeComposerPage() {
               href={`${API_URL}/admin/home/preview?layoutId=${activeLayoutId}`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50"
             >
               Ver JSON de vista previa
             </a>
@@ -597,23 +598,29 @@ export default function HomeComposerPage() {
               ))}
             </select>
           </label>
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
+          <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm">
             <div className="text-zinc-500">Estado</div>
             <div className="font-medium text-zinc-900">
               {activeLayout?.is_active ? "Publicado" : "Borrador"}
             </div>
           </div>
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
+          <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm">
             <div className="text-zinc-500">Secciones</div>
             <div className="font-medium text-zinc-900">{sections.length}</div>
           </div>
         </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><LayoutTemplate className="h-3.5 w-3.5" /> Diseña por bloques</span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Eye className="h-3.5 w-3.5" /> Previsualiza antes de publicar</span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Wand2 className="h-3.5 w-3.5" /> Ajustes rápidos en inspector</span>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Añadir bloque</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Selecciona el tipo de bloque, ponle un título y añádelo al canvas. Luego podrás configurarlo en el inspector.
+          Selecciona el tipo de bloque, ponle un título y añádelo al lienzo. Después podrás ajustarlo desde el inspector.
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <select
@@ -636,7 +643,7 @@ export default function HomeComposerPage() {
           <button
             onClick={addSection}
             disabled={saving || !activeLayoutId}
-            className="rounded-lg bg-black px-4 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60"
+            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
           >
             Añadir
           </button>
@@ -644,8 +651,9 @@ export default function HomeComposerPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Lienzo de secciones</h2>
+          <p className="mt-1 text-xs text-zinc-500">Reordena, oculta o elimina bloques con un clic.</p>
 
           <CanvasSections
             sections={sections}
@@ -659,12 +667,13 @@ export default function HomeComposerPage() {
           />
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Inspector del bloque</h2>
+          <p className="mt-1 text-xs text-zinc-500">Edita contenido, comportamiento y configuración avanzada.</p>
 
           {!selectedSection || !draft ? (
-            <div className="mt-4 rounded-xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500">
-              Selecciona un bloque en el canvas para editarlo.
+            <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-500">
+              Selecciona un bloque en el lienzo para empezar a editarlo.
             </div>
           ) : (
             <div className="mt-4 space-y-4">

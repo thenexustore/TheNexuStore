@@ -199,6 +199,84 @@ const PRESET_BUTTONS: Array<{
   },
 ];
 
+const RECOMMENDED_FLOW: Array<{
+  type: SectionType;
+  title: string;
+  configFactory?: (ctx: { electronicsCategoryId?: string }) => Record<string, unknown>;
+}> = [
+  { type: "HERO_BANNER_SLIDER", title: "Banner principal" },
+  {
+    type: "PRODUCT_CAROUSEL",
+    title: "Productos destacados",
+    configFactory: () => ({
+      source: "query",
+      query: {
+        type: "products",
+        featuredOnly: true,
+        inStockOnly: true,
+        sortBy: "newest",
+        limit: 12,
+      },
+      carousel_enabled: true,
+      carousel_autoplay: true,
+      carousel_interval_ms: 4500,
+      carousel_items_desktop: 4,
+      carousel_items_mobile: 2,
+    }),
+  },
+  {
+    type: "PRODUCT_CAROUSEL",
+    title: "Electrónica",
+    configFactory: ({ electronicsCategoryId }) => ({
+      source: "query",
+      query: {
+        type: "products",
+        ...(electronicsCategoryId ? { categoryId: electronicsCategoryId } : {}),
+        inStockOnly: true,
+        sortBy: "newest",
+        limit: 12,
+      },
+      carousel_enabled: true,
+      carousel_autoplay: true,
+      carousel_interval_ms: 4500,
+      carousel_items_desktop: 4,
+      carousel_items_mobile: 2,
+    }),
+  },
+  {
+    type: "BRANDS_STRIP",
+    title: "Top Brands",
+    configFactory: () => ({ source: "query", query: { type: "brands", limit: 12 } }),
+  },
+  {
+    type: "NEW_ARRIVALS",
+    title: "Productos recientes",
+    configFactory: () => ({
+      source: "query",
+      query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 },
+      carousel_enabled: true,
+      carousel_autoplay: true,
+      carousel_interval_ms: 4500,
+      carousel_items_desktop: 4,
+      carousel_items_mobile: 2,
+    }),
+  },
+  {
+    type: "BRANDS_STRIP",
+    title: "Marcas populares",
+    configFactory: () => ({ source: "query", query: { type: "brands", limit: 12 } }),
+  },
+  {
+    type: "TRUST_BAR",
+    title: "Por qué comprar con nosotros",
+  },
+  {
+    type: "NEWSLETTER",
+    title: "Newsletter",
+  },
+];
+
+
 function normalizeText(value?: string) {
   return (value || "")
     .toLowerCase()
@@ -453,82 +531,6 @@ export default function HomepageSectionsPage() {
       }
 };
 
-const RECOMMENDED_FLOW: Array<{
-  type: SectionType;
-  title: string;
-  configFactory?: (ctx: { electronicsCategoryId?: string }) => Record<string, unknown>;
-}> = [
-  { type: "HERO_BANNER_SLIDER", title: "Banner principal" },
-  {
-    type: "PRODUCT_CAROUSEL",
-    title: "Productos destacados",
-    configFactory: () => ({
-      source: "query",
-      query: {
-        type: "products",
-        featuredOnly: true,
-        inStockOnly: true,
-        sortBy: "newest",
-        limit: 12,
-      },
-      carousel_enabled: true,
-      carousel_autoplay: true,
-      carousel_interval_ms: 4500,
-      carousel_items_desktop: 4,
-      carousel_items_mobile: 2,
-    }),
-  },
-  {
-    type: "PRODUCT_CAROUSEL",
-    title: "Electrónica",
-    configFactory: ({ electronicsCategoryId }) => ({
-      source: "query",
-      query: {
-        type: "products",
-        ...(electronicsCategoryId ? { categoryId: electronicsCategoryId } : {}),
-        inStockOnly: true,
-        sortBy: "newest",
-        limit: 12,
-      },
-      carousel_enabled: true,
-      carousel_autoplay: true,
-      carousel_interval_ms: 4500,
-      carousel_items_desktop: 4,
-      carousel_items_mobile: 2,
-    }),
-  },
-  {
-    type: "BRANDS_STRIP",
-    title: "Top Brands",
-    configFactory: () => ({ source: "query", query: { type: "brands", limit: 12 } }),
-  },
-  {
-    type: "NEW_ARRIVALS",
-    title: "Productos recientes",
-    configFactory: () => ({
-      source: "query",
-      query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 },
-      carousel_enabled: true,
-      carousel_autoplay: true,
-      carousel_interval_ms: 4500,
-      carousel_items_desktop: 4,
-      carousel_items_mobile: 2,
-    }),
-  },
-  {
-    type: "BRANDS_STRIP",
-    title: "Marcas populares",
-    configFactory: () => ({ source: "query", query: { type: "brands", limit: 12 } }),
-  },
-  {
-    type: "TRUST_BAR",
-    title: "Por qué comprar con nosotros",
-  },
-  {
-    type: "NEWSLETTER",
-    title: "Newsletter",
-  },
-];
 
     for (const item of queryCatalogs.categories) {
       push(item.id, item.label, item.subtitle);

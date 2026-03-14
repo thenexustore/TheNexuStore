@@ -109,50 +109,86 @@ function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; i
     [items],
   );
   const [index, setIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
 
   useEffect(() => {
-    if (slides.length <= 1) return;
+    if (slides.length <= 1 || isPaused) return;
     const id = setInterval(() => setIndex((prev) => (prev + 1) % slides.length), 5000);
     return () => clearInterval(id);
-  }, [slides.length]);
+  }, [slides.length, isPaused]);
 
   if (!slides.length) return null;
 
-  const active = slides[index] || slides[0] || {};
+  const activeIndex = slides.length ? index % slides.length : 0;
+  const goPrev = () => setIndex((prev) => (prev - 1 + slides.length) % slides.length);
+  const goNext = () => setIndex((prev) => (prev + 1) % slides.length);
 
   return (
     <SectionShell title={title} subtitle={subtitle}>
-      <div className="relative h-52 overflow-hidden rounded-2xl bg-slate-200 shadow-sm sm:h-[380px]">
-        <SmartImage
-          src={asSrc(active.image)}
-          alt={asText(active.title_text, 'Hero')}
-          className="object-cover"
-          priority
-          sizes="(max-width: 640px) 100vw, 1200px"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
-        <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
-          {active.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(active.label)}</span> : null}
-          <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(active.title_text, 'Top tech deals')}</h3>
-          {active.subtitle_text ? <p className="text-sm text-slate-100 sm:text-base">{asText(active.subtitle_text)}</p> : null}
-          {active.button_text ? (
-            <Link href={asText(active.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-              {asText(active.button_text)}
-            </Link>
-          ) : null}
+      <div
+        className="relative h-52 overflow-hidden rounded-2xl bg-slate-200 shadow-sm sm:h-[380px]"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        <div
+          className="flex h-full transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(-${activeIndex * 100}%)` }}
+        >
+          {slides.map((slide, i) => (
+            <div key={asText(slide.id, `hero-${i}`)} className="relative h-full min-w-full">
+              <SmartImage
+                src={asSrc(slide.image)}
+                alt={asText(slide.title_text, 'Hero')}
+                className="object-cover"
+                priority={i === 0}
+                sizes="(max-width: 640px) 100vw, 1200px"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
+              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
+                {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
+                <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
+                {slide.subtitle_text ? <p className="text-sm text-slate-100 sm:text-base">{asText(slide.subtitle_text)}</p> : null}
+                {slide.button_text ? (
+                  <Link href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                    {asText(slide.button_text)}
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ))}
         </div>
 
         {slides.length > 1 ? (
-          <div className="absolute bottom-4 right-4 flex items-center gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                aria-label={`slide-${i + 1}`}
-                onClick={() => setIndex(i)}
-                className={`h-2.5 rounded-full transition-all ${index === i ? 'w-6 bg-white' : 'w-2.5 bg-white/60'}`}
-              />
-            ))}
-          </div>
+          <>
+            <button
+              type="button"
+              aria-label="Banner anterior"
+              onClick={goPrev}
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-2 text-lg text-slate-700 shadow transition hover:bg-white"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              aria-label="Banner siguiente"
+              onClick={goNext}
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-2 text-lg text-slate-700 shadow transition hover:bg-white"
+            >
+              ›
+            </button>
+
+            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  aria-label={`slide-${i + 1}`}
+                  onClick={() => setIndex(i)}
+                  className={`h-2.5 rounded-full transition-all ${activeIndex === i ? 'w-6 bg-white' : 'w-2.5 bg-white/60'}`}
+                />
+              ))}
+            </div>
+          </>
         ) : null}
       </div>
     </SectionShell>

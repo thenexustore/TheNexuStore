@@ -14,6 +14,17 @@ import { ProductSortBy } from '../user/products/dto/get-products.dto';
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const HOMEPAGE_DYNAMIC_SECTION_TYPES = new Set([
+  'PRODUCT_CAROUSEL',
+  'BEST_DEALS',
+  'NEW_ARRIVALS',
+  'FEATURED_PICKS',
+  'TOP_CATEGORIES_GRID',
+  'BRANDS_STRIP',
+  'TRUST_BAR',
+  'NEWSLETTER',
+]);
+
 @Controller('api')
 export class CarouselsController {
   constructor(
@@ -27,29 +38,26 @@ export class CarouselsController {
     const sections = await this.homepageSectionsService.getPublicSections();
 
     const normalized = sections
-      .filter((section) =>
-        [
-          'PRODUCT_CAROUSEL',
-          'BEST_DEALS',
-          'NEW_ARRIVALS',
-          'FEATURED_PICKS',
-          'TOP_CATEGORIES_GRID',
-          'BRANDS_STRIP',
-          'TRUST_BAR',
-          'NEWSLETTER',
-        ].includes(section.type),
-      )
+      .filter((section) => HOMEPAGE_DYNAMIC_SECTION_TYPES.has(section.type))
       .map((section) => ({
         id: section.id,
         type: section.type,
         title: section.title,
         config: section.config_json || {},
         enabled: section.enabled,
-        previewCount: Array.isArray(section.data) ? section.data.length : section.data ? 1 : 0,
+        previewCount: Array.isArray(section.data)
+          ? section.data.length
+          : section.data
+            ? 1
+            : 0,
         data: section.data ?? [],
       }));
 
-    return { sections: normalized };
+    return {
+      success: true,
+      sections: normalized,
+      data: { sections: normalized },
+    };
   }
 
   @Get('admin/trust-items')

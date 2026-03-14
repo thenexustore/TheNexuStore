@@ -219,11 +219,20 @@ export default function HomeDynamicSections({
     }
 
     let isMounted = true;
+    let activeController: AbortController | null = null;
+    let requestInFlight = false;
 
     const load = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
       try {
         const res = await fetch(`${API_URL}/homepage/sections`, {
           cache: highlightedSectionId ? "no-store" : "force-cache",
+          signal: controller.signal,
         });
 
         const json = res.ok ? await res.json().catch(() => null) : null;
@@ -236,6 +245,7 @@ export default function HomeDynamicSections({
 
         const fallbackRes = await fetch(`${API_URL}/api/carousels/config`, {
           cache: "no-store",
+          signal: controller.signal,
         });
         const fallbackJson = fallbackRes.ok
           ? await fallbackRes.json().catch(() => null)
@@ -251,9 +261,13 @@ export default function HomeDynamicSections({
         );
 
         if (isMounted) setSections(fallbackSections as Section[]);
-      } catch {
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
         if (isMounted) setSections([]);
       } finally {
+        requestInFlight = false;
         if (isMounted) setLoading(false);
       }
     };
@@ -285,6 +299,7 @@ export default function HomeDynamicSections({
 
     return () => {
       isMounted = false;
+      activeController?.abort();
       if (refreshInterval) window.clearInterval(refreshInterval);
       if (livePreviewStream) livePreviewStream.close();
     };

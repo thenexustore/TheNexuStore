@@ -100,6 +100,14 @@ function asNumber(value: unknown, fallback: number) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+type ChipsConfigItem = {
+  text?: string;
+  title?: string;
+  icon?: string;
+  image_url?: string;
+  href?: string;
+};
+
 export default function HomeComposerPage() {
   const locale = useLocale();
   const [loading, setLoading] = useState(true);
@@ -577,6 +585,7 @@ export default function HomeComposerPage() {
   }
 
   const config = parsedDraftConfig || {};
+  const chipsItems = Array.isArray(config.items) ? (config.items as ChipsConfigItem[]) : [];
   const isHeroSection = selectedSection?.type === "HERO_CAROUSEL";
   const isFeaturedProductSection =
     selectedSection?.type === "PRODUCT_CAROUSEL" &&
@@ -1046,6 +1055,105 @@ export default function HomeComposerPage() {
                   onEditImage={(item) => void updateCuratedItemImage(item)}
                   onEditLink={(item) => void updateCuratedItemLink(item)}
                 />
+              ) : null}
+
+              {(selectedSection.type === "VALUE_PROPS" || selectedSection.type === "TRENDING_CHIPS") && parsedDraftConfig ? (
+                <div className="rounded-xl border border-zinc-200 p-3">
+                  <div className="mb-3 text-sm font-medium">
+                    Controles rápidos: {selectedSection.type === "VALUE_PROPS" ? "Beneficios / confianza" : "Chips de tendencias"}
+                  </div>
+                  <div className="space-y-2">
+                    {chipsItems.map((item, index) => (
+                      <div key={`${index}-${item.text || item.title || "chip"}`} className="grid gap-2 rounded-lg border border-zinc-200 p-2 md:grid-cols-2">
+                        <label className="text-xs">
+                          <span className="mb-1 block text-zinc-500">Texto</span>
+                          <input
+                            value={String(item.text || item.title || "")}
+                            onChange={(event) => {
+                              const next = chipsItems.map((current, currentIndex) =>
+                                currentIndex === index
+                                  ? { ...current, text: event.target.value, title: event.target.value }
+                                  : current,
+                              );
+                              updateDraftConfig({ ...config, items: next });
+                            }}
+                            className="w-full rounded-md border border-zinc-300 px-2 py-1.5"
+                          />
+                        </label>
+                        <label className="text-xs">
+                          <span className="mb-1 block text-zinc-500">Enlace</span>
+                          <input
+                            value={String(item.href || "")}
+                            onChange={(event) => {
+                              const next = chipsItems.map((current, currentIndex) =>
+                                currentIndex === index ? { ...current, href: event.target.value } : current,
+                              );
+                              updateDraftConfig({ ...config, items: next });
+                            }}
+                            className="w-full rounded-md border border-zinc-300 px-2 py-1.5"
+                            placeholder="/products"
+                          />
+                        </label>
+                        <label className="text-xs md:col-span-2">
+                          <span className="mb-1 block text-zinc-500">Imagen (opcional)</span>
+                          <input
+                            value={String(item.image_url || "")}
+                            onChange={(event) => {
+                              const next = chipsItems.map((current, currentIndex) =>
+                                currentIndex === index ? { ...current, image_url: event.target.value } : current,
+                              );
+                              updateDraftConfig({ ...config, items: next });
+                            }}
+                            className="w-full rounded-md border border-zinc-300 px-2 py-1.5"
+                            placeholder="https://..."
+                          />
+                        </label>
+
+                        {selectedSection.type === "VALUE_PROPS" ? (
+                          <label className="text-xs md:col-span-2">
+                            <span className="mb-1 block text-zinc-500">Icono (opcional)</span>
+                            <input
+                              value={String(item.icon || "")}
+                              onChange={(event) => {
+                                const next = chipsItems.map((current, currentIndex) =>
+                                  currentIndex === index ? { ...current, icon: event.target.value } : current,
+                                );
+                                updateDraftConfig({ ...config, items: next });
+                              }}
+                              className="w-full rounded-md border border-zinc-300 px-2 py-1.5"
+                              placeholder="shield"
+                            />
+                          </label>
+                        ) : null}
+
+                        <div className="md:col-span-2 flex justify-end">
+                          <button
+                            onClick={() => {
+                              const next = chipsItems.filter((_, currentIndex) => currentIndex !== index);
+                              updateDraftConfig({ ...config, items: next });
+                            }}
+                            className="rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100"
+                          >
+                            Eliminar ítem
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      onClick={() => {
+                        const nextItem: ChipsConfigItem =
+                          selectedSection.type === "VALUE_PROPS"
+                            ? { text: "", title: "", icon: "", image_url: "", href: "/products" }
+                            : { text: "", title: "", image_url: "", href: "/products" };
+                        updateDraftConfig({ ...config, items: [...chipsItems, nextItem] });
+                      }}
+                      className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs hover:bg-zinc-50"
+                    >
+                      + Añadir ítem
+                    </button>
+                  </div>
+                </div>
               ) : null}
 
               <label className="block text-sm">

@@ -14,6 +14,25 @@ const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' 
 
 const FALLBACK_IMG = '/No_Image_Available.png';
 
+
+const isExternalHref = (href: string) => /^https?:\/\//i.test(href);
+
+function ActionLink({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
+  if (isExternalHref(href)) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className={className}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
+
 const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
 const asText = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
 const asSrc = (value: unknown): string => {
@@ -105,7 +124,18 @@ function RailControls({
 
 function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; items: unknown[] }) {
   const slides = useMemo(
-    () => toArray<Record<string, unknown>>(items).map((x) => (x?.banner as Record<string, unknown>) || x).filter(Boolean),
+    () =>
+      toArray<Record<string, unknown>>(items)
+        .map((item): Record<string, unknown> => {
+          const banner = (item?.banner as Record<string, unknown>) || {};
+          return {
+            ...banner,
+            ...item,
+            image: item.image_url || banner.image,
+            button_link: item.href || banner.button_link,
+          };
+        })
+        .filter(Boolean),
     [items],
   );
   const [index, setIndex] = useState(0);
@@ -138,7 +168,7 @@ function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; i
           {slides.map((slide, i) => (
             <div key={asText(slide.id, `hero-${i}`)} className="relative h-full min-w-full">
               <SmartImage
-                src={asSrc(slide.image)}
+                src={asSrc(slide.image || slide.image_url)}
                 alt={asText(slide.title_text, 'Hero')}
                 className="object-cover"
                 priority={i === 0}
@@ -150,9 +180,9 @@ function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; i
                 <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
                 {slide.subtitle_text ? <p className="text-sm text-slate-100 sm:text-base">{asText(slide.subtitle_text)}</p> : null}
                 {slide.button_text ? (
-                  <Link href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                  <ActionLink href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
                     {asText(slide.button_text)}
-                  </Link>
+                  </ActionLink>
                 ) : null}
               </div>
             </div>
@@ -181,6 +211,7 @@ function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; i
             <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
               {slides.map((_, i) => (
                 <button
+                  type="button"
                   key={i}
                   aria-label={`slide-${i + 1}`}
                   onClick={() => setIndex(i)}
@@ -201,9 +232,9 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {list.map((cat, idx) => (
-          <Link
+          <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
-            href={asText(cat.href) || `/products?categories=${encodeURIComponent(asText(cat.slug))}`}
+            href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
             className="group rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
           >
             <div className="mx-auto mb-2 relative h-16 w-full overflow-hidden rounded bg-slate-50">
@@ -215,7 +246,7 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
               />
             </div>
             <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{asText(cat.item_label) || asText(cat.name, 'Category')}</p>
-          </Link>
+          </ActionLink>
         ))}
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
@@ -240,6 +271,12 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
     syncRailState();
   }, [list.length]);
 
+  useEffect(() => {
+    const onResize = () => syncRailState();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 260;
@@ -262,9 +299,9 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
           const hasDeal = Number(product.compare_at_price || 0) > Number(product.price || 0);
           const pct = Number(product.discount_percentage || product.discount_pct || 0);
           return (
-            <Link
+            <ActionLink
               key={asText(product.id, `prod-${idx}`)}
-              href={`/products/${asText(product.slug)}`}
+              href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
               className="group min-w-[180px] max-w-[180px] snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow md:min-w-[210px] md:max-w-[210px]"
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-slate-50">
@@ -298,7 +335,7 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
               <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-center text-xs font-medium text-slate-700 transition group-hover:bg-slate-100">
                 Ver producto
               </div>
-            </Link>
+            </ActionLink>
           );
         })}
       </div>
@@ -324,6 +361,12 @@ function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: st
     syncRailState();
   }, [list.length]);
 
+  useEffect(() => {
+    const onResize = () => syncRailState();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 220;
@@ -339,9 +382,9 @@ function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: st
 
       <div ref={railRef} onScroll={syncRailState} className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
         {list.map((brand, idx) => (
-          <Link
+          <ActionLink
             key={asText(brand.id, `brand-${idx}`)}
-            href={asText(brand.href) || `/products?brand=${encodeURIComponent(asText(brand.slug))}`}
+            href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
             className="min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
           >
             <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
@@ -353,7 +396,7 @@ function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: st
               />
             </div>
             {asText(brand.item_label) || asText(brand.name, 'Brand')}
-          </Link>
+          </ActionLink>
         ))}
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
@@ -367,9 +410,23 @@ function ChipsLike({ title, subtitle, items }: { title?: string; subtitle?: stri
     <SectionShell title={title} subtitle={subtitle}>
       <div className="flex flex-wrap gap-2">
         {list.map((item, i) => (
-          <Link key={i} href={asText(item.href, '/products')} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:border-slate-300">
+          <ActionLink
+            key={i}
+            href={asText(item.href, '/products')}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:border-slate-300"
+          >
+            {item.image_url ? (
+              <span className="relative h-5 w-5 overflow-hidden rounded-full bg-slate-100">
+                <SmartImage
+                  src={asSrc(item.image_url)}
+                  alt={asText(item.title) || asText(item.text) || 'Item'}
+                  className="object-cover"
+                  sizes="20px"
+                />
+              </span>
+            ) : null}
             {asText(item.title) || asText(item.text) || 'Item'}
-          </Link>
+          </ActionLink>
         ))}
       </div>
     </SectionShell>

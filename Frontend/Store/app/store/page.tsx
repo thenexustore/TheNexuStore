@@ -20,9 +20,16 @@ const fallbackData = {
   ],
 };
 
-async function getHome(previewLayoutId?: string) {
+async function getHome({
+  previewLayoutId,
+  locale,
+}: {
+  previewLayoutId?: string;
+  locale?: string;
+}) {
   const query = new URLSearchParams();
   if (previewLayoutId) query.set("previewLayoutId", previewLayoutId);
+  if (locale) query.set("locale", locale);
   const endpoint = `${API_URL}/home${query.toString() ? `?${query.toString()}` : ""}`;
 
   try {
@@ -51,6 +58,7 @@ async function getDynamicSections(forceFresh = false) {
 
 export default async function StorePage({
   searchParams,
+  params,
 }: {
   searchParams?: Promise<{
     previewLayoutId?: string;
@@ -58,19 +66,31 @@ export default async function StorePage({
     useLayout?: string;
     highlightSection?: string;
   }>;
+  params?: Promise<{
+    locale?: string;
+  }>;
 }) {
   const sp = (await searchParams) || {};
-  const [data, initialDynamicSections] = await Promise.all([
-    getHome(sp.previewLayoutId),
-    getDynamicSections(Boolean(sp.highlightSection) || sp.forceDynamic === "1"),
-  ]);
+  const routeParams = (await params) || {};
+
+  const data = await getHome({
+    previewLayoutId: sp.previewLayoutId,
+    locale: routeParams.locale,
+  });
+
   const forceDynamic = sp.forceDynamic === "1";
-  const useLayout = sp.useLayout === "1" || Boolean(sp.previewLayoutId);
+  // Layout builder becomes the default source of truth.
+  // Set useLayout=0 only when we explicitly want to force legacy dynamic sections.
+  const useLayout = sp.useLayout !== "0" || Boolean(sp.previewLayoutId);
   const hasLayoutSections =
     Boolean(data?.layout) &&
     Array.isArray(data?.sections) &&
     data.sections.length > 0;
-  const shouldRenderDynamic = forceDynamic || !useLayout;
+  const shouldRenderDynamic = forceDynamic || !(useLayout && hasLayoutSections);
+
+  const initialDynamicSections = shouldRenderDynamic
+    ? await getDynamicSections(Boolean(sp.highlightSection) || forceDynamic)
+    : [];
 
   return (
     <main className="min-h-screen bg-slate-50 pb-10">

@@ -524,6 +524,39 @@ export default function HomeComposerPage() {
     }
   };
 
+
+  const updateCuratedItemImage = async (item: HomeSectionItem) => {
+    const nextImage = window.prompt("URL de imagen para este elemento (vacío para quitarla):", item.image_url || "");
+    if (nextImage === null) return;
+    try {
+      setSaving(true);
+      await homeBuilderApi.updateItem(item.id, { image_url: nextImage.trim() || null });
+      const data = (await homeBuilderApi.listItems(item.section_id)) as HomeSectionItem[];
+      setItems([...data].sort((a, b) => a.position - b.position));
+      toast.success("Imagen del ítem actualizada");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar la imagen");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateCuratedItemLink = async (item: HomeSectionItem) => {
+    const nextLink = window.prompt("Enlace destino (vacío para usar el enlace por defecto):", item.href || "");
+    if (nextLink === null) return;
+    try {
+      setSaving(true);
+      await homeBuilderApi.updateItem(item.id, { href: nextLink.trim() || null });
+      const data = (await homeBuilderApi.listItems(item.section_id)) as HomeSectionItem[];
+      setItems([...data].sort((a, b) => a.position - b.position));
+      toast.success("Enlace del ítem actualizado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el enlace");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const resetDraft = () => {
     if (!selectedSection) return;
     setDraft({
@@ -1010,6 +1043,8 @@ export default function HomeComposerPage() {
                   onAdd={(option) => void addCuratedItem(option)}
                   onMove={(item, direction) => void moveCuratedItem(item, direction)}
                   onDelete={(id) => void deleteCuratedItem(id)}
+                  onEditImage={(item) => void updateCuratedItemImage(item)}
+                  onEditLink={(item) => void updateCuratedItemLink(item)}
                 />
               ) : null}
 

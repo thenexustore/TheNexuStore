@@ -551,7 +551,17 @@ export class HomeLayoutService {
           orderBy: { position: 'asc' },
           include: { category: true },
         });
-        return items.map((x) => x.category).filter(Boolean);
+        return items
+          .map((x) => {
+            if (!x.category) return null;
+            return {
+              ...x.category,
+              image_url: x.image_url || (x.category as any).image_url || (x.category as any).image,
+              href: x.href || null,
+              item_label: x.label || null,
+            };
+          })
+          .filter(Boolean);
       }
       return this.prisma.category.findMany({
         where: { is_active: true, parent_id: null },
@@ -567,7 +577,17 @@ export class HomeLayoutService {
           orderBy: { position: 'asc' },
           include: { brand: true },
         });
-        return items.map((x) => x.brand).filter(Boolean);
+        return items
+          .map((x) => {
+            if (!x.brand) return null;
+            return {
+              ...x.brand,
+              image_url: x.image_url || (x.brand as any).logo_url || (x.brand as any).image,
+              href: x.href || null,
+              item_label: x.label || null,
+            };
+          })
+          .filter(Boolean);
       }
       return this.prisma.brand.findMany({
         where: { is_active: true },

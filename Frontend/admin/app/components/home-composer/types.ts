@@ -29,6 +29,8 @@ export type HomeSectionItem = {
   product_id?: string | null;
   banner_id?: string | null;
   label?: string | null;
+  image_url?: string | null;
+  href?: string | null;
 };
 
 export type HomeOption = {

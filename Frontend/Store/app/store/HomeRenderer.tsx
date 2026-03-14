@@ -201,8 +201,20 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {list.map((cat, idx) => (
-          <Link key={asText(cat.id, `cat-${idx}`)} href={`/products?categories=${encodeURIComponent(asText(cat.slug))}`} className="group rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300">
-            <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{asText(cat.name, 'Category')}</p>
+          <Link
+            key={asText(cat.id, `cat-${idx}`)}
+            href={asText(cat.href) || `/products?categories=${encodeURIComponent(asText(cat.slug))}`}
+            className="group rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+          >
+            <div className="mx-auto mb-2 relative h-16 w-full overflow-hidden rounded bg-slate-50">
+              <SmartImage
+                src={asSrc(cat.image_url || cat.image || cat.banner_image)}
+                alt={asText(cat.name, 'Category')}
+                className="object-contain"
+                sizes="120px"
+              />
+            </div>
+            <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{asText(cat.item_label) || asText(cat.name, 'Category')}</p>
           </Link>
         ))}
       </div>
@@ -329,18 +341,18 @@ function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: st
         {list.map((brand, idx) => (
           <Link
             key={asText(brand.id, `brand-${idx}`)}
-            href={`/products?brand=${encodeURIComponent(asText(brand.slug))}`}
+            href={asText(brand.href) || `/products?brand=${encodeURIComponent(asText(brand.slug))}`}
             className="min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
           >
             <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
               <SmartImage
-                src={asSrc(brand.logo_url || brand.image)}
-                alt={asText(brand.name, 'Brand')}
+                src={asSrc(brand.image_url || brand.logo_url || brand.image)}
+                alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
                 className="object-contain"
                 sizes="150px"
               />
             </div>
-            {asText(brand.name, 'Brand')}
+            {asText(brand.item_label) || asText(brand.name, 'Brand')}
           </Link>
         ))}
       </div>

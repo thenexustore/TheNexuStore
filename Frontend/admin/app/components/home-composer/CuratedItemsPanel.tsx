@@ -23,6 +23,8 @@ type Props = {
   onAdd: (option: HomeOption) => void;
   onMove: (item: HomeSectionItem, direction: -1 | 1) => void;
   onDelete: (itemId: string) => void;
+  onEditImage?: (item: HomeSectionItem) => void;
+  onEditLink?: (item: HomeSectionItem) => void;
 };
 
 export default function CuratedItemsPanel({
@@ -39,6 +41,8 @@ export default function CuratedItemsPanel({
   onAdd,
   onMove,
   onDelete,
+  onEditImage,
+  onEditLink,
 }: Props) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3">
@@ -125,6 +129,22 @@ export default function CuratedItemsPanel({
                     title="Bajar"
                   >
                     ↓
+                  </button>
+                  <button
+                    disabled={saving || !onEditImage}
+                    onClick={() => onEditImage?.(item)}
+                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
+                    title="Imagen"
+                  >
+                    Img
+                  </button>
+                  <button
+                    disabled={saving || !onEditLink}
+                    onClick={() => onEditLink?.(item)}
+                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
+                    title="Enlace"
+                  >
+                    Link
                   </button>
                   <button
                     disabled={saving}

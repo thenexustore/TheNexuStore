@@ -157,7 +157,7 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
-  const NavItems = () => (
+  const renderNavItems = () => (
     <div className="space-y-1.5 px-4">
       {filteredNavigation.map((item) => {
         const isParentActive = item.children?.some(
@@ -283,7 +283,7 @@ export default function DashboardLayout({
           <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={32} />
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
-          <NavItems />
+          {renderNavItems()}
         </nav>
         <div className="p-4 border-t border-zinc-200">
           <button
@@ -309,7 +309,7 @@ export default function DashboardLayout({
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
-          <NavItems />
+          {renderNavItems()}
         </nav>
         <div className="p-4 border-t border-zinc-200">
           <button

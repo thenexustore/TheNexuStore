@@ -19,8 +19,14 @@ const asSrc = (value: unknown): string => {
   if (typeof value !== 'string') return FALLBACK_IMG;
   const src = value.trim();
   if (!src) return FALLBACK_IMG;
-  if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('/')) return src;
+  if (src.startsWith('data:') || src.startsWith('blob:')) return src;
   if (/^https?:\/\//i.test(src)) return src;
+
+  if (src.startsWith('/')) {
+    if (src === FALLBACK_IMG || src.startsWith('/_next/')) return src;
+    return `${API_URL}${src}`;
+  }
+
   return `${API_URL}/${src.replace(/^\/+/, '')}`;
 };
 

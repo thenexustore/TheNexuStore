@@ -87,40 +87,48 @@ export default async function StorePage({
   // Layout builder becomes the default source of truth.
   // Set useLayout=0 only when we explicitly want to force legacy dynamic sections.
   const useLayout = sp.useLayout !== "0" || Boolean(sp.previewLayoutId);
+  const layoutSections: HomeResolvedSection[] = Array.isArray(data?.sections)
+    ? data.sections
+    : [];
+
   const hasLayoutSections =
     Boolean(data?.layout) &&
-    Array.isArray(data?.sections) &&
-    data.sections.length > 0;
+    layoutSections.length > 0;
 
-  const hasEmptyHeroInLayout =
-    hasLayoutSections &&
-    data.sections.some(
+  const heroSections = layoutSections.filter(
+    (section: HomeResolvedSection) => section?.type === "HERO_CAROUSEL",
+  );
+  const productSections = layoutSections.filter(
+    (section: HomeResolvedSection) => section?.type === "PRODUCT_CAROUSEL",
+  );
+
+  const heroSectionsEmpty =
+    heroSections.length > 0 &&
+    heroSections.every(
       (section: HomeResolvedSection) =>
-        section?.type === "HERO_CAROUSEL" &&
-        Array.isArray(section?.resolved) &&
-        section.resolved.length === 0,
+        Array.isArray(section?.resolved) && section.resolved.length === 0,
     );
 
-  const allProductSectionsEmpty =
-    hasLayoutSections &&
-    (() => {
-      const productSections = data.sections.filter(
-        (section: HomeResolvedSection) => section?.type === "PRODUCT_CAROUSEL",
-      );
-      if (!productSections.length) return false;
-      return productSections.every(
-        (section: HomeResolvedSection) =>
-          Array.isArray(section?.resolved) && section.resolved.length === 0,
-      );
-    })();
+  const productSectionsAllEmpty =
+    productSections.length > 0 &&
+    productSections.every(
+      (section: HomeResolvedSection) =>
+        Array.isArray(section?.resolved) && section.resolved.length === 0,
+    );
 
-  // During migration, fallback to legacy dynamic source when layout payload
-  // is structurally present but key sections are empty.
+  const hasAnyResolvedContent = layoutSections.some((section: HomeResolvedSection) => {
+    if (Array.isArray(section?.resolved)) return section.resolved.length > 0;
+    return Boolean(section?.resolved);
+  });
+
+  // During migration, fallback to legacy dynamic source only when layout is
+  // effectively empty. This avoids rendering the old homepage on mobile just
+  // because one key section is not populated yet.
   const shouldRenderDynamic =
     forceDynamic ||
     !(useLayout && hasLayoutSections) ||
-    hasEmptyHeroInLayout ||
-    allProductSectionsEmpty;
+    !hasAnyResolvedContent ||
+    (heroSectionsEmpty && productSectionsAllEmpty);
 
   const initialDynamicSections = shouldRenderDynamic
     ? await getDynamicSections(Boolean(sp.highlightSection) || forceDynamic)

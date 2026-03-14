@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { API_URL } from '../lib/env';
 
@@ -30,6 +31,33 @@ const asSrc = (value: unknown): string => {
   return `${API_URL}/${src.replace(/^\/+/, '')}`;
 };
 
+
+function SmartImage({
+  src,
+  alt,
+  className,
+  priority = false,
+  sizes,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  priority?: boolean;
+  sizes?: string;
+}) {
+  return (
+    <Image
+      src={src || FALLBACK_IMG}
+      alt={alt}
+      fill
+      unoptimized
+      priority={priority}
+      sizes={sizes || '100vw'}
+      className={className}
+    />
+  );
+}
+
 function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="w-full max-w-7xl px-3 sm:px-6">
@@ -37,6 +65,41 @@ function SectionShell({ title, subtitle, children }: { title?: string; subtitle?
       {subtitle ? <p className="mb-4 text-sm text-slate-500">{subtitle}</p> : null}
       {children}
     </section>
+  );
+}
+
+function RailControls({
+  canPrev,
+  canNext,
+  onPrev,
+  onNext,
+}: {
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="mb-2 flex items-center justify-end gap-2">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={!canPrev}
+        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Anterior"
+      >
+        ←
+      </button>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={!canNext}
+        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Siguiente"
+      >
+        →
+      </button>
+    </div>
   );
 }
 
@@ -60,15 +123,12 @@ function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; i
   return (
     <SectionShell title={title} subtitle={subtitle}>
       <div className="relative h-52 overflow-hidden rounded-2xl bg-slate-200 shadow-sm sm:h-[380px]">
-        <img
+        <SmartImage
           src={asSrc(active.image)}
           alt={asText(active.title_text, 'Hero')}
-          className="h-full w-full object-cover"
-          loading="eager"
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = FALLBACK_IMG;
-          }}
+          className="object-cover"
+          priority
+          sizes="(max-width: 640px) 100vw, 1200px"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
         <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
@@ -110,16 +170,46 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
           </Link>
         ))}
       </div>
-      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configure categories from admin.</div> : null}
+      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
     </SectionShell>
   );
 }
 
 function ProductCarousel({ title, subtitle, products }: { title?: string; subtitle?: string; products: unknown[] }) {
   const list = toArray<Record<string, unknown>>(products);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  const syncRailState = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    setCanPrev(rail.scrollLeft > 4);
+    setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    syncRailState();
+  }, [list.length]);
+
+  const step = () => {
+    const rail = railRef.current;
+    if (!rail) return 260;
+    return Math.max(200, Math.floor(rail.clientWidth * 0.8));
+  };
+
+  const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
+  const goNext = () => railRef.current?.scrollBy({ left: step(), behavior: 'smooth' });
+
   return (
     <SectionShell title={title} subtitle={subtitle}>
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+      {list.length > 1 ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+
+      <div
+        ref={railRef}
+        onScroll={syncRailState}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]"
+      >
         {list.map((product, idx) => {
           const hasDeal = Number(product.compare_at_price || 0) > Number(product.price || 0);
           const pct = Number(product.discount_percentage || product.discount_pct || 0);
@@ -127,18 +217,14 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
             <Link
               key={asText(product.id, `prod-${idx}`)}
               href={`/products/${asText(product.slug)}`}
-              className="group min-w-[180px] max-w-[180px] snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:shadow sm:min-w-[220px] sm:max-w-[220px]"
+              className="group min-w-[180px] max-w-[180px] snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow md:min-w-[210px] md:max-w-[210px]"
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-slate-50">
-                <img
+                <SmartImage
                   src={asSrc(product.thumbnail)}
                   alt={asText(product.title, 'Product')}
-                  className="h-full w-full object-contain p-2 transition group-hover:scale-105"
-                  loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = FALLBACK_IMG;
-                  }}
+                  className="object-contain p-2 transition group-hover:scale-105"
+                  sizes="(max-width: 640px) 180px, 210px"
                 />
                 {hasDeal && pct ? (
                   <span className="absolute left-2 top-2 rounded-md bg-red-600 px-2 py-1 text-xs font-bold text-white">-{pct}%</span>
@@ -149,7 +235,7 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
               <p className="mt-0.5 text-xs uppercase tracking-wide text-slate-400">{asText(product.brand_name)}</p>
 
               <div className="mt-2 flex items-center gap-2">
-                <span className={`text-base font-bold sm:text-lg ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
+                <span className={`text-base font-bold sm:text-lg ${hasDeal ? 'text-red-600' : 'text-slate-900'}`}>
                   {eur.format(Number(product.price || 0))}
                 </span>
                 {hasDeal ? <span className="text-xs text-slate-500 line-through">{eur.format(Number(product.compare_at_price || 0))}</span> : null}
@@ -157,44 +243,72 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
 
               {Number(product.stock_quantity || 0) > 0 && Number(product.stock_quantity || 0) <= 8 ? (
                 <div className="mt-1 text-xs font-medium text-orange-600">¡Solo quedan {Number(product.stock_quantity || 0)}!</div>
-              ) : null}
+              ) : (
+                <div className="mt-1 text-xs text-slate-400">Envío rápido disponible</div>
+              )}
+
+              <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-center text-xs font-medium text-slate-700 transition group-hover:bg-slate-100">
+                Ver producto
+              </div>
             </Link>
           );
         })}
       </div>
-      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No products configured for this section.</div> : null}
+      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay productos configurados para esta sección.</div> : null}
     </SectionShell>
   );
 }
 
 function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: string; brands: unknown[] }) {
   const list = toArray<Record<string, unknown>>(brands);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  const syncRailState = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    setCanPrev(rail.scrollLeft > 4);
+    setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    syncRailState();
+  }, [list.length]);
+
+  const step = () => {
+    const rail = railRef.current;
+    if (!rail) return 220;
+    return Math.max(180, Math.floor(rail.clientWidth * 0.7));
+  };
+
+  const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
+  const goNext = () => railRef.current?.scrollBy({ left: step(), behavior: 'smooth' });
+
   return (
     <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      {list.length > 1 ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+
+      <div ref={railRef} onScroll={syncRailState} className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
         {list.map((brand, idx) => (
           <Link
             key={asText(brand.id, `brand-${idx}`)}
             href={`/products?brand=${encodeURIComponent(asText(brand.slug))}`}
-            className="min-w-[150px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300"
+            className="min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
           >
             <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
-              <img
+              <SmartImage
                 src={asSrc(brand.logo_url || brand.image)}
                 alt={asText(brand.name, 'Brand')}
-                className="h-full w-auto object-contain"
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = FALLBACK_IMG;
-                }}
+                className="object-contain"
+                sizes="150px"
               />
             </div>
             {asText(brand.name, 'Brand')}
           </Link>
         ))}
       </div>
-      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No brands configured for this section.</div> : null}
+      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
     </SectionShell>
   );
 }

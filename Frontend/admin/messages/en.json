@@ -22,6 +22,7 @@
     "logout": "Logout",
     "imports": "Imports",
     "rmas": "Returns (RMA)",
-    "settings": "Settings"
+    "settings": "Settings",
+    "homeComposer": "Home Composer"
   }
 }

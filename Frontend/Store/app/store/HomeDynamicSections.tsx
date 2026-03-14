@@ -312,6 +312,39 @@ export default function HomeDynamicSections({
       </div>
     );
 
+  const hasRenderableSections = sections.some((section) => {
+    if (section.failed) return true;
+    if (!highlightedSectionId && isEmptyRenderableSection(section)) return false;
+    return [
+      "HERO_BANNER_SLIDER",
+      "PRODUCT_CAROUSEL",
+      "BEST_DEALS",
+      "NEW_ARRIVALS",
+      "FEATURED_PICKS",
+      "TOP_CATEGORIES_GRID",
+      "BRANDS_STRIP",
+      "TRUST_BAR",
+      "NEWSLETTER",
+    ].includes(section.type);
+  });
+
+  if (!hasRenderableSections) {
+    return (
+      <section className="w-full px-4 py-8 sm:px-6">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
+          <h2 className="text-base font-semibold text-slate-800 sm:text-lg">{t("dynamic.noContentTitle")}</h2>
+          <p className="mt-1 text-sm text-slate-500">{t("dynamic.noContentBody")}</p>
+          <Link
+            href="/products"
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            {t("dynamic.browseProducts")}
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <>
       {highlightedSectionId ? (

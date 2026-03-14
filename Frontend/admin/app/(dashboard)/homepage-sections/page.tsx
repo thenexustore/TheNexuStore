@@ -60,8 +60,10 @@ const PRODUCT_QUERY_TYPES = [
 const SECTION_TYPES = [
   "HERO_BANNER_SLIDER",
   "PRODUCT_CAROUSEL",
+  "NEW_ARRIVALS",
   "BRANDS_STRIP",
   "TRUST_BAR",
+  "NEWSLETTER",
 ] as const;
 
 const SORT_OPTIONS = [
@@ -132,6 +134,13 @@ const DEFAULT_CONFIG_BY_TYPE: Record<string, Record<string, unknown>> = {
       { icon: "refresh-ccw", text: "Devoluciones simples y soporte postventa" },
       { icon: "headset", text: "Atención experta antes y después de comprar" },
     ],
+  },
+  NEWSLETTER: {
+    title: "Suscríbete a nuestra newsletter",
+    subtitle: "Recibe ofertas, novedades y lanzamientos antes que nadie.",
+    placeholder: "Tu email",
+    button_text: "Suscribirme",
+    button_link: "/register",
   },
 };
 
@@ -442,7 +451,84 @@ export default function HomepageSectionsPage() {
         byId.set(id, { id, label, subtitle });
         if (slug) seenSlugs.add(slug);
       }
-    };
+};
+
+const RECOMMENDED_FLOW: Array<{
+  type: SectionType;
+  title: string;
+  configFactory?: (ctx: { electronicsCategoryId?: string }) => Record<string, unknown>;
+}> = [
+  { type: "HERO_BANNER_SLIDER", title: "Banner principal" },
+  {
+    type: "PRODUCT_CAROUSEL",
+    title: "Productos destacados",
+    configFactory: () => ({
+      source: "query",
+      query: {
+        type: "products",
+        featuredOnly: true,
+        inStockOnly: true,
+        sortBy: "newest",
+        limit: 12,
+      },
+      carousel_enabled: true,
+      carousel_autoplay: true,
+      carousel_interval_ms: 4500,
+      carousel_items_desktop: 4,
+      carousel_items_mobile: 2,
+    }),
+  },
+  {
+    type: "PRODUCT_CAROUSEL",
+    title: "Electrónica",
+    configFactory: ({ electronicsCategoryId }) => ({
+      source: "query",
+      query: {
+        type: "products",
+        ...(electronicsCategoryId ? { categoryId: electronicsCategoryId } : {}),
+        inStockOnly: true,
+        sortBy: "newest",
+        limit: 12,
+      },
+      carousel_enabled: true,
+      carousel_autoplay: true,
+      carousel_interval_ms: 4500,
+      carousel_items_desktop: 4,
+      carousel_items_mobile: 2,
+    }),
+  },
+  {
+    type: "BRANDS_STRIP",
+    title: "Top Brands",
+    configFactory: () => ({ source: "query", query: { type: "brands", limit: 12 } }),
+  },
+  {
+    type: "NEW_ARRIVALS",
+    title: "Productos recientes",
+    configFactory: () => ({
+      source: "query",
+      query: { type: "products", sortBy: "newest", inStockOnly: true, limit: 12 },
+      carousel_enabled: true,
+      carousel_autoplay: true,
+      carousel_interval_ms: 4500,
+      carousel_items_desktop: 4,
+      carousel_items_mobile: 2,
+    }),
+  },
+  {
+    type: "BRANDS_STRIP",
+    title: "Marcas populares",
+    configFactory: () => ({ source: "query", query: { type: "brands", limit: 12 } }),
+  },
+  {
+    type: "TRUST_BAR",
+    title: "Por qué comprar con nosotros",
+  },
+  {
+    type: "NEWSLETTER",
+    title: "Newsletter",
+  },
+];
 
     for (const item of queryCatalogs.categories) {
       push(item.id, item.label, item.subtitle);
@@ -879,6 +965,49 @@ export default function HomepageSectionsPage() {
         error instanceof Error
           ? error.message
           : `No se pudo crear el preset ${preset.title}`,
+      );
+    } finally {
+      setCreatingType(null);
+    }
+  };
+
+  const applyRecommendedFlow = async () => {
+    if (sorted.length > 0) {
+      const confirmed = window.confirm(
+        "Esto añadirá nuevas secciones al final de la home actual. ¿Continuar?",
+      );
+      if (!confirmed) return;
+    }
+
+    setCreatingType("recommended-flow");
+
+    try {
+      const electronicsCategoryId = findPresetCategoryId(
+        ["electronica", "electrónica", "electronics"],
+        menuTree,
+      );
+
+      let position = sorted.length;
+      for (const entry of RECOMMENDED_FLOW) {
+        position += 1;
+        await homepageSectionsApi.create({
+          type: entry.type,
+          position,
+          enabled: true,
+          title: entry.title,
+          config_json: entry.configFactory
+            ? entry.configFactory({ electronicsCategoryId })
+            : defaultConfigFor(entry.type),
+        });
+      }
+
+      toast.success("Flujo recomendado aplicado");
+      await load();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo aplicar el flujo recomendado",
       );
     } finally {
       setCreatingType(null);
@@ -2351,6 +2480,15 @@ export default function HomepageSectionsPage() {
           Presets rápidos
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => void applyRecommendedFlow()}
+            disabled={Boolean(creatingType)}
+            className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-white text-sm hover:bg-black disabled:opacity-50"
+          >
+            {creatingType === "recommended-flow"
+              ? "Aplicando flujo..."
+              : "Aplicar flujo recomendado"}
+          </button>
           {PRESET_BUTTONS.map((preset) => (
             <button
               key={preset.key}
@@ -3489,6 +3627,57 @@ export default function HomepageSectionsPage() {
                     >
                       Añadir item
                     </button>
+                  </div>
+                )}
+
+
+                {section.type === "NEWSLETTER" && (
+                  <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Configuración newsletter
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <input
+                        className="border rounded-lg px-3 py-2 md:col-span-2"
+                        value={String(section.config_json.title || "")}
+                        placeholder="Título"
+                        onChange={(e) =>
+                          updateConfig(section, { title: e.target.value })
+                        }
+                      />
+                      <input
+                        className="border rounded-lg px-3 py-2 md:col-span-2"
+                        value={String(section.config_json.subtitle || "")}
+                        placeholder="Subtítulo"
+                        onChange={(e) =>
+                          updateConfig(section, { subtitle: e.target.value })
+                        }
+                      />
+                      <input
+                        className="border rounded-lg px-3 py-2"
+                        value={String(section.config_json.placeholder || "")}
+                        placeholder="Placeholder email"
+                        onChange={(e) =>
+                          updateConfig(section, { placeholder: e.target.value })
+                        }
+                      />
+                      <input
+                        className="border rounded-lg px-3 py-2"
+                        value={String(section.config_json.button_text || "")}
+                        placeholder="Texto CTA"
+                        onChange={(e) =>
+                          updateConfig(section, { button_text: e.target.value })
+                        }
+                      />
+                      <input
+                        className="border rounded-lg px-3 py-2 md:col-span-2"
+                        value={String(section.config_json.button_link || "")}
+                        placeholder="Enlace CTA"
+                        onChange={(e) =>
+                          updateConfig(section, { button_link: e.target.value })
+                        }
+                      />
+                    </div>
                   </div>
                 )}
 

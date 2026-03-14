@@ -20,9 +20,21 @@ const fallbackData = {
   ],
 };
 
-async function getHome(previewLayoutId?: string) {
+type HomeResolvedSection = {
+  type?: string;
+  resolved?: unknown;
+};
+
+async function getHome({
+  previewLayoutId,
+  locale,
+}: {
+  previewLayoutId?: string;
+  locale?: string;
+}) {
   const query = new URLSearchParams();
   if (previewLayoutId) query.set("previewLayoutId", previewLayoutId);
+  if (locale) query.set("locale", locale);
   const endpoint = `${API_URL}/home${query.toString() ? `?${query.toString()}` : ""}`;
 
   try {
@@ -51,6 +63,7 @@ async function getDynamicSections(forceFresh = false) {
 
 export default async function StorePage({
   searchParams,
+  params,
 }: {
   searchParams?: Promise<{
     previewLayoutId?: string;
@@ -58,19 +71,68 @@ export default async function StorePage({
     useLayout?: string;
     highlightSection?: string;
   }>;
+  params?: Promise<{
+    locale?: string;
+  }>;
 }) {
   const sp = (await searchParams) || {};
-  const [data, initialDynamicSections] = await Promise.all([
-    getHome(sp.previewLayoutId),
-    getDynamicSections(Boolean(sp.highlightSection) || sp.forceDynamic === "1"),
-  ]);
+  const routeParams = (await params) || {};
+
+  const data = await getHome({
+    previewLayoutId: sp.previewLayoutId,
+    locale: routeParams.locale,
+  });
+
   const forceDynamic = sp.forceDynamic === "1";
-  const useLayout = sp.useLayout === "1" || Boolean(sp.previewLayoutId);
+  // Layout builder becomes the default source of truth.
+  // Set useLayout=0 only when we explicitly want to force legacy dynamic sections.
+  const useLayout = sp.useLayout !== "0" || Boolean(sp.previewLayoutId);
+  const layoutSections: HomeResolvedSection[] = Array.isArray(data?.sections)
+    ? data.sections
+    : [];
+
   const hasLayoutSections =
     Boolean(data?.layout) &&
-    Array.isArray(data?.sections) &&
-    data.sections.length > 0;
-  const shouldRenderDynamic = forceDynamic || !useLayout;
+    layoutSections.length > 0;
+
+  const heroSections = layoutSections.filter(
+    (section: HomeResolvedSection) => section?.type === "HERO_CAROUSEL",
+  );
+  const productSections = layoutSections.filter(
+    (section: HomeResolvedSection) => section?.type === "PRODUCT_CAROUSEL",
+  );
+
+  const heroSectionsEmpty =
+    heroSections.length > 0 &&
+    heroSections.every(
+      (section: HomeResolvedSection) =>
+        Array.isArray(section?.resolved) && section.resolved.length === 0,
+    );
+
+  const productSectionsAllEmpty =
+    productSections.length > 0 &&
+    productSections.every(
+      (section: HomeResolvedSection) =>
+        Array.isArray(section?.resolved) && section.resolved.length === 0,
+    );
+
+  const hasAnyResolvedContent = layoutSections.some((section: HomeResolvedSection) => {
+    if (Array.isArray(section?.resolved)) return section.resolved.length > 0;
+    return Boolean(section?.resolved);
+  });
+
+  // During migration, fallback to legacy dynamic source only when layout is
+  // effectively empty. This avoids rendering the old homepage on mobile just
+  // because one key section is not populated yet.
+  const shouldRenderDynamic =
+    forceDynamic ||
+    !(useLayout && hasLayoutSections) ||
+    !hasAnyResolvedContent ||
+    (heroSectionsEmpty && productSectionsAllEmpty);
+
+  const initialDynamicSections = shouldRenderDynamic
+    ? await getDynamicSections(Boolean(sp.highlightSection) || forceDynamic)
+    : [];
 
   return (
     <main className="min-h-screen bg-slate-50 pb-10">

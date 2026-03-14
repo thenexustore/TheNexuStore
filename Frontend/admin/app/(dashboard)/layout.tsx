@@ -66,6 +66,7 @@ const navigation: NavItem[] = [
     key: "homeContent",
     icon: LayoutTemplate,
     children: [
+      { key: "homeComposer", href: "/home-composer", requiredPermissions: ["full_access"] },
       { key: "banners", href: "/banners", requiredPermissions: ["full_access"] },
       { key: "featuredProducts", href: "/featured-products", requiredPermissions: ["full_access"] },
     ],

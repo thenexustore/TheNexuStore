@@ -1,11 +1,12 @@
 import { HomeOption, HomeSectionItem } from "./types";
 
-type CuratedTarget = "products" | "brands" | "categories";
+type CuratedTarget = "products" | "brands" | "categories" | "banners";
 
 const TARGET_LABEL: Record<CuratedTarget, string> = {
   products: "productos",
   brands: "marcas",
   categories: "categorías",
+  banners: "banners",
 };
 
 type Props = {
@@ -72,7 +73,8 @@ export default function CuratedItemsPanel({
               const alreadyAdded = items.some((item) => {
                 if (currentTarget === "products") return item.product_id === option.id;
                 if (currentTarget === "brands") return item.brand_id === option.id;
-                return item.category_id === option.id;
+                if (currentTarget === "categories") return item.category_id === option.id;
+                return item.banner_id === option.id;
               });
 
               return (
@@ -105,7 +107,7 @@ export default function CuratedItemsPanel({
                 className="flex items-center justify-between rounded-md border border-zinc-200 px-2 py-1 text-xs"
               >
                 <span className="truncate pr-2">
-                  {item.label || item.product_id || item.brand_id || item.category_id || item.id}
+                  {item.label || item.product_id || item.brand_id || item.category_id || item.banner_id || item.id}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -143,7 +145,7 @@ export default function CuratedItemsPanel({
 
       {!itemsLoading && items.length === 0 ? (
         <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-          Este bloque está en modo curado pero no tiene contenido; añade elementos antes de publicar.
+          Este bloque no tiene contenido curado; añade elementos antes de publicar.
         </div>
       ) : null}
     </div>

@@ -27,6 +27,7 @@ export type HomeSectionItem = {
   category_id?: string | null;
   brand_id?: string | null;
   product_id?: string | null;
+  banner_id?: string | null;
   label?: string | null;
 };
 

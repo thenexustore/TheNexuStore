@@ -137,11 +137,12 @@ export default function HomeComposerPage() {
     }
   }, [draft]);
 
-  const currentTarget = useMemo<"products" | "brands" | "categories" | null>(() => {
+  const currentTarget = useMemo<"products" | "brands" | "categories" | "banners" | null>(() => {
     if (!selectedSection) return null;
     if (selectedSection.type === "PRODUCT_CAROUSEL") return "products";
     if (selectedSection.type === "BRAND_STRIP") return "brands";
     if (selectedSection.type === "CATEGORY_STRIP") return "categories";
+    if (selectedSection.type === "HERO_CAROUSEL") return "banners";
     return null;
   }, [selectedSection]);
 
@@ -153,15 +154,16 @@ export default function HomeComposerPage() {
     if (selectedSection.type === "BRAND_STRIP" || selectedSection.type === "CATEGORY_STRIP") {
       return String(parsedDraftConfig.mode || "auto") === "curated";
     }
+    if (selectedSection.type === "HERO_CAROUSEL") return true;
     return false;
   }, [selectedSection, parsedDraftConfig]);
 
 
   const curatedLimit = useMemo(() => {
     const raw = Number(parsedDraftConfig?.limit || 0);
-    if (!Number.isFinite(raw) || raw <= 0) return 24;
+    if (!Number.isFinite(raw) || raw <= 0) return selectedSection?.type === "HERO_CAROUSEL" ? 6 : 24;
     return Math.max(1, Math.min(24, Math.floor(raw)));
-  }, [parsedDraftConfig]);
+  }, [parsedDraftConfig, selectedSection]);
 
   const curatedRemaining = useMemo(() => {
     return Math.max(0, curatedLimit - items.length);
@@ -437,7 +439,8 @@ export default function HomeComposerPage() {
     const alreadyAdded = items.some((item) => {
       if (currentTarget === "products") return item.product_id === option.id;
       if (currentTarget === "brands") return item.brand_id === option.id;
-      return item.category_id === option.id;
+      if (currentTarget === "categories") return item.category_id === option.id;
+      return item.banner_id === option.id;
     });
 
     if (alreadyAdded) {
@@ -461,6 +464,10 @@ export default function HomeComposerPage() {
     if (currentTarget === "categories") {
       basePayload.type = "CATEGORY";
       basePayload.category_id = option.id;
+    }
+    if (currentTarget === "banners") {
+      basePayload.type = "BANNER";
+      basePayload.banner_id = option.id;
     }
 
     try {
@@ -900,6 +907,12 @@ export default function HomeComposerPage() {
                       />
                     </label>
                   </div>
+                </div>
+              ) : null}
+
+              {selectedSection.type === "HERO_CAROUSEL" ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                  Este bloque Hero está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
                 </div>
               ) : null}
 

@@ -223,7 +223,7 @@ export default function HomeComposerPage() {
         setLoading(true);
         await loadLayouts();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "No se pudieron cargar layouts");
+        toast.error(error instanceof Error ? error.message : "No se pudieron cargar los diseños");
       } finally {
         setLoading(false);
       }
@@ -265,7 +265,7 @@ export default function HomeComposerPage() {
         const data = (await homeBuilderApi.listItems(selectedSection.id)) as HomeSectionItem[];
         setItems([...data].sort((a, b) => a.position - b.position));
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "No se pudieron cargar los items curados");
+        toast.error(error instanceof Error ? error.message : "No se pudieron cargar los ítems curados");
       } finally {
         setItemsLoading(false);
       }
@@ -303,9 +303,9 @@ export default function HomeComposerPage() {
       const layout = (await homeBuilderApi.createLayout({ name, locale })) as HomeLayout;
       await loadLayouts();
       setActiveLayoutId(layout.id);
-      toast.success("Layout creado");
+      toast.success("Diseño creado");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el layout");
+      toast.error(error instanceof Error ? error.message : "No se pudo crear el diseño");
     } finally {
       setSaving(false);
     }
@@ -320,7 +320,7 @@ export default function HomeComposerPage() {
         locale: activeLayout.locale || locale,
       });
       await loadLayouts();
-      toast.success("Layout publicado");
+      toast.success("Diseño publicado");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo publicar");
     } finally {
@@ -467,9 +467,9 @@ export default function HomeComposerPage() {
       await homeBuilderApi.createItem(selectedSection.id, basePayload);
       const data = (await homeBuilderApi.listItems(selectedSection.id)) as HomeSectionItem[];
       setItems([...data].sort((a, b) => a.position - b.position));
-      toast.success("Item añadido");
+      toast.success("Ítem añadido");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo añadir el item");
+      toast.error(error instanceof Error ? error.message : "No se pudo añadir el ítem");
     } finally {
       setSaving(false);
     }
@@ -477,7 +477,7 @@ export default function HomeComposerPage() {
 
   const deleteCuratedItem = async (itemId: string) => {
     if (!selectedSection) return;
-    if (!window.confirm("¿Eliminar este item curado?")) return;
+    if (!window.confirm("¿Eliminar este ítem curado?")) return;
     try {
       setSaving(true);
       await homeBuilderApi.deleteItem(itemId);
@@ -488,7 +488,7 @@ export default function HomeComposerPage() {
       }
       setItems(remaining.map((item, index) => ({ ...item, position: index + 1 })));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el item");
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el ítem");
     } finally {
       setSaving(false);
     }
@@ -509,7 +509,7 @@ export default function HomeComposerPage() {
       await homeBuilderApi.reorderItems(payload);
       setItems(reordered.map((entry, index) => ({ ...entry, position: index + 1 })));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo reordenar item");
+      toast.error(error instanceof Error ? error.message : "No se pudo reordenar el ítem");
     } finally {
       setSaving(false);
     }
@@ -543,7 +543,7 @@ export default function HomeComposerPage() {
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">Compositor de Inicio</h1>
             <p className="text-sm text-zinc-500">
-              Gestiona layouts de home, secciones y publicación por idioma.
+              Gestiona diseños de inicio, secciones y publicación por idioma.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -552,14 +552,14 @@ export default function HomeComposerPage() {
               disabled={saving}
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
             >
-              + Nuevo layout
+              + Nuevo diseño
             </button>
             <button
               onClick={publishLayout}
               disabled={saving || !activeLayout}
               className="rounded-lg bg-black px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60"
             >
-              Publicar layout
+              Publicar diseño
             </button>
             <a
               href={previewLink}
@@ -567,7 +567,7 @@ export default function HomeComposerPage() {
               rel="noreferrer"
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
             >
-              Abrir preview
+              Abrir vista previa
             </a>
             <a
               href={`${API_URL}/admin/home/preview?layoutId=${activeLayoutId}`}
@@ -575,7 +575,7 @@ export default function HomeComposerPage() {
               rel="noreferrer"
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
             >
-              Ver JSON preview
+              Ver JSON de vista previa
             </a>
           </div>
         </div>
@@ -600,7 +600,7 @@ export default function HomeComposerPage() {
           <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
             <div className="text-zinc-500">Estado</div>
             <div className="font-medium text-zinc-900">
-              {activeLayout?.is_active ? "Activo" : "Borrador"}
+              {activeLayout?.is_active ? "Publicado" : "Borrador"}
             </div>
           </div>
           <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
@@ -645,7 +645,7 @@ export default function HomeComposerPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-          <h2 className="text-lg font-semibold">Canvas de secciones</h2>
+          <h2 className="text-lg font-semibold">Lienzo de secciones</h2>
 
           <CanvasSections
             sections={sections}
@@ -734,11 +734,11 @@ export default function HomeComposerPage() {
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       >
-                        <option value="NEW_ARRIVALS">NEW_ARRIVALS</option>
-                        <option value="BEST_DEALS">BEST_DEALS</option>
-                        <option value="FEATURED">FEATURED</option>
-                        <option value="CATEGORY">CATEGORY</option>
-                        <option value="BRAND">BRAND</option>
+                        <option value="NEW_ARRIVALS">Novedades</option>
+                        <option value="BEST_DEALS">Mejores ofertas</option>
+                        <option value="FEATURED">Destacados</option>
+                        <option value="CATEGORY">Por categoría</option>
+                        <option value="BRAND">Por marca</option>
                       </select>
                     </label>
 
@@ -834,8 +834,8 @@ export default function HomeComposerPage() {
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       >
-                        <option value="auto">auto</option>
-                        <option value="curated">curated</option>
+                        <option value="auto">Automático</option>
+                        <option value="curated">Curado</option>
                       </select>
                     </label>
                     <label className="text-sm">
@@ -872,8 +872,8 @@ export default function HomeComposerPage() {
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       >
-                        <option value="auto">auto</option>
-                        <option value="curated">curated</option>
+                        <option value="auto">Automático</option>
+                        <option value="curated">Curado</option>
                       </select>
                     </label>
                     <label className="text-sm">

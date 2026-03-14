@@ -24,7 +24,7 @@ export default function CanvasSections({
   if (!sections.length) {
     return (
       <div className="mt-4 rounded-xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500">
-        Este layout aún no tiene secciones. Empieza añadiendo un bloque arriba.
+        Este diseño aún no tiene secciones. Empieza añadiendo un bloque arriba.
       </div>
     );
   }
@@ -71,7 +71,7 @@ export default function CanvasSections({
                       : "bg-zinc-100 text-zinc-600"
                   }`}
                 >
-                  {section.is_enabled ? "Visible" : "Oculta"}
+                  {section.is_enabled ? "Visible" : "Oculto"}
                 </span>
                 <button
                   onClick={(event) => {

@@ -32,6 +32,15 @@ export class HomepageSectionsService {
       throw new BadRequestException('config_json must be an object');
     }
 
+    if (type === HomepageSectionType.NEWSLETTER) {
+      if (!String(config.title || '').trim()) {
+        throw new BadRequestException(
+          'NEWSLETTER config_json.title must be a non-empty string',
+        );
+      }
+      return;
+    }
+
     const source = config.source || 'query';
     if (!['manual', 'query'].includes(source)) {
       throw new BadRequestException(
@@ -141,6 +150,19 @@ export class HomepageSectionsService {
       };
     }
 
+    if (type === HomepageSectionType.NEWSLETTER) {
+      return {
+        title: String(next.title || 'Suscríbete a nuestra newsletter').trim(),
+        subtitle: String(
+          next.subtitle ||
+            'Recibe ofertas, novedades y lanzamientos antes que nadie.',
+        ).trim(),
+        placeholder: String(next.placeholder || 'Tu email').trim(),
+        button_text: String(next.button_text || 'Suscribirme').trim(),
+        button_link: String(next.button_link || '/register').trim(),
+      };
+    }
+
     if ((next.source || 'query') !== 'query') return next;
 
     const query = { ...(next.query || {}) };
@@ -220,6 +242,16 @@ export class HomepageSectionsService {
       if (invalidItem) {
         issues.push('Todos los items de TRUST_BAR deben tener texto.');
       }
+    }
+
+    if (section.type === HomepageSectionType.NEWSLETTER) {
+      if (!String(config.title || '').trim()) {
+        issues.push('NEWSLETTER debe incluir título.');
+      }
+      if (!String(config.button_text || '').trim()) {
+        issues.push('NEWSLETTER debe incluir texto de CTA.');
+      }
+      return issues;
     }
 
     const source = config.source || 'query';
@@ -1017,6 +1049,17 @@ export class HomepageSectionsService {
         });
       case HomepageSectionType.TRUST_BAR:
         return config.items || [];
+      case HomepageSectionType.NEWSLETTER:
+        return {
+          title: String(config.title || 'Suscríbete a nuestra newsletter'),
+          subtitle: String(
+            config.subtitle ||
+              'Recibe ofertas, novedades y lanzamientos antes que nadie.',
+          ),
+          placeholder: String(config.placeholder || 'Tu email'),
+          button_text: String(config.button_text || 'Suscribirme'),
+          button_link: String(config.button_link || '/register'),
+        };
       default:
         return [];
     }

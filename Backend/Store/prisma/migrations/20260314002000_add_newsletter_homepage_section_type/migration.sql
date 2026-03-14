@@ -1,0 +1,7 @@
+DO $$
+BEGIN
+  ALTER TYPE "HomepageSectionType" ADD VALUE IF NOT EXISTS 'NEWSLETTER';
+EXCEPTION
+  WHEN undefined_object THEN
+    NULL;
+END $$;

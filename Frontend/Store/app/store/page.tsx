@@ -62,7 +62,7 @@ export default async function StorePage({
   const sp = (await searchParams) || {};
   const [data, initialDynamicSections] = await Promise.all([
     getHome(sp.previewLayoutId),
-    getDynamicSections(Boolean(sp.highlightSection)),
+    getDynamicSections(Boolean(sp.highlightSection) || sp.forceDynamic === "1"),
   ]);
   const forceDynamic = sp.forceDynamic === "1";
   const useLayout = sp.useLayout === "1" || Boolean(sp.previewLayoutId);

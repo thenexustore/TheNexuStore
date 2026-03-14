@@ -207,6 +207,7 @@ enum HomepageSectionType {
   FEATURED_PICKS
   BRANDS_STRIP
   TRUST_BAR
+  NEWSLETTER
 }
 
 enum HomePageSectionType {

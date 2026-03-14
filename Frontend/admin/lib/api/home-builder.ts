@@ -27,6 +27,12 @@ export const homeBuilderApi = {
   updateSection: (id: string, payload: Record<string, any>) => req(`/admin/home/sections/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteSection: (id: string) => req(`/admin/home/sections/${id}`, { method: 'DELETE' }),
   moveSection: (id: string, position: number) => req(`/admin/home/sections/${id}/move`, { method: 'POST', body: JSON.stringify({ position }) }),
+
+  listItems: (sectionId: string) => req(`/admin/home/sections/${sectionId}/items`),
+  createItem: (sectionId: string, payload: Record<string, any>) => req(`/admin/home/sections/${sectionId}/items`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateItem: (itemId: string, payload: Record<string, any>) => req(`/admin/home/items/${itemId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteItem: (itemId: string) => req(`/admin/home/items/${itemId}`, { method: 'DELETE' }),
+  reorderItems: (items: Array<{ id: string; position: number }>) => req('/admin/home/items/reorder', { method: 'POST', body: JSON.stringify({ items }) }),
   preview: (layoutId: string) => req(`/admin/home/preview?layoutId=${layoutId}`),
   options: (target: 'products' | 'categories' | 'brands' | 'banners', q = '', limit = 12) =>
     req(`/admin/home/options?target=${encodeURIComponent(target)}&q=${encodeURIComponent(q)}&limit=${limit}`),

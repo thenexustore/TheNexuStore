@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
+import { API_URL } from '../lib/env';
 
 type HomePayload = {
   layout: { id: string; locale?: string | null } | null;
@@ -18,9 +19,15 @@ const asSrc = (value: unknown): string => {
   if (typeof value !== 'string') return FALLBACK_IMG;
   const src = value.trim();
   if (!src) return FALLBACK_IMG;
-  if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('/')) return src;
+  if (src.startsWith('data:') || src.startsWith('blob:')) return src;
   if (/^https?:\/\//i.test(src)) return src;
-  return FALLBACK_IMG;
+
+  if (src.startsWith('/')) {
+    if (src === FALLBACK_IMG || src.startsWith('/_next/')) return src;
+    return `${API_URL}${src}`;
+  }
+
+  return `${API_URL}/${src.replace(/^\/+/, '')}`;
 };
 
 function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
@@ -166,11 +173,28 @@ function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: st
     <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
       <div className="flex gap-3 overflow-x-auto pb-2">
         {list.map((brand, idx) => (
-          <Link key={asText(brand.id, `brand-${idx}`)} href={`/products?brand=${encodeURIComponent(asText(brand.slug))}`} className="min-w-[150px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300">
+          <Link
+            key={asText(brand.id, `brand-${idx}`)}
+            href={`/products?brand=${encodeURIComponent(asText(brand.slug))}`}
+            className="min-w-[150px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300"
+          >
+            <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
+              <img
+                src={asSrc(brand.logo_url || brand.image)}
+                alt={asText(brand.name, 'Brand')}
+                className="h-full w-auto object-contain"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = FALLBACK_IMG;
+                }}
+              />
+            </div>
             {asText(brand.name, 'Brand')}
           </Link>
         ))}
       </div>
+      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No brands configured for this section.</div> : null}
     </SectionShell>
   );
 }

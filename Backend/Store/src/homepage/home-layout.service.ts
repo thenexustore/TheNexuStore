@@ -398,6 +398,29 @@ export class HomeLayoutService {
       };
     };
 
+    const toCard = (p: any) => {
+      const sku = p.skus?.[0];
+      const price = sku?.prices?.[0];
+      const compare = price?.compare_at_price
+        ? Number(price.compare_at_price)
+        : undefined;
+      const sale = Number(price?.sale_price || 0);
+      return {
+        id: p.id,
+        title: p.title,
+        slug: p.slug,
+        brand_name: p.brand?.name || '',
+        price: sale,
+        compare_at_price: compare,
+        discount_percentage:
+          compare && compare > sale
+            ? Math.round(((compare - sale) / compare) * 100)
+            : 0,
+        stock_quantity: sku?.inventory?.[0]?.qty_on_hand || 0,
+        thumbnail: p.media?.[0]?.url || '/No_Image_Available.png',
+      };
+    };
+
     if (config.mode === 'curated') {
       const items = await this.listItems(section.id);
       const ids = items.map((x) => x.product_id).filter(Boolean) as string[];

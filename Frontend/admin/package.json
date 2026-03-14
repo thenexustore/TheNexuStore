@@ -8,7 +8,8 @@
     "start": "next start",
     "check:merge-markers": "node scripts/check-merge-markers.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint"
+    "lint": "eslint",
+    "screenshot:home-composer": "bash ../../ops/home_composer_screenshot.sh"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

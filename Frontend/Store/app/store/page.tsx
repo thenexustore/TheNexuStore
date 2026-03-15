@@ -174,7 +174,7 @@ export default async function StorePage({
   return (
     <main className="min-h-screen bg-slate-50 pb-10">
       <div className="mx-auto w-full max-w-[1440px] space-y-8 px-2 sm:px-4">
-        {shouldRenderDynamic || !hasLayoutSections ? (
+        {shouldRenderDynamic ? (
           <HomeDynamicSections initialSections={initialDynamicSections} />
         ) : (
           <HomeRenderer payload={data} />

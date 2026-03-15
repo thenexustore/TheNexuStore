@@ -307,10 +307,66 @@ export default function HomeDynamicSections({
 
   if (loading)
     return (
-      <div className="w-full px-4 sm:px-6 py-8 text-sm text-slate-500">
-        {t("dynamic.loading")}
-      </div>
+      <section className="w-full px-4 py-6 sm:px-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 text-sm text-slate-500">{t("dynamic.loading")}</div>
+          <div className="space-y-3">
+            <div className="h-48 animate-pulse rounded-xl bg-slate-100 sm:h-64" />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div key={`card-${idx}`} className="h-44 animate-pulse rounded-xl bg-slate-100" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     );
+
+  const hasRenderableSections = sections.some((section) => {
+    if (section.failed) return true;
+    if (!highlightedSectionId && isEmptyRenderableSection(section)) return false;
+    return [
+      "HERO_BANNER_SLIDER",
+      "PRODUCT_CAROUSEL",
+      "BEST_DEALS",
+      "NEW_ARRIVALS",
+      "FEATURED_PICKS",
+      "TOP_CATEGORIES_GRID",
+      "BRANDS_STRIP",
+      "TRUST_BAR",
+      "NEWSLETTER",
+    ].includes(section.type);
+  });
+
+  if (!hasRenderableSections) {
+    return (
+      <section className="w-full px-4 py-8 sm:px-6">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm">
+          <h2 className="text-base font-semibold text-slate-800 sm:text-lg">{t("dynamic.noContentTitle")}</h2>
+          <p className="mt-1 text-sm text-slate-500">{t("dynamic.noContentBody")}</p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href="/products"
+              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              {t("dynamic.browseProducts")}
+            </Link>
+            <Link
+              href="/products?sort_by=newest"
+              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              {t("dynamic.seeNewProducts")}
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>

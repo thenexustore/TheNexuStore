@@ -133,4 +133,10 @@ export class HomeLayoutController {
   async reorderItems(@Body() body: ReorderItemsDto) {
     return { success: true, data: await this.service.reorderItems(body) };
   }
+
+  @UseGuards(AdminGuard)
+  @Post('/admin/home/items/upload-image')
+  async uploadItemImage(@Body() body: { dataUrl?: string }) {
+    return { success: true, data: await this.service.uploadItemImage(String(body?.dataUrl || '')) };
+  }
 }

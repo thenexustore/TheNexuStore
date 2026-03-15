@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
@@ -20,6 +21,7 @@ import { HomeSectionType } from './home-layout.types';
 
 @Injectable()
 export class HomeLayoutService {
+  private readonly logger = new Logger(HomeLayoutService.name);
   private readonly ttlMs = 5 * 60 * 1000;
   private readonly homeCache = new Map<
     string,
@@ -41,25 +43,53 @@ export class HomeLayoutService {
     return Math.max(1, Math.min(24, Math.floor(n)));
   }
 
+  private clampRange(value: unknown, min: number, max: number, fallback: number) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.max(min, Math.min(max, Math.floor(numeric)));
+  }
+
+  private asBoolean(value: unknown, fallback: boolean) {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return fallback;
+  }
+
   private normalizeSectionConfig(
     type: HomeSectionType,
     config: Record<string, any>,
   ) {
     const next = { ...(config || {}) };
 
+    if (type === HomeSectionType.HERO_CAROUSEL) {
+      next.autoplay = this.asBoolean(next.autoplay, true);
+      next.interval_ms = this.clampRange(next.interval_ms, 2500, 15000, 5000);
+    }
+
     if (type === HomeSectionType.PRODUCT_CAROUSEL) {
       next.source = next.source || 'NEW_ARRIVALS';
       next.limit = this.clampLimit(next.limit, 12);
-      next.inStockOnly = next.inStockOnly ?? true;
+      next.inStockOnly = this.asBoolean(next.inStockOnly, true);
       next.mode = next.mode || 'rule';
+      next.autoplay = this.asBoolean(next.autoplay, true);
+      next.interval_ms = this.clampRange(next.interval_ms, 2000, 15000, 4500);
+      next.items_mobile = this.clampRange(next.items_mobile, 1, 3, 2);
+      next.items_desktop = this.clampRange(next.items_desktop, 2, 6, 4);
     }
 
-    if (
-      type === HomeSectionType.CATEGORY_STRIP ||
-      type === HomeSectionType.BRAND_STRIP
-    ) {
+    if (type === HomeSectionType.CATEGORY_STRIP) {
       next.limit = this.clampLimit(next.limit, 12);
       next.mode = next.mode || 'auto';
+    }
+
+    if (type === HomeSectionType.BRAND_STRIP) {
+      next.limit = this.clampLimit(next.limit, 12);
+      next.mode = next.mode || 'auto';
+      next.autoplay = this.asBoolean(next.autoplay, true);
+      next.interval_ms = this.clampRange(next.interval_ms, 2000, 15000, 4500);
+      next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
+      next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
     }
 
     if (
@@ -489,6 +519,12 @@ export class HomeLayoutService {
       return result.products;
     }
 
+    if (source === 'CATEGORY' && !categoryId) {
+      this.logger.warn(
+        `PRODUCT_CAROUSEL section ${section.id} uses CATEGORY source without categoryId; falling back to generic catalog query.`,
+      );
+    }
+
     if (source === 'BRAND' && brandId) {
       const result = await this.productsService.getProducts({
         page: 1,
@@ -498,6 +534,12 @@ export class HomeLayoutService {
         sort_by: sortBy,
       });
       return result.products;
+    }
+
+    if (source === 'BRAND' && !brandId) {
+      this.logger.warn(
+        `PRODUCT_CAROUSEL section ${section.id} uses BRAND source without brandId; falling back to generic catalog query.`,
+      );
     }
 
     if (source === 'BEST_DEALS') {
@@ -557,6 +599,9 @@ export class HomeLayoutService {
 
       // Fallback bridge: if no curated hero items were linked yet,
       // use active banners from legacy Banner admin so homepage is never blank.
+      this.logger.warn(
+        `HERO_CAROUSEL section ${section.id} has no curated items; using active banner fallback.`,
+      );
       const activeBanners = await this.prisma.banner.findMany({
         where: { is_active: true },
         orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
@@ -627,6 +672,10 @@ export class HomeLayoutService {
       section.type === HomeSectionType.TRENDING_CHIPS
     ) {
       return Array.isArray(config.items) ? config.items : [];
+    }
+
+    if (section.type === HomeSectionType.CUSTOM_HTML) {
+      return { html: String(config.html || '').trim() };
     }
 
     return [];

@@ -22,6 +22,15 @@ const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' 
 
 const FALLBACK_IMG = '/No_Image_Available.png';
 
+const SECTION_TYPE_LABEL: Record<string, string> = {
+  HERO_CAROUSEL: 'Destacados',
+  CATEGORY_STRIP: 'Categorías TOP',
+  PRODUCT_CAROUSEL: 'Novedades',
+  BRAND_STRIP: 'Marcas populares',
+  VALUE_PROPS: '¿Por qué elegirnos?',
+  TRENDING_CHIPS: 'Tendencias',
+};
+
 
 const isExternalHref = (href: string) => /^https?:\/\//i.test(href);
 
@@ -43,6 +52,18 @@ function ActionLink({ href, className, children, style }: { href: string; classN
 
 const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
 const asText = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
+const isMachineTitle = (value: string) => /^[A-Z0-9_]+$/.test(value);
+const resolveSectionTitle = (type: string, title?: string): string => {
+  const normalized = asText(title).trim();
+  if (normalized && !isMachineTitle(normalized)) return normalized;
+  return SECTION_TYPE_LABEL[type] || normalized.replace(/_/g, ' ') || 'Sección destacada';
+};
+
+const isLikelyMissingImage = (value: unknown): boolean => {
+  const src = asText(value).toLowerCase();
+  if (!src) return true;
+  return src.includes('no_image_available') || src.includes('no-image') || src.includes('placeholder');
+};
 const asSrc = (value: unknown): string => {
   if (typeof value !== 'string') return FALLBACK_IMG;
   const src = value.trim();
@@ -88,8 +109,8 @@ function SmartImage({
 function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="w-full max-w-7xl px-3 sm:px-6">
-      {title ? <h2 className="mb-1 break-words text-xl font-bold tracking-tight text-slate-900 sm:text-3xl">{title}</h2> : null}
-      {subtitle ? <p className="mb-4 text-sm text-slate-500">{subtitle}</p> : null}
+      {title ? <h2 className="mb-1 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{title}</h2> : null}
+      {subtitle ? <p className="mb-4 text-sm text-slate-600">{subtitle}</p> : null}
       {children}
     </section>
   );
@@ -175,16 +196,23 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
-          {slides.map((slide, i) => (
+          {slides.map((slide, i) => {
+            const heroImage = slide.image || slide.image_url;
+            const hasVisual = !isLikelyMissingImage(heroImage);
+            return (
             <div key={asText(slide.id, `hero-${i}`)} className="relative h-full min-w-full">
-              <SmartImage
-                src={asSrc(slide.image || slide.image_url)}
-                alt={asText(slide.title_text, 'Hero')}
-                className="object-cover"
-                priority={i === 0}
-                sizes="(max-width: 640px) 100vw, 1200px"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
+              {hasVisual ? (
+                <SmartImage
+                  src={asSrc(heroImage)}
+                  alt={asText(slide.title_text, 'Hero')}
+                  className="object-cover"
+                  priority={i === 0}
+                  sizes="(max-width: 640px) 100vw, 1200px"
+                />
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-transparent" />
               <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
                 {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
                 <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
@@ -196,7 +224,8 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
                 ) : null}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {slides.length > 1 ? (
@@ -241,23 +270,32 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {list.map((cat, idx) => (
+        {list.map((cat, idx) => {
+          const name = asText(cat.item_label) || asText(cat.name, 'Category');
+          const imageValue = cat.image_url || cat.image || cat.banner_image;
+          const hasVisual = !isLikelyMissingImage(imageValue);
+          return (
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
             className="group rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
           >
             <div className="mx-auto mb-2 relative h-16 w-full overflow-hidden rounded bg-slate-50">
-              <SmartImage
-                src={asSrc(cat.image_url || cat.image || cat.banner_image)}
-                alt={asText(cat.name, 'Category')}
-                className="object-contain"
-                sizes="120px"
-              />
+              {hasVisual ? (
+                <SmartImage
+                  src={asSrc(imageValue)}
+                  alt={name}
+                  className="object-contain"
+                  sizes="120px"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[11px] font-medium uppercase tracking-wide text-slate-400">Sin imagen</div>
+              )}
             </div>
-            <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{asText(cat.item_label) || asText(cat.name, 'Category')}</p>
+            <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{name}</p>
           </ActionLink>
-        ))}
+          );
+        })}
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
     </SectionShell>
@@ -348,12 +386,16 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
               }}
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-slate-50">
-                <SmartImage
-                  src={asSrc(product.thumbnail)}
-                  alt={asText(product.title, 'Product')}
-                  className="object-contain p-2 transition group-hover:scale-105"
-                  sizes="(max-width: 640px) 180px, 210px"
-                />
+                {!isLikelyMissingImage(product.thumbnail) ? (
+                  <SmartImage
+                    src={asSrc(product.thumbnail)}
+                    alt={asText(product.title, 'Product')}
+                    className="object-contain p-2 transition group-hover:scale-105"
+                    sizes="(max-width: 640px) 180px, 210px"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-center text-xs font-medium text-slate-400">Imagen pendiente</div>
+                )}
                 {hasDeal && pct ? (
                   <span className="absolute left-2 top-2 rounded-md bg-red-600 px-2 py-1 text-xs font-bold text-white">-{pct}%</span>
                 ) : null}
@@ -468,12 +510,16 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
             }}
           >
             <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
-              <SmartImage
-                src={asSrc(brand.image_url || brand.logo_url || brand.image)}
-                alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
-                className="object-contain"
-                sizes="150px"
-              />
+              {!isLikelyMissingImage(brand.image_url || brand.logo_url || brand.image) ? (
+                <SmartImage
+                  src={asSrc(brand.image_url || brand.logo_url || brand.image)}
+                  alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
+                  className="object-contain"
+                  sizes="150px"
+                />
+              ) : (
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">Logo</span>
+              )}
             </div>
             {asText(brand.item_label) || asText(brand.name, 'Brand')}
           </ActionLink>
@@ -520,11 +566,12 @@ export default function HomeRenderer({ payload }: { payload: HomePayload }) {
     <>
       {sections.map((section, index) => {
         const key = section?.id || `section-${index}`;
-        if (section?.type === 'HERO_CAROUSEL') return <Hero key={key} title={section.title} subtitle={section.subtitle} items={toArray(section.resolved)} config={section.config} />;
-        if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={section.title} subtitle={section.subtitle} categories={toArray(section.resolved)} />;
-        if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={section.title} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
-        if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={section.title} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
-        if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={section.title} subtitle={section.subtitle} items={toArray(section.resolved)} />;
+        const displayTitle = resolveSectionTitle(asText(section?.type), section?.title);
+        if (section?.type === 'HERO_CAROUSEL') return <Hero key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} config={section.config} />;
+        if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={displayTitle} subtitle={section.subtitle} categories={toArray(section.resolved)} />;
+        if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={displayTitle} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
+        if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={displayTitle} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
+        if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;
         return null;
       })}
     </>

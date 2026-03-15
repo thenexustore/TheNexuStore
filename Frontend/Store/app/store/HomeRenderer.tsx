@@ -267,10 +267,15 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
 function ProductCarousel({ title, subtitle, products, config }: { title?: string; subtitle?: string; products: unknown[]; config?: Record<string, unknown> }) {
   const list = toArray<Record<string, unknown>>(products);
   const mobileItems = Math.max(1, Number(config?.items_mobile || 2));
+  const desktopItems = Math.max(mobileItems, Number(config?.items_desktop || 4));
   const mobileCardPx = Math.max(150, Math.floor(360 / mobileItems));
+  const desktopCardPx = Math.max(180, Math.floor(1120 / desktopItems));
+  const autoplayEnabled = config?.autoplay !== false;
+  const autoplayIntervalMs = Math.max(1800, Number(config?.interval_ms || 4500));
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const syncRailState = () => {
     const rail = railRef.current;
@@ -298,6 +303,22 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
   const goNext = () => railRef.current?.scrollBy({ left: step(), behavior: 'smooth' });
 
+  useEffect(() => {
+    if (!autoplayEnabled || isPaused || list.length <= 1) return;
+    const id = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const rail = railRef.current;
+      if (!rail) return;
+      const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4;
+      if (atEnd) {
+        rail.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        rail.scrollBy({ left: step(), behavior: 'smooth' });
+      }
+    }, autoplayIntervalMs);
+    return () => window.clearInterval(id);
+  }, [autoplayEnabled, autoplayIntervalMs, isPaused, list.length]);
+
   return (
     <SectionShell title={title} subtitle={subtitle}>
       {list.length > 1 ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
@@ -305,6 +326,12 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       <div
         ref={railRef}
         onScroll={syncRailState}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
+        onFocusCapture={() => setIsPaused(true)}
+        onBlurCapture={() => setIsPaused(false)}
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]"
       >
         {list.map((product, idx) => {
@@ -314,8 +341,11 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
             <ActionLink
               key={asText(product.id, `prod-${idx}`)}
               href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-              className="group snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
-              style={{ minWidth: `${mobileCardPx}px`, maxWidth: `${mobileCardPx}px` }}
+              className="group snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow min-w-[var(--card-mobile)] max-w-[var(--card-mobile)] md:min-w-[var(--card-desktop)] md:max-w-[var(--card-desktop)]"
+              style={{
+                ['--card-mobile' as string]: `${mobileCardPx}px`,
+                ['--card-desktop' as string]: `${desktopCardPx}px`,
+              }}
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-slate-50">
                 <SmartImage
@@ -359,11 +389,16 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
 
 function BrandStrip({ title, subtitle, brands, config }: { title?: string; subtitle?: string; brands: unknown[]; config?: Record<string, unknown> }) {
   const list = toArray<Record<string, unknown>>(brands);
+  const mobileItems = Math.max(2, Number(config?.items_mobile || 2));
   const desktopItems = Math.max(2, Number(config?.items_desktop || 6));
+  const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
   const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
+  const autoplayEnabled = config?.autoplay !== false;
+  const autoplayIntervalMs = Math.max(1800, Number(config?.interval_ms || 4500));
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const syncRailState = () => {
     const rail = railRef.current;
@@ -391,17 +426,46 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
   const goNext = () => railRef.current?.scrollBy({ left: step(), behavior: 'smooth' });
 
+  useEffect(() => {
+    if (!autoplayEnabled || isPaused || list.length <= 1) return;
+    const id = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const rail = railRef.current;
+      if (!rail) return;
+      const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4;
+      if (atEnd) {
+        rail.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        rail.scrollBy({ left: step(), behavior: 'smooth' });
+      }
+    }, autoplayIntervalMs);
+    return () => window.clearInterval(id);
+  }, [autoplayEnabled, autoplayIntervalMs, isPaused, list.length]);
+
   return (
     <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
       {list.length > 1 ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
 
-      <div ref={railRef} onScroll={syncRailState} className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
+      <div
+        ref={railRef}
+        onScroll={syncRailState}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
+        onFocusCapture={() => setIsPaused(true)}
+        onBlurCapture={() => setIsPaused(false)}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]"
+      >
         {list.map((brand, idx) => (
           <ActionLink
             key={asText(brand.id, `brand-${idx}`)}
             href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-            className="snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
-            style={{ minWidth: `${itemPx}px` }}
+            className="snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]"
+            style={{
+              ['--brand-mobile' as string]: `${mobileItemPx}px`,
+              ['--brand-desktop' as string]: `${itemPx}px`,
+            }}
           >
             <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
               <SmartImage

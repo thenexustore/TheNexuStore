@@ -33,6 +33,7 @@ export const homeBuilderApi = {
   updateItem: (itemId: string, payload: Record<string, any>) => req(`/admin/home/items/${itemId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteItem: (itemId: string) => req(`/admin/home/items/${itemId}`, { method: 'DELETE' }),
   reorderItems: (items: Array<{ id: string; position: number }>) => req('/admin/home/items/reorder', { method: 'POST', body: JSON.stringify({ items }) }),
+  uploadItemImage: (dataUrl: string) => req('/admin/home/items/upload-image', { method: 'POST', body: JSON.stringify({ dataUrl }) }) as Promise<{ url: string }>,
   preview: (layoutId: string) => req(`/admin/home/preview?layoutId=${layoutId}`),
   options: (target: 'products' | 'categories' | 'brands' | 'banners', q = '', limit = 12) =>
     req(`/admin/home/options?target=${encodeURIComponent(target)}&q=${encodeURIComponent(q)}&limit=${limit}`),

@@ -36,9 +36,17 @@ export default function CanvasSections({
         const limit = Number(section.config?.limit || 0);
 
         return (
-          <button
+          <div
             key={section.id}
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(section.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect(section.id);
+              }
+            }}
             className={`w-full rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-zinc-300 ${
               selectedSectionId === section.id
                 ? "border-black bg-zinc-50 shadow"
@@ -117,7 +125,7 @@ export default function CanvasSections({
                 </button>
               </div>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>

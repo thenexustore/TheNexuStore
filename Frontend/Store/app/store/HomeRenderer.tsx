@@ -7,7 +7,15 @@ import { API_URL } from '../lib/env';
 
 type HomePayload = {
   layout: { id: string; locale?: string | null } | null;
-  sections: Array<{ id: string; type: string; title?: string; subtitle?: string; variant?: string; resolved: unknown }>;
+  sections: Array<{
+    id: string;
+    type: string;
+    title?: string;
+    subtitle?: string;
+    variant?: string;
+    config?: Record<string, unknown>;
+    resolved: unknown;
+  }>;
 };
 
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
@@ -17,17 +25,17 @@ const FALLBACK_IMG = '/No_Image_Available.png';
 
 const isExternalHref = (href: string) => /^https?:\/\//i.test(href);
 
-function ActionLink({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
+function ActionLink({ href, className, children, style }: { href: string; className: string; children: React.ReactNode; style?: React.CSSProperties }) {
   if (isExternalHref(href)) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" className={className}>
+      <a href={href} target="_blank" rel="noreferrer" className={className} style={style}>
         {children}
       </a>
     );
   }
 
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} style={style}>
       {children}
     </Link>
   );
@@ -122,7 +130,7 @@ function RailControls({
   );
 }
 
-function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; items: unknown[] }) {
+function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: string; items: unknown[]; config?: Record<string, unknown> }) {
   const slides = useMemo(
     () =>
       toArray<Record<string, unknown>>(items)
@@ -140,13 +148,15 @@ function Hero({ title, subtitle, items }: { title?: string; subtitle?: string; i
   );
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const autoplayEnabled = config?.autoplay !== false;
+  const intervalMs = Number(config?.interval_ms || 5000);
 
 
   useEffect(() => {
-    if (slides.length <= 1 || isPaused) return;
-    const id = setInterval(() => setIndex((prev) => (prev + 1) % slides.length), 5000);
+    if (slides.length <= 1 || isPaused || !autoplayEnabled) return;
+    const id = setInterval(() => setIndex((prev) => (prev + 1) % slides.length), Math.max(1500, intervalMs));
     return () => clearInterval(id);
-  }, [slides.length, isPaused]);
+  }, [slides.length, isPaused, autoplayEnabled, intervalMs]);
 
   if (!slides.length) return null;
 
@@ -254,8 +264,10 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
   );
 }
 
-function ProductCarousel({ title, subtitle, products }: { title?: string; subtitle?: string; products: unknown[] }) {
+function ProductCarousel({ title, subtitle, products, config }: { title?: string; subtitle?: string; products: unknown[]; config?: Record<string, unknown> }) {
   const list = toArray<Record<string, unknown>>(products);
+  const mobileItems = Math.max(1, Number(config?.items_mobile || 2));
+  const mobileCardPx = Math.max(150, Math.floor(360 / mobileItems));
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -302,7 +314,8 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
             <ActionLink
               key={asText(product.id, `prod-${idx}`)}
               href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-              className="group min-w-[180px] max-w-[180px] snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow md:min-w-[210px] md:max-w-[210px]"
+              className="group snap-start rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
+              style={{ minWidth: `${mobileCardPx}px`, maxWidth: `${mobileCardPx}px` }}
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-slate-50">
                 <SmartImage
@@ -344,8 +357,10 @@ function ProductCarousel({ title, subtitle, products }: { title?: string; subtit
   );
 }
 
-function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: string; brands: unknown[] }) {
+function BrandStrip({ title, subtitle, brands, config }: { title?: string; subtitle?: string; brands: unknown[]; config?: Record<string, unknown> }) {
   const list = toArray<Record<string, unknown>>(brands);
+  const desktopItems = Math.max(2, Number(config?.items_desktop || 6));
+  const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -385,7 +400,8 @@ function BrandStrip({ title, subtitle, brands }: { title?: string; subtitle?: st
           <ActionLink
             key={asText(brand.id, `brand-${idx}`)}
             href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-            className="min-w-[150px] snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+            className="snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+            style={{ minWidth: `${itemPx}px` }}
           >
             <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
               <SmartImage
@@ -440,10 +456,10 @@ export default function HomeRenderer({ payload }: { payload: HomePayload }) {
     <>
       {sections.map((section, index) => {
         const key = section?.id || `section-${index}`;
-        if (section?.type === 'HERO_CAROUSEL') return <Hero key={key} title={section.title} subtitle={section.subtitle} items={toArray(section.resolved)} />;
+        if (section?.type === 'HERO_CAROUSEL') return <Hero key={key} title={section.title} subtitle={section.subtitle} items={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={section.title} subtitle={section.subtitle} categories={toArray(section.resolved)} />;
-        if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={section.title} subtitle={section.subtitle} products={toArray(section.resolved)} />;
-        if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={section.title} subtitle={section.subtitle} brands={toArray(section.resolved)} />;
+        if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={section.title} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
+        if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={section.title} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={section.title} subtitle={section.subtitle} items={toArray(section.resolved)} />;
         return null;
       })}

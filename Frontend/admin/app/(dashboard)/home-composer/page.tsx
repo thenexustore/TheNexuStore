@@ -100,6 +100,26 @@ function asNumber(value: unknown, fallback: number) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+function pickImageFileAsDataUrl(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    };
+
+    input.click();
+  });
+}
+
 type ChipsConfigItem = {
   text?: string;
   title?: string;
@@ -534,16 +554,36 @@ export default function HomeComposerPage() {
 
 
   const updateCuratedItemImage = async (item: HomeSectionItem) => {
-    const nextImage = window.prompt("URL de imagen para este elemento (vacío para quitarla):", item.image_url || "");
-    if (nextImage === null) return;
+    const action = window.prompt("URL de imagen para este elemento (vacío para quitarla):", item.image_url || "");
+    if (action === null) return;
+
     try {
       setSaving(true);
-      await homeBuilderApi.updateItem(item.id, { image_url: nextImage.trim() || null });
+      await homeBuilderApi.updateItem(item.id, { image_url: action.trim() || null });
       const data = (await homeBuilderApi.listItems(item.section_id)) as HomeSectionItem[];
       setItems([...data].sort((a, b) => a.position - b.position));
       toast.success("Imagen del ítem actualizada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la imagen");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uploadCuratedItemImage = async (item: HomeSectionItem) => {
+    try {
+      const dataUrl = await pickImageFileAsDataUrl();
+      if (!dataUrl) return;
+
+      setSaving(true);
+      const uploaded = await homeBuilderApi.uploadItemImage(dataUrl);
+      await homeBuilderApi.updateItem(item.id, { image_url: uploaded.url || null });
+
+      const data = (await homeBuilderApi.listItems(item.section_id)) as HomeSectionItem[];
+      setItems([...data].sort((a, b) => a.position - b.position));
+      toast.success("Imagen subida y aplicada al ítem");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo subir la imagen");
     } finally {
       setSaving(false);
     }
@@ -1053,6 +1093,7 @@ export default function HomeComposerPage() {
                   onMove={(item, direction) => void moveCuratedItem(item, direction)}
                   onDelete={(id) => void deleteCuratedItem(id)}
                   onEditImage={(item) => void updateCuratedItemImage(item)}
+                  onUploadImage={(item) => void uploadCuratedItemImage(item)}
                   onEditLink={(item) => void updateCuratedItemLink(item)}
                 />
               ) : null}

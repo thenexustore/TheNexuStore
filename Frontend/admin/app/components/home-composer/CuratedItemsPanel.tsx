@@ -24,6 +24,7 @@ type Props = {
   onMove: (item: HomeSectionItem, direction: -1 | 1) => void;
   onDelete: (itemId: string) => void;
   onEditImage?: (item: HomeSectionItem) => void;
+  onUploadImage?: (item: HomeSectionItem) => void;
   onEditLink?: (item: HomeSectionItem) => void;
 };
 
@@ -42,6 +43,7 @@ export default function CuratedItemsPanel({
   onMove,
   onDelete,
   onEditImage,
+  onUploadImage,
   onEditLink,
 }: Props) {
   return (
@@ -134,9 +136,17 @@ export default function CuratedItemsPanel({
                     disabled={saving || !onEditImage}
                     onClick={() => onEditImage?.(item)}
                     className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
-                    title="Imagen"
+                    title="URL imagen"
                   >
-                    Img
+                    Img URL
+                  </button>
+                  <button
+                    disabled={saving || !onUploadImage}
+                    onClick={() => onUploadImage?.(item)}
+                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
+                    title="Subir imagen"
+                  >
+                    Subir Img
                   </button>
                   <button
                     disabled={saving || !onEditLink}

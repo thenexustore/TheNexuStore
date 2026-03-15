@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { ProductsService } from '../user/products/products.service';
+import { saveBase64Image } from '../common/image.util';
 import {
   CreateItemDto,
   CreateLayoutDto,
@@ -337,6 +338,27 @@ export class HomeLayoutService {
     return { success: true };
   }
 
+
+  async uploadItemImage(dataUrl: string) {
+    if (!dataUrl?.startsWith('data:image/')) {
+      throw new BadRequestException('Invalid image payload');
+    }
+
+    const matches = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+    if (!matches) {
+      throw new BadRequestException('Invalid image payload');
+    }
+
+    const buffer = Buffer.from(matches[2], 'base64');
+    const maxBytes = 3 * 1024 * 1024;
+    if (buffer.length > maxBytes) {
+      throw new BadRequestException('Image must not exceed 3MB');
+    }
+
+    const url = await saveBase64Image(dataUrl);
+    return { url };
+  }
+
   async searchOptions(
     target: 'products' | 'categories' | 'brands' | 'banners',
     q = '',
@@ -641,6 +663,7 @@ export class HomeLayoutService {
         title: section.title,
         subtitle: section.subtitle,
         variant: section.variant,
+        config: section.config,
         resolved: await this.resolveSection(section),
       })),
     );

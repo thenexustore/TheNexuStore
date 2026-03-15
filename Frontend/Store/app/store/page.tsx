@@ -25,6 +25,16 @@ type HomeResolvedSection = {
   resolved?: unknown;
 };
 
+type HomeRenderDecision = {
+  shouldRenderDynamic: boolean;
+  reason:
+    | "force_dynamic"
+    | "legacy_forced_by_query"
+    | "layout_preview"
+    | "layout_active"
+    | "layout_missing";
+};
+
 async function getHome({
   previewLayoutId,
   locale,
@@ -84,8 +94,10 @@ export default async function StorePage({
   });
 
   const forceDynamic = sp.forceDynamic === "1";
-  // Layout builder becomes the default source of truth.
-  // Set useLayout=0 only when we explicitly want to force legacy dynamic sections.
+  // Source-of-truth rules for homepage rendering:
+  // 1) Home Layout is the default source of truth whenever a layout exists.
+  // 2) Legacy dynamic sections are only used when no layout exists (or explicit forced flags).
+  // 3) Keep opt-in query overrides for safe rollback/debug (`forceDynamic=1` / `useLayout=0`).
   const useLayout = sp.useLayout !== "0" || Boolean(sp.previewLayoutId);
   const layoutSections: HomeResolvedSection[] = Array.isArray(data?.sections)
     ? data.sections
@@ -121,18 +133,43 @@ export default async function StorePage({
     return Boolean(section?.resolved);
   });
 
-  // During migration, fallback to legacy dynamic source only when layout is
-  // effectively empty. This avoids rendering the old homepage on mobile just
-  // because one key section is not populated yet.
-  const shouldRenderDynamic =
-    forceDynamic ||
-    !(useLayout && hasLayoutSections) ||
-    !hasAnyResolvedContent ||
-    (heroSectionsEmpty && productSectionsAllEmpty);
+  const resolveRenderDecision = (): HomeRenderDecision => {
+    if (forceDynamic) {
+      return { shouldRenderDynamic: true, reason: "force_dynamic" };
+    }
+
+    if (!useLayout && !sp.previewLayoutId) {
+      return { shouldRenderDynamic: true, reason: "legacy_forced_by_query" };
+    }
+
+    if (Boolean(sp.previewLayoutId)) {
+      return { shouldRenderDynamic: false, reason: "layout_preview" };
+    }
+
+    if (hasLayoutSections || data?.layout) {
+      return { shouldRenderDynamic: false, reason: "layout_active" };
+    }
+
+    return { shouldRenderDynamic: true, reason: "layout_missing" };
+  };
+
+  const renderDecision = resolveRenderDecision();
+  const shouldRenderDynamic = renderDecision.shouldRenderDynamic;
 
   const initialDynamicSections = shouldRenderDynamic
     ? await getDynamicSections(Boolean(sp.highlightSection) || forceDynamic)
     : [];
+
+  if (shouldRenderDynamic) {
+    console.warn("[store-home] Rendering legacy homepage sections", {
+      reason: renderDecision.reason,
+      hasLayout: Boolean(data?.layout),
+      hasLayoutSections,
+      hasAnyResolvedContent,
+      heroSectionsEmpty,
+      productSectionsAllEmpty,
+    });
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 pb-10">

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repoRoot = process.cwd();
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(scriptDir, '..');
 
 const files = {
   sync: path.join(repoRoot, 'ops/env.sync.example'),
@@ -36,6 +38,29 @@ function parseEnv(filePath) {
   }
 
   return map;
+}
+
+
+function collectDuplicateKeys(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const seen = new Set();
+  const duplicates = new Set();
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const separator = line.indexOf('=');
+    if (separator <= 0) continue;
+
+    const key = line.slice(0, separator).trim();
+    if (!key) continue;
+
+    if (seen.has(key)) duplicates.add(key);
+    seen.add(key);
+  }
+
+  return [...duplicates];
 }
 
 function assertFileExists(filePath) {
@@ -72,6 +97,14 @@ try {
   const backendEnv = parseEnv(files.backend);
   const storefrontEnv = parseEnv(files.storefront);
   const adminEnv = parseEnv(files.admin);
+
+  for (const [name, filePath] of Object.entries(files)) {
+    if (name === 'sync') continue;
+    const duplicates = collectDuplicateKeys(filePath);
+    if (duplicates.length) {
+      console.warn(`⚠️ ${name} has duplicated keys (last value wins): ${duplicates.join(', ')}`);
+    }
+  }
 
   ensureKeysExist('ops/env.sync.example', syncEnv, [
     ...REQUIRED_BY_SERVICE.backend,

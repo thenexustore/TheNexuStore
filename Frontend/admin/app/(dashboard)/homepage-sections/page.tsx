@@ -1777,6 +1777,15 @@ export default function HomepageSectionsPage() {
         </div>
       </div>
 
+      <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="font-semibold">Modo legacy de homepage</p>
+        <p className="mt-1">
+          Este panel edita <code>/homepage/sections</code> (legacy). La Store usa
+          <code className="mx-1">/home</code> (Home Composer layouts) como fuente principal.
+          Usa este editor solo para fallback/migración controlada.
+        </p>
+      </div>
+
       <div className="sticky top-3 z-20 rounded-2xl border bg-white/95 p-2 shadow-sm backdrop-blur">
         <div className="flex flex-wrap items-center gap-2">
           {[

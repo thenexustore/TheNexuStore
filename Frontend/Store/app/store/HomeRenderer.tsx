@@ -64,9 +64,17 @@ const isLikelyMissingImage = (value: unknown): boolean => {
   if (!src) return true;
   return src.includes('no_image_available') || src.includes('no-image') || src.includes('placeholder');
 };
+
+const sanitizeImageValue = (value: unknown): string => {
+  const raw = asText(value).trim();
+  if (!raw) return '';
+  return raw
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\\//g, '/');
+};
+
 const asSrc = (value: unknown): string => {
-  if (typeof value !== 'string') return FALLBACK_IMG;
-  const src = value.trim();
+  const src = sanitizeImageValue(value);
   if (!src) return FALLBACK_IMG;
   if (src.startsWith('data:') || src.startsWith('blob:')) return src;
   if (/^https?:\/\//i.test(src)) return src;
@@ -77,6 +85,77 @@ const asSrc = (value: unknown): string => {
   }
 
   return `${API_URL}/${src.replace(/^\/+/, '')}`;
+};
+
+const firstUsableImage = (candidates: unknown[]): string => {
+  for (const candidate of candidates) {
+    const value = sanitizeImageValue(candidate);
+    if (!value) continue;
+    if (isLikelyMissingImage(value)) continue;
+    return value;
+  }
+  return '';
+};
+
+type HeroImageDecision = {
+  selectedField: string;
+  selectedRawValue: string;
+  normalizedUrl: string;
+  hasVisual: boolean;
+};
+
+const getHeroImageDecision = (slide: Record<string, unknown>): HeroImageDecision => {
+  const banner = (slide.banner as Record<string, unknown>) || {};
+  const config = (slide.config as Record<string, unknown> | undefined) || {};
+  const candidates: Array<{ field: string; value: unknown }> = [
+    { field: 'slide.image_url', value: slide.image_url },
+    { field: 'slide.image', value: slide.image },
+    { field: 'slide.config.image_url', value: config.image_url },
+    { field: 'slide.config.image', value: config.image },
+    { field: 'slide.banner.image', value: banner.image },
+    { field: 'slide.banner.image_url', value: banner.image_url },
+    { field: 'slide.banner.background_image', value: banner.background_image },
+    { field: 'slide.banner.desktop_image', value: banner.desktop_image },
+    { field: 'slide.banner.mobile_image', value: banner.mobile_image },
+  ];
+
+  for (const candidate of candidates) {
+    const raw = sanitizeImageValue(candidate.value);
+    if (!raw || isLikelyMissingImage(raw)) continue;
+    return {
+      selectedField: candidate.field,
+      selectedRawValue: raw,
+      normalizedUrl: asSrc(raw),
+      hasVisual: true,
+    };
+  }
+
+  return {
+    selectedField: 'none',
+    selectedRawValue: '',
+    normalizedUrl: FALLBACK_IMG,
+    hasVisual: false,
+  };
+};
+
+const hasUsableHeroImageData = (slide: Record<string, unknown>): boolean => {
+  const banner = (slide.banner as Record<string, unknown>) || {};
+  const config =
+    (slide.config as Record<string, unknown> | undefined) || {};
+
+  return Boolean(
+    firstUsableImage([
+      slide.image_url,
+      slide.image,
+      config.image_url,
+      config.image,
+      banner.image,
+      banner.image_url,
+      banner.background_image,
+      banner.desktop_image,
+      banner.mobile_image,
+    ]),
+  );
 };
 
 
@@ -157,14 +236,31 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
       toArray<Record<string, unknown>>(items)
         .map((item): Record<string, unknown> => {
           const banner = (item?.banner as Record<string, unknown>) || {};
+          const bannerSlide = {
+            id: banner.id,
+            title_text: banner.title_text,
+            subtitle_text: banner.subtitle_text,
+            button_text: banner.button_text,
+            button_link: banner.button_link,
+            label: banner.label,
+            image: banner.image,
+            image_url: banner.image_url,
+            overlay: banner.overlay,
+            align: banner.align,
+          } as Record<string, unknown>;
+
           return {
-            ...banner,
             ...item,
-            image: item.image_url || banner.image,
-            button_link: item.href || banner.button_link,
+            ...bannerSlide,
+            banner,
+            banner_id: item.banner_id || banner.id,
+            image: bannerSlide.image,
+            image_url: bannerSlide.image_url || bannerSlide.image,
+            button_link: bannerSlide.button_link,
+            label: bannerSlide.label,
           };
         })
-        .filter(Boolean),
+        .filter((slide) => Boolean(slide?.banner_id || slide?.image_url || slide?.title_text)),
     [items],
   );
   const [index, setIndex] = useState(0);
@@ -197,13 +293,47 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
           {slides.map((slide, i) => {
-            const heroImage = slide.image || slide.image_url;
-            const hasVisual = !isLikelyMissingImage(heroImage);
+            const decision = getHeroImageDecision(slide);
+            const hasVisual = decision.hasVisual;
+            const slideId = asText(slide.id, `hero-${i}`);
+
+            console.info('[store-home][hero][image-decision]', {
+              slideId,
+              selectedField: decision.selectedField,
+              selectedRawValue: decision.selectedRawValue,
+              normalizedUrl: decision.normalizedUrl,
+              hasVisual,
+            });
+
+            if (!hasVisual) {
+              const banner = (slide.banner as Record<string, unknown>) || {};
+              console.warn('[store-home][hero] Missing hero image for slide', {
+                slideId,
+                bannerId: asText(slide.banner_id),
+                title: asText(slide.title_text),
+                hasBannerObject: Object.keys(banner).length > 0,
+                hasUsableHeroImageData: hasUsableHeroImageData(slide),
+                selectedField: decision.selectedField,
+                normalizedUrl: decision.normalizedUrl,
+                rawImageFields: {
+                  slideImageUrl: asText(slide.image_url),
+                  slideImage: asText(slide.image),
+                  bannerImage: asText(banner.image),
+                  bannerImageUrl: asText(banner.image_url),
+                },
+              });
+            }
             return (
-            <div key={asText(slide.id, `hero-${i}`)} className="relative h-full min-w-full">
+            <div
+              key={slideId}
+              className="relative h-full min-w-full"
+              data-hero-image-field={decision.selectedField}
+              data-hero-image-url={decision.normalizedUrl.slice(0, 300)}
+              data-hero-has-visual={hasVisual ? 'true' : 'false'}
+            >
               {hasVisual ? (
                 <SmartImage
-                  src={asSrc(heroImage)}
+                  src={decision.normalizedUrl}
                   alt={asText(slide.title_text, 'Hero')}
                   className="object-cover"
                   priority={i === 0}
@@ -274,6 +404,13 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
           const name = asText(cat.item_label) || asText(cat.name, 'Category');
           const imageValue = cat.image_url || cat.image || cat.banner_image;
           const hasVisual = !isLikelyMissingImage(imageValue);
+          if (!hasVisual) {
+            console.warn('[store-home][category-strip] Missing category image', {
+              categoryId: asText(cat.id, `cat-${idx}`),
+              slug: asText(cat.slug),
+              name,
+            });
+          }
           return (
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}

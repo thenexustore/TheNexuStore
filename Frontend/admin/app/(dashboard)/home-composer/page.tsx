@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { homeBuilderApi } from "@/lib/api/home-builder";
+import { HomeBuilderApiError, homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
 import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
+import { getBanners, toggleBannerStatus } from "@/lib/api/banners";
+import {
+  fetchFeaturedProducts,
+  toggleFeaturedProductStatus,
+} from "@/lib/api/featured-products";
 import CanvasSections from "@/app/components/home-composer/CanvasSections";
 import CuratedItemsPanel from "@/app/components/home-composer/CuratedItemsPanel";
 import { HomeOption, HomeSection, HomeSectionItem, HomeSectionType } from "@/app/components/home-composer/types";
@@ -54,6 +59,25 @@ type SectionDraft = {
   variant: string;
   configText: string;
 };
+
+type IntegratedBanner = {
+  id: string;
+  title_text: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
+
+type IntegratedFeatured = {
+  id: string;
+  title: string | null;
+  sort_order: number;
+  is_active: boolean;
+  product?: { title?: string | null } | null;
+};
+
+function shouldUseLegacyIntegratedFallback(error: unknown) {
+  return error instanceof HomeBuilderApiError && error.status === 404;
+}
 
 const SECTION_TYPES: HomeSectionType[] = [
   "HERO_CAROUSEL",
@@ -168,8 +192,10 @@ export default function HomeComposerPage() {
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
-  const [activeTab, setActiveTab] = useState<"composer" | "banners" | "featured">("composer");
   const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
+  const [integratedBanners, setIntegratedBanners] = useState<IntegratedBanner[]>([]);
+  const [integratedFeatured, setIntegratedFeatured] = useState<IntegratedFeatured[]>([]);
+  const [integratedLoading, setIntegratedLoading] = useState(false);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -282,12 +308,71 @@ export default function HomeComposerPage() {
     }
   }, [locale]);
 
+  const loadIntegratedModules = useCallback(async () => {
+    setIntegratedLoading(true);
+
+    try {
+      try {
+        const summary = (await homeBuilderApi.integratedSummary(8)) as {
+          banners?: IntegratedBanner[];
+          featured?: IntegratedFeatured[];
+        };
+        setIntegratedBanners(summary?.banners || []);
+        setIntegratedFeatured(summary?.featured || []);
+        return;
+      } catch (error) {
+        if (!shouldUseLegacyIntegratedFallback(error)) {
+          throw error;
+        }
+      }
+
+      const [banners, featuredResponse] = await Promise.all([
+        getBanners(),
+        fetchFeaturedProducts({ take: 8 }),
+      ]);
+
+      setIntegratedBanners(
+        banners
+          .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order)
+          .slice(0, 8)
+          .map((banner) => ({
+            id: banner.id,
+            title_text: banner.title_text ?? null,
+            sort_order: banner.sort_order,
+            is_active: banner.is_active,
+          })),
+      );
+
+      setIntegratedFeatured(
+        (featuredResponse?.data || [])
+          .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order)
+          .slice(0, 8)
+          .map((item) => ({
+            id: item.id,
+            title: item.title ?? null,
+            sort_order: item.sort_order,
+            is_active: item.is_active,
+            product: { title: item.product?.title ?? null },
+          })),
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los módulos integrados",
+      );
+    } finally {
+      setIntegratedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
         await loadLayouts();
         await loadActiveDiagnostics();
+        await loadIntegratedModules();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No se pudieron cargar los diseños");
       } finally {
@@ -295,7 +380,50 @@ export default function HomeComposerPage() {
       }
     };
     void run();
-  }, [loadLayouts, loadActiveDiagnostics]);
+  }, [loadLayouts, loadActiveDiagnostics, loadIntegratedModules]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadIntegratedModules();
+    }, 45_000);
+    return () => window.clearInterval(id);
+  }, [loadIntegratedModules]);
+
+  const syncComposerRuntimeState = async () => {
+    await Promise.all([
+      loadActiveDiagnostics(),
+      activeLayoutId ? loadSections(activeLayoutId) : Promise.resolve(),
+    ]);
+  };
+
+  const toggleIntegratedBanner = async (bannerId: string) => {
+    try {
+      await toggleBannerStatus(bannerId);
+      await loadIntegratedModules();
+      await syncComposerRuntimeState();
+      toast.success("Estado de banner actualizado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo actualizar banner",
+      );
+    }
+  };
+
+  const toggleIntegratedFeatured = async (featuredId: string) => {
+    try {
+      await toggleFeaturedProductStatus(featuredId);
+      await loadIntegratedModules();
+      await syncComposerRuntimeState();
+      toast.success("Estado de destacado actualizado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar producto destacado",
+      );
+    }
+  };
 
   useEffect(() => {
     if (!activeLayoutId) return;
@@ -671,57 +799,17 @@ export default function HomeComposerPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveTab("composer")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "composer"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Compositor de Inicio
-          </button>
-          <button
-            onClick={() => setActiveTab("banners")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "banners"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Banners
-          </button>
-          <button
-            onClick={() => setActiveTab("featured")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "featured"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Productos destacados
-          </button>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Compositor de Inicio</span>
+          <a href="#composer-banners-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+            Ir a Banners integrados
+          </a>
+          <a href="#composer-featured-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+            Ir a Productos destacados integrados
+          </a>
         </div>
       </div>
 
-      {activeTab !== "composer" ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm text-zinc-500">
-            {activeTab === "banners"
-              ? "Gestión integrada de Banners (mismo flujo, sin salir de Compositor)."
-              : "Gestión integrada de Productos destacados (mismo flujo, sin salir de Compositor)."}
-          </div>
-          <iframe
-            src={activeTab === "banners" ? `/${locale}/banners` : `/${locale}/featured-products`}
-            className="h-[78vh] w-full rounded-xl border border-zinc-200"
-            title={activeTab === "banners" ? "Banners" : "Productos destacados"}
-          />
-        </div>
-      ) : null}
-
-      {activeTab === "composer" ? (
-      <>
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1290,26 +1378,26 @@ export default function HomeComposerPage() {
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
                   Este bloque Hero está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
                   <div className="mt-2">
-                    <button
-                      onClick={() => setActiveTab("banners")}
-                      className="rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                    <a
+                      href="#composer-banners-panel"
+                      className="inline-block rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
                     >
                       Gestionar Banners
-                    </button>
+                    </a>
                   </div>
                 </div>
               ) : null}
 
               {isFeaturedProductSection ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                  Esta sección usa la fuente Destacados. Puedes gestionarlos desde la pestaña de Productos destacados.
+                  Esta sección usa la fuente Destacados. Puedes gestionarlos desde el panel integrado de Productos destacados.
                   <div className="mt-2">
-                    <button
-                      onClick={() => setActiveTab("featured")}
-                      className="rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                    <a
+                      href="#composer-featured-panel"
+                      className="inline-block rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
                     >
                       Gestionar Productos destacados
-                    </button>
+                    </a>
                   </div>
                 </div>
               ) : null}
@@ -1502,8 +1590,102 @@ export default function HomeComposerPage() {
           )}
         </div>
       </div>
-      </>
-      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Banners</h3>
+              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIntegratedModules}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Refrescar
+              </button>
+              <a
+                href={`/${locale}/banners`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Abrir completo ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="p-3 text-xs text-zinc-500">Cargando banners…</div>
+            ) : integratedBanners.length === 0 ? (
+              <div className="p-3 text-xs text-zinc-500">No hay banners configurados.</div>
+            ) : (
+              integratedBanners.slice(0, 8).map((banner) => (
+                <div key={banner.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{banner.title_text || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-500">Orden #{banner.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => toggleIntegratedBanner(banner.id)}
+                    className={`rounded px-2 py-1 text-[11px] ${banner.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                  >
+                    {banner.is_active ? "Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Productos destacados</h3>
+              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIntegratedModules}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Refrescar
+              </button>
+              <a
+                href={`/${locale}/featured-products`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Abrir completo ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="p-3 text-xs text-zinc-500">Cargando destacados…</div>
+            ) : integratedFeatured.length === 0 ? (
+              <div className="p-3 text-xs text-zinc-500">No hay productos destacados configurados.</div>
+            ) : (
+              integratedFeatured.slice(0, 8).map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{item.title || item.product?.title || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-500">Orden #{item.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => toggleIntegratedFeatured(item.id)}
+                    className={`rounded px-2 py-1 text-[11px] ${item.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                  >
+                    {item.is_active ? "Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

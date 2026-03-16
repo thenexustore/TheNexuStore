@@ -259,6 +259,24 @@ export class HomeLayoutService {
     return { success: true };
   }
 
+
+  private async reindexLayoutSections(layoutId: string) {
+    const sections = await this.prisma.homePageSection.findMany({
+      where: { layout_id: layoutId },
+      orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
+      select: { id: true },
+    });
+
+    await this.prisma.$transaction(
+      sections.map((section, index) =>
+        this.prisma.homePageSection.update({
+          where: { id: section.id },
+          data: { position: index + 1 },
+        }),
+      ),
+    );
+  }
+
   async listSections(layoutId: string) {
     return this.prisma.homePageSection.findMany({
       where: { layout_id: layoutId },
@@ -268,9 +286,20 @@ export class HomeLayoutService {
 
   async createSection(layoutId: string, dto: CreateSectionDto) {
     const config = this.normalizeSectionConfig(dto.type, dto.config || {});
-    const section = await this.prisma.homePageSection.create({
-      data: { layout_id: layoutId, ...dto, config },
+    const maxPosition = await this.prisma.homePageSection.aggregate({
+      where: { layout_id: layoutId },
+      _max: { position: true },
     });
+
+    const section = await this.prisma.homePageSection.create({
+      data: {
+        layout_id: layoutId,
+        ...dto,
+        config,
+        position: (maxPosition._max.position || 0) + 1,
+      },
+    });
+    await this.reindexLayoutSections(layoutId);
     this.invalidateCache();
     return section;
   }
@@ -323,7 +352,11 @@ export class HomeLayoutService {
   }
 
   async removeSection(id: string) {
+    const section = await this.prisma.homePageSection.findUnique({ where: { id } });
+    if (!section) throw new NotFoundException('Section not found');
+
     await this.prisma.homePageSection.delete({ where: { id } });
+    await this.reindexLayoutSections(section.layout_id);
     this.invalidateCache();
     return { success: true };
   }

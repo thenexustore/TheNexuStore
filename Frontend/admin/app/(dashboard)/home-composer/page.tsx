@@ -549,12 +549,15 @@ export default function HomeComposerPage() {
   };
 
   const moveSection = async (section: HomeSection, direction: -1 | 1) => {
-    const nextPosition = section.position + direction;
-    if (nextPosition < 1 || nextPosition > sections.length) return;
+    const currentIndex = sections.findIndex((x) => x.id === section.id);
+    if (currentIndex < 0) return;
+
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= sections.length) return;
 
     try {
       setSaving(true);
-      await homeBuilderApi.moveSection(section.id, nextPosition);
+      await homeBuilderApi.moveSection(section.id, nextIndex + 1);
       await loadSections(activeLayoutId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo mover la sección");

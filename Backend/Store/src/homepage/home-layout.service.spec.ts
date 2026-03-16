@@ -445,3 +445,36 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     );
   });
 });
+
+
+describe('HomeLayoutService section ordering integrity', () => {
+  it('reindexes positions after removing a section', async () => {
+    const prisma = {
+      homePageSection: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'sec-2', layout_id: 'layout-1' }),
+        delete: jest.fn().mockResolvedValue({ id: 'sec-2' }),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'sec-1' },
+          { id: 'sec-3' },
+        ]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      $transaction: jest.fn(async (ops) => Promise.all(ops)),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+
+    await service.removeSection('sec-2');
+
+    expect(prisma.homePageSection.findUnique).toHaveBeenCalledWith({ where: { id: 'sec-2' } });
+    expect(prisma.homePageSection.delete).toHaveBeenCalledWith({ where: { id: 'sec-2' } });
+    expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ where: { id: 'sec-1' }, data: { position: 1 } }),
+    );
+    expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ where: { id: 'sec-3' }, data: { position: 2 } }),
+    );
+  });
+});

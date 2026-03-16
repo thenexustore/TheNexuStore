@@ -587,29 +587,58 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const items = await this.prisma.homePageSectionItem.findMany({
-        where: { section_id: section.id },
-        orderBy: { position: 'asc' },
-        include: { banner: true },
-      });
+      const [items, activeBanners] = await Promise.all([
+        this.prisma.homePageSectionItem.findMany({
+          where: { section_id: section.id },
+          orderBy: { position: 'asc' },
+          include: { banner: true },
+        }),
+        this.prisma.banner.findMany({
+          where: { is_active: true },
+          orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+          take: 6,
+        }),
+      ]);
 
-      if (items.length) {
-        return items.map((x) => ({ ...x, banner: x.banner }));
+      if (!activeBanners.length) {
+        return [];
       }
 
-      // Fallback bridge: if no curated hero items were linked yet,
-      // use active banners from legacy Banner admin so homepage is never blank.
-      this.logger.warn(
-        `HERO_CAROUSEL section ${section.id} has no curated items; using active banner fallback.`,
-      );
-      const activeBanners = await this.prisma.banner.findMany({
-        where: { is_active: true },
-        orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
-        take: 6,
-      });
+      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const seen = new Set<string>();
+      const curatedOrderedBanners = items
+        .map((item) => {
+          const bannerId = item.banner_id || item.banner?.id || null;
+          if (!bannerId) return null;
+          return activeBannerById.get(bannerId) || null;
+        })
+        .filter((banner): banner is (typeof activeBanners)[number] => {
+          if (!banner) return false;
+          if (seen.has(banner.id)) return false;
+          seen.add(banner.id);
+          return true;
+        });
 
-      return activeBanners.map((banner) => ({ banner_id: banner.id, banner }));
+      if (!curatedOrderedBanners.length) {
+        const fallbackReason = items.length
+          ? 'curated items without active linked banners'
+          : 'no curated items';
+
+        this.logger.warn(
+          `HERO_CAROUSEL section ${section.id} has ${fallbackReason}; using active banner fallback.`,
+        );
+      }
+
+      const remainingActiveBanners = activeBanners.filter(
+        (banner) => !seen.has(banner.id),
+      );
+
+      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
+        banner_id: banner.id,
+        banner,
+      }));
     }
+
 
     if (section.type === HomeSectionType.CATEGORY_STRIP) {
       if (config.mode === 'curated') {

@@ -236,14 +236,31 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
       toArray<Record<string, unknown>>(items)
         .map((item): Record<string, unknown> => {
           const banner = (item?.banner as Record<string, unknown>) || {};
+          const bannerSlide = {
+            id: banner.id,
+            title_text: banner.title_text,
+            subtitle_text: banner.subtitle_text,
+            button_text: banner.button_text,
+            button_link: banner.button_link,
+            label: banner.label,
+            image: banner.image,
+            image_url: banner.image_url,
+            overlay: banner.overlay,
+            align: banner.align,
+          } as Record<string, unknown>;
+
           return {
-            ...banner,
             ...item,
-            image: item.image_url || banner.image,
-            button_link: item.href || banner.button_link,
+            ...bannerSlide,
+            banner,
+            banner_id: item.banner_id || banner.id,
+            image: bannerSlide.image,
+            image_url: bannerSlide.image_url || bannerSlide.image,
+            button_link: bannerSlide.button_link,
+            label: bannerSlide.label,
           };
         })
-        .filter(Boolean),
+        .filter((slide) => Boolean(slide?.banner_id || slide?.image_url || slide?.title_text)),
     [items],
   );
   const [index, setIndex] = useState(0);

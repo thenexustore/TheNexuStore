@@ -6,6 +6,12 @@ import { homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
 import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
+import { Banner, getBanners, toggleBannerStatus } from "@/lib/api/banners";
+import {
+  FeaturedProduct,
+  fetchFeaturedProducts,
+  toggleFeaturedProductStatus,
+} from "@/lib/api/featured-products";
 import CanvasSections from "@/app/components/home-composer/CanvasSections";
 import CuratedItemsPanel from "@/app/components/home-composer/CuratedItemsPanel";
 import { HomeOption, HomeSection, HomeSectionItem, HomeSectionType } from "@/app/components/home-composer/types";
@@ -169,6 +175,9 @@ export default function HomeComposerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
   const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
+  const [integratedBanners, setIntegratedBanners] = useState<Banner[]>([]);
+  const [integratedFeatured, setIntegratedFeatured] = useState<FeaturedProduct[]>([]);
+  const [integratedLoading, setIntegratedLoading] = useState(false);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -281,12 +290,33 @@ export default function HomeComposerPage() {
     }
   }, [locale]);
 
+  const loadIntegratedModules = useCallback(async () => {
+    try {
+      setIntegratedLoading(true);
+      const [banners, featuredRes] = await Promise.all([
+        getBanners(),
+        fetchFeaturedProducts({ take: 8 }),
+      ]);
+      setIntegratedBanners(banners || []);
+      setIntegratedFeatured(featuredRes?.data || []);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los módulos integrados",
+      );
+    } finally {
+      setIntegratedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
         await loadLayouts();
         await loadActiveDiagnostics();
+        await loadIntegratedModules();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No se pudieron cargar los diseños");
       } finally {
@@ -294,7 +324,50 @@ export default function HomeComposerPage() {
       }
     };
     void run();
-  }, [loadLayouts, loadActiveDiagnostics]);
+  }, [loadLayouts, loadActiveDiagnostics, loadIntegratedModules]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadIntegratedModules();
+    }, 45_000);
+    return () => window.clearInterval(id);
+  }, [loadIntegratedModules]);
+
+  const syncComposerRuntimeState = async () => {
+    await Promise.all([
+      loadActiveDiagnostics(),
+      activeLayoutId ? loadSections(activeLayoutId) : Promise.resolve(),
+    ]);
+  };
+
+  const toggleIntegratedBanner = async (bannerId: string) => {
+    try {
+      await toggleBannerStatus(bannerId);
+      await loadIntegratedModules();
+      await syncComposerRuntimeState();
+      toast.success("Estado de banner actualizado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo actualizar banner",
+      );
+    }
+  };
+
+  const toggleIntegratedFeatured = async (featuredId: string) => {
+    try {
+      await toggleFeaturedProductStatus(featuredId);
+      await loadIntegratedModules();
+      await syncComposerRuntimeState();
+      toast.success("Estado de destacado actualizado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar producto destacado",
+      );
+    }
+  };
 
   useEffect(() => {
     if (!activeLayoutId) return;
@@ -1462,38 +1535,100 @@ export default function HomeComposerPage() {
         </div>
       </div>
 
-      <div id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-        <details open>
-          <summary className="cursor-pointer list-none text-sm font-semibold text-zinc-900">
-            Gestión de Banners (integrada en Compositor)
-          </summary>
-          <p className="mb-2 mt-2 text-sm text-zinc-500">
-            Este panel carga la gestión completa de banners sin salir del Compositor de Inicio.
-          </p>
-          <iframe
-            src={`/${locale}/banners`}
-            className="h-[72vh] w-full rounded-xl border border-zinc-200"
-            title="Banners integrados en Compositor"
-            loading="lazy"
-          />
-        </details>
-      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Banners</h3>
+              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIntegratedModules}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Refrescar
+              </button>
+              <a
+                href={`/${locale}/banners`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Abrir completo ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="p-3 text-xs text-zinc-500">Cargando banners…</div>
+            ) : integratedBanners.length === 0 ? (
+              <div className="p-3 text-xs text-zinc-500">No hay banners configurados.</div>
+            ) : (
+              integratedBanners.slice(0, 8).map((banner) => (
+                <div key={banner.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{banner.title_text || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-500">Orden #{banner.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => toggleIntegratedBanner(banner.id)}
+                    className={`rounded px-2 py-1 text-[11px] ${banner.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                  >
+                    {banner.is_active ? "Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
-      <div id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-        <details>
-          <summary className="cursor-pointer list-none text-sm font-semibold text-zinc-900">
-            Gestión de Productos destacados (integrada en Compositor)
-          </summary>
-          <p className="mb-2 mt-2 text-sm text-zinc-500">
-            Este panel carga la gestión completa de productos destacados sin salir del Compositor de Inicio.
-          </p>
-          <iframe
-            src={`/${locale}/featured-products`}
-            className="h-[72vh] w-full rounded-xl border border-zinc-200"
-            title="Productos destacados integrados en Compositor"
-            loading="lazy"
-          />
-        </details>
+        <section id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Productos destacados</h3>
+              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIntegratedModules}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Refrescar
+              </button>
+              <a
+                href={`/${locale}/featured-products`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Abrir completo ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="p-3 text-xs text-zinc-500">Cargando destacados…</div>
+            ) : integratedFeatured.length === 0 ? (
+              <div className="p-3 text-xs text-zinc-500">No hay productos destacados configurados.</div>
+            ) : (
+              integratedFeatured.slice(0, 8).map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{item.title || item.product?.title || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-500">Orden #{item.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => toggleIntegratedFeatured(item.id)}
+                    className={`rounded px-2 py-1 text-[11px] ${item.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                  >
+                    {item.is_active ? "Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

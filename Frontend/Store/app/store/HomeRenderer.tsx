@@ -441,22 +441,31 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className={`group rounded-2xl border bg-gradient-to-b from-white to-slate-50 p-3 text-center transition hover:-translate-y-1 ${elevatedCards ? "border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-200" : "border-slate-200 shadow-sm hover:border-indigo-200"}`}
+            className={`group relative rounded-2xl border bg-gradient-to-b from-white to-slate-50 p-3 text-center transition duration-200 hover:-translate-y-1 ${elevatedCards ? "border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-200" : "border-slate-200 shadow-sm hover:border-indigo-200"}`}
           >
-            <div className="mx-auto mb-2 relative h-20 w-full overflow-hidden rounded-xl bg-white ring-1 ring-slate-100">
+            {idx < 3 ? (
+              <span className="absolute right-2 top-2 rounded-full bg-indigo-600/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                Top {idx + 1}
+              </span>
+            ) : null}
+            <div className="mx-auto mb-2 relative h-24 w-full overflow-hidden rounded-xl bg-white p-1 ring-1 ring-slate-100">
               {hasVisual ? (
                 <SmartImage
                   src={asSrc(imageValue)}
                   alt={name}
                   className={imageFitClass}
-                  sizes="140px"
+                  sizes="160px"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[11px] font-medium uppercase tracking-wide text-slate-400">Sin imagen</div>
               )}
             </div>
-            {showNames ? <p className="line-clamp-2 min-h-10 text-sm font-semibold text-slate-800 group-hover:text-indigo-700">{name}</p> : null}
-            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-indigo-500">Explorar</div>
+            {showNames ? (
+              <p className="line-clamp-2 min-h-10 break-words text-sm font-semibold leading-5 text-slate-800 group-hover:text-indigo-700">{name}</p>
+            ) : null}
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 transition group-hover:border-indigo-300 group-hover:bg-indigo-100">
+              Explorar <span aria-hidden>→</span>
+            </div>
           </ActionLink>
           );
         })}

@@ -555,11 +555,20 @@ export default function HomeComposerPage() {
     const nextIndex = currentIndex + direction;
     if (nextIndex < 0 || nextIndex >= sections.length) return;
 
+    const reordered = [...sections];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(nextIndex, 0, moved);
+    const payload = reordered.map((entry, index) => ({ id: entry.id, position: index + 1 }));
+
+    const previousSections = sections;
+    setSections(reordered.map((entry, index) => ({ ...entry, position: index + 1 })));
+
     try {
       setSaving(true);
-      await homeBuilderApi.moveSection(section.id, nextIndex + 1);
+      await homeBuilderApi.reorderSections(payload);
       await loadSections(activeLayoutId);
     } catch (error) {
+      setSections(previousSections);
       toast.error(error instanceof Error ? error.message : "No se pudo mover la sección");
     } finally {
       setSaving(false);

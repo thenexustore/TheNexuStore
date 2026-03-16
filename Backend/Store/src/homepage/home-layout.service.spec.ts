@@ -577,6 +577,48 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
 
 
 describe('HomeLayoutService section ordering integrity', () => {
+
+  it('reorders sections and normalizes contiguous positions', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            { id: 'sec-1', layout_id: 'layout-1' },
+            { id: 'sec-2', layout_id: 'layout-1' },
+            { id: 'sec-3', layout_id: 'layout-1' },
+          ])
+          .mockResolvedValueOnce([
+            { id: 'sec-3' },
+            { id: 'sec-1' },
+            { id: 'sec-2' },
+          ])
+          .mockResolvedValueOnce([
+            { id: 'sec-3', position: 1 },
+            { id: 'sec-1', position: 2 },
+            { id: 'sec-2', position: 3 },
+          ]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      $transaction: jest.fn(async (ops) => Promise.all(ops)),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+
+    const result = await service.reorderSections({
+      items: [
+        { id: 'sec-3', position: 1 },
+        { id: 'sec-1', position: 2 },
+        { id: 'sec-2', position: 3 },
+      ],
+    });
+
+    expect(prisma.homePageSection.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'sec-3' }, data: { position: 1 } }),
+    );
+    expect(result.map((x: any) => x.id)).toEqual(['sec-3', 'sec-1', 'sec-2']);
+  });
+
   it('reindexes positions after removing a section', async () => {
     const prisma = {
       homePageSection: {

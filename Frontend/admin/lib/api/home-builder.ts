@@ -42,6 +42,7 @@ export const homeBuilderApi = {
   updateSection: (id: string, payload: Record<string, any>) => req(`/admin/home/sections/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteSection: (id: string) => req(`/admin/home/sections/${id}`, { method: 'DELETE' }),
   moveSection: (id: string, position: number) => req(`/admin/home/sections/${id}/move`, { method: 'POST', body: JSON.stringify({ position }) }),
+  reorderSections: (items: Array<{ id: string; position: number }>) => req('/admin/home/sections/reorder', { method: 'POST', body: JSON.stringify({ items }) }),
 
   listItems: (sectionId: string) => req(`/admin/home/sections/${sectionId}/items`),
   createItem: (sectionId: string, payload: Record<string, any>) => req(`/admin/home/sections/${sectionId}/items`, { method: 'POST', body: JSON.stringify(payload) }),

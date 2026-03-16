@@ -433,6 +433,44 @@ export class HomeLayoutService {
     return this.listSections(section.layout_id);
   }
 
+  async reorderSections(dto: { items: Array<{ id: string; position: number }> }) {
+    const items = Array.isArray(dto?.items) ? dto.items : [];
+    if (!items.length) throw new BadRequestException('items is required');
+
+    const uniqueIds = Array.from(new Set(items.map((item) => item.id).filter(Boolean)));
+    if (uniqueIds.length !== items.length) {
+      throw new BadRequestException('Section ids must be unique');
+    }
+
+    const sections = await this.prisma.homePageSection.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, layout_id: true },
+    });
+
+    if (sections.length !== uniqueIds.length) {
+      throw new NotFoundException('One or more sections were not found');
+    }
+
+    const layoutIds = new Set(sections.map((section) => section.layout_id));
+    if (layoutIds.size !== 1) {
+      throw new BadRequestException('All sections must belong to the same layout');
+    }
+
+    await this.prisma.$transaction(
+      items.map((item) =>
+        this.prisma.homePageSection.update({
+          where: { id: item.id },
+          data: { position: item.position },
+        }),
+      ),
+    );
+
+    const layoutId = sections[0].layout_id;
+    await this.reindexLayoutSections(layoutId);
+    this.invalidateCache();
+    return this.listSections(layoutId);
+  }
+
   async removeSection(id: string) {
     const section = await this.prisma.homePageSection.findUnique({ where: { id } });
     if (!section) throw new NotFoundException('Section not found');

@@ -82,6 +82,7 @@ export default function CanvasSections({
                   {section.is_enabled ? "Visible" : "Oculto"}
                 </span>
                 <button
+                  type="button"
                   onClick={(event) => {
                     event.stopPropagation();
                     onMove(section, -1);
@@ -93,6 +94,7 @@ export default function CanvasSections({
                   ↑
                 </button>
                 <button
+                  type="button"
                   onClick={(event) => {
                     event.stopPropagation();
                     onMove(section, 1);
@@ -104,6 +106,7 @@ export default function CanvasSections({
                   ↓
                 </button>
                 <button
+                  type="button"
                   onClick={(event) => {
                     event.stopPropagation();
                     onToggle(section);
@@ -114,6 +117,7 @@ export default function CanvasSections({
                   {section.is_enabled ? "Ocultar" : "Mostrar"}
                 </button>
                 <button
+                  type="button"
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete(section.id);

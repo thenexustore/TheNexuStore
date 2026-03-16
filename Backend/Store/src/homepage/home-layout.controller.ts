@@ -6,6 +6,7 @@ import {
   CreateSectionDto,
   MoveSectionDto,
   ReorderItemsDto,
+  ReorderSectionsDto,
   UpdateItemDto,
   UpdateLayoutDto,
   UpdateSectionDto,
@@ -122,6 +123,11 @@ export class HomeLayoutController {
   @Post('/admin/home/sections/:sectionId/move')
   async moveSection(@Param('sectionId') sectionId: string, @Body() body: MoveSectionDto) {
     return { success: true, data: await this.service.moveSection(sectionId, body) };
+  }
+
+  @Post('/admin/home/sections/reorder')
+  async reorderSections(@Body() body: ReorderSectionsDto) {
+    return { success: true, data: await this.service.reorderSections(body) };
   }
 
   @UseGuards(AdminGuard)

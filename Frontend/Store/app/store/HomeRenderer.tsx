@@ -79,6 +79,17 @@ const asSrc = (value: unknown): string => {
   return `${API_URL}/${src.replace(/^\/+/, '')}`;
 };
 
+const resolveHeroImage = (slide: Record<string, unknown>): unknown => {
+  const banner = (slide.banner as Record<string, unknown>) || {};
+  return (
+    slide.image_url ||
+    slide.image ||
+    (slide.config as Record<string, unknown> | undefined)?.image_url ||
+    banner.image ||
+    banner.image_url
+  );
+};
+
 
 function SmartImage({
   src,
@@ -197,8 +208,15 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
           {slides.map((slide, i) => {
-            const heroImage = slide.image || slide.image_url;
+            const heroImage = resolveHeroImage(slide);
             const hasVisual = !isLikelyMissingImage(heroImage);
+            if (!hasVisual) {
+              console.warn('[store-home][hero] Missing hero image for slide', {
+                slideId: asText(slide.id, `hero-${i}`),
+                bannerId: asText(slide.banner_id),
+                title: asText(slide.title_text),
+              });
+            }
             return (
             <div key={asText(slide.id, `hero-${i}`)} className="relative h-full min-w-full">
               {hasVisual ? (
@@ -274,6 +292,13 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
           const name = asText(cat.item_label) || asText(cat.name, 'Category');
           const imageValue = cat.image_url || cat.image || cat.banner_image;
           const hasVisual = !isLikelyMissingImage(imageValue);
+          if (!hasVisual) {
+            console.warn('[store-home][category-strip] Missing category image', {
+              categoryId: asText(cat.id, `cat-${idx}`),
+              slug: asText(cat.slug),
+              name,
+            });
+          }
           return (
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}

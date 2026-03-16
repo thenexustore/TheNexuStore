@@ -64,6 +64,9 @@ export class HomeLayoutService {
 
     if (type === HomeSectionType.HERO_CAROUSEL) {
       next.autoplay = this.asBoolean(next.autoplay, true);
+      next.pause_on_hover = this.asBoolean(next.pause_on_hover, true);
+      next.show_arrows = this.asBoolean(next.show_arrows, true);
+      next.show_dots = this.asBoolean(next.show_dots, true);
       next.interval_ms = this.clampRange(next.interval_ms, 2500, 15000, 5000);
     }
 
@@ -81,6 +84,11 @@ export class HomeLayoutService {
     if (type === HomeSectionType.CATEGORY_STRIP) {
       next.limit = this.clampLimit(next.limit, 12);
       next.mode = next.mode || 'auto';
+      next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
+      next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
+      next.show_names = this.asBoolean(next.show_names, true);
+      next.image_fit = next.image_fit === 'cover' ? 'cover' : 'contain';
+      next.card_style = next.card_style === 'elevated' ? 'elevated' : 'minimal';
     }
 
     if (type === HomeSectionType.BRAND_STRIP) {
@@ -256,6 +264,24 @@ export class HomeLayoutService {
     return { success: true };
   }
 
+
+  private async reindexLayoutSections(layoutId: string) {
+    const sections = await this.prisma.homePageSection.findMany({
+      where: { layout_id: layoutId },
+      orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
+      select: { id: true },
+    });
+
+    await this.prisma.$transaction(
+      sections.map((section, index) =>
+        this.prisma.homePageSection.update({
+          where: { id: section.id },
+          data: { position: index + 1 },
+        }),
+      ),
+    );
+  }
+
   async listSections(layoutId: string) {
     return this.prisma.homePageSection.findMany({
       where: { layout_id: layoutId },
@@ -265,9 +291,20 @@ export class HomeLayoutService {
 
   async createSection(layoutId: string, dto: CreateSectionDto) {
     const config = this.normalizeSectionConfig(dto.type, dto.config || {});
-    const section = await this.prisma.homePageSection.create({
-      data: { layout_id: layoutId, ...dto, config },
+    const maxPosition = await this.prisma.homePageSection.aggregate({
+      where: { layout_id: layoutId },
+      _max: { position: true },
     });
+
+    const section = await this.prisma.homePageSection.create({
+      data: {
+        layout_id: layoutId,
+        ...dto,
+        config,
+        position: (maxPosition._max.position || 0) + 1,
+      },
+    });
+    await this.reindexLayoutSections(layoutId);
     this.invalidateCache();
     return section;
   }
@@ -320,7 +357,11 @@ export class HomeLayoutService {
   }
 
   async removeSection(id: string) {
+    const section = await this.prisma.homePageSection.findUnique({ where: { id } });
+    if (!section) throw new NotFoundException('Section not found');
+
     await this.prisma.homePageSection.delete({ where: { id } });
+    await this.reindexLayoutSections(section.layout_id);
     this.invalidateCache();
     return { success: true };
   }
@@ -587,29 +628,58 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const items = await this.prisma.homePageSectionItem.findMany({
-        where: { section_id: section.id },
-        orderBy: { position: 'asc' },
-        include: { banner: true },
-      });
+      const [items, activeBanners] = await Promise.all([
+        this.prisma.homePageSectionItem.findMany({
+          where: { section_id: section.id },
+          orderBy: { position: 'asc' },
+          include: { banner: true },
+        }),
+        this.prisma.banner.findMany({
+          where: { is_active: true },
+          orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+          take: 6,
+        }),
+      ]);
 
-      if (items.length) {
-        return items.map((x) => ({ ...x, banner: x.banner }));
+      if (!activeBanners.length) {
+        return [];
       }
 
-      // Fallback bridge: if no curated hero items were linked yet,
-      // use active banners from legacy Banner admin so homepage is never blank.
-      this.logger.warn(
-        `HERO_CAROUSEL section ${section.id} has no curated items; using active banner fallback.`,
-      );
-      const activeBanners = await this.prisma.banner.findMany({
-        where: { is_active: true },
-        orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
-        take: 6,
-      });
+      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const seen = new Set<string>();
+      const curatedOrderedBanners = items
+        .map((item) => {
+          const bannerId = item.banner_id || item.banner?.id || null;
+          if (!bannerId) return null;
+          return activeBannerById.get(bannerId) || null;
+        })
+        .filter((banner): banner is (typeof activeBanners)[number] => {
+          if (!banner) return false;
+          if (seen.has(banner.id)) return false;
+          seen.add(banner.id);
+          return true;
+        });
 
-      return activeBanners.map((banner) => ({ banner_id: banner.id, banner }));
+      if (!curatedOrderedBanners.length) {
+        const fallbackReason = items.length
+          ? 'curated items without active linked banners'
+          : 'no curated items';
+
+        this.logger.warn(
+          `HERO_CAROUSEL section ${section.id} has ${fallbackReason}; using active banner fallback.`,
+        );
+      }
+
+      const remainingActiveBanners = activeBanners.filter(
+        (banner) => !seen.has(banner.id),
+      );
+
+      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
+        banner_id: banner.id,
+        banner,
+      }));
     }
+
 
     if (section.type === HomeSectionType.CATEGORY_STRIP) {
       if (config.mode === 'curated') {
@@ -630,11 +700,54 @@ export class HomeLayoutService {
           })
           .filter(Boolean);
       }
-      return this.prisma.category.findMany({
+      const categories = await this.prisma.category.findMany({
         where: { is_active: true, parent_id: null },
         take: this.clampLimit(config.limit, 10),
         orderBy: [{ sort_order: 'asc' }],
       });
+
+      const categoriesWithImage = await Promise.all(
+        categories.map(async (category) => {
+          const existingImage =
+            (category as any).image_url || (category as any).image || null;
+          if (existingImage) {
+            return { ...category, image_url: existingImage };
+          }
+
+          const firstProduct = await this.prisma.product.findFirst({
+            where: {
+              status: 'ACTIVE',
+              OR: [
+                { main_category_id: category.id },
+                { categories: { some: { category_id: category.id } } },
+              ],
+              media: { some: {} },
+            },
+            select: {
+              media: {
+                orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+                select: { url: true },
+                take: 1,
+              },
+            },
+            orderBy: { created_at: 'desc' },
+          });
+
+          const derivedImage = firstProduct?.media?.[0]?.url || null;
+          if (!derivedImage) {
+            this.logger.warn(
+              `CATEGORY_STRIP category ${category.id} (${category.slug}) has no image_url and no product media fallback.`,
+            );
+          }
+
+          return {
+            ...category,
+            image_url: derivedImage,
+          };
+        }),
+      );
+
+      return categoriesWithImage;
     }
 
     if (section.type === HomeSectionType.BRAND_STRIP) {
@@ -850,5 +963,35 @@ export class HomeLayoutService {
       },
       sections: sectionDiagnostics,
     };
+  }
+
+  async getIntegratedModulesSummary(limit = 8) {
+    const take = this.clampLimit(limit, 8);
+
+    const [banners, featured] = await Promise.all([
+      this.prisma.banner.findMany({
+        orderBy: [{ is_active: 'desc' }, { sort_order: 'asc' }],
+        take,
+        select: {
+          id: true,
+          title_text: true,
+          sort_order: true,
+          is_active: true,
+        },
+      }),
+      this.prisma.featuredProduct.findMany({
+        orderBy: [{ is_active: 'desc' }, { sort_order: 'asc' }],
+        take,
+        select: {
+          id: true,
+          title: true,
+          sort_order: true,
+          is_active: true,
+          product: { select: { title: true } },
+        },
+      }),
+    ]);
+
+    return { banners, featured };
   }
 }

@@ -23,7 +23,7 @@ const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' 
 const FALLBACK_IMG = '/No_Image_Available.png';
 
 const SECTION_TYPE_LABEL: Record<string, string> = {
-  HERO_CAROUSEL: 'Destacados',
+  HERO_CAROUSEL: '',
   CATEGORY_STRIP: 'Categorías TOP',
   PRODUCT_CAROUSEL: 'Novedades',
   BRAND_STRIP: 'Marcas populares',
@@ -56,6 +56,11 @@ const isMachineTitle = (value: string) => /^[A-Z0-9_]+$/.test(value);
 const resolveSectionTitle = (type: string, title?: string): string => {
   const normalized = asText(title).trim();
   if (normalized && !isMachineTitle(normalized)) return normalized;
+
+  if (type === 'HERO_CAROUSEL') {
+    return '';
+  }
+
   return SECTION_TYPE_LABEL[type] || normalized.replace(/_/g, ' ') || 'Sección destacada';
 };
 
@@ -64,9 +69,17 @@ const isLikelyMissingImage = (value: unknown): boolean => {
   if (!src) return true;
   return src.includes('no_image_available') || src.includes('no-image') || src.includes('placeholder');
 };
+
+const sanitizeImageValue = (value: unknown): string => {
+  const raw = asText(value).trim();
+  if (!raw) return '';
+  return raw
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\\\//g, '/');
+};
+
 const asSrc = (value: unknown): string => {
-  if (typeof value !== 'string') return FALLBACK_IMG;
-  const src = value.trim();
+  const src = sanitizeImageValue(value);
   if (!src) return FALLBACK_IMG;
   if (src.startsWith('data:') || src.startsWith('blob:')) return src;
   if (/^https?:\/\//i.test(src)) return src;
@@ -77,6 +90,77 @@ const asSrc = (value: unknown): string => {
   }
 
   return `${API_URL}/${src.replace(/^\/+/, '')}`;
+};
+
+const firstUsableImage = (candidates: unknown[]): string => {
+  for (const candidate of candidates) {
+    const value = sanitizeImageValue(candidate);
+    if (!value) continue;
+    if (isLikelyMissingImage(value)) continue;
+    return value;
+  }
+  return '';
+};
+
+type HeroImageDecision = {
+  selectedField: string;
+  selectedRawValue: string;
+  normalizedUrl: string;
+  hasVisual: boolean;
+};
+
+const getHeroImageDecision = (slide: Record<string, unknown>): HeroImageDecision => {
+  const banner = (slide.banner as Record<string, unknown>) || {};
+  const config = (slide.config as Record<string, unknown> | undefined) || {};
+  const candidates: Array<{ field: string; value: unknown }> = [
+    { field: 'slide.image_url', value: slide.image_url },
+    { field: 'slide.image', value: slide.image },
+    { field: 'slide.config.image_url', value: config.image_url },
+    { field: 'slide.config.image', value: config.image },
+    { field: 'slide.banner.image', value: banner.image },
+    { field: 'slide.banner.image_url', value: banner.image_url },
+    { field: 'slide.banner.background_image', value: banner.background_image },
+    { field: 'slide.banner.desktop_image', value: banner.desktop_image },
+    { field: 'slide.banner.mobile_image', value: banner.mobile_image },
+  ];
+
+  for (const candidate of candidates) {
+    const raw = sanitizeImageValue(candidate.value);
+    if (!raw || isLikelyMissingImage(raw)) continue;
+    return {
+      selectedField: candidate.field,
+      selectedRawValue: raw,
+      normalizedUrl: asSrc(raw),
+      hasVisual: true,
+    };
+  }
+
+  return {
+    selectedField: 'none',
+    selectedRawValue: '',
+    normalizedUrl: FALLBACK_IMG,
+    hasVisual: false,
+  };
+};
+
+const hasUsableHeroImageData = (slide: Record<string, unknown>): boolean => {
+  const banner = (slide.banner as Record<string, unknown>) || {};
+  const config =
+    (slide.config as Record<string, unknown> | undefined) || {};
+
+  return Boolean(
+    firstUsableImage([
+      slide.image_url,
+      slide.image,
+      config.image_url,
+      config.image,
+      banner.image,
+      banner.image_url,
+      banner.background_image,
+      banner.desktop_image,
+      banner.mobile_image,
+    ]),
+  );
 };
 
 
@@ -157,19 +241,39 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
       toArray<Record<string, unknown>>(items)
         .map((item): Record<string, unknown> => {
           const banner = (item?.banner as Record<string, unknown>) || {};
+          const bannerSlide = {
+            id: banner.id,
+            title_text: banner.title_text,
+            subtitle_text: banner.subtitle_text,
+            button_text: banner.button_text,
+            button_link: banner.button_link,
+            label: banner.label,
+            image: banner.image,
+            image_url: banner.image_url,
+            overlay: banner.overlay,
+            align: banner.align,
+          } as Record<string, unknown>;
+
           return {
-            ...banner,
             ...item,
-            image: item.image_url || banner.image,
-            button_link: item.href || banner.button_link,
+            ...bannerSlide,
+            banner,
+            banner_id: item.banner_id || banner.id,
+            image: bannerSlide.image,
+            image_url: bannerSlide.image_url || bannerSlide.image,
+            button_link: bannerSlide.button_link,
+            label: bannerSlide.label,
           };
         })
-        .filter(Boolean),
+        .filter((slide) => Boolean(slide?.banner_id || slide?.image_url || slide?.title_text)),
     [items],
   );
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const autoplayEnabled = config?.autoplay !== false;
+  const pauseOnHover = config?.pause_on_hover !== false;
+  const showArrows = config?.show_arrows !== false;
+  const showDots = config?.show_dots !== false;
   const intervalMs = Number(config?.interval_ms || 5000);
 
 
@@ -188,22 +292,56 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   return (
     <SectionShell title={title} subtitle={subtitle}>
       <div
-        className="relative h-52 overflow-hidden rounded-2xl bg-slate-200 shadow-sm sm:h-[380px]"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
+        className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px]"
+        onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
+        onMouseLeave={() => { if (pauseOnHover) setIsPaused(false); }}
       >
         <div
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
           {slides.map((slide, i) => {
-            const heroImage = slide.image || slide.image_url;
-            const hasVisual = !isLikelyMissingImage(heroImage);
+            const decision = getHeroImageDecision(slide);
+            const hasVisual = decision.hasVisual;
+            const slideId = asText(slide.id, `hero-${i}`);
+
+            console.info('[store-home][hero][image-decision]', {
+              slideId,
+              selectedField: decision.selectedField,
+              selectedRawValue: decision.selectedRawValue,
+              normalizedUrl: decision.normalizedUrl,
+              hasVisual,
+            });
+
+            if (!hasVisual) {
+              const banner = (slide.banner as Record<string, unknown>) || {};
+              console.warn('[store-home][hero] Missing hero image for slide', {
+                slideId,
+                bannerId: asText(slide.banner_id),
+                title: asText(slide.title_text),
+                hasBannerObject: Object.keys(banner).length > 0,
+                hasUsableHeroImageData: hasUsableHeroImageData(slide),
+                selectedField: decision.selectedField,
+                normalizedUrl: decision.normalizedUrl,
+                rawImageFields: {
+                  slideImageUrl: asText(slide.image_url),
+                  slideImage: asText(slide.image),
+                  bannerImage: asText(banner.image),
+                  bannerImageUrl: asText(banner.image_url),
+                },
+              });
+            }
             return (
-            <div key={asText(slide.id, `hero-${i}`)} className="relative h-full min-w-full">
+            <div
+              key={slideId}
+              className="relative h-full w-full shrink-0"
+              data-hero-image-field={decision.selectedField}
+              data-hero-image-url={decision.normalizedUrl.slice(0, 300)}
+              data-hero-has-visual={hasVisual ? 'true' : 'false'}
+            >
               {hasVisual ? (
                 <SmartImage
-                  src={asSrc(heroImage)}
+                  src={decision.normalizedUrl}
                   alt={asText(slide.title_text, 'Hero')}
                   className="object-cover"
                   priority={i === 0}
@@ -213,10 +351,10 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
                 <div className="h-full w-full bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800" />
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
-              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
+              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-3 p-4 text-white sm:p-10">
                 {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
-                <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
-                {slide.subtitle_text ? <p className="text-sm text-slate-100 sm:text-base">{asText(slide.subtitle_text)}</p> : null}
+                <h3 className="w-fit max-w-full rounded-xl bg-black/25 px-3 py-2 text-xl font-bold leading-tight backdrop-blur-[1px] sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
+                {slide.subtitle_text ? <p className="w-fit max-w-full rounded-lg bg-black/20 px-3 py-1.5 text-sm text-slate-100 backdrop-blur-[1px] sm:text-base">{asText(slide.subtitle_text)}</p> : null}
                 {slide.button_text ? (
                   <ActionLink href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
                     {asText(slide.button_text)}
@@ -228,36 +366,42 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           })}
         </div>
 
-        {slides.length > 1 ? (
+        {slides.length > 1 && (showArrows || showDots) ? (
           <>
-            <button
-              type="button"
-              aria-label="Banner anterior"
-              onClick={goPrev}
-              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-2 text-lg text-slate-700 shadow transition hover:bg-white"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              aria-label="Banner siguiente"
-              onClick={goNext}
-              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-2 text-lg text-slate-700 shadow transition hover:bg-white"
-            >
-              ›
-            </button>
-
-            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
-              {slides.map((_, i) => (
+            {showArrows ? (
+              <>
                 <button
                   type="button"
-                  key={i}
-                  aria-label={`slide-${i + 1}`}
-                  onClick={() => setIndex(i)}
-                  className={`h-2.5 rounded-full transition-all ${activeIndex === i ? 'w-6 bg-white' : 'w-2.5 bg-white/60'}`}
-                />
-              ))}
-            </div>
+                  aria-label="Banner anterior"
+                  onClick={goPrev}
+                  className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  aria-label="Banner siguiente"
+                  onClick={goNext}
+                  className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
+                >
+                  ›
+                </button>
+              </>
+            ) : null}
+
+            {showDots ? (
+              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
+                {slides.map((_, i) => (
+                  <button
+                    type="button"
+                    key={i}
+                    aria-label={`slide-${i + 1}`}
+                    onClick={() => setIndex(i)}
+                    className={`h-2.5 rounded-full transition-all ${activeIndex === i ? 'w-6 bg-white' : 'w-2.5 bg-white/60'}`}
+                  />
+                ))}
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -274,6 +418,13 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
           const name = asText(cat.item_label) || asText(cat.name, 'Category');
           const imageValue = cat.image_url || cat.image || cat.banner_image;
           const hasVisual = !isLikelyMissingImage(imageValue);
+          if (!hasVisual) {
+            console.warn('[store-home][category-strip] Missing category image', {
+              categoryId: asText(cat.id, `cat-${idx}`),
+              slug: asText(cat.slug),
+              name,
+            });
+          }
           return (
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}

@@ -54,6 +54,17 @@ export class HomeLayoutController {
   }
 
   @UseGuards(AdminGuard)
+  @Get('/admin/home/integrated-summary')
+  async integratedSummary(@Query('limit') limit?: string) {
+    return {
+      success: true,
+      data: await this.service.getIntegratedModulesSummary(
+        Number(limit || 8),
+      ),
+    };
+  }
+
+  @UseGuards(AdminGuard)
   @Get('/admin/home/layouts')
   async layouts() {
     return { success: true, data: await this.service.listLayouts() };

@@ -23,7 +23,7 @@ const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' 
 const FALLBACK_IMG = '/No_Image_Available.png';
 
 const SECTION_TYPE_LABEL: Record<string, string> = {
-  HERO_CAROUSEL: 'Destacados',
+  HERO_CAROUSEL: '',
   CATEGORY_STRIP: 'Categorías TOP',
   PRODUCT_CAROUSEL: 'Novedades',
   BRAND_STRIP: 'Marcas populares',
@@ -56,6 +56,11 @@ const isMachineTitle = (value: string) => /^[A-Z0-9_]+$/.test(value);
 const resolveSectionTitle = (type: string, title?: string): string => {
   const normalized = asText(title).trim();
   if (normalized && !isMachineTitle(normalized)) return normalized;
+
+  if (type === 'HERO_CAROUSEL') {
+    return '';
+  }
+
   return SECTION_TYPE_LABEL[type] || normalized.replace(/_/g, ' ') || 'Sección destacada';
 };
 
@@ -284,7 +289,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   return (
     <SectionShell title={title} subtitle={subtitle}>
       <div
-        className="relative h-52 overflow-hidden rounded-2xl bg-slate-200 shadow-sm sm:h-[380px]"
+        className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -343,10 +348,10 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
                 <div className="h-full w-full bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800" />
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
-              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
+              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-3 p-4 text-white sm:p-10">
                 {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
-                <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
-                {slide.subtitle_text ? <p className="text-sm text-slate-100 sm:text-base">{asText(slide.subtitle_text)}</p> : null}
+                <h3 className="w-fit max-w-full rounded-xl bg-black/25 px-3 py-2 text-xl font-bold leading-tight backdrop-blur-[1px] sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
+                {slide.subtitle_text ? <p className="w-fit max-w-full rounded-lg bg-black/20 px-3 py-1.5 text-sm text-slate-100 backdrop-blur-[1px] sm:text-base">{asText(slide.subtitle_text)}</p> : null}
                 {slide.button_text ? (
                   <ActionLink href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
                     {asText(slide.button_text)}
@@ -364,7 +369,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
               type="button"
               aria-label="Banner anterior"
               onClick={goPrev}
-              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-2 text-lg text-slate-700 shadow transition hover:bg-white"
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
             >
               ‹
             </button>
@@ -372,7 +377,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
               type="button"
               aria-label="Banner siguiente"
               onClick={goNext}
-              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md bg-white/95 px-3 py-2 text-lg text-slate-700 shadow transition hover:bg-white"
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
             >
               ›
             </button>

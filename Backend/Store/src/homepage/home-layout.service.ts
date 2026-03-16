@@ -728,4 +728,127 @@ export class HomeLayoutService {
 
     return value;
   }
+
+  async getActiveLayoutDiagnostics(locale?: string) {
+    const layout = await this.getActiveLayout(locale);
+    if (!layout) {
+      return {
+        locale: locale || null,
+        activeLayout: null,
+        sections: [],
+      };
+    }
+
+    const sections = await this.prisma.homePageSection.findMany({
+      where: { layout_id: layout.id },
+      orderBy: { position: 'asc' },
+    });
+
+    const sectionDiagnostics = await Promise.all(
+      sections.map(async (section) => {
+        const config = ((section.config || {}) as Record<string, any>) || {};
+        const normalizedConfig = this.normalizeSectionConfig(
+          section.type as unknown as HomeSectionType,
+          config,
+        );
+        const resolved = section.is_enabled
+          ? await this.resolveSection({ ...section, config: normalizedConfig })
+          : [];
+
+        const warnings: string[] = [];
+        let fallbackReason: string | null = null;
+
+        if (section.type === HomeSectionType.HERO_CAROUSEL) {
+          const linkedItems = await this.prisma.homePageSectionItem.count({
+            where: { section_id: section.id },
+          });
+          if (!linkedItems) {
+            fallbackReason = 'legacy_active_banners_fallback';
+            warnings.push(
+              'Sin items curados: se están usando banners activos como fallback.',
+            );
+          }
+        }
+
+        if (section.type === HomeSectionType.PRODUCT_CAROUSEL) {
+          const source = String(normalizedConfig.source || 'NEW_ARRIVALS');
+          const mode = String(normalizedConfig.mode || 'rule');
+
+          if (mode === 'curated') {
+            const linkedProducts = await this.prisma.homePageSectionItem.count({
+              where: { section_id: section.id, product_id: { not: null } },
+            });
+            if (!linkedProducts) {
+              warnings.push(
+                'Modo curado sin productos vinculados: la sección puede quedar vacía.',
+              );
+            }
+          }
+
+          if (
+            source === 'CATEGORY' &&
+            !String(normalizedConfig.categoryId || '').trim()
+          ) {
+            fallbackReason = 'category_source_without_category_id';
+            warnings.push(
+              'Fuente CATEGORY sin categoryId: se aplica fallback a catálogo general.',
+            );
+          }
+
+          if (
+            source === 'BRAND' &&
+            !String(normalizedConfig.brandId || '').trim()
+          ) {
+            fallbackReason = 'brand_source_without_brand_id';
+            warnings.push(
+              'Fuente BRAND sin brandId: se aplica fallback a catálogo general.',
+            );
+          }
+        }
+
+        if (section.type === HomeSectionType.CATEGORY_STRIP) {
+          warnings.push(
+            'Storefront renderiza CATEGORY_STRIP como grid fijo (no carrusel/autoplay).',
+          );
+        }
+
+        if (section.type === HomeSectionType.CUSTOM_HTML) {
+          warnings.push(
+            'CUSTOM_HTML no renderiza HTML libre en Store por seguridad.',
+          );
+        }
+
+        const resolvedCount = Array.isArray(resolved)
+          ? resolved.length
+          : resolved && typeof resolved === 'object'
+            ? 1
+            : 0;
+
+        return {
+          id: section.id,
+          type: section.type,
+          title: section.title,
+          position: section.position,
+          is_enabled: section.is_enabled,
+          raw_config: config,
+          effective_config: normalizedConfig,
+          resolved_count: resolvedCount,
+          fallback_reason: fallbackReason,
+          warnings,
+        };
+      }),
+    );
+
+    return {
+      locale: locale || null,
+      activeLayout: {
+        id: layout.id,
+        name: layout.name,
+        locale: layout.locale,
+        is_active: layout.is_active,
+        updated_at: layout.updated_at,
+      },
+      sections: sectionDiagnostics,
+    };
+  }
 }

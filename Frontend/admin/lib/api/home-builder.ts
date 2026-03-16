@@ -35,6 +35,8 @@ export const homeBuilderApi = {
   reorderItems: (items: Array<{ id: string; position: number }>) => req('/admin/home/items/reorder', { method: 'POST', body: JSON.stringify({ items }) }),
   uploadItemImage: (dataUrl: string) => req('/admin/home/items/upload-image', { method: 'POST', body: JSON.stringify({ dataUrl }) }) as Promise<{ url: string }>,
   preview: (layoutId: string) => req(`/admin/home/preview?layoutId=${layoutId}`),
+  activeDiagnostics: (locale?: string) =>
+    req(`/admin/home/diagnostics/active${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`),
   options: (target: 'products' | 'categories' | 'brands' | 'banners', q = '', limit = 12) =>
     req(`/admin/home/options?target=${encodeURIComponent(target)}&q=${encodeURIComponent(q)}&limit=${limit}`),
 };

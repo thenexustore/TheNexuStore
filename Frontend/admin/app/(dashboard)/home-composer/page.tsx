@@ -17,6 +17,29 @@ type HomeLayout = {
   is_active: boolean;
 };
 
+type ActiveLayoutDiagnostics = {
+  locale: string | null;
+  activeLayout: {
+    id: string;
+    name: string;
+    locale?: string | null;
+    is_active: boolean;
+    updated_at?: string;
+  } | null;
+  sections: Array<{
+    id: string;
+    type: string;
+    title?: string | null;
+    position: number;
+    is_enabled: boolean;
+    raw_config: Record<string, unknown>;
+    effective_config: Record<string, unknown>;
+    resolved_count: number;
+    fallback_reason: string | null;
+    warnings: string[];
+  }>;
+};
+
 type ProductSource =
   | "NEW_ARRIVALS"
   | "BEST_DEALS"
@@ -146,6 +169,7 @@ export default function HomeComposerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
   const [activeTab, setActiveTab] = useState<"composer" | "banners" | "featured">("composer");
+  const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -249,11 +273,21 @@ export default function HomeComposerPage() {
     setSelectedSectionId((prev) => (prev && sorted.some((x) => x.id === prev) ? prev : sorted[0].id));
   }, []);
 
+  const loadActiveDiagnostics = useCallback(async () => {
+    try {
+      const data = (await homeBuilderApi.activeDiagnostics(locale)) as ActiveLayoutDiagnostics;
+      setActiveDiagnostics(data);
+    } catch {
+      setActiveDiagnostics(null);
+    }
+  }, [locale]);
+
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
         await loadLayouts();
+        await loadActiveDiagnostics();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No se pudieron cargar los diseños");
       } finally {
@@ -261,14 +295,15 @@ export default function HomeComposerPage() {
       }
     };
     void run();
-  }, [loadLayouts]);
+  }, [loadLayouts, loadActiveDiagnostics]);
 
   useEffect(() => {
     if (!activeLayoutId) return;
     void loadSections(activeLayoutId).catch((error) => {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar secciones");
     });
-  }, [activeLayoutId, loadSections]);
+    void loadActiveDiagnostics();
+  }, [activeLayoutId, loadSections, loadActiveDiagnostics]);
 
   useEffect(() => {
     if (!selectedSection) {
@@ -352,6 +387,7 @@ export default function HomeComposerPage() {
         locale: activeLayout.locale || locale,
       });
       await loadLayouts();
+      await loadActiveDiagnostics();
       toast.success("Diseño publicado");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo publicar");
@@ -417,6 +453,7 @@ export default function HomeComposerPage() {
       setSaving(true);
       await homeBuilderApi.deleteSection(sectionId);
       await loadSections(activeLayoutId);
+      await loadActiveDiagnostics();
       toast.success("Sección eliminada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo eliminar la sección");
@@ -755,6 +792,32 @@ export default function HomeComposerPage() {
             <div className="font-medium text-zinc-900">{sections.length}</div>
           </div>
         </div>
+
+        {activeDiagnostics?.activeLayout ? (
+          <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
+            <div className="font-semibold">Diagnóstico layout activo (runtime)</div>
+            <div className="mt-1">
+              Layout activo en API: <span className="font-mono">{activeDiagnostics.activeLayout.id}</span>
+              {activeDiagnostics.activeLayout.locale ? ` · ${activeDiagnostics.activeLayout.locale}` : " · global"}
+            </div>
+            <div className="mt-1">Secciones diagnosticadas: {activeDiagnostics.sections.length}</div>
+            <div className="mt-2 max-h-36 overflow-auto space-y-1">
+              {activeDiagnostics.sections.map((section) => (
+                <div key={section.id} className="rounded border border-indigo-200 bg-white px-2 py-1">
+                  <span className="font-semibold">{section.type}</span>
+                  <span className="ml-1">• resolved: {section.resolved_count}</span>
+                  {section.fallback_reason ? (
+                    <span className="ml-1 text-amber-700">• fallback: {section.fallback_reason}</span>
+                  ) : null}
+                  {section.warnings.length ? (
+                    <div className="mt-1 text-amber-700">{section.warnings.join(" ")}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><LayoutTemplate className="h-3.5 w-3.5" /> Diseña por bloques</span>
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Eye className="h-3.5 w-3.5" /> Previsualiza antes de publicar</span>

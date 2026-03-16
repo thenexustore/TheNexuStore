@@ -56,6 +56,27 @@ export class HomeLayoutService {
     return fallback;
   }
 
+  private categoryDemandKeywordScore(name: string, slug: string) {
+    const text = `${name || ''} ${slug || ''}`.toLowerCase();
+    const buckets: Array<{ terms: string[]; score: number }> = [
+      { terms: ['portatil', 'portátil', 'laptop', 'notebook'], score: 70 },
+      { terms: ['impresora', 'printer', 'multifuncion', 'multifunción'], score: 55 },
+      { terms: ['monitor', 'pantalla'], score: 50 },
+      { terms: ['tablet', 'ipad'], score: 45 },
+      { terms: ['teclado', 'keyboard'], score: 35 },
+      { terms: ['raton', 'ratón', 'mouse'], score: 35 },
+      { terms: ['cartucho', 'toner', 'tóner', 'tinta'], score: 30 },
+      { terms: ['disco', 'ssd', 'almacenamiento', 'memoria'], score: 28 },
+      { terms: ['router', 'wifi', 'red'], score: 25 },
+    ];
+
+    return buckets.reduce((acc, bucket) => {
+      return bucket.terms.some((term) => text.includes(term))
+        ? acc + bucket.score
+        : acc;
+    }, 0);
+  }
+
   private normalizeSectionConfig(
     type: HomeSectionType,
     config: Record<string, any>,
@@ -700,11 +721,39 @@ export class HomeLayoutService {
           })
           .filter(Boolean);
       }
-      const categories = await this.prisma.category.findMany({
+      const requestedLimit = this.clampLimit(config.limit, 10);
+      const pool = await this.prisma.category.findMany({
         where: { is_active: true, parent_id: null },
-        take: this.clampLimit(config.limit, 10),
+        take: 64,
         orderBy: [{ sort_order: 'asc' }],
       });
+
+      const scoredCategories = await Promise.all(
+        pool.map(async (category) => {
+          const activeProducts = await this.prisma.product.count({
+            where: {
+              status: 'ACTIVE',
+              OR: [
+                { main_category_id: category.id },
+                { categories: { some: { category_id: category.id } } },
+              ],
+            },
+          });
+
+          return {
+            category,
+            score:
+              this.categoryDemandKeywordScore(category.name, category.slug) * 5 +
+              activeProducts * 4 -
+              category.sort_order,
+          };
+        }),
+      );
+
+      const categories = scoredCategories
+        .sort((a, b) => b.score - a.score)
+        .slice(0, requestedLimit)
+        .map((entry) => entry.category);
 
       const categoriesWithImage = await Promise.all(
         categories.map(async (category) => {

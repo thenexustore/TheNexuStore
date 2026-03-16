@@ -420,7 +420,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
       <div
-        className="grid gap-2 sm:gap-3 [grid-template-columns:repeat(var(--cols-mobile),minmax(0,1fr))] lg:[grid-template-columns:repeat(var(--cols-desktop),minmax(0,1fr))]"
+        className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(var(--cols-mobile),minmax(0,1fr))] lg:[grid-template-columns:repeat(var(--cols-desktop),minmax(0,1fr))]"
         style={{
           ['--cols-mobile' as string]: String(mobileCols),
           ['--cols-desktop' as string]: String(desktopCols),
@@ -441,21 +441,22 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className={`group rounded-xl border bg-white p-3 text-center transition hover:-translate-y-0.5 ${elevatedCards ? "border-slate-200 shadow hover:shadow-md hover:border-slate-300" : "border-slate-200 shadow-sm hover:border-slate-300"}`}
+            className={`group rounded-2xl border bg-gradient-to-b from-white to-slate-50 p-3 text-center transition hover:-translate-y-1 ${elevatedCards ? "border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-200" : "border-slate-200 shadow-sm hover:border-indigo-200"}`}
           >
-            <div className="mx-auto mb-2 relative h-16 w-full overflow-hidden rounded bg-slate-50">
+            <div className="mx-auto mb-2 relative h-20 w-full overflow-hidden rounded-xl bg-white ring-1 ring-slate-100">
               {hasVisual ? (
                 <SmartImage
                   src={asSrc(imageValue)}
                   alt={name}
                   className={imageFitClass}
-                  sizes="120px"
+                  sizes="140px"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[11px] font-medium uppercase tracking-wide text-slate-400">Sin imagen</div>
               )}
             </div>
-            {showNames ? <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{name}</p> : null}
+            {showNames ? <p className="line-clamp-2 min-h-10 text-sm font-semibold text-slate-800 group-hover:text-indigo-700">{name}</p> : null}
+            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-indigo-500">Explorar</div>
           </ActionLink>
           );
         })}

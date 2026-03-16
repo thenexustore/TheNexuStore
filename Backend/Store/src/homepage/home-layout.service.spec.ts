@@ -378,6 +378,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
         ]),
       },
       product: {
+        count: jest.fn().mockResolvedValue(3),
         findFirst: jest.fn().mockResolvedValue({
           media: [{ url: '/category-1-cover.jpg' }],
         }),
@@ -406,6 +407,53 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
         where: expect.objectContaining({ status: 'ACTIVE' }),
       }),
     );
+  });
+
+  it('prioritizes high-demand keyword categories in CATEGORY_STRIP auto mode', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-strip-sec',
+            type: 'CATEGORY_STRIP',
+            title: 'Categories',
+            subtitle: null,
+            variant: null,
+            config: { mode: 'auto', limit: 2 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'cat-a', name: 'Portátiles', slug: 'portatiles', sort_order: 5, is_active: true, parent_id: null },
+          { id: 'cat-b', name: 'Consumibles varios', slug: 'consumibles', sort_order: 1, is_active: true, parent_id: null },
+          { id: 'cat-c', name: 'Impresoras', slug: 'impresoras', sort_order: 8, is_active: true, parent_id: null },
+        ]),
+      },
+      product: {
+        count: jest.fn().mockImplementation(({ where }) => {
+          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-a')) return Promise.resolve(8);
+          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-b')) return Promise.resolve(20);
+          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-c')) return Promise.resolve(4);
+          return Promise.resolve(0);
+        }),
+        findFirst: jest.fn().mockResolvedValue({ media: [{ url: '/fallback.jpg' }] }),
+      },
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-cats',
+      locale: 'es',
+      name: 'Categories layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const section = payload.sections[0] as any;
+    expect(section.type).toBe('CATEGORY_STRIP');
+    expect(section.resolved).toHaveLength(2);
+    expect(section.resolved.map((x: any) => x.slug)).toEqual(['portatiles', 'impresoras']);
   });
 
   it('uses query.categoryId source config for CATEGORY product sections', async () => {

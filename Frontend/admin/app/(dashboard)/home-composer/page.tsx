@@ -101,7 +101,7 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
 
 const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
   HERO_CAROUSEL: { autoplay: true, interval_ms: 5000, pause_on_hover: true, show_arrows: true, show_dots: true },
-  CATEGORY_STRIP: { mode: "auto", limit: 10, items_mobile: 2, items_desktop: 6, show_names: true, image_fit: "contain", card_style: "minimal" },
+  CATEGORY_STRIP: { mode: "auto", limit: 10, items_mobile: 2, items_desktop: 6, show_names: true, image_fit: "contain", card_style: "elevated" },
   PRODUCT_CAROUSEL: {
     mode: "rule",
     source: "NEW_ARRIVALS",
@@ -1539,7 +1539,7 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "CATEGORY_STRIP" ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Nota de contrato: en storefront este bloque se renderiza como grid fijo. Se aplican modo, límite, columnas, visibilidad de nombres y estilo visual de tarjetas.
+                  Nota: en modo automático priorizamos categorías con mayor demanda (catálogo activo + señales comerciales como portátiles, impresoras, monitores, tablets, periféricos y consumibles).
                 </div>
               ) : null}
 

@@ -52,7 +52,7 @@ function ActionLink({ href, className, children, style }: { href: string; classN
 
 const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
 const asText = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
-const normalizeCategoryLabel = (value: string): string => value.replace(/,(?=\S)/g, ', ').replace(/\s{2,}/g, ' ').trim();
+const normalizeCategoryLabel = (value: string): string => value.replace(/,(?=\S)/g, ', ').replace(/\/(?=\S)/g, '/ ').replace(/\s{2,}/g, ' ').trim();
 const isMachineTitle = (value: string) => /^[A-Z0-9_]+$/.test(value);
 const resolveSectionTitle = (type: string, title?: string): string => {
   const normalized = asText(title).trim();
@@ -447,7 +447,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className={`group relative flex min-h-[224px] flex-col overflow-hidden rounded-2xl border bg-white p-3 text-center transition duration-300 hover:-translate-y-1 ${cardToneClass}`}
+            className={`group relative flex min-h-[224px] flex-col overflow-hidden rounded-2xl border bg-white p-3 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
           >
             <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-blue-500 to-indigo-600 opacity-80" />
             {showTopBadges && idx < 3 ? (
@@ -455,7 +455,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
                 Top {idx + 1}
               </span>
             ) : null}
-            <div className="mx-auto mb-3 relative h-28 w-full overflow-hidden rounded-xl bg-slate-50 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
+            <div className="mx-auto mb-3 relative h-28 w-full overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100/70 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
               {hasVisual ? (
                 <SmartImage
                   src={asSrc(imageValue)}
@@ -464,14 +464,14 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
                   sizes="160px"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-[11px] font-medium uppercase tracking-wide text-slate-400">Sin imagen</div>
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-400"><span className="text-lg">◻</span><span>Sin imagen</span></div>
               )}
             </div>
             {showNames ? (
-              <p className="line-clamp-2 min-h-12 break-words text-base font-semibold leading-6 text-slate-800 transition-colors group-hover:text-indigo-700">{name}</p>
+              <p title={name} className="line-clamp-2 min-h-12 break-words text-base font-semibold leading-6 text-slate-800 transition-colors group-hover:text-indigo-700">{name}</p>
             ) : null}
             <div className="mt-auto pt-2">
-              <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition group-hover:brightness-110">
+              <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition group-hover:brightness-110 group-hover:shadow-md">
                 {ctaText} <span aria-hidden>→</span>
               </div>
             </div>

@@ -168,7 +168,6 @@ export default function HomeComposerPage() {
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
-  const [activeTab, setActiveTab] = useState<"composer" | "banners" | "featured">("composer");
   const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
 
   const activeLayout = useMemo(
@@ -671,57 +670,17 @@ export default function HomeComposerPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveTab("composer")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "composer"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Compositor de Inicio
-          </button>
-          <button
-            onClick={() => setActiveTab("banners")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "banners"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Banners
-          </button>
-          <button
-            onClick={() => setActiveTab("featured")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "featured"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Productos destacados
-          </button>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Compositor de Inicio</span>
+          <a href="#composer-banners-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+            Ir a Banners integrados
+          </a>
+          <a href="#composer-featured-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+            Ir a Productos destacados integrados
+          </a>
         </div>
       </div>
 
-      {activeTab !== "composer" ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm text-zinc-500">
-            {activeTab === "banners"
-              ? "Gestión integrada de Banners (mismo flujo, sin salir de Compositor)."
-              : "Gestión integrada de Productos destacados (mismo flujo, sin salir de Compositor)."}
-          </div>
-          <iframe
-            src={activeTab === "banners" ? `/${locale}/banners` : `/${locale}/featured-products`}
-            className="h-[78vh] w-full rounded-xl border border-zinc-200"
-            title={activeTab === "banners" ? "Banners" : "Productos destacados"}
-          />
-        </div>
-      ) : null}
-
-      {activeTab === "composer" ? (
-      <>
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1290,26 +1249,26 @@ export default function HomeComposerPage() {
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
                   Este bloque Hero está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
                   <div className="mt-2">
-                    <button
-                      onClick={() => setActiveTab("banners")}
-                      className="rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                    <a
+                      href="#composer-banners-panel"
+                      className="inline-block rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
                     >
                       Gestionar Banners
-                    </button>
+                    </a>
                   </div>
                 </div>
               ) : null}
 
               {isFeaturedProductSection ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                  Esta sección usa la fuente Destacados. Puedes gestionarlos desde la pestaña de Productos destacados.
+                  Esta sección usa la fuente Destacados. Puedes gestionarlos desde el panel integrado de Productos destacados.
                   <div className="mt-2">
-                    <button
-                      onClick={() => setActiveTab("featured")}
-                      className="rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                    <a
+                      href="#composer-featured-panel"
+                      className="inline-block rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
                     >
                       Gestionar Productos destacados
-                    </button>
+                    </a>
                   </div>
                 </div>
               ) : null}
@@ -1502,8 +1461,40 @@ export default function HomeComposerPage() {
           )}
         </div>
       </div>
-      </>
-      ) : null}
+
+      <div id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+        <details open>
+          <summary className="cursor-pointer list-none text-sm font-semibold text-zinc-900">
+            Gestión de Banners (integrada en Compositor)
+          </summary>
+          <p className="mb-2 mt-2 text-sm text-zinc-500">
+            Este panel carga la gestión completa de banners sin salir del Compositor de Inicio.
+          </p>
+          <iframe
+            src={`/${locale}/banners`}
+            className="h-[72vh] w-full rounded-xl border border-zinc-200"
+            title="Banners integrados en Compositor"
+            loading="lazy"
+          />
+        </details>
+      </div>
+
+      <div id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+        <details>
+          <summary className="cursor-pointer list-none text-sm font-semibold text-zinc-900">
+            Gestión de Productos destacados (integrada en Compositor)
+          </summary>
+          <p className="mb-2 mt-2 text-sm text-zinc-500">
+            Este panel carga la gestión completa de productos destacados sin salir del Compositor de Inicio.
+          </p>
+          <iframe
+            src={`/${locale}/featured-products`}
+            className="h-[72vh] w-full rounded-xl border border-zinc-200"
+            title="Productos destacados integrados en Compositor"
+            loading="lazy"
+          />
+        </details>
+      </div>
     </div>
   );
 }

@@ -31,7 +31,7 @@ export default function CanvasSections({
 
   return (
     <div className="mt-4 space-y-3">
-      {sections.map((section) => {
+      {sections.map((section, index) => {
         const mode = typeof section.config?.mode === "string" ? String(section.config.mode) : null;
         const limit = Number(section.config?.limit || 0);
 
@@ -55,7 +55,7 @@ export default function CanvasSections({
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-xs text-zinc-500">Posición #{section.position}</div>
+                <div className="text-xs text-zinc-500">Posición #{index + 1}</div>
                 <div className="font-medium text-zinc-900">
                   {section.title || sectionTypeLabels[section.type] || section.type}
                 </div>
@@ -86,7 +86,7 @@ export default function CanvasSections({
                     event.stopPropagation();
                     onMove(section, -1);
                   }}
-                  disabled={saving || section.position === 1}
+                  disabled={saving || index === 0}
                   className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-50"
                   title="Mover arriba"
                 >
@@ -97,7 +97,7 @@ export default function CanvasSections({
                     event.stopPropagation();
                     onMove(section, 1);
                   }}
-                  disabled={saving || section.position === sections.length}
+                  disabled={saving || index === sections.length - 1}
                   className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-50"
                   title="Mover abajo"
                 >

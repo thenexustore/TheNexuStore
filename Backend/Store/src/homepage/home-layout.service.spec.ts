@@ -127,6 +127,170 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect((payload.sections[0].resolved as any[])[0]?.banner?.id).toBe('banner-1');
   });
 
+
+  it('falls back HERO_CAROUSEL to active banners when curated items reference inactive or missing banners', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-inactive',
+            banner: {
+              id: 'banner-inactive',
+              is_active: false,
+            },
+          },
+          {
+            id: 'item-2',
+            section_id: 'hero-sec',
+            position: 2,
+            banner_id: 'banner-missing',
+            banner: null,
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'banner-active',
+            image: '/hero.jpg',
+            title_text: 'Hero Banner',
+            subtitle_text: 'Sub',
+            button_text: 'Shop',
+            button_link: '/products',
+            sort_order: 1,
+            is_active: true,
+          },
+        ]),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(heroSection.type).toBe('HERO_CAROUSEL');
+    expect(heroSection.resolved).toHaveLength(1);
+    expect(heroSection.resolved[0]?.banner?.id).toBe('banner-active');
+    expect(prisma.banner.findMany).toHaveBeenCalled();
+  });
+  it('keeps curated active banner order and appends new active banners from Banner module', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-2',
+            banner: { id: 'banner-2', is_active: true },
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'banner-1',
+            image: '/hero-1.jpg',
+            title_text: 'Hero 1',
+            subtitle_text: 'Sub 1',
+            button_text: 'Shop 1',
+            button_link: '/products/1',
+            sort_order: 1,
+            is_active: true,
+          },
+          {
+            id: 'banner-2',
+            image: '/hero-2.jpg',
+            title_text: 'Hero 2',
+            subtitle_text: 'Sub 2',
+            button_text: 'Shop 2',
+            button_link: '/products/2',
+            sort_order: 2,
+            is_active: true,
+          },
+          {
+            id: 'banner-3',
+            image: '/hero-3.jpg',
+            title_text: 'Hero 3',
+            subtitle_text: 'Sub 3',
+            button_text: 'Shop 3',
+            button_link: '/products/3',
+            sort_order: 3,
+            is_active: true,
+          },
+        ]),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(heroSection.type).toBe('HERO_CAROUSEL');
+    expect(heroSection.resolved).toHaveLength(3);
+    expect(heroSection.resolved.map((x: any) => x.banner_id)).toEqual([
+      'banner-2',
+      'banner-1',
+      'banner-3',
+    ]);
+    expect(heroSection.resolved[0]?.banner?.title_text).toBe('Hero 2');
+  });
+
   it('falls back BEST_DEALS to featured products when no deals are available', async () => {
     const prisma = {
       homePageSection: {
@@ -185,6 +349,63 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.resolved[0].id).toBe('prod-1');
     expect(productsService.getDealsProducts).toHaveBeenCalled();
     expect(prisma.featuredProduct.findMany).toHaveBeenCalled();
+  });
+
+  it('derives CATEGORY_STRIP auto-mode image_url from active category product media when category has no image', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-strip-sec',
+            type: 'CATEGORY_STRIP',
+            title: 'Categories',
+            subtitle: null,
+            variant: null,
+            config: { mode: 'auto', limit: 10 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-1',
+            name: 'Category 1',
+            slug: 'category-1',
+            is_active: true,
+            parent_id: null,
+          },
+        ]),
+      },
+      product: {
+        findFirst: jest.fn().mockResolvedValue({
+          media: [{ url: '/category-1-cover.jpg' }],
+        }),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-cats',
+      locale: 'es',
+      name: 'Categories layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const section = payload.sections[0] as any;
+    expect(section.type).toBe('CATEGORY_STRIP');
+    expect(section.resolved).toHaveLength(1);
+    expect(section.resolved[0].image_url).toBe('/category-1-cover.jpg');
+    expect(prisma.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'ACTIVE' }),
+      }),
+    );
   });
 
   it('uses query.categoryId source config for CATEGORY product sections', async () => {

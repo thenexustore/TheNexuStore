@@ -101,7 +101,7 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
 
 const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
   HERO_CAROUSEL: { autoplay: true, interval_ms: 5000, pause_on_hover: true, show_arrows: true, show_dots: true },
-  CATEGORY_STRIP: { mode: "auto", limit: 10 },
+  CATEGORY_STRIP: { mode: "auto", limit: 10, items_mobile: 2, items_desktop: 6, show_names: true, image_fit: "contain", card_style: "minimal" },
   PRODUCT_CAROUSEL: {
     mode: "rule",
     source: "NEW_ARRIVALS",
@@ -1428,6 +1428,83 @@ export default function HomeComposerPage() {
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Columnas móvil</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={4}
+                        value={asNumber(config.items_mobile, 2)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_mobile: Math.max(2, Math.min(4, Number(event.target.value) || 2)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Columnas desktop</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={8}
+                        value={asNumber(config.items_desktop, 6)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_desktop: Math.max(2, Math.min(8, Number(event.target.value) || 2)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_names ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_names: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar nombre de categoría
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Ajuste de imagen</span>
+                      <select
+                        value={String(config.image_fit || "contain")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            image_fit: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="contain">Contener (sin recorte)</option>
+                        <option value="cover">Cubrir (recorte suave)</option>
+                      </select>
+                    </label>
+                    <label className="text-sm md:col-span-2">
+                      <span className="mb-1 block text-zinc-500">Estilo de tarjeta</span>
+                      <select
+                        value={String(config.card_style || "minimal")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            card_style: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="minimal">Minimal (borde limpio)</option>
+                        <option value="elevated">Elevated (sombra marcada)</option>
+                      </select>
+                    </label>
                   </div>
                 </div>
               ) : null}
@@ -1462,7 +1539,7 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "CATEGORY_STRIP" ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Nota de contrato: en storefront este bloque se renderiza como grid fijo (no carrusel/autoplay). Solo se aplican modo curado/automático y límite.
+                  Nota de contrato: en storefront este bloque se renderiza como grid fijo. Se aplican modo, límite, columnas, visibilidad de nombres y estilo visual de tarjetas.
                 </div>
               ) : null}
 

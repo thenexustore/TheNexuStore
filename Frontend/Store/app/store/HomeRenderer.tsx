@@ -409,11 +409,23 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   );
 }
 
-function CategoryStrip({ title, subtitle, categories }: { title?: string; subtitle?: string; categories: unknown[] }) {
+function CategoryStrip({ title, subtitle, categories, config }: { title?: string; subtitle?: string; categories: unknown[]; config?: Record<string, unknown> }) {
   const list = toArray<Record<string, unknown>>(categories);
+  const mobileCols = Math.max(2, Math.min(4, Number(config?.items_mobile || 2)));
+  const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
+  const showNames = config?.show_names !== false;
+  const imageFitClass = String(config?.image_fit || 'contain') === 'cover' ? 'object-cover' : 'object-contain';
+  const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
+
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div
+        className="grid gap-2 sm:gap-3 [grid-template-columns:repeat(var(--cols-mobile),minmax(0,1fr))] lg:[grid-template-columns:repeat(var(--cols-desktop),minmax(0,1fr))]"
+        style={{
+          ['--cols-mobile' as string]: String(mobileCols),
+          ['--cols-desktop' as string]: String(desktopCols),
+        }}
+      >
         {list.map((cat, idx) => {
           const name = asText(cat.item_label) || asText(cat.name, 'Category');
           const imageValue = cat.image_url || cat.image || cat.banner_image;
@@ -429,21 +441,21 @@ function CategoryStrip({ title, subtitle, categories }: { title?: string; subtit
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className="group rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+            className={`group rounded-xl border bg-white p-3 text-center transition hover:-translate-y-0.5 ${elevatedCards ? "border-slate-200 shadow hover:shadow-md hover:border-slate-300" : "border-slate-200 shadow-sm hover:border-slate-300"}`}
           >
             <div className="mx-auto mb-2 relative h-16 w-full overflow-hidden rounded bg-slate-50">
               {hasVisual ? (
                 <SmartImage
                   src={asSrc(imageValue)}
                   alt={name}
-                  className="object-contain"
+                  className={imageFitClass}
                   sizes="120px"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-[11px] font-medium uppercase tracking-wide text-slate-400">Sin imagen</div>
               )}
             </div>
-            <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{name}</p>
+            {showNames ? <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{name}</p> : null}
           </ActionLink>
           );
         })}
@@ -742,7 +754,7 @@ export default function HomeRenderer({ payload }: { payload: HomePayload }) {
         const key = section?.id || `section-${index}`;
         const displayTitle = resolveSectionTitle(asText(section?.type), section?.title);
         if (section?.type === 'HERO_CAROUSEL') return <Hero key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} config={section.config} />;
-        if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={displayTitle} subtitle={section.subtitle} categories={toArray(section.resolved)} />;
+        if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={displayTitle} subtitle={section.subtitle} categories={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={displayTitle} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={displayTitle} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;

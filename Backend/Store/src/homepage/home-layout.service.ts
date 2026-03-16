@@ -84,6 +84,11 @@ export class HomeLayoutService {
     if (type === HomeSectionType.CATEGORY_STRIP) {
       next.limit = this.clampLimit(next.limit, 12);
       next.mode = next.mode || 'auto';
+      next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
+      next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
+      next.show_names = this.asBoolean(next.show_names, true);
+      next.image_fit = next.image_fit === 'cover' ? 'cover' : 'contain';
+      next.card_style = next.card_style === 'elevated' ? 'elevated' : 'minimal';
     }
 
     if (type === HomeSectionType.BRAND_STRIP) {

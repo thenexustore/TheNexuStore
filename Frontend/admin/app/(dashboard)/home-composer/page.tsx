@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { homeBuilderApi } from "@/lib/api/home-builder";
+import { HomeBuilderApiError, homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
 import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
@@ -76,9 +76,7 @@ type IntegratedFeatured = {
 };
 
 function shouldUseLegacyIntegratedFallback(error: unknown) {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return message.includes("404") || message.includes("not found");
+  return error instanceof HomeBuilderApiError && error.status === 404;
 }
 
 const SECTION_TYPES: HomeSectionType[] = [
@@ -198,7 +196,6 @@ export default function HomeComposerPage() {
   const [integratedBanners, setIntegratedBanners] = useState<IntegratedBanner[]>([]);
   const [integratedFeatured, setIntegratedFeatured] = useState<IntegratedFeatured[]>([]);
   const [integratedLoading, setIntegratedLoading] = useState(false);
-  const [integratedSyncedAt, setIntegratedSyncedAt] = useState<Date | null>(null);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -386,29 +383,25 @@ export default function HomeComposerPage() {
   }, [loadLayouts, loadActiveDiagnostics, loadIntegratedModules]);
 
   useEffect(() => {
-    const onFocus = () => {
-      void loadIntegratedModules();
-    };
-
-    const interval = window.setInterval(() => {
+    const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       void loadIntegratedModules();
     }, 45_000);
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    return () => window.clearInterval(id);
   }, [loadIntegratedModules]);
+
+  const syncComposerRuntimeState = async () => {
+    await Promise.all([
+      loadActiveDiagnostics(),
+      activeLayoutId ? loadSections(activeLayoutId) : Promise.resolve(),
+    ]);
+  };
 
   const toggleIntegratedBanner = async (bannerId: string) => {
     try {
       await toggleBannerStatus(bannerId);
       await loadIntegratedModules();
+      await syncComposerRuntimeState();
       toast.success("Estado de banner actualizado");
     } catch (error) {
       toast.error(
@@ -421,6 +414,7 @@ export default function HomeComposerPage() {
     try {
       await toggleFeaturedProductStatus(featuredId);
       await loadIntegratedModules();
+      await syncComposerRuntimeState();
       toast.success("Estado de destacado actualizado");
     } catch (error) {
       toast.error(
@@ -819,11 +813,6 @@ export default function HomeComposerPage() {
           <a href="#composer-featured-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
             Ir a Productos destacados integrados
           </a>
-          <span className="text-xs text-zinc-500">
-            {integratedSyncedAt
-              ? `Sincronizado ${integratedSyncedAt.toLocaleTimeString()}`
-              : "Sincronizando módulos…"}
-          </span>
         </div>
       </div>
 

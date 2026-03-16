@@ -1,5 +1,15 @@
 import { API_URL } from '../constants';
 
+export class HomeBuilderApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'HomeBuilderApiError';
+    this.status = status;
+  }
+}
+
 async function req(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('admin_token');
   const res = await fetch(`${API_URL}${path}`, {
@@ -11,8 +21,13 @@ async function req(path: string, options: RequestInit = {}) {
     },
     cache: 'no-store',
   });
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message || `Request failed: ${res.status}`);
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.success) {
+    throw new HomeBuilderApiError(
+      json?.message || `Request failed: ${res.status}`,
+      res.status,
+    );
+  }
   return json.data;
 }
 

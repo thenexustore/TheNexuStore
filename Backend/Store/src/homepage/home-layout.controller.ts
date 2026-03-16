@@ -45,6 +45,15 @@ export class HomeLayoutController {
   }
 
   @UseGuards(AdminGuard)
+  @Get('/admin/home/diagnostics/active')
+  async activeDiagnostics(@Query('locale') locale?: string) {
+    return {
+      success: true,
+      data: await this.service.getActiveLayoutDiagnostics(locale),
+    };
+  }
+
+  @UseGuards(AdminGuard)
   @Get('/admin/home/layouts')
   async layouts() {
     return { success: true, data: await this.service.listLayouts() };

@@ -17,6 +17,29 @@ type HomeLayout = {
   is_active: boolean;
 };
 
+type ActiveLayoutDiagnostics = {
+  locale: string | null;
+  activeLayout: {
+    id: string;
+    name: string;
+    locale?: string | null;
+    is_active: boolean;
+    updated_at?: string;
+  } | null;
+  sections: Array<{
+    id: string;
+    type: string;
+    title?: string | null;
+    position: number;
+    is_enabled: boolean;
+    raw_config: Record<string, unknown>;
+    effective_config: Record<string, unknown>;
+    resolved_count: number;
+    fallback_reason: string | null;
+    warnings: string[];
+  }>;
+};
+
 type ProductSource =
   | "NEW_ARRIVALS"
   | "BEST_DEALS"
@@ -44,7 +67,7 @@ const SECTION_TYPES: HomeSectionType[] = [
 
 const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
   HERO_CAROUSEL: "Hero principal",
-  CATEGORY_STRIP: "Carrusel de categorías",
+  CATEGORY_STRIP: "Grid de categorías",
   PRODUCT_CAROUSEL: "Carrusel de productos",
   BRAND_STRIP: "Carrusel de marcas",
   VALUE_PROPS: "Beneficios / confianza",
@@ -146,6 +169,7 @@ export default function HomeComposerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
   const [activeTab, setActiveTab] = useState<"composer" | "banners" | "featured">("composer");
+  const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -249,11 +273,21 @@ export default function HomeComposerPage() {
     setSelectedSectionId((prev) => (prev && sorted.some((x) => x.id === prev) ? prev : sorted[0].id));
   }, []);
 
+  const loadActiveDiagnostics = useCallback(async () => {
+    try {
+      const data = (await homeBuilderApi.activeDiagnostics(locale)) as ActiveLayoutDiagnostics;
+      setActiveDiagnostics(data);
+    } catch {
+      setActiveDiagnostics(null);
+    }
+  }, [locale]);
+
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
         await loadLayouts();
+        await loadActiveDiagnostics();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No se pudieron cargar los diseños");
       } finally {
@@ -261,14 +295,15 @@ export default function HomeComposerPage() {
       }
     };
     void run();
-  }, [loadLayouts]);
+  }, [loadLayouts, loadActiveDiagnostics]);
 
   useEffect(() => {
     if (!activeLayoutId) return;
     void loadSections(activeLayoutId).catch((error) => {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar secciones");
     });
-  }, [activeLayoutId, loadSections]);
+    void loadActiveDiagnostics();
+  }, [activeLayoutId, loadSections, loadActiveDiagnostics]);
 
   useEffect(() => {
     if (!selectedSection) {
@@ -352,6 +387,7 @@ export default function HomeComposerPage() {
         locale: activeLayout.locale || locale,
       });
       await loadLayouts();
+      await loadActiveDiagnostics();
       toast.success("Diseño publicado");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo publicar");
@@ -417,6 +453,7 @@ export default function HomeComposerPage() {
       setSaving(true);
       await homeBuilderApi.deleteSection(sectionId);
       await loadSections(activeLayoutId);
+      await loadActiveDiagnostics();
       toast.success("Sección eliminada");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo eliminar la sección");
@@ -755,6 +792,32 @@ export default function HomeComposerPage() {
             <div className="font-medium text-zinc-900">{sections.length}</div>
           </div>
         </div>
+
+        {activeDiagnostics?.activeLayout ? (
+          <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
+            <div className="font-semibold">Diagnóstico layout activo (runtime)</div>
+            <div className="mt-1">
+              Layout activo en API: <span className="font-mono">{activeDiagnostics.activeLayout.id}</span>
+              {activeDiagnostics.activeLayout.locale ? ` · ${activeDiagnostics.activeLayout.locale}` : " · global"}
+            </div>
+            <div className="mt-1">Secciones diagnosticadas: {activeDiagnostics.sections.length}</div>
+            <div className="mt-2 max-h-36 overflow-auto space-y-1">
+              {activeDiagnostics.sections.map((section) => (
+                <div key={section.id} className="rounded border border-indigo-200 bg-white px-2 py-1">
+                  <span className="font-semibold">{section.type}</span>
+                  <span className="ml-1">• resolved: {section.resolved_count}</span>
+                  {section.fallback_reason ? (
+                    <span className="ml-1 text-amber-700">• fallback: {section.fallback_reason}</span>
+                  ) : null}
+                  {section.warnings.length ? (
+                    <div className="mt-1 text-amber-700">{section.warnings.join(" ")}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><LayoutTemplate className="h-3.5 w-3.5" /> Diseña por bloques</span>
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Eye className="h-3.5 w-3.5" /> Previsualiza antes de publicar</span>
@@ -873,10 +936,62 @@ export default function HomeComposerPage() {
                 Bloque visible
               </label>
 
+              {selectedSection.type === "HERO_CAROUSEL" && parsedDraftConfig ? (
+                <div className="rounded-xl border border-zinc-200 p-3">
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Hero</div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.autoplay ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            autoplay: event.target.checked,
+                          })
+                        }
+                      />
+                      Autoplay
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Intervalo (ms)</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.interval_ms, 5000)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            interval_ms: Math.max(2500, Number(event.target.value) || 2500),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
               {selectedSection.type === "PRODUCT_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
                   <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de productos</div>
                   <div className="grid gap-3 md:grid-cols-2">
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Modo</span>
+                      <select
+                        value={String(config.mode || "rule")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            mode: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="rule">Reglas automáticas</option>
+                        <option value="curated">Curado manual</option>
+                      </select>
+                    </label>
+
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Fuente</span>
                       <select
@@ -912,6 +1027,98 @@ export default function HomeComposerPage() {
                       />
                     </label>
 
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.inStockOnly ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            inStockOnly: event.target.checked,
+                          })
+                        }
+                      />
+                      Solo con stock
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Orden</span>
+                      <select
+                        value={String(config.sortBy || "newest")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            sortBy: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="newest">Más nuevos</option>
+                        <option value="price_asc">Precio ascendente</option>
+                        <option value="price_desc">Precio descendente</option>
+                        <option value="discount_desc">Mayor descuento</option>
+                      </select>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.autoplay ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            autoplay: event.target.checked,
+                          })
+                        }
+                      />
+                      Autoplay
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Intervalo autoplay (ms)</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.interval_ms, 4500)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            interval_ms: Math.max(2000, Number(event.target.value) || 2000),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Ítems en desktop</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.items_desktop, 4)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_desktop: Math.max(2, Number(event.target.value) || 2),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Ítems en móvil</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.items_mobile, 2)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_mobile: Math.max(1, Number(event.target.value) || 1),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">ID de categoría</span>
                       <input
@@ -934,36 +1141,6 @@ export default function HomeComposerPage() {
                           updateDraftConfig({
                             ...config,
                             brandId: event.target.value.trim() || null,
-                          })
-                        }
-                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                      />
-                    </label>
-
-                    <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Ítems en desktop</span>
-                      <input
-                        type="number"
-                        value={asNumber(config.items_desktop, 4)}
-                        onChange={(event) =>
-                          updateDraftConfig({
-                            ...config,
-                            items_desktop: Math.max(1, Number(event.target.value) || 1),
-                          })
-                        }
-                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                      />
-                    </label>
-
-                    <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Ítems en móvil</span>
-                      <input
-                        type="number"
-                        value={asNumber(config.items_mobile, 2)}
-                        onChange={(event) =>
-                          updateDraftConfig({
-                            ...config,
-                            items_mobile: Math.max(1, Number(event.target.value) || 1),
                           })
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
@@ -993,6 +1170,7 @@ export default function HomeComposerPage() {
                         <option value="curated">Curado</option>
                       </select>
                     </label>
+
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Límite</span>
                       <input
@@ -1007,13 +1185,72 @@ export default function HomeComposerPage() {
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.autoplay ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            autoplay: event.target.checked,
+                          })
+                        }
+                      />
+                      Autoplay
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Intervalo autoplay (ms)</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.interval_ms, 4500)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            interval_ms: Math.max(2000, Number(event.target.value) || 2000),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Ítems en desktop</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.items_desktop, 6)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_desktop: Math.max(2, Number(event.target.value) || 2),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Ítems en móvil</span>
+                      <input
+                        type="number"
+                        value={asNumber(config.items_mobile, 2)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_mobile: Math.max(2, Number(event.target.value) || 2),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
                   </div>
                 </div>
               ) : null}
 
               {selectedSection.type === "CATEGORY_STRIP" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
-                  <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de categorías</div>
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Grid de categorías</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Modo</span>
@@ -1074,6 +1311,38 @@ export default function HomeComposerPage() {
                       Gestionar Productos destacados
                     </button>
                   </div>
+                </div>
+              ) : null}
+
+              {selectedSection.type === "CATEGORY_STRIP" ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Nota de contrato: en storefront este bloque se renderiza como grid fijo (no carrusel/autoplay). Solo se aplican modo curado/automático y límite.
+                </div>
+              ) : null}
+
+              {selectedSection.type === "PRODUCT_CAROUSEL" && parsedDraftConfig ? (
+                <>
+                  {String(config.mode || "rule") === "curated" && items.length === 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      El modo curado requiere productos vinculados. Si guardas sin items, la sección quedará vacía en Store.
+                    </div>
+                  ) : null}
+                  {String(config.source || "NEW_ARRIVALS") === "CATEGORY" && !String(config.categoryId || "").trim() ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      Fuente por categoría sin categoryId: Store aplicará fallback a catálogo general.
+                    </div>
+                  ) : null}
+                  {String(config.source || "NEW_ARRIVALS") === "BRAND" && !String(config.brandId || "").trim() ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      Fuente por marca sin brandId: Store aplicará fallback a catálogo general.
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {selectedSection.type === "CUSTOM_HTML" ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Este bloque no renderiza HTML libre en Store público por seguridad. Úsalo solo como marcador de migración.
                 </div>
               ) : null}
 

@@ -212,7 +212,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
               <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-2 p-4 text-white sm:p-10">
                 {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
                 <h3 className="text-xl font-bold leading-tight sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
@@ -559,6 +559,29 @@ function ChipsLike({ title, subtitle, items }: { title?: string; subtitle?: stri
   );
 }
 
+
+function CustomHtmlSection({ title, subtitle, content }: { title?: string; subtitle?: string; content: unknown }) {
+  const html = typeof content === 'object' && content && typeof (content as Record<string, unknown>).html === 'string'
+    ? String((content as Record<string, unknown>).html || '')
+    : '';
+
+  if (!html.trim()) {
+    return (
+      <SectionShell title={title} subtitle={subtitle}>
+        <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Bloque HTML sin contenido.</div>
+      </SectionShell>
+    );
+  }
+
+  return (
+    <SectionShell title={title} subtitle={subtitle}>
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        El contenido HTML personalizado no se renderiza en storefront público por seguridad. Usa este bloque solo como marcador de migración.
+      </div>
+    </SectionShell>
+  );
+}
+
 export default function HomeRenderer({ payload }: { payload: HomePayload }) {
   const sections = toArray<HomePayload['sections'][number]>(payload?.sections);
 
@@ -572,6 +595,7 @@ export default function HomeRenderer({ payload }: { payload: HomePayload }) {
         if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={displayTitle} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={displayTitle} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;
+        if (section?.type === 'CUSTOM_HTML') return <CustomHtmlSection key={key} title={displayTitle} subtitle={section.subtitle} content={section.resolved} />;
         return null;
       })}
     </>

@@ -23,3 +23,9 @@
 
 - ✅ No quedan pendientes funcionales del alcance original de refactorización de Home Admin Panel.
 - ℹ️ Siguientes mejoras (opcionales): métricas de conversión para newsletter y analítica por sección.
+
+## Nota de fuente de verdad (2026-03)
+
+- **Storefront usa `GET /home` (Home Layout Builder) como fuente principal**.
+- `GET /homepage/sections` y `GET /api/carousels/config` permanecen como **legacy/fallback de transición**.
+- El panel legacy `/homepage-sections` debe usarse solo para migración controlada o rollback, no como flujo editorial principal.

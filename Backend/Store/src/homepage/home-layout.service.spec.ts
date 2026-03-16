@@ -379,9 +379,9 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       },
       product: {
         count: jest.fn().mockResolvedValue(3),
-        findFirst: jest.fn().mockResolvedValue({
-          media: [{ url: '/category-1-cover.jpg' }],
-        }),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'p-1', title: 'Category 1 rack', slug: 'category-1-rack', media: [{ url: '/category-1-cover.jpg' }] },
+        ]),
       },
     } as any;
 
@@ -402,7 +402,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.type).toBe('CATEGORY_STRIP');
     expect(section.resolved).toHaveLength(1);
     expect(section.resolved[0].image_url).toBe('/category-1-cover.jpg');
-    expect(prisma.product.findFirst).toHaveBeenCalledWith(
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ status: 'ACTIVE' }),
       }),
@@ -438,7 +438,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
           if (where?.OR?.some((x: any) => x.main_category_id === 'cat-c')) return Promise.resolve(4);
           return Promise.resolve(0);
         }),
-        findFirst: jest.fn().mockResolvedValue({ media: [{ url: '/fallback.jpg' }] }),
+        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
       },
     } as any;
 
@@ -454,6 +454,47 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.type).toBe('CATEGORY_STRIP');
     expect(section.resolved).toHaveLength(2);
     expect(section.resolved.map((x: any) => x.slug)).toEqual(['portatiles', 'impresoras']);
+  });
+
+  it('picks fallback category image using product-title/category keyword matching', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-strip-sec',
+            type: 'CATEGORY_STRIP',
+            title: 'Categories',
+            subtitle: null,
+            variant: null,
+            config: { mode: 'auto', limit: 1 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'cat-network', name: 'Switches de Red', slug: 'switches-red', sort_order: 1, is_active: true, parent_id: null },
+        ]),
+      },
+      product: {
+        count: jest.fn().mockResolvedValue(10),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'p-random', title: 'Silla ergonómica oficina', slug: 'silla-ergonomica', media: [{ url: '/silla.jpg' }] },
+          { id: 'p-switch', title: 'Switch de red gigabit 24 puertos', slug: 'switch-red-gigabit', media: [{ url: '/switch.jpg' }] },
+        ]),
+      },
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-cats',
+      locale: 'es',
+      name: 'Categories layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const section = payload.sections[0] as any;
+    expect(section.resolved[0].image_url).toBe('/switch.jpg');
   });
 
   it('supports alphabetical strategy in CATEGORY_STRIP auto mode', async () => {
@@ -480,7 +521,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       },
       product: {
         count: jest.fn().mockResolvedValue(1),
-        findFirst: jest.fn().mockResolvedValue({ media: [{ url: '/fallback.jpg' }] }),
+        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
       },
     } as any;
 

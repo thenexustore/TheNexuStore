@@ -77,6 +77,57 @@ export class HomeLayoutService {
     }, 0);
   }
 
+  private tokenizeCategoryText(...parts: Array<string | null | undefined>) {
+    return parts
+      .join(' ')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3);
+  }
+
+  private pickBestCategoryMedia(
+    category: { id: string; name: string; slug: string },
+    products: Array<{
+      id: string;
+      title: string | null;
+      slug: string | null;
+      media: Array<{ url: string }>;
+    }>,
+  ) {
+    if (!products.length) return null;
+
+    const categoryTokens = this.tokenizeCategoryText(category.name, category.slug);
+    const categoryTokenSet = new Set(categoryTokens);
+
+    const ranked = products
+      .map((product) => {
+        const firstMedia = product.media?.[0]?.url || null;
+        if (!firstMedia) return null;
+
+        const productTokens = this.tokenizeCategoryText(product.title, product.slug);
+        const overlapCount = productTokens.reduce(
+          (acc, token) => acc + (categoryTokenSet.has(token) ? 1 : 0),
+          0,
+        );
+
+        return {
+          url: firstMedia,
+          overlapCount,
+        };
+      })
+      .filter((entry): entry is { url: string; overlapCount: number } => Boolean(entry));
+
+    if (!ranked.length) return null;
+
+    ranked.sort((a, b) => b.overlapCount - a.overlapCount);
+
+    return ranked[0]?.url || null;
+  }
+
   private normalizeSectionConfig(
     type: HomeSectionType,
     config: Record<string, any>,
@@ -778,7 +829,7 @@ export class HomeLayoutService {
             return { ...category, image_url: existingImage };
           }
 
-          const firstProduct = await this.prisma.product.findFirst({
+          const candidateProducts = await this.prisma.product.findMany({
             where: {
               status: 'ACTIVE',
               OR: [
@@ -788,6 +839,9 @@ export class HomeLayoutService {
               media: { some: {} },
             },
             select: {
+              id: true,
+              title: true,
+              slug: true,
               media: {
                 orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
                 select: { url: true },
@@ -795,9 +849,10 @@ export class HomeLayoutService {
               },
             },
             orderBy: { created_at: 'desc' },
+            take: 12,
           });
 
-          const derivedImage = firstProduct?.media?.[0]?.url || null;
+          const derivedImage = this.pickBestCategoryMedia(category, candidateProducts);
           if (!derivedImage) {
             this.logger.warn(
               `CATEGORY_STRIP category ${category.id} (${category.slug}) has no image_url and no product media fallback.`,

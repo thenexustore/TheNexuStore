@@ -37,6 +37,8 @@ export const homeBuilderApi = {
   preview: (layoutId: string) => req(`/admin/home/preview?layoutId=${layoutId}`),
   activeDiagnostics: (locale?: string) =>
     req(`/admin/home/diagnostics/active${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`),
+  integratedSummary: (limit = 8) =>
+    req(`/admin/home/integrated-summary?limit=${encodeURIComponent(String(limit))}`),
   options: (target: 'products' | 'categories' | 'brands' | 'banners', q = '', limit = 12) =>
     req(`/admin/home/options?target=${encodeURIComponent(target)}&q=${encodeURIComponent(q)}&limit=${limit}`),
 };

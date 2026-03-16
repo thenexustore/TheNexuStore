@@ -101,7 +101,7 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
 
 const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
   HERO_CAROUSEL: { autoplay: true, interval_ms: 5000, pause_on_hover: true, show_arrows: true, show_dots: true },
-  CATEGORY_STRIP: { mode: "auto", limit: 10, items_mobile: 2, items_desktop: 6, show_names: true, image_fit: "contain", card_style: "elevated" },
+  CATEGORY_STRIP: { mode: "auto", limit: 10, items_mobile: 2, items_desktop: 6, show_names: true, show_top_badges: true, image_fit: "contain", card_style: "elevated", auto_strategy: "demand", cta_text: "Explorar" },
   PRODUCT_CAROUSEL: {
     mode: "rule",
     source: "NEW_ARRIVALS",
@@ -1504,6 +1504,50 @@ export default function HomeComposerPage() {
                         <option value="minimal">Minimal (borde limpio)</option>
                         <option value="elevated">Elevated (sombra marcada)</option>
                       </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Estrategia automática</span>
+                      <select
+                        value={String(config.auto_strategy || "demand")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            auto_strategy: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="demand">Demanda (ventas + categorías tech top)</option>
+                        <option value="alphabetical">Alfabético</option>
+                        <option value="manual_sort">Orden manual de categorías</option>
+                      </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Texto CTA</span>
+                      <input
+                        value={String(config.cta_text || "Explorar")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            cta_text: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                        placeholder="Explorar"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700 md:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_top_badges ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_top_badges: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar badges Top 1/2/3
                     </label>
                   </div>
                 </div>

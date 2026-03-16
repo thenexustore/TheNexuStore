@@ -108,8 +108,13 @@ export class HomeLayoutService {
       next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
       next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
       next.show_names = this.asBoolean(next.show_names, true);
+      next.show_top_badges = this.asBoolean(next.show_top_badges, true);
       next.image_fit = next.image_fit === 'cover' ? 'cover' : 'contain';
       next.card_style = next.card_style === 'elevated' ? 'elevated' : 'minimal';
+      next.auto_strategy = ['demand', 'alphabetical', 'manual_sort'].includes(String(next.auto_strategy))
+        ? String(next.auto_strategy)
+        : 'demand';
+      next.cta_text = String(next.cta_text || 'Explorar').trim() || 'Explorar';
     }
 
     if (type === HomeSectionType.BRAND_STRIP) {
@@ -750,8 +755,18 @@ export class HomeLayoutService {
         }),
       );
 
-      const categories = scoredCategories
-        .sort((a, b) => b.score - a.score)
+      const autoStrategy = String(config.auto_strategy || 'demand');
+      const ranked = [...scoredCategories];
+
+      if (autoStrategy === 'alphabetical') {
+        ranked.sort((a, b) => a.category.name.localeCompare(b.category.name, 'es'));
+      } else if (autoStrategy === 'manual_sort') {
+        ranked.sort((a, b) => a.category.sort_order - b.category.sort_order);
+      } else {
+        ranked.sort((a, b) => b.score - a.score);
+      }
+
+      const categories = ranked
         .slice(0, requestedLimit)
         .map((entry) => entry.category);
 

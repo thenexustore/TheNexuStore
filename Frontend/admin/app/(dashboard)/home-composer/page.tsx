@@ -178,6 +178,7 @@ export default function HomeComposerPage() {
   const [integratedBanners, setIntegratedBanners] = useState<Banner[]>([]);
   const [integratedFeatured, setIntegratedFeatured] = useState<FeaturedProduct[]>([]);
   const [integratedLoading, setIntegratedLoading] = useState(false);
+  const [integratedSyncedAt, setIntegratedSyncedAt] = useState<Date | null>(null);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -299,6 +300,7 @@ export default function HomeComposerPage() {
       ]);
       setIntegratedBanners(banners || []);
       setIntegratedFeatured(featuredRes?.data || []);
+      setIntegratedSyncedAt(new Date());
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -327,25 +329,29 @@ export default function HomeComposerPage() {
   }, [loadLayouts, loadActiveDiagnostics, loadIntegratedModules]);
 
   useEffect(() => {
-    const id = window.setInterval(() => {
+    const onFocus = () => {
+      void loadIntegratedModules();
+    };
+
+    const interval = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       void loadIntegratedModules();
     }, 45_000);
-    return () => window.clearInterval(id);
-  }, [loadIntegratedModules]);
 
-  const syncComposerRuntimeState = async () => {
-    await Promise.all([
-      loadActiveDiagnostics(),
-      activeLayoutId ? loadSections(activeLayoutId) : Promise.resolve(),
-    ]);
-  };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [loadIntegratedModules]);
 
   const toggleIntegratedBanner = async (bannerId: string) => {
     try {
       await toggleBannerStatus(bannerId);
       await loadIntegratedModules();
-      await syncComposerRuntimeState();
       toast.success("Estado de banner actualizado");
     } catch (error) {
       toast.error(
@@ -358,7 +364,6 @@ export default function HomeComposerPage() {
     try {
       await toggleFeaturedProductStatus(featuredId);
       await loadIntegratedModules();
-      await syncComposerRuntimeState();
       toast.success("Estado de destacado actualizado");
     } catch (error) {
       toast.error(
@@ -558,6 +563,9 @@ export default function HomeComposerPage() {
       });
 
       await loadSections(activeLayoutId);
+      if (selectedSection.type === "HERO_CAROUSEL") {
+        await loadIntegratedModules();
+      }
       toast.success("Bloque guardado");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el bloque");
@@ -613,6 +621,9 @@ export default function HomeComposerPage() {
       await homeBuilderApi.createItem(selectedSection.id, basePayload);
       const data = (await homeBuilderApi.listItems(selectedSection.id)) as HomeSectionItem[];
       setItems([...data].sort((a, b) => a.position - b.position));
+      if (currentTarget === "banners") {
+        await loadIntegratedModules();
+      }
       toast.success("Ítem añadido");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo añadir el ítem");
@@ -751,6 +762,11 @@ export default function HomeComposerPage() {
           <a href="#composer-featured-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
             Ir a Productos destacados integrados
           </a>
+          <span className="text-xs text-zinc-500">
+            {integratedSyncedAt
+              ? `Sincronizado ${integratedSyncedAt.toLocaleTimeString()}`
+              : "Sincronizando módulos…"}
+          </span>
         </div>
       </div>
 

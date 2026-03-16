@@ -630,11 +630,54 @@ export class HomeLayoutService {
           })
           .filter(Boolean);
       }
-      return this.prisma.category.findMany({
+      const categories = await this.prisma.category.findMany({
         where: { is_active: true, parent_id: null },
         take: this.clampLimit(config.limit, 10),
         orderBy: [{ sort_order: 'asc' }],
       });
+
+      const categoriesWithImage = await Promise.all(
+        categories.map(async (category) => {
+          const existingImage =
+            (category as any).image_url || (category as any).image || null;
+          if (existingImage) {
+            return { ...category, image_url: existingImage };
+          }
+
+          const firstProduct = await this.prisma.product.findFirst({
+            where: {
+              status: 'ACTIVE',
+              OR: [
+                { main_category_id: category.id },
+                { categories: { some: { category_id: category.id } } },
+              ],
+              media: { some: {} },
+            },
+            select: {
+              media: {
+                orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+                select: { url: true },
+                take: 1,
+              },
+            },
+            orderBy: { created_at: 'desc' },
+          });
+
+          const derivedImage = firstProduct?.media?.[0]?.url || null;
+          if (!derivedImage) {
+            this.logger.warn(
+              `CATEGORY_STRIP category ${category.id} (${category.slug}) has no image_url and no product media fallback.`,
+            );
+          }
+
+          return {
+            ...category,
+            image_url: derivedImage,
+          };
+        }),
+      );
+
+      return categoriesWithImage;
     }
 
     if (section.type === HomeSectionType.BRAND_STRIP) {

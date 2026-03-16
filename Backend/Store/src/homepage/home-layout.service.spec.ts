@@ -187,6 +187,63 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(prisma.featuredProduct.findMany).toHaveBeenCalled();
   });
 
+  it('derives CATEGORY_STRIP auto-mode image_url from active category product media when category has no image', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-strip-sec',
+            type: 'CATEGORY_STRIP',
+            title: 'Categories',
+            subtitle: null,
+            variant: null,
+            config: { mode: 'auto', limit: 10 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-1',
+            name: 'Category 1',
+            slug: 'category-1',
+            is_active: true,
+            parent_id: null,
+          },
+        ]),
+      },
+      product: {
+        findFirst: jest.fn().mockResolvedValue({
+          media: [{ url: '/category-1-cover.jpg' }],
+        }),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-cats',
+      locale: 'es',
+      name: 'Categories layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const section = payload.sections[0] as any;
+    expect(section.type).toBe('CATEGORY_STRIP');
+    expect(section.resolved).toHaveLength(1);
+    expect(section.resolved[0].image_url).toBe('/category-1-cover.jpg');
+    expect(prisma.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'ACTIVE' }),
+      }),
+    );
+  });
+
   it('uses query.categoryId source config for CATEGORY product sections', async () => {
     const prisma = {
       homePageSection: {

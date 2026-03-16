@@ -1,5 +1,15 @@
 import { API_URL } from '../constants';
 
+export class HomeBuilderApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'HomeBuilderApiError';
+    this.status = status;
+  }
+}
+
 async function req(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('admin_token');
   const res = await fetch(`${API_URL}${path}`, {
@@ -11,8 +21,13 @@ async function req(path: string, options: RequestInit = {}) {
     },
     cache: 'no-store',
   });
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message || `Request failed: ${res.status}`);
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.success) {
+    throw new HomeBuilderApiError(
+      json?.message || `Request failed: ${res.status}`,
+      res.status,
+    );
+  }
   return json.data;
 }
 
@@ -37,6 +52,8 @@ export const homeBuilderApi = {
   preview: (layoutId: string) => req(`/admin/home/preview?layoutId=${layoutId}`),
   activeDiagnostics: (locale?: string) =>
     req(`/admin/home/diagnostics/active${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`),
+  integratedSummary: (limit = 8) =>
+    req(`/admin/home/integrated-summary?limit=${encodeURIComponent(String(limit))}`),
   options: (target: 'products' | 'categories' | 'brands' | 'banners', q = '', limit = 12) =>
     req(`/admin/home/options?target=${encodeURIComponent(target)}&q=${encodeURIComponent(q)}&limit=${limit}`),
 };

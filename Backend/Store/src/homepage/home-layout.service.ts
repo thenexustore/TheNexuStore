@@ -56,6 +56,78 @@ export class HomeLayoutService {
     return fallback;
   }
 
+  private categoryDemandKeywordScore(name: string, slug: string) {
+    const text = `${name || ''} ${slug || ''}`.toLowerCase();
+    const buckets: Array<{ terms: string[]; score: number }> = [
+      { terms: ['portatil', 'portátil', 'laptop', 'notebook'], score: 70 },
+      { terms: ['impresora', 'printer', 'multifuncion', 'multifunción'], score: 55 },
+      { terms: ['monitor', 'pantalla'], score: 50 },
+      { terms: ['tablet', 'ipad'], score: 45 },
+      { terms: ['teclado', 'keyboard'], score: 35 },
+      { terms: ['raton', 'ratón', 'mouse'], score: 35 },
+      { terms: ['cartucho', 'toner', 'tóner', 'tinta'], score: 30 },
+      { terms: ['disco', 'ssd', 'almacenamiento', 'memoria'], score: 28 },
+      { terms: ['router', 'wifi', 'red'], score: 25 },
+    ];
+
+    return buckets.reduce((acc, bucket) => {
+      return bucket.terms.some((term) => text.includes(term))
+        ? acc + bucket.score
+        : acc;
+    }, 0);
+  }
+
+  private tokenizeCategoryText(...parts: Array<string | null | undefined>) {
+    return parts
+      .join(' ')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3);
+  }
+
+  private pickBestCategoryMedia(
+    category: { id: string; name: string; slug: string },
+    products: Array<{
+      id: string;
+      title: string | null;
+      slug: string | null;
+      media: Array<{ url: string }>;
+    }>,
+  ) {
+    if (!products.length) return null;
+
+    const categoryTokens = this.tokenizeCategoryText(category.name, category.slug);
+    const categoryTokenSet = new Set(categoryTokens);
+
+    const ranked = products
+      .map((product) => {
+        const firstMedia = product.media?.[0]?.url || null;
+        if (!firstMedia) return null;
+
+        const productTokens = this.tokenizeCategoryText(product.title, product.slug);
+        const overlapCount = productTokens.reduce(
+          (acc, token) => acc + (categoryTokenSet.has(token) ? 1 : 0),
+          0,
+        );
+
+        return {
+          url: firstMedia,
+          overlapCount,
+        };
+      })
+      .filter((entry): entry is { url: string; overlapCount: number } => Boolean(entry));
+
+    if (!ranked.length) return null;
+
+    ranked.sort((a, b) => b.overlapCount - a.overlapCount);
+
+    return ranked[0]?.url || null;
+  }
+
   private normalizeSectionConfig(
     type: HomeSectionType,
     config: Record<string, any>,
@@ -64,6 +136,9 @@ export class HomeLayoutService {
 
     if (type === HomeSectionType.HERO_CAROUSEL) {
       next.autoplay = this.asBoolean(next.autoplay, true);
+      next.pause_on_hover = this.asBoolean(next.pause_on_hover, true);
+      next.show_arrows = this.asBoolean(next.show_arrows, true);
+      next.show_dots = this.asBoolean(next.show_dots, true);
       next.interval_ms = this.clampRange(next.interval_ms, 2500, 15000, 5000);
     }
 
@@ -81,6 +156,16 @@ export class HomeLayoutService {
     if (type === HomeSectionType.CATEGORY_STRIP) {
       next.limit = this.clampLimit(next.limit, 12);
       next.mode = next.mode || 'auto';
+      next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
+      next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
+      next.show_names = this.asBoolean(next.show_names, true);
+      next.show_top_badges = this.asBoolean(next.show_top_badges, true);
+      next.image_fit = next.image_fit === 'cover' ? 'cover' : 'contain';
+      next.card_style = next.card_style === 'elevated' ? 'elevated' : 'minimal';
+      next.auto_strategy = ['demand', 'alphabetical', 'manual_sort'].includes(String(next.auto_strategy))
+        ? String(next.auto_strategy)
+        : 'demand';
+      next.cta_text = String(next.cta_text || 'Explorar').trim() || 'Explorar';
     }
 
     if (type === HomeSectionType.BRAND_STRIP) {
@@ -256,6 +341,24 @@ export class HomeLayoutService {
     return { success: true };
   }
 
+
+  private async reindexLayoutSections(layoutId: string) {
+    const sections = await this.prisma.homePageSection.findMany({
+      where: { layout_id: layoutId },
+      orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
+      select: { id: true },
+    });
+
+    await this.prisma.$transaction(
+      sections.map((section, index) =>
+        this.prisma.homePageSection.update({
+          where: { id: section.id },
+          data: { position: index + 1 },
+        }),
+      ),
+    );
+  }
+
   async listSections(layoutId: string) {
     return this.prisma.homePageSection.findMany({
       where: { layout_id: layoutId },
@@ -265,9 +368,20 @@ export class HomeLayoutService {
 
   async createSection(layoutId: string, dto: CreateSectionDto) {
     const config = this.normalizeSectionConfig(dto.type, dto.config || {});
-    const section = await this.prisma.homePageSection.create({
-      data: { layout_id: layoutId, ...dto, config },
+    const maxPosition = await this.prisma.homePageSection.aggregate({
+      where: { layout_id: layoutId },
+      _max: { position: true },
     });
+
+    const section = await this.prisma.homePageSection.create({
+      data: {
+        layout_id: layoutId,
+        ...dto,
+        config,
+        position: (maxPosition._max.position || 0) + 1,
+      },
+    });
+    await this.reindexLayoutSections(layoutId);
     this.invalidateCache();
     return section;
   }
@@ -320,7 +434,11 @@ export class HomeLayoutService {
   }
 
   async removeSection(id: string) {
+    const section = await this.prisma.homePageSection.findUnique({ where: { id } });
+    if (!section) throw new NotFoundException('Section not found');
+
     await this.prisma.homePageSection.delete({ where: { id } });
+    await this.reindexLayoutSections(section.layout_id);
     this.invalidateCache();
     return { success: true };
   }
@@ -587,29 +705,58 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const items = await this.prisma.homePageSectionItem.findMany({
-        where: { section_id: section.id },
-        orderBy: { position: 'asc' },
-        include: { banner: true },
-      });
+      const [items, activeBanners] = await Promise.all([
+        this.prisma.homePageSectionItem.findMany({
+          where: { section_id: section.id },
+          orderBy: { position: 'asc' },
+          include: { banner: true },
+        }),
+        this.prisma.banner.findMany({
+          where: { is_active: true },
+          orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+          take: 6,
+        }),
+      ]);
 
-      if (items.length) {
-        return items.map((x) => ({ ...x, banner: x.banner }));
+      if (!activeBanners.length) {
+        return [];
       }
 
-      // Fallback bridge: if no curated hero items were linked yet,
-      // use active banners from legacy Banner admin so homepage is never blank.
-      this.logger.warn(
-        `HERO_CAROUSEL section ${section.id} has no curated items; using active banner fallback.`,
-      );
-      const activeBanners = await this.prisma.banner.findMany({
-        where: { is_active: true },
-        orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
-        take: 6,
-      });
+      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const seen = new Set<string>();
+      const curatedOrderedBanners = items
+        .map((item) => {
+          const bannerId = item.banner_id || item.banner?.id || null;
+          if (!bannerId) return null;
+          return activeBannerById.get(bannerId) || null;
+        })
+        .filter((banner): banner is (typeof activeBanners)[number] => {
+          if (!banner) return false;
+          if (seen.has(banner.id)) return false;
+          seen.add(banner.id);
+          return true;
+        });
 
-      return activeBanners.map((banner) => ({ banner_id: banner.id, banner }));
+      if (!curatedOrderedBanners.length) {
+        const fallbackReason = items.length
+          ? 'curated items without active linked banners'
+          : 'no curated items';
+
+        this.logger.warn(
+          `HERO_CAROUSEL section ${section.id} has ${fallbackReason}; using active banner fallback.`,
+        );
+      }
+
+      const remainingActiveBanners = activeBanners.filter(
+        (banner) => !seen.has(banner.id),
+      );
+
+      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
+        banner_id: banner.id,
+        banner,
+      }));
     }
+
 
     if (section.type === HomeSectionType.CATEGORY_STRIP) {
       if (config.mode === 'curated') {
@@ -630,11 +777,96 @@ export class HomeLayoutService {
           })
           .filter(Boolean);
       }
-      return this.prisma.category.findMany({
+      const requestedLimit = this.clampLimit(config.limit, 10);
+      const pool = await this.prisma.category.findMany({
         where: { is_active: true, parent_id: null },
-        take: this.clampLimit(config.limit, 10),
+        take: 64,
         orderBy: [{ sort_order: 'asc' }],
       });
+
+      const scoredCategories = await Promise.all(
+        pool.map(async (category) => {
+          const activeProducts = await this.prisma.product.count({
+            where: {
+              status: 'ACTIVE',
+              OR: [
+                { main_category_id: category.id },
+                { categories: { some: { category_id: category.id } } },
+              ],
+            },
+          });
+
+          return {
+            category,
+            score:
+              this.categoryDemandKeywordScore(category.name, category.slug) * 5 +
+              activeProducts * 4 -
+              category.sort_order,
+          };
+        }),
+      );
+
+      const autoStrategy = String(config.auto_strategy || 'demand');
+      const ranked = [...scoredCategories];
+
+      if (autoStrategy === 'alphabetical') {
+        ranked.sort((a, b) => a.category.name.localeCompare(b.category.name, 'es'));
+      } else if (autoStrategy === 'manual_sort') {
+        ranked.sort((a, b) => a.category.sort_order - b.category.sort_order);
+      } else {
+        ranked.sort((a, b) => b.score - a.score);
+      }
+
+      const categories = ranked
+        .slice(0, requestedLimit)
+        .map((entry) => entry.category);
+
+      const categoriesWithImage = await Promise.all(
+        categories.map(async (category) => {
+          const existingImage =
+            (category as any).image_url || (category as any).image || null;
+          if (existingImage) {
+            return { ...category, image_url: existingImage };
+          }
+
+          const candidateProducts = await this.prisma.product.findMany({
+            where: {
+              status: 'ACTIVE',
+              OR: [
+                { main_category_id: category.id },
+                { categories: { some: { category_id: category.id } } },
+              ],
+              media: { some: {} },
+            },
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              media: {
+                orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+                select: { url: true },
+                take: 1,
+              },
+            },
+            orderBy: { created_at: 'desc' },
+            take: 12,
+          });
+
+          const derivedImage = this.pickBestCategoryMedia(category, candidateProducts);
+          if (!derivedImage) {
+            this.logger.warn(
+              `CATEGORY_STRIP category ${category.id} (${category.slug}) has no image_url and no product media fallback.`,
+            );
+          }
+
+          return {
+            ...category,
+            image_url: derivedImage,
+          };
+        }),
+      );
+
+      return categoriesWithImage;
     }
 
     if (section.type === HomeSectionType.BRAND_STRIP) {
@@ -850,5 +1082,35 @@ export class HomeLayoutService {
       },
       sections: sectionDiagnostics,
     };
+  }
+
+  async getIntegratedModulesSummary(limit = 8) {
+    const take = this.clampLimit(limit, 8);
+
+    const [banners, featured] = await Promise.all([
+      this.prisma.banner.findMany({
+        orderBy: [{ is_active: 'desc' }, { sort_order: 'asc' }],
+        take,
+        select: {
+          id: true,
+          title_text: true,
+          sort_order: true,
+          is_active: true,
+        },
+      }),
+      this.prisma.featuredProduct.findMany({
+        orderBy: [{ is_active: 'desc' }, { sort_order: 'asc' }],
+        take,
+        select: {
+          id: true,
+          title: true,
+          sort_order: true,
+          is_active: true,
+          product: { select: { title: true } },
+        },
+      }),
+    ]);
+
+    return { banners, featured };
   }
 }

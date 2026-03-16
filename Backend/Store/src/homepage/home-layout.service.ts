@@ -64,6 +64,9 @@ export class HomeLayoutService {
 
     if (type === HomeSectionType.HERO_CAROUSEL) {
       next.autoplay = this.asBoolean(next.autoplay, true);
+      next.pause_on_hover = this.asBoolean(next.pause_on_hover, true);
+      next.show_arrows = this.asBoolean(next.show_arrows, true);
+      next.show_dots = this.asBoolean(next.show_dots, true);
       next.interval_ms = this.clampRange(next.interval_ms, 2500, 15000, 5000);
     }
 

@@ -90,7 +90,7 @@ const SECTION_TYPES: HomeSectionType[] = [
 ];
 
 const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
-  HERO_CAROUSEL: "Hero principal",
+  HERO_CAROUSEL: "Banner",
   CATEGORY_STRIP: "Grid de categorías",
   PRODUCT_CAROUSEL: "Carrusel de productos",
   BRAND_STRIP: "Carrusel de marcas",
@@ -100,7 +100,7 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
 };
 
 const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
-  HERO_CAROUSEL: { autoplay: true, interval_ms: 5000 },
+  HERO_CAROUSEL: { autoplay: true, interval_ms: 5000, pause_on_hover: true, show_arrows: true, show_dots: true },
   CATEGORY_STRIP: { mode: "auto", limit: 10 },
   PRODUCT_CAROUSEL: {
     mode: "rule",
@@ -533,7 +533,9 @@ export default function HomeComposerPage() {
         type: newSectionType,
         position: sections.length + 1,
         is_enabled: true,
-        title: newSectionTitle.trim() || newSectionType,
+        title:
+          newSectionTitle.trim() ||
+          (newSectionType === "HERO_CAROUSEL" ? "Banner" : newSectionType),
         config: DEFAULT_CONFIG[newSectionType],
       });
       await loadSections(activeLayoutId);
@@ -989,32 +991,40 @@ export default function HomeComposerPage() {
                 )}
               </div>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Título</span>
-                <input
-                  value={draft.title}
-                  onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                />
-              </label>
+              {selectedSection.type === "HERO_CAROUSEL" ? (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                  Este bloque está vinculado al módulo interno de <strong>Banners</strong>. El título, subtítulo, CTA e imagen se editan en cada banner individual.
+                </div>
+              ) : (
+                <>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Título</span>
+                    <input
+                      value={draft.title}
+                      onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                    />
+                  </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Subtítulo</span>
-                <input
-                  value={draft.subtitle}
-                  onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                />
-              </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Subtítulo</span>
+                    <input
+                      value={draft.subtitle}
+                      onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                    />
+                  </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Variante (opcional)</span>
-                <input
-                  value={draft.variant}
-                  onChange={(event) => setDraft({ ...draft, variant: event.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                />
-              </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Variante (opcional)</span>
+                    <input
+                      value={draft.variant}
+                      onChange={(event) => setDraft({ ...draft, variant: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                    />
+                  </label>
+                </>
+              )}
 
               <label className="flex items-center gap-2 text-sm text-zinc-700">
                 <input
@@ -1032,7 +1042,7 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "HERO_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
-                  <div className="mb-3 text-sm font-medium">Controles rápidos: Hero</div>
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Banner</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="flex items-center gap-2 text-sm text-zinc-700">
                       <input
@@ -1045,9 +1055,48 @@ export default function HomeComposerPage() {
                           })
                         }
                       />
-                      Autoplay
+                      Reproducción automática
                     </label>
-                    <label className="text-sm">
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.pause_on_hover ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            pause_on_hover: event.target.checked,
+                          })
+                        }
+                      />
+                      Pausar al pasar el cursor
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_arrows ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_arrows: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar flechas laterales
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_dots ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_dots: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar indicadores (dots)
+                    </label>
+                    <label className="text-sm md:col-span-2">
                       <span className="mb-1 block text-zinc-500">Intervalo (ms)</span>
                       <input
                         type="number"
@@ -1382,7 +1431,7 @@ export default function HomeComposerPage() {
 
               {isHeroSection ? (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-                  Este bloque Hero está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
+                  Este bloque Banner está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
                   <div className="mt-2">
                     <a
                       href="#composer-banners-panel"

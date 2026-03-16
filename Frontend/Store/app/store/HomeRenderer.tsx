@@ -271,6 +271,9 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const autoplayEnabled = config?.autoplay !== false;
+  const pauseOnHover = config?.pause_on_hover !== false;
+  const showArrows = config?.show_arrows !== false;
+  const showDots = config?.show_dots !== false;
   const intervalMs = Number(config?.interval_ms || 5000);
 
 
@@ -290,8 +293,8 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
     <SectionShell title={title} subtitle={subtitle}>
       <div
         className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px]"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
+        onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
+        onMouseLeave={() => { if (pauseOnHover) setIsPaused(false); }}
       >
         <div
           className="flex h-full transition-transform duration-500 ease-out"
@@ -363,36 +366,42 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           })}
         </div>
 
-        {slides.length > 1 ? (
+        {slides.length > 1 && (showArrows || showDots) ? (
           <>
-            <button
-              type="button"
-              aria-label="Banner anterior"
-              onClick={goPrev}
-              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              aria-label="Banner siguiente"
-              onClick={goNext}
-              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
-            >
-              ›
-            </button>
-
-            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
-              {slides.map((_, i) => (
+            {showArrows ? (
+              <>
                 <button
                   type="button"
-                  key={i}
-                  aria-label={`slide-${i + 1}`}
-                  onClick={() => setIndex(i)}
-                  className={`h-2.5 rounded-full transition-all ${activeIndex === i ? 'w-6 bg-white' : 'w-2.5 bg-white/60'}`}
-                />
-              ))}
-            </div>
+                  aria-label="Banner anterior"
+                  onClick={goPrev}
+                  className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  aria-label="Banner siguiente"
+                  onClick={goNext}
+                  className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-slate-700 shadow-md backdrop-blur transition hover:bg-white"
+                >
+                  ›
+                </button>
+              </>
+            ) : null}
+
+            {showDots ? (
+              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
+                {slides.map((_, i) => (
+                  <button
+                    type="button"
+                    key={i}
+                    aria-label={`slide-${i + 1}`}
+                    onClick={() => setIndex(i)}
+                    className={`h-2.5 rounded-full transition-all ${activeIndex === i ? 'w-6 bg-white' : 'w-2.5 bg-white/60'}`}
+                  />
+                ))}
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>

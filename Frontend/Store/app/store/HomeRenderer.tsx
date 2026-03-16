@@ -52,6 +52,7 @@ function ActionLink({ href, className, children, style }: { href: string; classN
 
 const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
 const asText = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
+const normalizeCategoryLabel = (value: string): string => value.replace(/,(?=\S)/g, ', ').replace(/\s{2,}/g, ' ').trim();
 const isMachineTitle = (value: string) => /^[A-Z0-9_]+$/.test(value);
 const resolveSectionTitle = (type: string, title?: string): string => {
   const normalized = asText(title).trim();
@@ -418,29 +419,9 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
   const showTopBadges = config?.show_top_badges !== false;
   const ctaText = asText(config?.cta_text, 'Explorar').trim() || 'Explorar';
-  const accentStyles = [
-    {
-      glow: 'from-indigo-500/20 via-violet-500/10 to-transparent',
-      badge: 'from-indigo-600 to-violet-600',
-      cta: 'from-indigo-600 to-violet-600',
-      ring: 'group-hover:ring-indigo-300/70',
-      title: 'group-hover:text-indigo-700',
-    },
-    {
-      glow: 'from-cyan-500/20 via-blue-500/10 to-transparent',
-      badge: 'from-cyan-600 to-blue-600',
-      cta: 'from-cyan-600 to-blue-600',
-      ring: 'group-hover:ring-cyan-300/70',
-      title: 'group-hover:text-cyan-700',
-    },
-    {
-      glow: 'from-fuchsia-500/20 via-indigo-500/10 to-transparent',
-      badge: 'from-fuchsia-600 to-indigo-600',
-      cta: 'from-fuchsia-600 to-indigo-600',
-      ring: 'group-hover:ring-fuchsia-300/70',
-      title: 'group-hover:text-fuchsia-700',
-    },
-  ] as const;
+  const cardToneClass = elevatedCards
+    ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'
+    : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
 
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
@@ -452,8 +433,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
         }}
       >
         {list.map((cat, idx) => {
-          const accent = accentStyles[idx % accentStyles.length];
-          const name = asText(cat.item_label) || asText(cat.name, 'Category');
+          const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
           const imageValue = cat.image_url || cat.image || cat.banner_image;
           const hasVisual = !isLikelyMissingImage(imageValue);
           if (!hasVisual) {
@@ -467,15 +447,15 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-b from-white via-white to-slate-50/90 p-3 text-center transition duration-300 hover:-translate-y-1 ${elevatedCards ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300' : 'border-slate-200 shadow-sm hover:border-indigo-200'}`}
+            className={`group relative flex min-h-[224px] flex-col overflow-hidden rounded-2xl border bg-white p-3 text-center transition duration-300 hover:-translate-y-1 ${cardToneClass}`}
           >
-            <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-100 ${accent.glow}`} />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-blue-500 to-indigo-600 opacity-80" />
             {showTopBadges && idx < 3 ? (
-              <span className={`absolute right-2 top-2 rounded-full bg-gradient-to-r px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm ${accent.badge}`}>
+              <span className="absolute right-2 top-2 rounded-full border border-indigo-200 bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
                 Top {idx + 1}
               </span>
             ) : null}
-            <div className={`mx-auto mb-2 relative h-24 w-full overflow-hidden rounded-xl bg-white p-1 ring-1 ring-slate-100 transition ${accent.ring}`}>
+            <div className="mx-auto mb-3 relative h-28 w-full overflow-hidden rounded-xl bg-slate-50 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
               {hasVisual ? (
                 <SmartImage
                   src={asSrc(imageValue)}
@@ -488,10 +468,12 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               )}
             </div>
             {showNames ? (
-              <p className={`line-clamp-2 min-h-10 break-words text-sm font-semibold leading-5 text-slate-800 transition-colors ${accent.title}`}>{name}</p>
+              <p className="line-clamp-2 min-h-12 break-words text-base font-semibold leading-6 text-slate-800 transition-colors group-hover:text-indigo-700">{name}</p>
             ) : null}
-            <div className={`mt-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition group-hover:brightness-110 ${accent.cta}`}>
-              {ctaText} <span aria-hidden>→</span>
+            <div className="mt-auto pt-2">
+              <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition group-hover:brightness-110">
+                {ctaText} <span aria-hidden>→</span>
+              </div>
             </div>
           </ActionLink>
           );

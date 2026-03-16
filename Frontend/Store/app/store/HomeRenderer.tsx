@@ -326,7 +326,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
             return (
             <div
               key={slideId}
-              className="relative h-full min-w-full"
+              className="relative h-full w-full shrink-0"
               data-hero-image-field={decision.selectedField}
               data-hero-image-url={decision.normalizedUrl.slice(0, 300)}
               data-hero-has-visual={hasVisual ? 'true' : 'false'}

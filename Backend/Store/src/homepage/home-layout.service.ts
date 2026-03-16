@@ -894,4 +894,34 @@ export class HomeLayoutService {
       sections: sectionDiagnostics,
     };
   }
+
+  async getIntegratedModulesSummary(limit = 8) {
+    const take = this.clampLimit(limit, 8);
+
+    const [banners, featured] = await Promise.all([
+      this.prisma.banner.findMany({
+        orderBy: [{ is_active: 'desc' }, { sort_order: 'asc' }],
+        take,
+        select: {
+          id: true,
+          title_text: true,
+          sort_order: true,
+          is_active: true,
+        },
+      }),
+      this.prisma.featuredProduct.findMany({
+        orderBy: [{ is_active: 'desc' }, { sort_order: 'asc' }],
+        take,
+        select: {
+          id: true,
+          title: true,
+          sort_order: true,
+          is_active: true,
+          product: { select: { title: true } },
+        },
+      }),
+    ]);
+
+    return { banners, featured };
+  }
 }

@@ -6,9 +6,8 @@ import { homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
 import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
-import { Banner, getBanners, toggleBannerStatus } from "@/lib/api/banners";
+import { getBanners, toggleBannerStatus } from "@/lib/api/banners";
 import {
-  FeaturedProduct,
   fetchFeaturedProducts,
   toggleFeaturedProductStatus,
 } from "@/lib/api/featured-products";
@@ -60,6 +59,27 @@ type SectionDraft = {
   variant: string;
   configText: string;
 };
+
+type IntegratedBanner = {
+  id: string;
+  title_text: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
+
+type IntegratedFeatured = {
+  id: string;
+  title: string | null;
+  sort_order: number;
+  is_active: boolean;
+  product?: { title?: string | null } | null;
+};
+
+function shouldUseLegacyIntegratedFallback(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes("404") || message.includes("not found");
+}
 
 const SECTION_TYPES: HomeSectionType[] = [
   "HERO_CAROUSEL",
@@ -175,8 +195,8 @@ export default function HomeComposerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
   const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
-  const [integratedBanners, setIntegratedBanners] = useState<Banner[]>([]);
-  const [integratedFeatured, setIntegratedFeatured] = useState<FeaturedProduct[]>([]);
+  const [integratedBanners, setIntegratedBanners] = useState<IntegratedBanner[]>([]);
+  const [integratedFeatured, setIntegratedFeatured] = useState<IntegratedFeatured[]>([]);
   const [integratedLoading, setIntegratedLoading] = useState(false);
   const [integratedSyncedAt, setIntegratedSyncedAt] = useState<Date | null>(null);
 
@@ -292,15 +312,52 @@ export default function HomeComposerPage() {
   }, [locale]);
 
   const loadIntegratedModules = useCallback(async () => {
+    setIntegratedLoading(true);
+
     try {
-      setIntegratedLoading(true);
-      const [banners, featuredRes] = await Promise.all([
+      try {
+        const summary = (await homeBuilderApi.integratedSummary(8)) as {
+          banners?: IntegratedBanner[];
+          featured?: IntegratedFeatured[];
+        };
+        setIntegratedBanners(summary?.banners || []);
+        setIntegratedFeatured(summary?.featured || []);
+        return;
+      } catch (error) {
+        if (!shouldUseLegacyIntegratedFallback(error)) {
+          throw error;
+        }
+      }
+
+      const [banners, featuredResponse] = await Promise.all([
         getBanners(),
         fetchFeaturedProducts({ take: 8 }),
       ]);
-      setIntegratedBanners(banners || []);
-      setIntegratedFeatured(featuredRes?.data || []);
-      setIntegratedSyncedAt(new Date());
+
+      setIntegratedBanners(
+        banners
+          .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order)
+          .slice(0, 8)
+          .map((banner) => ({
+            id: banner.id,
+            title_text: banner.title_text ?? null,
+            sort_order: banner.sort_order,
+            is_active: banner.is_active,
+          })),
+      );
+
+      setIntegratedFeatured(
+        (featuredResponse?.data || [])
+          .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order)
+          .slice(0, 8)
+          .map((item) => ({
+            id: item.id,
+            title: item.title ?? null,
+            sort_order: item.sort_order,
+            is_active: item.is_active,
+            product: { title: item.product?.title ?? null },
+          })),
+      );
     } catch (error) {
       toast.error(
         error instanceof Error

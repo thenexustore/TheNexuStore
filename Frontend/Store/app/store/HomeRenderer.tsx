@@ -494,10 +494,15 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const mobileCardPx = Math.max(150, Math.floor(360 / mobileItems));
   const desktopCardPx = Math.max(180, Math.floor(1120 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
+  const showArrows = config?.show_arrows !== false;
+  const showDots = config?.show_dots === true;
+  const viewAllHref = asText(config?.view_all_href).trim();
+  const viewAllLabel = asText(config?.view_all_label, 'Ver todo').trim() || 'Ver todo';
   const autoplayIntervalMs = Math.max(1800, Number(config?.interval_ms || 4500));
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
   const syncRailState = () => {
@@ -505,6 +510,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
+    const approxIndex = Math.round(rail.scrollLeft / Math.max(rail.clientWidth * 0.72, 220));
+    setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
   };
 
   useEffect(() => {
@@ -544,7 +551,14 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
 
   return (
     <SectionShell title={title} subtitle={subtitle}>
-      {list.length > 1 ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        {viewAllHref ? (
+          <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">
+            {viewAllLabel} <span aria-hidden className="ml-1">→</span>
+          </ActionLink>
+        ) : <span />}
+        {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+      </div>
 
       <div
         ref={railRef}
@@ -609,6 +623,25 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
           );
         })}
       </div>
+
+      {list.length > 1 && showDots ? (
+        <div className="mt-1 flex items-center justify-center gap-1.5">
+          {list.slice(0, Math.min(list.length, 8)).map((_, idx) => (
+            <button
+              type="button"
+              key={`dot-${idx}`}
+              onClick={() => {
+                const rail = railRef.current;
+                if (!rail) return;
+                const targetLeft = idx * Math.max(rail.clientWidth * 0.72, 220);
+                rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
+              }}
+              className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300'}`}
+              aria-label={`ir a producto ${idx + 1}`}
+            />
+          ))}
+        </div>
+      ) : null}
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay productos configurados para esta sección.</div> : null}
     </SectionShell>
   );
@@ -621,10 +654,15 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
   const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
+  const showArrows = config?.show_arrows !== false;
+  const showDots = config?.show_dots === true;
+  const viewAllHref = asText(config?.view_all_href).trim();
+  const viewAllLabel = asText(config?.view_all_label, 'Ver todo').trim() || 'Ver todo';
   const autoplayIntervalMs = Math.max(1800, Number(config?.interval_ms || 4500));
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
   const syncRailState = () => {
@@ -632,6 +670,8 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
+    const approxIndex = Math.round(rail.scrollLeft / Math.max(rail.clientWidth * 0.72, 220));
+    setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
   };
 
   useEffect(() => {
@@ -671,7 +711,14 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
 
   return (
     <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
-      {list.length > 1 ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        {viewAllHref ? (
+          <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">
+            {viewAllLabel} <span aria-hidden className="ml-1">→</span>
+          </ActionLink>
+        ) : <span />}
+        {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+      </div>
 
       <div
         ref={railRef}

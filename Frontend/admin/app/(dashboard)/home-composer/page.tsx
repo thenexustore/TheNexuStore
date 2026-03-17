@@ -50,7 +50,8 @@ type ProductSource =
   | "BEST_DEALS"
   | "FEATURED"
   | "CATEGORY"
-  | "BRAND";
+  | "BRAND"
+  | "BEST_SELLERS";
 
 type SectionDraft = {
   title: string;
@@ -107,10 +108,18 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
     source: "NEW_ARRIVALS",
     limit: 12,
     inStockOnly: true,
+    discount_only: false,
+    featured_only: false,
+    category_scope: "parent_and_descendants",
+    sortBy: "newest",
     autoplay: true,
+    show_arrows: true,
+    show_dots: false,
     interval_ms: 4500,
     items_mobile: 2,
     items_desktop: 4,
+    view_all_label: "Ver todo",
+    view_all_href: "/products",
   },
   BRAND_STRIP: {
     mode: "auto",
@@ -1176,6 +1185,7 @@ export default function HomeComposerPage() {
                         <option value="FEATURED">Destacados</option>
                         <option value="CATEGORY">Por categoría</option>
                         <option value="BRAND">Por marca</option>
+                        <option value="BEST_SELLERS">Más vendidos</option>
                       </select>
                     </label>
 
@@ -1206,6 +1216,33 @@ export default function HomeComposerPage() {
                         }
                       />
                       Solo con stock
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.discount_only ?? false)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            discount_only: event.target.checked,
+                          })
+                        }
+                      />
+                      Solo productos con descuento
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.featured_only ?? false)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            featured_only: event.target.checked,
+                          })
+                        }
+                      />
+                      Restringir a destacados
                     </label>
 
                     <label className="text-sm">
@@ -1287,13 +1324,91 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">ID de categoría</span>
-                      <input
-                        value={String(config.categoryId || "")}
+                      <span className="mb-1 block text-zinc-500">Alcance categoría</span>
+                      <select
+                        value={String(config.category_scope || "parent_and_descendants")}
                         onChange={(event) =>
                           updateDraftConfig({
                             ...config,
-                            categoryId: event.target.value.trim() || null,
+                            category_scope: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="parent_and_descendants">Padre + descendientes</option>
+                        <option value="parent_only">Solo padres</option>
+                        <option value="children_only">Solo hijas</option>
+                      </select>
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Category IDs (coma separada)</span>
+                      <input
+                        value={String(config.categoryIds || config.categoryId || "")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            categoryIds: event.target.value,
+                            categoryId: null,
+                          })
+                        }
+                        placeholder="cat-parent-1,cat-parent-2"
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Brand IDs (coma separada)</span>
+                      <input
+                        value={String(config.brandIds || config.brandId || "")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            brandIds: event.target.value,
+                            brandId: null,
+                          })
+                        }
+                        placeholder="brand-1,brand-2"
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_arrows ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_arrows: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar flechas
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_dots ?? false)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_dots: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar indicadores
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">CTA ver todo (texto)</span>
+                      <input
+                        value={String(config.view_all_label || "")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            view_all_label: event.target.value,
                           })
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
@@ -1301,13 +1416,13 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">ID de marca</span>
+                      <span className="mb-1 block text-zinc-500">CTA ver todo (URL)</span>
                       <input
-                        value={String(config.brandId || "")}
+                        value={String(config.view_all_href || "")}
                         onChange={(event) =>
                           updateDraftConfig({
                             ...config,
-                            brandId: event.target.value.trim() || null,
+                            view_all_href: event.target.value,
                           })
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
@@ -1615,14 +1730,14 @@ export default function HomeComposerPage() {
                       El modo curado requiere productos vinculados. Si guardas sin items, la sección quedará vacía en Store.
                     </div>
                   ) : null}
-                  {String(config.source || "NEW_ARRIVALS") === "CATEGORY" && !String(config.categoryId || "").trim() ? (
+                  {String(config.source || "NEW_ARRIVALS") === "CATEGORY" && !String(config.categoryId || config.categoryIds || "").trim() ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                      Fuente por categoría sin categoryId: Store aplicará fallback a catálogo general.
+                      Fuente por categoría sin categoryId/categoryIds: Store aplicará fallback a catálogo general.
                     </div>
                   ) : null}
-                  {String(config.source || "NEW_ARRIVALS") === "BRAND" && !String(config.brandId || "").trim() ? (
+                  {String(config.source || "NEW_ARRIVALS") === "BRAND" && !String(config.brandId || config.brandIds || "").trim() ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                      Fuente por marca sin brandId: Store aplicará fallback a catálogo general.
+                      Fuente por marca sin brandId/brandIds: Store aplicará fallback a catálogo general.
                     </div>
                   ) : null}
                 </>

@@ -642,6 +642,66 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.resolved.map((x: any) => x.slug)).toEqual(['alpha', 'beta', 'zeta']);
   });
 
+
+  it('supports CATEGORY source with parent_and_descendants scope for product carousel', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'prod-sec',
+            type: 'PRODUCT_CAROUSEL',
+            title: 'Category picks',
+            subtitle: null,
+            variant: null,
+            config: {
+              source: 'CATEGORY',
+              categoryIds: ['parent-cat'],
+              category_scope: 'parent_and_descendants',
+              limit: 6,
+            },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'child-cat', parent_id: 'parent-cat' }]),
+      },
+      product: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p1',
+            status: 'ACTIVE',
+            title: 'Switch 24 puertos',
+            slug: 'switch-24',
+            brand: { name: 'Nexus' },
+            media: [{ url: '/switch.jpg' }],
+            skus: [{ prices: [{ sale_price: 100, compare_at_price: 120 }], inventory: [{ qty_on_hand: 5 }] }],
+          },
+        ]),
+      },
+      featuredProduct: { findMany: jest.fn().mockResolvedValue([]) },
+    } as any;
+
+    const service = new HomeLayoutService(prisma, { getProducts: jest.fn(), getDealsProducts: jest.fn() } as any);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-category',
+      locale: 'es',
+      name: 'Category layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    expect((payload.sections[0] as any).resolved).toHaveLength(1);
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { main_category_id: { in: ['parent-cat', 'child-cat'] } },
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('uses query.categoryId source config for CATEGORY product sections', async () => {
     const prisma = {
       homePageSection: {

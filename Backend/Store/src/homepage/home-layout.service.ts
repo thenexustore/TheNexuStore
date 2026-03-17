@@ -143,14 +143,34 @@ export class HomeLayoutService {
     }
 
     if (type === HomeSectionType.PRODUCT_CAROUSEL) {
-      next.source = next.source || 'NEW_ARRIVALS';
+      next.source = ['NEW_ARRIVALS', 'BEST_DEALS', 'FEATURED', 'CATEGORY', 'BRAND', 'BEST_SELLERS'].includes(String(next.source))
+        ? String(next.source)
+        : 'NEW_ARRIVALS';
       next.limit = this.clampLimit(next.limit, 12);
       next.inStockOnly = this.asBoolean(next.inStockOnly, true);
       next.mode = next.mode || 'rule';
+      next.discount_only = this.asBoolean(next.discount_only, false);
+      next.featured_only = this.asBoolean(next.featured_only, false);
+      next.category_scope = ['parent_only', 'children_only', 'parent_and_descendants'].includes(String(next.category_scope))
+        ? String(next.category_scope)
+        : 'parent_and_descendants';
+      next.categoryId = String(next.categoryId || next.query?.categoryId || '').trim() || null;
+      next.categoryIds = Array.isArray(next.categoryIds)
+        ? next.categoryIds.map((x: any) => String(x || '').trim()).filter(Boolean)
+        : String(next.categoryIds || '').split(',').map((x: string) => x.trim()).filter(Boolean);
+      next.brandId = String(next.brandId || next.query?.brandId || '').trim() || null;
+      next.brandIds = Array.isArray(next.brandIds)
+        ? next.brandIds.map((x: any) => String(x || '').trim()).filter(Boolean)
+        : String(next.brandIds || '').split(',').map((x: string) => x.trim()).filter(Boolean);
+      next.sortBy = String(next.sortBy || next.query?.sortBy || 'newest');
       next.autoplay = this.asBoolean(next.autoplay, true);
+      next.show_arrows = this.asBoolean(next.show_arrows, true);
+      next.show_dots = this.asBoolean(next.show_dots, false);
       next.interval_ms = this.clampRange(next.interval_ms, 2000, 15000, 4500);
       next.items_mobile = this.clampRange(next.items_mobile, 1, 3, 2);
       next.items_desktop = this.clampRange(next.items_desktop, 2, 6, 4);
+      next.view_all_href = String(next.view_all_href || '').trim() || null;
+      next.view_all_label = String(next.view_all_label || '').trim() || null;
     }
 
     if (type === HomeSectionType.CATEGORY_STRIP) {
@@ -628,9 +648,69 @@ export class HomeLayoutService {
     const source = config.source || 'NEW_ARRIVALS';
     const limit = this.clampLimit(config.limit, 12);
     const inStockOnly = config.inStockOnly ?? true;
-    const categoryId = String(config.categoryId || config.query?.categoryId || '').trim();
-    const brandId = String(config.brandId || config.query?.brandId || '').trim();
     const sortBy = (config.sortBy || config.query?.sortBy || 'newest') as any;
+    const featuredOnly = Boolean(config.featured_only);
+    const discountOnly = Boolean(config.discount_only);
+
+    const singleCategoryId = String(config.categoryId || config.query?.categoryId || '').trim();
+    const singleBrandId = String(config.brandId || config.query?.brandId || '').trim();
+    const categoryIds = [
+      ...new Set(
+        [
+          singleCategoryId,
+          ...((Array.isArray(config.categoryIds) ? config.categoryIds : String(config.categoryIds || '').split(','))
+            .map((x: any) => String(x || '').trim())
+            .filter(Boolean)),
+        ].filter(Boolean),
+      ),
+    ];
+    const brandIds = [
+      ...new Set(
+        [
+          singleBrandId,
+          ...((Array.isArray(config.brandIds) ? config.brandIds : String(config.brandIds || '').split(','))
+            .map((x: any) => String(x || '').trim())
+            .filter(Boolean)),
+        ].filter(Boolean),
+      ),
+    ];
+
+    const applyPostFilters = (products: any[]) => {
+      const filtered = products
+        .filter((p) => p?.status === 'ACTIVE')
+        .filter((p) => (inStockOnly ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0 : true))
+        .map((product) => this.toProductCard(product));
+
+      return filtered
+        .filter((card) => (discountOnly ? Number(card.discount_percentage || 0) > 0 : true))
+        .slice(0, limit);
+    };
+
+    const loadProductsByWhere = async (where: Record<string, any>) => {
+      const products = await this.prisma.product.findMany({
+        where: {
+          status: 'ACTIVE',
+          ...where,
+        },
+        include: {
+          brand: true,
+          media: { where: { sku_id: null }, take: 1 },
+          skus: {
+            where: { name: null },
+            include: { prices: true, inventory: true },
+            take: 1,
+          },
+        },
+        orderBy:
+          sortBy === 'price_asc'
+            ? [{ skus: { _count: 'desc' } }, { created_at: 'desc' }]
+            : sortBy === 'price_desc'
+              ? [{ skus: { _count: 'desc' } }, { created_at: 'desc' }]
+              : [{ created_at: 'desc' }],
+        take: Math.max(limit * 3, 24),
+      });
+      return applyPostFilters(products);
+    };
 
     if (config.mode === 'curated') {
       const items = await this.listItems(section.id);
@@ -649,12 +729,12 @@ export class HomeLayoutService {
         },
       });
       const order = new Map(ids.map((id, idx) => [id, idx]));
-      return products
-        .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
-        .map((product) => this.toProductCard(product));
+      return applyPostFilters(
+        products.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)),
+      );
     }
 
-    if (source === 'FEATURED') {
+    if (source === 'FEATURED' || featuredOnly) {
       const featured = await this.prisma.featuredProduct.findMany({
         where: { is_active: true },
         include: {
@@ -671,51 +751,74 @@ export class HomeLayoutService {
           },
         },
         orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
-        take: limit,
+        take: Math.max(limit * 2, 24),
       });
 
-      const featuredCards = featured
-        .map((entry) => entry.product)
-        .filter((p) => p?.status === 'ACTIVE')
-        .filter((p) =>
-          inStockOnly
-            ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0
-            : true,
-        )
-        .map((product) => this.toProductCard(product));
-
-      if (featuredCards.length) return featuredCards;
+      const featuredCards = applyPostFilters(featured.map((entry) => entry.product));
+      if (featuredCards.length && source === 'FEATURED') return featuredCards;
+      if (featuredOnly) return featuredCards;
     }
 
-    if (source === 'CATEGORY' && categoryId) {
-      const result = await this.productsService.getProducts({
-        page: 1,
-        limit,
-        category: categoryId,
-        in_stock_only: inStockOnly,
-        sort_by: sortBy,
+    if (source === 'CATEGORY' && categoryIds.length) {
+      const categoryScope = String(config.category_scope || 'parent_and_descendants');
+
+      if (
+        categoryIds.length === 1 &&
+        categoryScope === 'parent_and_descendants' &&
+        (!config.categoryIds || (Array.isArray(config.categoryIds) && config.categoryIds.length === 0))
+      ) {
+        const result = await this.productsService.getProducts({
+          page: 1,
+          limit,
+          category: categoryIds[0],
+          in_stock_only: inStockOnly,
+          sort_by: sortBy,
+        });
+        const cards = (result.products || []).filter((p: any) =>
+          discountOnly ? Number(p.discount_percentage || p.discount_pct || 0) > 0 : true,
+        );
+        if (cards.length) return cards.slice(0, limit);
+      }
+
+      const childRows =
+        (await this.prisma.category?.findMany?.({
+          where: { is_active: true, parent_id: { in: categoryIds } },
+          select: { id: true, parent_id: true },
+        })) || [];
+      const childIds = childRows.map((row) => row.id);
+
+      const targetCategoryIds =
+        categoryScope === 'children_only'
+          ? childIds
+          : categoryScope === 'parent_only'
+            ? categoryIds
+            : [...new Set([...categoryIds, ...childIds])];
+
+      if (!targetCategoryIds.length) return [];
+
+      const cards = await loadProductsByWhere({
+        OR: [
+          { main_category_id: { in: targetCategoryIds } },
+          { categories: { some: { category_id: { in: targetCategoryIds } } } },
+        ],
       });
-      return result.products;
+      if (cards.length) return cards;
     }
 
-    if (source === 'CATEGORY' && !categoryId) {
+    if (source === 'CATEGORY' && !categoryIds.length) {
       this.logger.warn(
         `PRODUCT_CAROUSEL section ${section.id} uses CATEGORY source without categoryId; falling back to generic catalog query.`,
       );
     }
 
-    if (source === 'BRAND' && brandId) {
-      const result = await this.productsService.getProducts({
-        page: 1,
-        limit,
-        brand: brandId,
-        in_stock_only: inStockOnly,
-        sort_by: sortBy,
+    if (source === 'BRAND' && brandIds.length) {
+      const cards = await loadProductsByWhere({
+        brand_id: { in: brandIds },
       });
-      return result.products;
+      if (cards.length) return cards;
     }
 
-    if (source === 'BRAND' && !brandId) {
+    if (source === 'BRAND' && !brandIds.length) {
       this.logger.warn(
         `PRODUCT_CAROUSEL section ${section.id} uses BRAND source without brandId; falling back to generic catalog query.`,
       );
@@ -723,10 +826,9 @@ export class HomeLayoutService {
 
     if (source === 'BEST_DEALS') {
       const deals = await this.productsService.getDealsProducts(limit, inStockOnly);
-      if (deals.length) return deals;
+      const dealCards = deals.filter((p: any) => (discountOnly ? Number(p.discount_percentage || p.discount_pct || 0) > 0 : true));
+      if (dealCards.length) return dealCards;
 
-      // If there are no active discounted products, keep the section useful by
-      // falling back to featured products and, as last resort, newest products.
       const featured = await this.prisma.featuredProduct.findMany({
         where: { is_active: true },
         include: {
@@ -743,15 +845,17 @@ export class HomeLayoutService {
           },
         },
         orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
-        take: limit,
+        take: Math.max(limit * 2, 24),
       });
-
-      const featuredCards = featured
-        .map((entry) => entry.product)
-        .filter((p) => p?.status === 'ACTIVE')
-        .filter((p) => (inStockOnly ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0 : true))
-        .map((product) => this.toProductCard(product));
+      const featuredCards = applyPostFilters(featured.map((entry) => entry.product));
       if (featuredCards.length) return featuredCards;
+    }
+
+    if (source === 'BEST_SELLERS') {
+      const bestSellerCards = await loadProductsByWhere({
+        order_items: { some: {} },
+      });
+      if (bestSellerCards.length) return bestSellerCards;
     }
 
     const result = await this.productsService.getProducts({
@@ -760,7 +864,10 @@ export class HomeLayoutService {
       in_stock_only: inStockOnly,
       sort_by: sortBy,
     });
-    return result.products;
+
+    return (result.products || [])
+      .filter((p: any) => (discountOnly ? Number(p.discount_percentage || p.discount_pct || 0) > 0 : true))
+      .slice(0, limit);
   }
 
   private async resolveSection(section: any) {
@@ -1117,23 +1224,43 @@ export class HomeLayoutService {
             }
           }
 
-          if (
-            source === 'CATEGORY' &&
-            !String(normalizedConfig.categoryId || '').trim()
-          ) {
+          const categoryIdsConfigured = [
+            String(normalizedConfig.categoryId || '').trim(),
+            ...(Array.isArray(normalizedConfig.categoryIds)
+              ? normalizedConfig.categoryIds
+              : String(normalizedConfig.categoryIds || '')
+                  .split(','))
+              .map((x: any) => String(x || '').trim())
+              .filter(Boolean),
+          ].filter(Boolean);
+
+          const brandIdsConfigured = [
+            String(normalizedConfig.brandId || '').trim(),
+            ...(Array.isArray(normalizedConfig.brandIds)
+              ? normalizedConfig.brandIds
+              : String(normalizedConfig.brandIds || '')
+                  .split(','))
+              .map((x: any) => String(x || '').trim())
+              .filter(Boolean),
+          ].filter(Boolean);
+
+          if (source === 'CATEGORY' && !categoryIdsConfigured.length) {
             fallbackReason = 'category_source_without_category_id';
             warnings.push(
-              'Fuente CATEGORY sin categoryId: se aplica fallback a catálogo general.',
+              'Fuente CATEGORY sin categoryId/categoryIds: se aplica fallback a catálogo general.',
             );
           }
 
-          if (
-            source === 'BRAND' &&
-            !String(normalizedConfig.brandId || '').trim()
-          ) {
+          if (source === 'BRAND' && !brandIdsConfigured.length) {
             fallbackReason = 'brand_source_without_brand_id';
             warnings.push(
-              'Fuente BRAND sin brandId: se aplica fallback a catálogo general.',
+              'Fuente BRAND sin brandId/brandIds: se aplica fallback a catálogo general.',
+            );
+          }
+
+          if (normalizedConfig.discount_only) {
+            warnings.push(
+              'Filtro discount_only activo: puede reducir resultados si no hay ofertas vigentes.',
             );
           }
         }

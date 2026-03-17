@@ -9,12 +9,16 @@ const checks = [
   { label: 'reorder sections route decorator', regex: /@Post\('\/admin\/home\/sections\/reorder'\)/g, expected: 1 },
 ];
 
+const lineOfIndex = (text, index) => text.slice(0, index).split('\n').length;
+
 let failed = false;
 for (const check of checks) {
-  const count = (source.match(check.regex) || []).length;
+  const matches = [...source.matchAll(check.regex)];
+  const count = matches.length;
   if (count !== check.expected) {
+    const lines = matches.map((m) => lineOfIndex(source, m.index || 0)).join(', ');
     console.error(
-      `[check-home-controller-duplicates] Expected ${check.expected} occurrence(s) of ${check.label}, found ${count}.`,
+      `[check-home-controller-duplicates] Expected ${check.expected} occurrence(s) of ${check.label}, found ${count}. Lines: ${lines || 'none'}.`,
     );
     failed = true;
   }

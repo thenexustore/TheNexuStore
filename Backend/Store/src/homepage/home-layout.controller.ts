@@ -125,29 +125,7 @@ export class HomeLayoutController {
     return { success: true, data: await this.service.moveSection(sectionId, body) };
   }
 
-  @Post('/admin/home/sections/reorder')
-  async reorderSections(@Body() body: ReorderSectionsDto) {
-    return { success: true, data: await this.service.reorderSections(body) };
-  }
-
-  @UseGuards(AdminGuard)
-  @Post('/admin/home/sections/reorder')
-  async reorderSections(@Body() body: ReorderSectionsDto) {
-    return { success: true, data: await this.service.reorderSections(body) };
-  }
-
-  @UseGuards(AdminGuard)
-  @Post('/admin/home/sections/reorder')
-  async reorderSections(@Body() body: ReorderSectionsDto) {
-    return { success: true, data: await this.service.reorderSections(body) };
-  }
-
-  @UseGuards(AdminGuard)
-  @Post('/admin/home/sections/reorder')
-  async reorderSections(@Body() body: ReorderSectionsDto) {
-    return { success: true, data: await this.service.reorderSections(body) };
-  }
-
+  // Single canonical endpoint for section reorder (must not be duplicated).
   @UseGuards(AdminGuard)
   @Post('/admin/home/sections/reorder')
   async reorderSections(@Body() body: ReorderSectionsDto) {

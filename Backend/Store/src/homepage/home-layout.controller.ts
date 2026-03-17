@@ -149,6 +149,12 @@ export class HomeLayoutController {
   }
 
   @UseGuards(AdminGuard)
+  @Post('/admin/home/sections/reorder')
+  async reorderSections(@Body() body: ReorderSectionsDto) {
+    return { success: true, data: await this.service.reorderSections(body) };
+  }
+
+  @UseGuards(AdminGuard)
   @Get('/admin/home/sections/:sectionId/items')
   async listItems(@Param('sectionId') sectionId: string) {
     return { success: true, data: await this.service.listItems(sectionId) };

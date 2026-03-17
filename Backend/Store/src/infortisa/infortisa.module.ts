@@ -6,6 +6,7 @@ import { InfortisaController } from './infortisa.controller';
 import { InfortisaSyncService } from './infortisa.sync';
 import { PrismaService } from '../common/prisma.service';
 import { ProductsService } from '../user/products/products.service';
+import { AdminGuard } from '../admin/admin.guard';
 
 @Module({
   imports: [ConfigModule, ScheduleModule.forRoot()],
@@ -15,6 +16,7 @@ import { ProductsService } from '../user/products/products.service';
     InfortisaSyncService,
     PrismaService,
     ProductsService,
+    AdminGuard,
   ],
   exports: [InfortisaService, InfortisaSyncService],
 })

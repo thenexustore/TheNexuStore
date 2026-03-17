@@ -366,7 +366,7 @@ export default function CartPage() {
                 <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
                   <div
                     className="h-full rounded-full bg-indigo-600 transition-all"
-                    style={{ width: `${Math.min(100, (((cart?.summary.subtotal || 0) / 100) * 100))}%` }}
+                    style={{ width: `${Math.min(100, cart?.summary.subtotal || 0)}%` }}
                   />
                 </div>
               </div>

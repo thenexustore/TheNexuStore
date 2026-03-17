@@ -108,7 +108,7 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
   PRODUCT_CAROUSEL: {
     mode: "rule",
     source: "NEW_ARRIVALS",
-    limit: 12,
+    limit: 4,
     inStockOnly: true,
     discount_only: false,
     featured_only: false,

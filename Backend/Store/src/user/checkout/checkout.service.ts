@@ -14,6 +14,7 @@ import { AppLogger } from '../../common/app-logger.service';
 import { MailService } from '../../auth/mail/mail.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
 import { RedsysService } from '../payment/redsys.service';
+import { randomBytes, randomInt } from 'crypto';
 
 @Injectable()
 export class CheckoutService {
@@ -39,7 +40,7 @@ export class CheckoutService {
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
+    const random = randomInt(0, 1000);
     return `ORD-${timestamp}-${random.toString().padStart(3, '0')}`;
   }
 
@@ -283,7 +284,7 @@ export class CheckoutService {
   ): Promise<PaymentIntentDto> {
     if (provider === 'COD') {
       const paymentIntent = {
-        id: `pi_cod_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+        id: `pi_cod_${Date.now()}_${randomBytes(6).toString('hex')}`,
         client_secret: '',
         amount,
         currency: 'EUR',
@@ -399,8 +400,7 @@ export class CheckoutService {
   }
 
   private async generateTrackingToken(): Promise<string> {
-    // Simple random token; uniqueness enforced at DB level
-    return `trk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    return `trk_${randomBytes(12).toString('hex')}`;
   }
 
   private appendQueryParam(baseUrl: string, key: string, value: string): string {

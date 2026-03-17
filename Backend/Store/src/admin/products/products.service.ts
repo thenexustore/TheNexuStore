@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class ProductsService {
@@ -9,7 +10,7 @@ export class ProductsService {
 
   private generateSKU(prefix: string = 'PROD'): string {
     const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substr(2, 6).toUpperCase();
+    const random = randomBytes(3).toString('hex').toUpperCase();
     return `${prefix}-${timestamp}-${random}`;
   }
 

@@ -1,5 +1,6 @@
 // Frontend/admin/app/lib/api/banners.ts
 import { API_URL } from "../constants";
+import { fetchWithAuth } from "../utils";
 
 export interface Banner {
   id: string;
@@ -48,19 +49,7 @@ export interface CreateBannerData {
 }
 
 export async function getBanners(): Promise<Banner[]> {
-  const response = await fetch(`${API_URL}/admin/banners`, {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch banners");
-  }
-
-  return data.data;
+  return fetchWithAuth<Banner[]>("/admin/banners");
 }
 
 export async function getActiveBanners(): Promise<Banner[]> {
@@ -76,109 +65,41 @@ export async function getActiveBanners(): Promise<Banner[]> {
 }
 
 export async function getBanner(id: string): Promise<Banner> {
-  const response = await fetch(`${API_URL}/admin/banners/${id}`, {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch banner");
-  }
-
-  return data.data;
+  return fetchWithAuth<Banner>(`/admin/banners/${id}`);
 }
 
 export async function createBanner(
   bannerData: CreateBannerData
 ): Promise<Banner> {
-  const response = await fetch(`${API_URL}/admin/banners`, {
+  return fetchWithAuth<Banner>("/admin/banners", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
     body: JSON.stringify(bannerData),
   });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to create banner");
-  }
-
-  return data.data;
 }
 
 export async function updateBanner(
   id: string,
   bannerData: Partial<CreateBannerData>
 ): Promise<Banner> {
-  const response = await fetch(`${API_URL}/admin/banners/${id}`, {
+  return fetchWithAuth<Banner>(`/admin/banners/${id}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
     body: JSON.stringify(bannerData),
   });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to update banner");
-  }
-
-  return data.data;
 }
 
 export async function deleteBanner(id: string): Promise<void> {
-  const response = await fetch(`${API_URL}/admin/banners/${id}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to delete banner");
-  }
+  await fetchWithAuth<void>(`/admin/banners/${id}`, { method: "DELETE" });
 }
 
 export async function toggleBannerStatus(id: string): Promise<Banner> {
-  const response = await fetch(`${API_URL}/admin/banners/${id}/toggle-status`, {
+  return fetchWithAuth<Banner>(`/admin/banners/${id}/toggle-status`, {
     method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
   });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to toggle banner status");
-  }
-
-  return data.data;
 }
 
 export async function reorderBanners(ids: string[]): Promise<void> {
-  const response = await fetch(`${API_URL}/admin/banners/reorder`, {
+  await fetchWithAuth<void>("/admin/banners/reorder", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
-    },
     body: JSON.stringify({ ids }),
   });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to reorder banners");
-  }
 }

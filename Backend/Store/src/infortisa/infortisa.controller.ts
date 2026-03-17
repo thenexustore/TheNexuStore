@@ -7,12 +7,15 @@ import {
   Query,
   Param,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { InfortisaService } from './infortisa.service';
 import { PrismaService } from '../common/prisma.service';
 import { ProductsService } from '../user/products/products.service';
 import { InfortisaSyncService } from './infortisa.sync';
+import { AdminGuard } from '../admin/admin.guard';
 
+@UseGuards(AdminGuard)
 @Controller('admin/infortisa')
 export class InfortisaController {
   constructor(

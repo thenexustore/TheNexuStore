@@ -547,6 +547,32 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [canNext, setCanNext] = useState(false);
   const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  const sourceLabel = {
+    NEW_ARRIVALS: 'Novedades',
+    BEST_DEALS: 'Ofertas activas',
+    FEATURED: 'Selección destacada',
+    CATEGORY: 'Categoría',
+    BRAND: 'Marca',
+    BEST_SELLERS: 'Más vendidos',
+  }[source] || 'Selección';
+
+  const scopeLabel = {
+    parent_only: 'Solo categorías padre',
+    children_only: 'Solo categorías hijas',
+    parent_and_descendants: 'Padre + descendientes',
+  }[categoryScope] || 'Reglas automáticas';
+
+  const contextualChips = [
+    sourceLabel,
+    source === 'CATEGORY' ? scopeLabel : null,
+    categoryIds.length ? `${categoryIds.length} categorías` : null,
+    brandIds.length ? `${brandIds.length} marcas` : null,
+  ].filter(Boolean);
+
+  const useGridFallback = list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3));
 
   const sourceLabel = {
     NEW_ARRIVALS: 'Novedades',
@@ -591,6 +617,24 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const sync = () => {
+      setIsMobileViewport(media.matches);
+      setReduceMotion(motionMedia.matches);
+    };
+
+    sync();
+    media.addEventListener('change', sync);
+    motionMedia.addEventListener('change', sync);
+    return () => {
+      media.removeEventListener('change', sync);
+      motionMedia.removeEventListener('change', sync);
+    };
+  }, []);
+
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 260;
@@ -601,7 +645,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const goNext = () => railRef.current?.scrollBy({ left: step(), behavior: 'smooth' });
 
   useEffect(() => {
-    if (!autoplayEnabled || isPaused || list.length <= 1) return;
+    const shouldAutoplay = autoplayEnabled && !reduceMotion && (!isMobileViewport || list.length > 3);
+    if (!shouldAutoplay || isPaused || list.length <= 1) return;
     const id = window.setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const rail = railRef.current;
@@ -614,7 +659,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       }
     }, autoplayIntervalMs);
     return () => window.clearInterval(id);
-  }, [autoplayEnabled, autoplayIntervalMs, isPaused, list.length]);
+  }, [autoplayEnabled, autoplayIntervalMs, isPaused, isMobileViewport, list.length, reduceMotion]);
 
   const renderCard = (product: Record<string, unknown>, idx: number) => {
     const hasDeal = Number(product.compare_at_price || 0) > Number(product.price || 0);

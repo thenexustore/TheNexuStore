@@ -792,6 +792,9 @@ export default function HomeComposerPage() {
       });
 
       await loadSections(activeLayoutId);
+      if (selectedSection.type === "HERO_CAROUSEL") {
+        await loadIntegratedModules();
+      }
       toast.success("Bloque guardado");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el bloque");
@@ -847,6 +850,9 @@ export default function HomeComposerPage() {
       await homeBuilderApi.createItem(selectedSection.id, basePayload);
       const data = (await homeBuilderApi.listItems(selectedSection.id)) as HomeSectionItem[];
       setItems([...data].sort((a, b) => a.position - b.position));
+      if (currentTarget === "banners") {
+        await loadIntegratedModules();
+      }
       toast.success("Ítem añadido");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo añadir el ítem");
@@ -1340,6 +1346,15 @@ export default function HomeComposerPage() {
                         <option value="BRAND">Por marca</option>
                         <option value="BEST_SELLERS">Más vendidos</option>
                       </select>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {String(config.source || "NEW_ARRIVALS") === "CATEGORY"
+                          ? "Usa category scope + categorías seleccionadas para controlar padre/hijas."
+                          : String(config.source || "NEW_ARRIVALS") === "BRAND"
+                            ? "Filtra por una o varias marcas seleccionadas."
+                            : String(config.source || "NEW_ARRIVALS") === "BEST_DEALS"
+                              ? "Prioriza productos con descuento activo."
+                              : "Fuente automática de catálogo."}
+                      </p>
                     </label>
 
                     <label className="text-sm">

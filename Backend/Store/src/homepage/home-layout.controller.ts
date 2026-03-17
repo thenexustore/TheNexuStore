@@ -6,6 +6,7 @@ import {
   CreateSectionDto,
   MoveSectionDto,
   ReorderItemsDto,
+  ReorderSectionsDto,
   UpdateItemDto,
   UpdateLayoutDto,
   UpdateSectionDto,
@@ -50,6 +51,17 @@ export class HomeLayoutController {
     return {
       success: true,
       data: await this.service.getActiveLayoutDiagnostics(locale),
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('/admin/home/integrated-summary')
+  async integratedSummary(@Query('limit') limit?: string) {
+    return {
+      success: true,
+      data: await this.service.getIntegratedModulesSummary(
+        Number(limit || 8),
+      ),
     };
   }
 
@@ -111,6 +123,12 @@ export class HomeLayoutController {
   @Post('/admin/home/sections/:sectionId/move')
   async moveSection(@Param('sectionId') sectionId: string, @Body() body: MoveSectionDto) {
     return { success: true, data: await this.service.moveSection(sectionId, body) };
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('/admin/home/sections/reorder')
+  async reorderSections(@Body() body: ReorderSectionsDto) {
+    return { success: true, data: await this.service.reorderSections(body) };
   }
 
   @UseGuards(AdminGuard)

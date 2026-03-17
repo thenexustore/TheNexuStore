@@ -426,14 +426,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
 function CategoryStrip({ title, subtitle, categories, config }: { title?: string; subtitle?: string; categories: unknown[]; config?: Record<string, unknown> }) {
   const list = uniqueBy(
     toArray<Record<string, unknown>>(categories),
-    (cat, idx) => {
-      const rawName = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, '')).toLowerCase();
-      const slug = asText(cat.slug).trim().toLowerCase();
-      const href = asText(cat.href).trim().toLowerCase();
-      const normalizedPath = href ? href.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '') : '';
-      const primaryKey = slug || normalizedPath || rawName;
-      return primaryKey || asText(cat.id) || `cat-${idx}`;
-    },
+    (cat, idx) => asText(cat.id) || asText(cat.slug) || asText(cat.name) || `cat-${idx}`,
   );
   const mobileCols = Math.max(2, Math.min(4, Number(config?.items_mobile || 2)));
   const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
@@ -556,6 +549,30 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+
+  const sourceLabel = {
+    NEW_ARRIVALS: 'Novedades',
+    BEST_DEALS: 'Ofertas activas',
+    FEATURED: 'Selección destacada',
+    CATEGORY: 'Categoría',
+    BRAND: 'Marca',
+    BEST_SELLERS: 'Más vendidos',
+  }[source] || 'Selección';
+
+  const scopeLabel = {
+    parent_only: 'Solo categorías padre',
+    children_only: 'Solo categorías hijas',
+    parent_and_descendants: 'Padre + descendientes',
+  }[categoryScope] || 'Reglas automáticas';
+
+  const contextualChips = [
+    sourceLabel,
+    source === 'CATEGORY' ? scopeLabel : null,
+    categoryIds.length ? `${categoryIds.length} categorías` : null,
+    brandIds.length ? `${brandIds.length} marcas` : null,
+  ].filter(Boolean);
+
+  const useGridFallback = list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3));
 
   const sourceLabel = {
     NEW_ARRIVALS: 'Novedades',
@@ -750,7 +767,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
               onTouchEnd={() => setIsPaused(false)}
               onFocusCapture={() => setIsPaused(true)}
               onBlurCapture={() => setIsPaused(false)}
-              className="flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scroll-padding-left:8px] active:cursor-grabbing"
+              className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scroll-padding-left:8px]"
             >
               {list.map((product, idx) => renderCard(product, idx))}
             </div>

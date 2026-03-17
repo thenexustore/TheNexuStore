@@ -319,31 +319,35 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
             const hasVisual = decision.hasVisual;
             const slideId = asText(slide.id, `hero-${i}`);
 
-            console.info('[store-home][hero][image-decision]', {
-              slideId,
-              selectedField: decision.selectedField,
-              selectedRawValue: decision.selectedRawValue,
-              normalizedUrl: decision.normalizedUrl,
-              hasVisual,
-            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.info('[store-home][hero][image-decision]', {
+                slideId,
+                selectedField: decision.selectedField,
+                selectedRawValue: decision.selectedRawValue,
+                normalizedUrl: decision.normalizedUrl,
+                hasVisual,
+              });
+            }
 
             if (!hasVisual) {
               const banner = (slide.banner as Record<string, unknown>) || {};
-              console.warn('[store-home][hero] Missing hero image for slide', {
-                slideId,
-                bannerId: asText(slide.banner_id),
-                title: asText(slide.title_text),
-                hasBannerObject: Object.keys(banner).length > 0,
-                hasUsableHeroImageData: hasUsableHeroImageData(slide),
-                selectedField: decision.selectedField,
-                normalizedUrl: decision.normalizedUrl,
-                rawImageFields: {
-                  slideImageUrl: asText(slide.image_url),
-                  slideImage: asText(slide.image),
-                  bannerImage: asText(banner.image),
-                  bannerImageUrl: asText(banner.image_url),
-                },
-              });
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn('[store-home][hero] Missing hero image for slide', {
+                  slideId,
+                  bannerId: asText(slide.banner_id),
+                  title: asText(slide.title_text),
+                  hasBannerObject: Object.keys(banner).length > 0,
+                  hasUsableHeroImageData: hasUsableHeroImageData(slide),
+                  selectedField: decision.selectedField,
+                  normalizedUrl: decision.normalizedUrl,
+                  rawImageFields: {
+                    slideImageUrl: asText(slide.image_url),
+                    slideImage: asText(slide.image),
+                    bannerImage: asText(banner.image),
+                    bannerImageUrl: asText(banner.image_url),
+                  },
+                });
+              }
             }
             return (
             <div
@@ -464,11 +468,13 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
           const imageValue = cat.image_url || cat.image || cat.banner_image;
           const hasVisual = !isLikelyMissingImage(imageValue);
           if (!hasVisual) {
-            console.warn('[store-home][category-strip] Missing category image', {
-              categoryId: asText(cat.id, `cat-${idx}`),
-              slug: asText(cat.slug),
-              name,
-            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[store-home][category-strip] Missing category image', {
+                categoryId: asText(cat.id, `cat-${idx}`),
+                slug: asText(cat.slug),
+                name,
+              });
+            }
           }
           return (
           <ActionLink

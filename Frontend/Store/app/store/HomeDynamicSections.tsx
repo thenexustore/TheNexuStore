@@ -427,11 +427,13 @@ export default function HomeDynamicSections({
           case "NEW_ARRIVALS":
           case "FEATURED_PICKS": {
             const productBreakpoints = calculateCarouselBreakpoints(sectionConfig, 6);
-            if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
-              console.warn(
-                `[HomeDynamicSections] Section "${section.id}" (${section.type}) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
-                sectionConfig,
-              );
+            if (process.env.NODE_ENV !== 'production') {
+              if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
+                console.warn(
+                  `[HomeDynamicSections] Section "${section.id}" (${section.type}) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
+                  sectionConfig,
+                );
+              }
             }
             return (
               <SectionShell
@@ -473,11 +475,13 @@ export default function HomeDynamicSections({
           }
           case "TOP_CATEGORIES_GRID": {
             const catBreakpoints = calculateCarouselBreakpoints(sectionConfig, 8);
-            if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
-              console.warn(
-                `[HomeDynamicSections] Section "${section.id}" (TOP_CATEGORIES_GRID) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
-                sectionConfig,
-              );
+            if (process.env.NODE_ENV !== 'production') {
+              if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
+                console.warn(
+                  `[HomeDynamicSections] Section "${section.id}" (TOP_CATEGORIES_GRID) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
+                  sectionConfig,
+                );
+              }
             }
             return (
               <SectionShell
@@ -506,11 +510,13 @@ export default function HomeDynamicSections({
           }
           case "BRANDS_STRIP": {
             const brandBreakpoints = calculateCarouselBreakpoints(sectionConfig, 8);
-            if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
-              console.warn(
-                `[HomeDynamicSections] Section "${section.id}" (BRANDS_STRIP) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
-                sectionConfig,
-              );
+            if (process.env.NODE_ENV !== 'production') {
+              if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
+                console.warn(
+                  `[HomeDynamicSections] Section "${section.id}" (BRANDS_STRIP) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
+                  sectionConfig,
+                );
+              }
             }
             return (
               <SectionShell

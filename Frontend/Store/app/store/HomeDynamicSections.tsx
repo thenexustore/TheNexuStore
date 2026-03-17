@@ -200,6 +200,16 @@ type HomeDynamicSectionsProps = {
   initialSections?: Section[];
 };
 
+function calculateCarouselBreakpoints(
+  config: Record<string, any>,
+  maxDesktop = 6,
+): { mobile: number; tablet: number; desktop: number } {
+  const mobile = Math.max(1, Number(config.carousel_items_mobile) || 2);
+  const desktop = Math.max(mobile, Math.min(maxDesktop, Number(config.carousel_items_desktop) || Math.min(maxDesktop, 4)));
+  const tablet = Math.min(desktop, Math.ceil((mobile + desktop) / 2));
+  return { mobile, tablet, desktop };
+}
+
 export default function HomeDynamicSections({
   initialSections = [],
 }: HomeDynamicSectionsProps) {
@@ -415,7 +425,14 @@ export default function HomeDynamicSections({
           case "PRODUCT_CAROUSEL":
           case "BEST_DEALS":
           case "NEW_ARRIVALS":
-          case "FEATURED_PICKS":
+          case "FEATURED_PICKS": {
+            const productBreakpoints = calculateCarouselBreakpoints(sectionConfig, 6);
+            if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
+              console.warn(
+                `[HomeDynamicSections] Section "${section.id}" (${section.type}) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
+                sectionConfig,
+              );
+            }
             return (
               <SectionShell
                 key={section.id}
@@ -446,21 +463,22 @@ export default function HomeDynamicSections({
                   autoplayIntervalMs={Number(
                     sectionConfig.carousel_interval_ms || 4500,
                   )}
-                  itemsPerView={{
-                    mobile: Number(sectionConfig.carousel_items_mobile || 2),
-                    tablet: Math.max(
-                      Number(sectionConfig.carousel_items_mobile || 2),
-                      Number(sectionConfig.carousel_items_mobile || 2) + 1,
-                    ),
-                    desktop: Number(sectionConfig.carousel_items_desktop || 4),
-                  }}
+                  itemsPerView={productBreakpoints}
                   maxItems={Number(
                     sectionConfig.limit || sectionConfig?.query?.limit || 20,
                   )}
                 />
               </SectionShell>
             );
-          case "TOP_CATEGORIES_GRID":
+          }
+          case "TOP_CATEGORIES_GRID": {
+            const catBreakpoints = calculateCarouselBreakpoints(sectionConfig, 8);
+            if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
+              console.warn(
+                `[HomeDynamicSections] Section "${section.id}" (TOP_CATEGORIES_GRID) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
+                sectionConfig,
+              );
+            }
             return (
               <SectionShell
                 key={section.id}
@@ -478,14 +496,22 @@ export default function HomeDynamicSections({
                     slug: string;
                   }>}
                   autoplay={false}
-                  itemsPerView={{ mobile: 2, tablet: 3, desktop: 6 }}
+                  itemsPerView={catBreakpoints}
                   maxItems={Number(
                     sectionConfig.limit || sectionConfig?.query?.limit || 12,
                   )}
                 />
               </SectionShell>
             );
-          case "BRANDS_STRIP":
+          }
+          case "BRANDS_STRIP": {
+            const brandBreakpoints = calculateCarouselBreakpoints(sectionConfig, 8);
+            if (sectionConfig.carousel_items_desktop == null || sectionConfig.carousel_items_mobile == null) {
+              console.warn(
+                `[HomeDynamicSections] Section "${section.id}" (BRANDS_STRIP) is missing carousel_items_desktop or carousel_items_mobile config. Using defaults.`,
+                sectionConfig,
+              );
+            }
             return (
               <SectionShell
                 key={section.id}
@@ -498,6 +524,7 @@ export default function HomeDynamicSections({
                   autoplayIntervalMs={Number(
                     sectionConfig.carousel_interval_ms || 4500,
                   )}
+                  itemsPerView={brandBreakpoints}
                   items={(section.data || []).map((x: any) => ({
                     id: x.id,
                     name: x.name,
@@ -509,6 +536,7 @@ export default function HomeDynamicSections({
                 />
               </SectionShell>
             );
+          }
           case "TRUST_BAR":
             return (
               <SectionShell

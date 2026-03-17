@@ -515,8 +515,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     toArray<Record<string, unknown>>(products),
     (product, idx) => asText(product.id) || asText(product.slug) || asText(product.title) || `product-${idx}`,
   );
-  const mobileItems = Math.max(1, Number(config?.items_mobile || 2));
-  const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.items_desktop || 4)));
+  const mobileItems = Math.max(1, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
+  const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
   const mobileCardPx = Math.max(168, Math.floor(360 / mobileItems));
   const desktopCardPx = Math.max(205, Math.floor(1160 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
@@ -790,8 +790,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
 
 function BrandStrip({ title, subtitle, brands, config }: { title?: string; subtitle?: string; brands: unknown[]; config?: Record<string, unknown> }) {
   const list = toArray<Record<string, unknown>>(brands);
-  const mobileItems = Math.max(2, Number(config?.items_mobile || 2));
-  const desktopItems = Math.max(2, Number(config?.items_desktop || 6));
+  const mobileItems = Math.max(2, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
+  const desktopItems = Math.max(2, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 6));
   const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
   const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;

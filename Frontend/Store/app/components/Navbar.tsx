@@ -9,7 +9,7 @@ import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
 import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
-import { buildCuratedCategoryTree } from "../lib/category-navigation";
+import { normalizeCategoryTree, resolveCategoryScopeSlug } from "../lib/category-navigation";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "./StoreBrandLogo";
 
@@ -49,11 +49,11 @@ export default function Navbar() {
   const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-  const curatedCategoryTree = useMemo(
-    () => buildCuratedCategoryTree(categoryTreeState),
+  const canonicalCategoryTree = useMemo(
+    () => normalizeCategoryTree(categoryTreeState),
     [categoryTreeState],
   );
-  const filteredCategories = curatedCategoryTree;
+  const filteredCategories = canonicalCategoryTree;
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -219,7 +219,7 @@ export default function Navbar() {
   };
 
   const handleCategoryClick = (categorySlug: string) => {
-    router.push(`/products?categories=${categorySlug}`);
+    router.push(`/products?categories=${encodeURIComponent(resolveCategoryScopeSlug({ slug: categorySlug }))}`);
     closeMobilePanels();
   };
 
@@ -562,7 +562,7 @@ export default function Navbar() {
         key={categoryPanelOpen ? "category-drawer-open" : "category-drawer-closed"}
         open={categoryPanelOpen}
         loading={categoriesLoading}
-        tree={curatedCategoryTree}
+        tree={canonicalCategoryTree}
         query={categorySearch}
         searchResults={categorySearchResults}
         searchLoading={categorySearchLoading}

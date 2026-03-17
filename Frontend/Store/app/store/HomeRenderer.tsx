@@ -52,7 +52,11 @@ function ActionLink({ href, className, children, style }: { href: string; classN
 
 const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
 const asText = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
-const normalizeCategoryLabel = (value: string): string => value.replace(/,(?=\S)/g, ', ').replace(/\/(?=\S)/g, '/ ').replace(/\s{2,}/g, ' ').trim();
+const normalizeCategoryLabel = (value: string): string => value
+  .replace(/,(?=\S)/g, ', ')
+  .replace(/\s*\/\s*/g, ' / ')
+  .replace(/\s{2,}/g, ' ')
+  .trim();
 const isMachineTitle = (value: string) => /^[A-Z0-9_]+$/.test(value);
 const resolveSectionTitle = (type: string, title?: string): string => {
   const normalized = asText(title).trim();

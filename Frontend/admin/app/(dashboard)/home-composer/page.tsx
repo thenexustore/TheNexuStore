@@ -565,8 +565,17 @@ export default function HomeComposerPage() {
 
     try {
       setSaving(true);
-      await homeBuilderApi.reorderSections(payload);
+      try {
+        await homeBuilderApi.reorderSections(payload);
+      } catch (error) {
+        // Fallback defensivo: algunos entornos legacy aún no aceptan reorder masivo.
+        await homeBuilderApi.moveSection(section.id, nextIndex + 1);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[home-composer] reorderSections failed, used moveSection fallback', error);
+        }
+      }
       await loadSections(activeLayoutId);
+      toast.success('Bloque reordenado');
     } catch (error) {
       setSections(previousSections);
       toast.error(error instanceof Error ? error.message : "No se pudo mover la sección");

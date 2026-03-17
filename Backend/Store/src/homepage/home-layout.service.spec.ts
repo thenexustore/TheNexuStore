@@ -578,6 +578,27 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
 
 describe('HomeLayoutService section ordering integrity', () => {
 
+  it('rejects reorder payload with duplicated section ids', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+
+    await expect(
+      service.reorderSections({
+        items: [
+          { id: 'sec-1', position: 1 },
+          { id: 'sec-1', position: 2 },
+        ],
+      }),
+    ).rejects.toThrow('Section ids must be unique');
+  });
+
   it('reorders sections and normalizes contiguous positions', async () => {
     const prisma = {
       homePageSection: {

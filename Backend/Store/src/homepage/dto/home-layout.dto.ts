@@ -97,6 +97,22 @@ export class MoveSectionDto {
   position!: number;
 }
 
+export class MoveSectionEntryDto {
+  @IsString()
+  id!: string;
+
+  @IsInt()
+  @Min(1)
+  position!: number;
+}
+
+export class ReorderSectionsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MoveSectionEntryDto)
+  items!: MoveSectionEntryDto[];
+}
+
 export class CreateItemDto {
   @IsInt()
   @Min(1)

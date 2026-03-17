@@ -118,15 +118,20 @@ export default function ProductsPage() {
           ) : loading ? (
             <ProductGridSkeleton />
           ) : productsResponse?.products.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white py-12 text-center">
-              <h3 className="text-xl font-semibold">{t("noProducts")}</h3>
-              <p className="mt-2 text-gray-600">
+            <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                <svg className="h-8 w-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800">{t("noProducts")}</h3>
+              <p className="mt-2 text-sm text-slate-500 max-w-xs mx-auto">
                 {t("adjustFilters")}
               </p>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 sm:gap-4">
                 {productsResponse?.products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

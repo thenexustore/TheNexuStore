@@ -31,24 +31,26 @@ export function Pagination({
   };
 
   return (
-    <div className="mt-8 flex justify-center">
-      <nav className="flex gap-2">
+    <div className="mt-10 flex justify-center">
+      <nav className="flex items-center gap-1" aria-label="Pagination">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="rounded-full px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-50"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          aria-label="Previous page"
         >
-          Previous
+          ‹
         </button>
 
         {getPageNumbers().map((pageNum) => (
           <button
             key={pageNum}
             onClick={() => onPageChange(pageNum)}
-            className={`rounded-full px-4 py-2 text-sm ${
+            aria-current={currentPage === pageNum ? "page" : undefined}
+            className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-medium transition-all ${
               currentPage === pageNum
-                ? "bg-[#0B123A] text-white"
-                : "hover:bg-gray-100"
+                ? "bg-[#0B123A] text-white shadow-sm"
+                : "border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
             }`}
           >
             {pageNum}
@@ -57,10 +59,10 @@ export function Pagination({
 
         {totalPages > maxVisiblePages && currentPage < totalPages - 2 && (
           <>
-            <span className="px-2 py-2">...</span>
+            <span className="flex h-10 w-10 items-center justify-center text-slate-400">…</span>
             <button
               onClick={() => onPageChange(totalPages)}
-              className="rounded-full px-4 py-2 text-sm hover:bg-gray-100"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
             >
               {totalPages}
             </button>
@@ -70,9 +72,10 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="rounded-full px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-50"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          aria-label="Next page"
         >
-          Next
+          ›
         </button>
       </nav>
     </div>

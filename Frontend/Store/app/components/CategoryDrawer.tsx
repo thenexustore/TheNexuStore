@@ -120,6 +120,7 @@ export function CategoryDrawer({
                   ) : (
                     tree.map((parent) => {
                       const isActive = activeParent?.id === parent.id;
+                      const ParentIcon = getCategoryIcon(parent.slug);
                       return (
                         <button
                           key={parent.id}
@@ -134,7 +135,7 @@ export function CategoryDrawer({
                           }`}
                         >
                           <span className="flex items-center gap-2">
-                            {(() => { const Icon = getCategoryIcon(parent.slug); return Icon ? <Icon className="h-4 w-4 flex-shrink-0" /> : null; })()}
+                            {ParentIcon && <ParentIcon className="h-4 w-4 flex-shrink-0" />}
                             <span className="font-medium">{parent.name}</span>
                           </span>
                           <ChevronRight className="h-4 w-4" />

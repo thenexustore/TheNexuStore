@@ -48,6 +48,7 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
         <div className="space-y-1">
           {tree.map((parent) => {
             const isActive = activeParent?.id === parent.id;
+            const ParentIcon = getCategoryIcon(parent.slug);
             return (
               <button
                 key={parent.id}
@@ -63,7 +64,7 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  {(() => { const Icon = getCategoryIcon(parent.slug); return Icon ? <Icon className="h-4 w-4 flex-shrink-0" /> : null; })()}
+                  {ParentIcon && <ParentIcon className="h-4 w-4 flex-shrink-0" />}
                   <span className="font-medium">{parent.name}</span>
                 </span>
                 <span className="flex items-center gap-1">

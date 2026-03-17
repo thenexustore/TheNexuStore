@@ -203,7 +203,7 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'streaming',
       'tdt',
       'soporte tv',
-      'projector',
+      'proyector',
       'pantalla proyeccion',
       'altavoz bluetooth',
       'auriculares bluetooth',

@@ -1346,6 +1346,15 @@ export default function HomeComposerPage() {
                         <option value="BRAND">Por marca</option>
                         <option value="BEST_SELLERS">Más vendidos</option>
                       </select>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {String(config.source || "NEW_ARRIVALS") === "CATEGORY"
+                          ? "Usa category scope + categorías seleccionadas para controlar padre/hijas."
+                          : String(config.source || "NEW_ARRIVALS") === "BRAND"
+                            ? "Filtra por una o varias marcas seleccionadas."
+                            : String(config.source || "NEW_ARRIVALS") === "BEST_DEALS"
+                              ? "Prioriza productos con descuento activo."
+                              : "Fuente automática de catálogo."}
+                      </p>
                     </label>
 
                     <label className="text-sm">
@@ -1503,12 +1512,29 @@ export default function HomeComposerPage() {
                     <div className="text-sm md:col-span-2">
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="block text-zinc-500">Selector de categorías (padre/hijas)</span>
-                        <input
-                          value={categoryFilter}
-                          onChange={(event) => setCategoryFilter(event.target.value)}
-                          placeholder="Buscar categoría..."
-                          className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={categoryFilter}
+                            onChange={(event) => setCategoryFilter(event.target.value)}
+                            placeholder="Buscar categoría..."
+                            className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+                          />
+                          {selectedCategoryIds.length ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateDraftConfig({
+                                  ...config,
+                                  categoryIds: [],
+                                  categoryId: null,
+                                })
+                              }
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+                            >
+                              Limpiar
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
 
                       {selectedCategoryMeta.length ? (
@@ -1568,12 +1594,29 @@ export default function HomeComposerPage() {
                     <div className="text-sm md:col-span-2">
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="block text-zinc-500">Selector de marcas</span>
-                        <input
-                          value={brandFilter}
-                          onChange={(event) => setBrandFilter(event.target.value)}
-                          placeholder="Buscar marca..."
-                          className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={brandFilter}
+                            onChange={(event) => setBrandFilter(event.target.value)}
+                            placeholder="Buscar marca..."
+                            className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+                          />
+                          {selectedBrandIds.length ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateDraftConfig({
+                                  ...config,
+                                  brandIds: [],
+                                  brandId: null,
+                                })
+                              }
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+                            >
+                              Limpiar
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
 
                       {selectedBrandMeta.length ? (

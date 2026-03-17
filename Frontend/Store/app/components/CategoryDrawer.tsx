@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { CategorySearchResult, CategoryTreeNode } from "../lib/products";
+import { getCategoryIcon } from "../lib/category-icons";
 
 type Props = {
   open: boolean;
@@ -119,6 +120,7 @@ export function CategoryDrawer({
                   ) : (
                     tree.map((parent) => {
                       const isActive = activeParent?.id === parent.id;
+                      const ParentIcon = getCategoryIcon(parent.slug);
                       return (
                         <button
                           key={parent.id}
@@ -132,7 +134,10 @@ export function CategoryDrawer({
                               : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
                           }`}
                         >
-                          <span className="font-medium">{parent.name}</span>
+                          <span className="flex items-center gap-2">
+                            {ParentIcon && <ParentIcon className="h-4 w-4 flex-shrink-0" />}
+                            <span className="font-medium">{parent.name}</span>
+                          </span>
                           <ChevronRight className="h-4 w-4" />
                         </button>
                       );
@@ -155,31 +160,37 @@ export function CategoryDrawer({
                         Ver todo en {activeParent.name}
                       </button>
 
-                      {activeParent.children.map((child) => {
-                        const isActive = activeChild?.id === child.id;
+                      {activeParent.children.length === 0 ? (
+                        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                          Próximamente: estamos preparando los productos de esta categoría.
+                        </p>
+                      ) : (
+                        activeParent.children.map((child) => {
+                          const isActive = activeChild?.id === child.id;
 
-                        return (
-                          <div key={child.id} className="flex items-center gap-1">
-                            <button
-                              onClick={() => setActiveChildId(child.id)}
-                              className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                                isActive
-                                  ? "bg-[#0B123A] text-white"
-                                  : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
-                              }`}
-                            >
-                              {child.name}
-                            </button>
-                            <button
-                              onClick={() => onNavigate(child.slug)}
-                              className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                              aria-label={`Ver ${child.name}`}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
-                          </div>
-                        );
-                      })}
+                          return (
+                            <div key={child.id} className="flex items-center gap-1">
+                              <button
+                                onClick={() => setActiveChildId(child.id)}
+                                className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                                  isActive
+                                    ? "bg-[#0B123A] text-white"
+                                    : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
+                                }`}
+                              >
+                                {child.name}
+                              </button>
+                              <button
+                                onClick={() => onNavigate(child.slug)}
+                                className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                                aria-label={`Ver ${child.name}`}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
                     </>
                   ) : (
                     <p className="px-2 text-sm text-slate-500">No hay datos disponibles.</p>

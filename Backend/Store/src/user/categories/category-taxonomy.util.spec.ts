@@ -69,4 +69,53 @@ describe('category-taxonomy.util', () => {
     const descendants = getDescendantIds('grandparent-a', rows);
     expect(descendants).toEqual(['grandparent-a', 'parent-a1', 'child-a1-1']);
   });
+
+  it('includes seeded parent categories with no children (empty children array)', () => {
+    const taxonomyRows = [
+      { id: 'p1', name: 'Ordenadores y portátiles', slug: 'ordenadores-portatiles', parent_id: null, sort_order: 10 },
+      { id: 'p2', name: 'Componentes y almacenamiento', slug: 'componentes-almacenamiento', parent_id: null, sort_order: 20 },
+      { id: 'p3', name: 'Monitores y periféricos', slug: 'monitores-perifericos', parent_id: null, sort_order: 30 },
+      { id: 'p4', name: 'Impresión y escaneado', slug: 'impresion-escaneado', parent_id: null, sort_order: 40 },
+      { id: 'p5', name: 'Redes y servidores', slug: 'redes-servidores', parent_id: null, sort_order: 50 },
+      { id: 'p6', name: 'Telefonía y movilidad', slug: 'telefonia-movilidad', parent_id: null, sort_order: 60 },
+      { id: 'p7', name: 'TV, audio y vídeo', slug: 'tv-audio-video', parent_id: null, sort_order: 65 },
+      { id: 'p8', name: 'Software y seguridad', slug: 'software-seguridad', parent_id: null, sort_order: 70 },
+      { id: 'p9', name: 'Gaming y smart home', slug: 'gaming-smart-home', parent_id: null, sort_order: 80 },
+      { id: 'p10', name: 'Accesorios y consumibles', slug: 'accesorios-consumibles', parent_id: null, sort_order: 90 },
+      // Only p1 has a child
+      { id: 'c1', name: 'Portátiles', slug: 'ordenadores-portatiles-portatiles', parent_id: 'p1', sort_order: 1 },
+    ];
+
+    const tree = buildCategoryTaxonomyTree(taxonomyRows, 3);
+
+    expect(tree).toHaveLength(10);
+    expect(tree.map((n) => n.slug)).toEqual([
+      'ordenadores-portatiles',
+      'componentes-almacenamiento',
+      'monitores-perifericos',
+      'impresion-escaneado',
+      'redes-servidores',
+      'telefonia-movilidad',
+      'tv-audio-video',
+      'software-seguridad',
+      'gaming-smart-home',
+      'accesorios-consumibles',
+    ]);
+
+    const ordenadores = tree.find((n) => n.slug === 'ordenadores-portatiles')!;
+    expect(ordenadores.children).toHaveLength(1);
+
+    const componentes = tree.find((n) => n.slug === 'componentes-almacenamiento')!;
+    expect(componentes.children).toHaveLength(0);
+  });
+
+  it('respects sort_order when building the tree', () => {
+    const unordered = [
+      { id: 'z', name: 'Z', slug: 'z', parent_id: null, sort_order: 30 },
+      { id: 'a', name: 'A', slug: 'a', parent_id: null, sort_order: 10 },
+      { id: 'm', name: 'M', slug: 'm', parent_id: null, sort_order: 20 },
+    ];
+    const tree = buildCategoryTaxonomyTree(unordered, 3);
+    expect(tree.map((n) => n.slug)).toEqual(['a', 'm', 'z']);
+  });
 });

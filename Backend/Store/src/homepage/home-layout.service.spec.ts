@@ -642,6 +642,61 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.resolved.map((x: any) => x.slug)).toEqual(['alpha', 'beta', 'zeta']);
   });
 
+<<<<<<< codex/audit-and-fix-media-resolution-for-homepage-rx43iu
+  it('fills CATEGORY_STRIP auto mode with child categories when parent pool is below configured limit', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-strip-sec',
+            type: 'CATEGORY_STRIP',
+            title: 'Categories',
+            subtitle: null,
+            variant: null,
+            config: { mode: 'auto', limit: 4 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            { id: 'parent-a', name: 'Networking', slug: 'networking', sort_order: 1, is_active: true, parent_id: null },
+            { id: 'parent-b', name: 'Storage', slug: 'storage', sort_order: 2, is_active: true, parent_id: null },
+          ])
+          .mockResolvedValueOnce([
+            { id: 'child-cables', name: 'Cables', slug: 'cables', sort_order: 3, is_active: true, parent_id: 'parent-a' },
+            { id: 'child-routers', name: 'Routers', slug: 'routers', sort_order: 4, is_active: true, parent_id: 'parent-a' },
+          ])
+          .mockResolvedValueOnce([
+            { id: 'child-sw', parent_id: 'parent-a' },
+            { id: 'child-ssd', parent_id: 'parent-b' },
+          ]),
+      },
+      product: {
+        count: jest.fn().mockResolvedValue(2),
+        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
+      },
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-cats',
+      locale: 'es',
+      name: 'Categories layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const section = payload.sections[0] as any;
+    expect(section.resolved).toHaveLength(4);
+    expect(section.resolved.map((x: any) => x.slug)).toEqual(
+      expect.arrayContaining(['networking', 'storage', 'cables', 'routers']),
+    );
+  });
+
+=======
+>>>>>>> main
 
   it('supports CATEGORY source with parent_and_descendants scope for product carousel', async () => {
     const prisma = {

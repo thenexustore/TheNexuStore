@@ -1001,6 +1001,37 @@ export class HomeLayoutService {
         .slice(0, requestedLimit)
         .map((entry) => entry.category);
 
+      if (categories.length < requestedLimit) {
+        const existingSemanticKeys = new Set(
+          categories.map((category) =>
+            `${String(category.slug || '').toLowerCase()}|${String(category.name || '').toLowerCase()}`,
+          ),
+        );
+        const existingIds = new Set(categories.map((category) => category.id));
+
+        const childFallback = await this.prisma.category.findMany({
+          where: {
+            is_active: true,
+            parent_id: { not: null },
+          },
+          orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+          take: 96,
+        });
+
+        for (const childCategory of childFallback) {
+          if (categories.length >= requestedLimit) break;
+          if (existingIds.has(childCategory.id)) continue;
+
+          const semanticKey = `${String(childCategory.slug || '').toLowerCase()}|${String(childCategory.name || '').toLowerCase()}`;
+          if (!semanticKey.replace('|', '').trim()) continue;
+          if (existingSemanticKeys.has(semanticKey)) continue;
+
+          existingIds.add(childCategory.id);
+          existingSemanticKeys.add(semanticKey);
+          categories.push(childCategory as any);
+        }
+      }
+
       const parentIds = categories.map((category) => category.id);
       const childRows = parentIds.length
         ? ((await this.prisma.category.findMany({

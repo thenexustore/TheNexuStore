@@ -1,12 +1,16 @@
 import {
   getParentCategorySortOrder,
   recommendParentCategory,
+  isKnownParentCategorySlug,
   slugifyCategory,
 } from './infortisa-category-mapping.util';
 
 describe('Infortisa category mapping', () => {
   it('maps networking families into Redes y servidores', () => {
-    const result = recommendParentCategory('Networking', 'Switches Gestionables');
+    const result = recommendParentCategory(
+      'Networking',
+      'Switches Gestionables',
+    );
     expect(result.label).toBe('Redes y servidores');
   });
 
@@ -37,6 +41,11 @@ describe('Infortisa category mapping', () => {
 
   it('slugifies accents and punctuation', () => {
     expect(slugifyCategory('TV, audio y vídeo')).toBe('tv-audio-y-video');
+  });
+
+  it('recognizes canonical parent slugs from both key and label', () => {
+    expect(isKnownParentCategorySlug('ordenadores-portatiles')).toBe(true);
+    expect(isKnownParentCategorySlug('tv-audio-y-video')).toBe(true);
   });
 
   it('returns stable sort order for parent categories', () => {

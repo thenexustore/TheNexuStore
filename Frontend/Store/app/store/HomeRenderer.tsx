@@ -198,8 +198,8 @@ function SmartImage({
 function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="w-full max-w-7xl px-3 sm:px-6">
-      {title ? <h2 className="mb-1 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{title}</h2> : null}
-      {subtitle ? <p className="mb-4 text-sm text-slate-600">{subtitle}</p> : null}
+      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{title}</h2> : null}
+      {subtitle ? <p className="mb-5 text-sm text-slate-600">{subtitle}</p> : null}
       {children}
     </section>
   );
@@ -451,15 +451,14 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
           <ActionLink
             key={asText(cat.id, `cat-${idx}`)}
             href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className={`group relative flex min-h-[224px] flex-col overflow-hidden rounded-2xl border bg-white p-3 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
+            className={`group relative flex min-h-[224px] flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-blue-500 to-indigo-600 opacity-80" />
             {showTopBadges && idx < 3 ? (
               <span className="absolute right-2 top-2 rounded-full border border-indigo-200 bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
                 Top {idx + 1}
               </span>
             ) : null}
-            <div className="mx-auto mb-3 relative h-28 w-full overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100/70 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
+            <div className="mx-auto mb-3 mt-1 relative h-28 w-full overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100/70 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
               {hasVisual ? (
                 <SmartImage
                   src={asSrc(imageValue)}

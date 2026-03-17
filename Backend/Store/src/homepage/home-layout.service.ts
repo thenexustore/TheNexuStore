@@ -839,11 +839,23 @@ export class HomeLayoutService {
           .filter(Boolean);
       }
       const requestedLimit = this.clampLimit(config.limit, 10);
-      const pool = await this.prisma.category.findMany({
-        where: { is_active: true, parent_id: null },
+      const parentPool = await this.prisma.category.findMany({
+        where: {
+          is_active: true,
+          parent_id: null,
+          children: { some: { is_active: true } },
+        },
         take: 64,
         orderBy: [{ sort_order: 'asc' }],
       });
+
+      const pool = parentPool.length
+        ? parentPool
+        : await this.prisma.category.findMany({
+            where: { is_active: true, parent_id: null },
+            take: 64,
+            orderBy: [{ sort_order: 'asc' }],
+          });
 
       const scoredCategories = await Promise.all(
         pool.map(async (category) => {

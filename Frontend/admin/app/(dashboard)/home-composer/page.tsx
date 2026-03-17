@@ -2,10 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { homeBuilderApi } from "@/lib/api/home-builder";
+import { HomeBuilderApiError, homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
 import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
+import { getBanners, toggleBannerStatus } from "@/lib/api/banners";
+import {
+  fetchFeaturedProducts,
+  toggleFeaturedProductStatus,
+} from "@/lib/api/featured-products";
+import { fetchCategories, type Category } from "@/lib/api/categories";
+import { fetchBrands, type Brand } from "@/lib/api/brands";
 import CanvasSections from "@/app/components/home-composer/CanvasSections";
 import CuratedItemsPanel from "@/app/components/home-composer/CuratedItemsPanel";
 import { HomeOption, HomeSection, HomeSectionItem, HomeSectionType } from "@/app/components/home-composer/types";
@@ -45,7 +52,8 @@ type ProductSource =
   | "BEST_DEALS"
   | "FEATURED"
   | "CATEGORY"
-  | "BRAND";
+  | "BRAND"
+  | "BEST_SELLERS";
 
 type SectionDraft = {
   title: string;
@@ -54,6 +62,25 @@ type SectionDraft = {
   variant: string;
   configText: string;
 };
+
+type IntegratedBanner = {
+  id: string;
+  title_text: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
+
+type IntegratedFeatured = {
+  id: string;
+  title: string | null;
+  sort_order: number;
+  is_active: boolean;
+  product?: { title?: string | null } | null;
+};
+
+function shouldUseLegacyIntegratedFallback(error: unknown) {
+  return error instanceof HomeBuilderApiError && error.status === 404;
+}
 
 const SECTION_TYPES: HomeSectionType[] = [
   "HERO_CAROUSEL",
@@ -66,7 +93,7 @@ const SECTION_TYPES: HomeSectionType[] = [
 ];
 
 const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
-  HERO_CAROUSEL: "Hero principal",
+  HERO_CAROUSEL: "Banner",
   CATEGORY_STRIP: "Grid de categorías",
   PRODUCT_CAROUSEL: "Carrusel de productos",
   BRAND_STRIP: "Carrusel de marcas",
@@ -76,17 +103,25 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
 };
 
 const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
-  HERO_CAROUSEL: { autoplay: true, interval_ms: 5000 },
-  CATEGORY_STRIP: { mode: "auto", limit: 10 },
+  HERO_CAROUSEL: { autoplay: true, interval_ms: 5000, pause_on_hover: true, show_arrows: true, show_dots: true },
+  CATEGORY_STRIP: { mode: "auto", limit: 10, items_mobile: 2, items_desktop: 6, show_names: true, show_top_badges: true, image_fit: "contain", card_style: "elevated", auto_strategy: "demand", cta_text: "Explorar" },
   PRODUCT_CAROUSEL: {
     mode: "rule",
     source: "NEW_ARRIVALS",
     limit: 12,
     inStockOnly: true,
+    discount_only: false,
+    featured_only: false,
+    category_scope: "parent_and_descendants",
+    sortBy: "newest",
     autoplay: true,
+    show_arrows: true,
+    show_dots: false,
     interval_ms: 4500,
     items_mobile: 2,
     items_desktop: 4,
+    view_all_label: "Ver todo",
+    view_all_href: "/products",
   },
   BRAND_STRIP: {
     mode: "auto",
@@ -121,6 +156,16 @@ function safeJsonParse(value: string): Record<string, unknown> {
 function asNumber(value: unknown, fallback: number) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
+}
+
+function parseIds(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function pickImageFileAsDataUrl(): Promise<string | null> {
@@ -168,8 +213,14 @@ export default function HomeComposerPage() {
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOptions, setSearchOptions] = useState<HomeOption[]>([]);
-  const [activeTab, setActiveTab] = useState<"composer" | "banners" | "featured">("composer");
   const [activeDiagnostics, setActiveDiagnostics] = useState<ActiveLayoutDiagnostics | null>(null);
+  const [integratedBanners, setIntegratedBanners] = useState<IntegratedBanner[]>([]);
+  const [integratedFeatured, setIntegratedFeatured] = useState<IntegratedFeatured[]>([]);
+  const [integratedLoading, setIntegratedLoading] = useState(false);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -189,6 +240,83 @@ export default function HomeComposerPage() {
       return null;
     }
   }, [draft]);
+
+  const categoryTree = useMemo(() => {
+    const parentBuckets = new Map<string, Category[]>();
+    const roots: Category[] = [];
+
+    allCategories.forEach((category) => {
+      if (category.parent_id) {
+        const bucket = parentBuckets.get(category.parent_id) || [];
+        bucket.push(category);
+        parentBuckets.set(category.parent_id, bucket);
+        return;
+      }
+      roots.push(category);
+    });
+
+    const bySort = (a: Category, b: Category) => {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+    };
+
+    return roots.sort(bySort).map((parent) => ({
+      parent,
+      children: (parentBuckets.get(parent.id) || []).sort(bySort),
+    }));
+  }, [allCategories]);
+
+  const selectedCategoryIds = useMemo(() => {
+    if (!parsedDraftConfig) return [];
+    return [...new Set(parseIds(parsedDraftConfig.categoryIds || parsedDraftConfig.categoryId))];
+  }, [parsedDraftConfig]);
+
+  const selectedBrandIds = useMemo(() => {
+    if (!parsedDraftConfig) return [];
+    return [...new Set(parseIds(parsedDraftConfig.brandIds || parsedDraftConfig.brandId))];
+  }, [parsedDraftConfig]);
+
+  const normalizedCategoryFilter = categoryFilter.trim().toLowerCase();
+  const normalizedBrandFilter = brandFilter.trim().toLowerCase();
+
+  const filteredCategoryTree = useMemo(() => {
+    if (!normalizedCategoryFilter) return categoryTree;
+    return categoryTree
+      .map(({ parent, children }) => {
+        const parentMatch = `${parent.name} ${parent.slug}`.toLowerCase().includes(normalizedCategoryFilter);
+        if (parentMatch) return { parent, children };
+        const matchingChildren = children.filter((child) => `${child.name} ${child.slug}`.toLowerCase().includes(normalizedCategoryFilter));
+        return { parent, children: matchingChildren };
+      })
+      .filter(({ parent, children }) => children.length > 0 || `${parent.name} ${parent.slug}`.toLowerCase().includes(normalizedCategoryFilter));
+  }, [categoryTree, normalizedCategoryFilter]);
+
+  const filteredBrands = useMemo(() => {
+    const sorted = [...allBrands].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+    if (!normalizedBrandFilter) return sorted;
+    return sorted.filter((brand) => `${brand.name} ${brand.slug}`.toLowerCase().includes(normalizedBrandFilter));
+  }, [allBrands, normalizedBrandFilter]);
+
+  const selectedCategoryMeta = useMemo(() => {
+    const index = new Map(allCategories.map((category) => [category.id, category]));
+    return selectedCategoryIds
+      .map((id) => index.get(id))
+      .filter((entry): entry is Category => Boolean(entry));
+  }, [allCategories, selectedCategoryIds]);
+
+  const selectedBrandMeta = useMemo(() => {
+    const index = new Map(allBrands.map((brand) => [brand.id, brand]));
+    return selectedBrandIds
+      .map((id) => index.get(id))
+      .filter((entry): entry is Brand => Boolean(entry));
+  }, [allBrands, selectedBrandIds]);
+
+  useEffect(() => {
+    if (selectedSection?.type !== "PRODUCT_CAROUSEL") {
+      setCategoryFilter("");
+      setBrandFilter("");
+    }
+  }, [selectedSection?.type]);
 
   const currentTarget = useMemo<"products" | "brands" | "categories" | "banners" | null>(() => {
     if (!selectedSection) return null;
@@ -221,6 +349,11 @@ export default function HomeComposerPage() {
   const curatedRemaining = useMemo(() => {
     return Math.max(0, curatedLimit - items.length);
   }, [curatedLimit, items.length]);
+
+  const selectedSectionDiagnostic = useMemo(() => {
+    if (!selectedSection || !activeDiagnostics) return null;
+    return activeDiagnostics.sections.find((section) => section.id === selectedSection.id) || null;
+  }, [activeDiagnostics, selectedSection]);
 
   const isDraftDirty = useMemo(() => {
     if (!selectedSection || !draft || !parsedDraftConfig) return false;
@@ -282,12 +415,71 @@ export default function HomeComposerPage() {
     }
   }, [locale]);
 
+  const loadIntegratedModules = useCallback(async () => {
+    setIntegratedLoading(true);
+
+    try {
+      try {
+        const summary = (await homeBuilderApi.integratedSummary(8)) as {
+          banners?: IntegratedBanner[];
+          featured?: IntegratedFeatured[];
+        };
+        setIntegratedBanners(summary?.banners || []);
+        setIntegratedFeatured(summary?.featured || []);
+        return;
+      } catch (error) {
+        if (!shouldUseLegacyIntegratedFallback(error)) {
+          throw error;
+        }
+      }
+
+      const [banners, featuredResponse] = await Promise.all([
+        getBanners(),
+        fetchFeaturedProducts({ take: 8 }),
+      ]);
+
+      setIntegratedBanners(
+        banners
+          .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order)
+          .slice(0, 8)
+          .map((banner) => ({
+            id: banner.id,
+            title_text: banner.title_text ?? null,
+            sort_order: banner.sort_order,
+            is_active: banner.is_active,
+          })),
+      );
+
+      setIntegratedFeatured(
+        (featuredResponse?.data || [])
+          .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order)
+          .slice(0, 8)
+          .map((item) => ({
+            id: item.id,
+            title: item.title ?? null,
+            sort_order: item.sort_order,
+            is_active: item.is_active,
+            product: { title: item.product?.title ?? null },
+          })),
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron cargar los módulos integrados",
+      );
+    } finally {
+      setIntegratedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
         await loadLayouts();
         await loadActiveDiagnostics();
+        await loadIntegratedModules();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No se pudieron cargar los diseños");
       } finally {
@@ -295,7 +487,65 @@ export default function HomeComposerPage() {
       }
     };
     void run();
-  }, [loadLayouts, loadActiveDiagnostics]);
+  }, [loadLayouts, loadActiveDiagnostics, loadIntegratedModules]);
+
+  useEffect(() => {
+    const loadTaxonomy = async () => {
+      try {
+        const [categories, brands] = await Promise.all([fetchCategories(), fetchBrands()]);
+        setAllCategories(categories || []);
+        setAllBrands(brands || []);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[home-composer] failed to load category/brand selectors", error);
+        }
+      }
+    };
+    void loadTaxonomy();
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadIntegratedModules();
+    }, 45_000);
+    return () => window.clearInterval(id);
+  }, [loadIntegratedModules]);
+
+  const syncComposerRuntimeState = async () => {
+    await Promise.all([
+      loadActiveDiagnostics(),
+      activeLayoutId ? loadSections(activeLayoutId) : Promise.resolve(),
+    ]);
+  };
+
+  const toggleIntegratedBanner = async (bannerId: string) => {
+    try {
+      await toggleBannerStatus(bannerId);
+      await loadIntegratedModules();
+      await syncComposerRuntimeState();
+      toast.success("Estado de banner actualizado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo actualizar banner",
+      );
+    }
+  };
+
+  const toggleIntegratedFeatured = async (featuredId: string) => {
+    try {
+      await toggleFeaturedProductStatus(featuredId);
+      await loadIntegratedModules();
+      await syncComposerRuntimeState();
+      toast.success("Estado de destacado actualizado");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar producto destacado",
+      );
+    }
+  };
 
   useEffect(() => {
     if (!activeLayoutId) return;
@@ -405,7 +655,9 @@ export default function HomeComposerPage() {
         type: newSectionType,
         position: sections.length + 1,
         is_enabled: true,
-        title: newSectionTitle.trim() || newSectionType,
+        title:
+          newSectionTitle.trim() ||
+          (newSectionType === "HERO_CAROUSEL" ? "Banner" : newSectionType),
         config: DEFAULT_CONFIG[newSectionType],
       });
       await loadSections(activeLayoutId);
@@ -419,14 +671,38 @@ export default function HomeComposerPage() {
   };
 
   const moveSection = async (section: HomeSection, direction: -1 | 1) => {
-    const nextPosition = section.position + direction;
-    if (nextPosition < 1 || nextPosition > sections.length) return;
+    if (saving) return;
+
+    const orderedSections = [...sections].sort(byPosition);
+    const currentIndex = orderedSections.findIndex((x) => x.id === section.id);
+    if (currentIndex < 0) return;
+
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= orderedSections.length) return;
+
+    const reordered = [...orderedSections];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(nextIndex, 0, moved);
+    const payload = reordered.map((entry, index) => ({ id: entry.id, position: index + 1 }));
+
+    const previousSections = sections;
+    setSections(reordered.map((entry, index) => ({ ...entry, position: index + 1 })));
 
     try {
       setSaving(true);
-      await homeBuilderApi.moveSection(section.id, nextPosition);
+      try {
+        await homeBuilderApi.reorderSections(payload);
+      } catch (error) {
+        // Fallback defensivo: algunos entornos legacy aún no aceptan reorder masivo.
+        await homeBuilderApi.moveSection(section.id, nextIndex + 1);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[home-composer] reorderSections failed, used moveSection fallback', error);
+        }
+      }
       await loadSections(activeLayoutId);
+      toast.success('Bloque reordenado');
     } catch (error) {
+      setSections(previousSections);
       toast.error(error instanceof Error ? error.message : "No se pudo mover la sección");
     } finally {
       setSaving(false);
@@ -467,6 +743,36 @@ export default function HomeComposerPage() {
     setDraft({
       ...draft,
       configText: JSON.stringify(nextConfig, null, 2),
+    });
+  };
+
+  const toggleCategorySelection = (categoryId: string) => {
+    if (!parsedDraftConfig) return;
+    const current = new Set(selectedCategoryIds);
+    if (current.has(categoryId)) {
+      current.delete(categoryId);
+    } else {
+      current.add(categoryId);
+    }
+    updateDraftConfig({
+      ...parsedDraftConfig,
+      categoryIds: Array.from(current),
+      categoryId: null,
+    });
+  };
+
+  const toggleBrandSelection = (brandId: string) => {
+    if (!parsedDraftConfig) return;
+    const current = new Set(selectedBrandIds);
+    if (current.has(brandId)) {
+      current.delete(brandId);
+    } else {
+      current.add(brandId);
+    }
+    updateDraftConfig({
+      ...parsedDraftConfig,
+      brandIds: Array.from(current),
+      brandId: null,
     });
   };
 
@@ -671,57 +977,17 @@ export default function HomeComposerPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveTab("composer")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "composer"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Compositor de Inicio
-          </button>
-          <button
-            onClick={() => setActiveTab("banners")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "banners"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Banners
-          </button>
-          <button
-            onClick={() => setActiveTab("featured")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              activeTab === "featured"
-                ? "bg-black text-white"
-                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-            }`}
-          >
-            Productos destacados
-          </button>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Compositor de Inicio</span>
+          <a href="#composer-banners-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+            Ir a Banners integrados
+          </a>
+          <a href="#composer-featured-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+            Ir a Productos destacados integrados
+          </a>
         </div>
       </div>
 
-      {activeTab !== "composer" ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm text-zinc-500">
-            {activeTab === "banners"
-              ? "Gestión integrada de Banners (mismo flujo, sin salir de Compositor)."
-              : "Gestión integrada de Productos destacados (mismo flujo, sin salir de Compositor)."}
-          </div>
-          <iframe
-            src={activeTab === "banners" ? `/${locale}/banners` : `/${locale}/featured-products`}
-            className="h-[78vh] w-full rounded-xl border border-zinc-200"
-            title={activeTab === "banners" ? "Banners" : "Productos destacados"}
-          />
-        </div>
-      ) : null}
-
-      {activeTab === "composer" ? (
-      <>
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -895,32 +1161,40 @@ export default function HomeComposerPage() {
                 )}
               </div>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Título</span>
-                <input
-                  value={draft.title}
-                  onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                />
-              </label>
+              {selectedSection.type === "HERO_CAROUSEL" ? (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+                  Este bloque está vinculado al módulo interno de <strong>Banners</strong>. El título, subtítulo, CTA e imagen se editan en cada banner individual.
+                </div>
+              ) : (
+                <>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Título</span>
+                    <input
+                      value={draft.title}
+                      onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                    />
+                  </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Subtítulo</span>
-                <input
-                  value={draft.subtitle}
-                  onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                />
-              </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Subtítulo</span>
+                    <input
+                      value={draft.subtitle}
+                      onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                    />
+                  </label>
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Variante (opcional)</span>
-                <input
-                  value={draft.variant}
-                  onChange={(event) => setDraft({ ...draft, variant: event.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                />
-              </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Variante (opcional)</span>
+                    <input
+                      value={draft.variant}
+                      onChange={(event) => setDraft({ ...draft, variant: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                    />
+                  </label>
+                </>
+              )}
 
               <label className="flex items-center gap-2 text-sm text-zinc-700">
                 <input
@@ -938,7 +1212,7 @@ export default function HomeComposerPage() {
 
               {selectedSection.type === "HERO_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
-                  <div className="mb-3 text-sm font-medium">Controles rápidos: Hero</div>
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Banner</div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="flex items-center gap-2 text-sm text-zinc-700">
                       <input
@@ -951,9 +1225,48 @@ export default function HomeComposerPage() {
                           })
                         }
                       />
-                      Autoplay
+                      Reproducción automática
                     </label>
-                    <label className="text-sm">
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.pause_on_hover ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            pause_on_hover: event.target.checked,
+                          })
+                        }
+                      />
+                      Pausar al pasar el cursor
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_arrows ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_arrows: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar flechas laterales
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_dots ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_dots: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar indicadores (dots)
+                    </label>
+                    <label className="text-sm md:col-span-2">
                       <span className="mb-1 block text-zinc-500">Intervalo (ms)</span>
                       <input
                         type="number"
@@ -974,6 +1287,22 @@ export default function HomeComposerPage() {
               {selectedSection.type === "PRODUCT_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
                   <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de productos</div>
+                  {selectedSectionDiagnostic ? (
+                    <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                      <div className="font-medium text-zinc-900">Diagnóstico en tiempo real</div>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white px-2 py-1">Resultados: {selectedSectionDiagnostic.resolved_count}</span>
+                        {selectedSectionDiagnostic.fallback_reason ? (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Fallback: {selectedSectionDiagnostic.fallback_reason}</span>
+                        ) : null}
+                        {selectedSectionDiagnostic.warnings.length ? (
+                          <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Warnings: {selectedSectionDiagnostic.warnings.length}</span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Sin warnings</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Modo</span>
@@ -1009,7 +1338,17 @@ export default function HomeComposerPage() {
                         <option value="FEATURED">Destacados</option>
                         <option value="CATEGORY">Por categoría</option>
                         <option value="BRAND">Por marca</option>
+                        <option value="BEST_SELLERS">Más vendidos</option>
                       </select>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {String(config.source || "NEW_ARRIVALS") === "CATEGORY"
+                          ? "Usa category scope + categorías seleccionadas para controlar padre/hijas."
+                          : String(config.source || "NEW_ARRIVALS") === "BRAND"
+                            ? "Filtra por una o varias marcas seleccionadas."
+                            : String(config.source || "NEW_ARRIVALS") === "BEST_DEALS"
+                              ? "Prioriza productos con descuento activo."
+                              : "Fuente automática de catálogo."}
+                      </p>
                     </label>
 
                     <label className="text-sm">
@@ -1039,6 +1378,33 @@ export default function HomeComposerPage() {
                         }
                       />
                       Solo con stock
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.discount_only ?? false)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            discount_only: event.target.checked,
+                          })
+                        }
+                      />
+                      Solo productos con descuento
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.featured_only ?? false)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            featured_only: event.target.checked,
+                          })
+                        }
+                      />
+                      Restringir a destacados
                     </label>
 
                     <label className="text-sm">
@@ -1120,13 +1486,208 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">ID de categoría</span>
-                      <input
-                        value={String(config.categoryId || "")}
+                      <span className="mb-1 block text-zinc-500">Alcance categoría</span>
+                      <select
+                        value={String(config.category_scope || "parent_and_descendants")}
                         onChange={(event) =>
                           updateDraftConfig({
                             ...config,
-                            categoryId: event.target.value.trim() || null,
+                            category_scope: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="parent_and_descendants">Padre + descendientes</option>
+                        <option value="parent_only">Solo padres</option>
+                        <option value="children_only">Solo hijas</option>
+                      </select>
+                    </label>
+
+                    <div className="text-sm md:col-span-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="block text-zinc-500">Selector de categorías (padre/hijas)</span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={categoryFilter}
+                            onChange={(event) => setCategoryFilter(event.target.value)}
+                            placeholder="Buscar categoría..."
+                            className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+                          />
+                          {selectedCategoryIds.length ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateDraftConfig({
+                                  ...config,
+                                  categoryIds: [],
+                                  categoryId: null,
+                                })
+                              }
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+                            >
+                              Limpiar
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {selectedCategoryMeta.length ? (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {selectedCategoryMeta.map((category) => (
+                            <button
+                              key={`cat-chip-${category.id}`}
+                              type="button"
+                              onClick={() => toggleCategorySelection(category.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                            >
+                              {category.name} <span aria-hidden>×</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="max-h-52 space-y-2 overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 p-2">
+                        {filteredCategoryTree.length === 0 ? (
+                          <p className="text-xs text-zinc-500">No hay categorías disponibles para seleccionar.</p>
+                        ) : (
+                          filteredCategoryTree.map(({ parent, children }) => (
+                            <div key={parent.id} className="rounded-md border border-zinc-200 bg-white p-2">
+                              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCategoryIds.includes(parent.id)}
+                                  onChange={() => toggleCategorySelection(parent.id)}
+                                />
+                                {parent.name}
+                                <span className="text-xs text-zinc-500">({parent.id})</span>
+                              </label>
+                              {children.length ? (
+                                <div className="mt-2 grid gap-1 pl-5">
+                                  {children.map((child) => (
+                                    <label key={child.id} className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedCategoryIds.includes(child.id)}
+                                        onChange={() => toggleCategorySelection(child.id)}
+                                      />
+                                      {child.name}
+                                      <span className="text-[11px] text-zinc-500">({child.id})</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Seleccionadas: {selectedCategoryIds.length ? selectedCategoryIds.join(", ") : "ninguna"}.
+                      </p>
+                    </div>
+
+                    <div className="text-sm md:col-span-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="block text-zinc-500">Selector de marcas</span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={brandFilter}
+                            onChange={(event) => setBrandFilter(event.target.value)}
+                            placeholder="Buscar marca..."
+                            className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+                          />
+                          {selectedBrandIds.length ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateDraftConfig({
+                                  ...config,
+                                  brandIds: [],
+                                  brandId: null,
+                                })
+                              }
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+                            >
+                              Limpiar
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {selectedBrandMeta.length ? (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {selectedBrandMeta.map((brand) => (
+                            <button
+                              key={`brand-chip-${brand.id}`}
+                              type="button"
+                              onClick={() => toggleBrandSelection(brand.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                            >
+                              {brand.name} <span aria-hidden>×</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="max-h-40 overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 p-2">
+                        <div className="grid gap-1 sm:grid-cols-2">
+                          {filteredBrands.length === 0 ? (
+                            <p className="text-xs text-zinc-500">No hay marcas disponibles.</p>
+                          ) : (
+                            filteredBrands.map((brand) => (
+                                <label key={brand.id} className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedBrandIds.includes(brand.id)}
+                                    onChange={() => toggleBrandSelection(brand.id)}
+                                  />
+                                  {brand.name}
+                                  <span className="text-[11px] text-zinc-500">({brand.id})</span>
+                                </label>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Seleccionadas: {selectedBrandIds.length ? selectedBrandIds.join(", ") : "ninguna"}.
+                      </p>
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_arrows ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_arrows: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar flechas
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_dots ?? false)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_dots: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar indicadores
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">CTA ver todo (texto)</span>
+                      <input
+                        value={String(config.view_all_label || "")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            view_all_label: event.target.value,
                           })
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
@@ -1134,13 +1695,13 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">ID de marca</span>
+                      <span className="mb-1 block text-zinc-500">CTA ver todo (URL)</span>
                       <input
-                        value={String(config.brandId || "")}
+                        value={String(config.view_all_href || "")}
                         onChange={(event) =>
                           updateDraftConfig({
                             ...config,
-                            brandId: event.target.value.trim() || null,
+                            view_all_href: event.target.value,
                           })
                         }
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
@@ -1282,41 +1843,162 @@ export default function HomeComposerPage() {
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Columnas móvil</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={4}
+                        value={asNumber(config.items_mobile, 2)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_mobile: Math.max(2, Math.min(4, Number(event.target.value) || 2)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Columnas desktop</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={8}
+                        value={asNumber(config.items_desktop, 6)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            items_desktop: Math.max(2, Math.min(8, Number(event.target.value) || 2)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_names ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_names: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar nombre de categoría
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Ajuste de imagen</span>
+                      <select
+                        value={String(config.image_fit || "contain")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            image_fit: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="contain">Contener (sin recorte)</option>
+                        <option value="cover">Cubrir (recorte suave)</option>
+                      </select>
+                    </label>
+                    <label className="text-sm md:col-span-2">
+                      <span className="mb-1 block text-zinc-500">Estilo de tarjeta</span>
+                      <select
+                        value={String(config.card_style || "minimal")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            card_style: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="minimal">Minimal (borde limpio)</option>
+                        <option value="elevated">Elevated (sombra marcada)</option>
+                      </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Estrategia automática</span>
+                      <select
+                        value={String(config.auto_strategy || "demand")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            auto_strategy: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      >
+                        <option value="demand">Demanda (ventas + categorías tech top)</option>
+                        <option value="alphabetical">Alfabético</option>
+                        <option value="manual_sort">Orden manual de categorías</option>
+                      </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Texto CTA</span>
+                      <input
+                        value={String(config.cta_text || "Explorar")}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            cta_text: event.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                        placeholder="Explorar"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700 md:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_top_badges ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_top_badges: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar badges Top 1/2/3
+                    </label>
                   </div>
                 </div>
               ) : null}
 
               {isHeroSection ? (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-                  Este bloque Hero está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
+                  Este bloque Banner está conectado al módulo de Banners: selecciona y ordena aquí los banners reales que se mostrarán en el carrusel.
                   <div className="mt-2">
-                    <button
-                      onClick={() => setActiveTab("banners")}
-                      className="rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                    <a
+                      href="#composer-banners-panel"
+                      className="inline-block rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
                     >
                       Gestionar Banners
-                    </button>
+                    </a>
                   </div>
                 </div>
               ) : null}
 
               {isFeaturedProductSection ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                  Esta sección usa la fuente Destacados. Puedes gestionarlos desde la pestaña de Productos destacados.
+                  Esta sección usa la fuente Destacados. Puedes gestionarlos desde el panel integrado de Productos destacados.
                   <div className="mt-2">
-                    <button
-                      onClick={() => setActiveTab("featured")}
-                      className="rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                    <a
+                      href="#composer-featured-panel"
+                      className="inline-block rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
                     >
                       Gestionar Productos destacados
-                    </button>
+                    </a>
                   </div>
                 </div>
               ) : null}
 
               {selectedSection.type === "CATEGORY_STRIP" ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Nota de contrato: en storefront este bloque se renderiza como grid fijo (no carrusel/autoplay). Solo se aplican modo curado/automático y límite.
+                  Nota: en modo automático priorizamos categorías con mayor demanda (catálogo activo + señales comerciales como portátiles, impresoras, monitores, tablets, periféricos y consumibles).
                 </div>
               ) : null}
 
@@ -1327,14 +2009,14 @@ export default function HomeComposerPage() {
                       El modo curado requiere productos vinculados. Si guardas sin items, la sección quedará vacía en Store.
                     </div>
                   ) : null}
-                  {String(config.source || "NEW_ARRIVALS") === "CATEGORY" && !String(config.categoryId || "").trim() ? (
+                  {String(config.source || "NEW_ARRIVALS") === "CATEGORY" && !String(config.categoryId || config.categoryIds || "").trim() ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                      Fuente por categoría sin categoryId: Store aplicará fallback a catálogo general.
+                      Fuente por categoría sin categoryId/categoryIds: Store aplicará fallback a catálogo general.
                     </div>
                   ) : null}
-                  {String(config.source || "NEW_ARRIVALS") === "BRAND" && !String(config.brandId || "").trim() ? (
+                  {String(config.source || "NEW_ARRIVALS") === "BRAND" && !String(config.brandId || config.brandIds || "").trim() ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                      Fuente por marca sin brandId: Store aplicará fallback a catálogo general.
+                      Fuente por marca sin brandId/brandIds: Store aplicará fallback a catálogo general.
                     </div>
                   ) : null}
                 </>
@@ -1502,8 +2184,102 @@ export default function HomeComposerPage() {
           )}
         </div>
       </div>
-      </>
-      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Banners</h3>
+              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIntegratedModules}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Refrescar
+              </button>
+              <a
+                href={`/${locale}/banners`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Abrir completo ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="p-3 text-xs text-zinc-500">Cargando banners…</div>
+            ) : integratedBanners.length === 0 ? (
+              <div className="p-3 text-xs text-zinc-500">No hay banners configurados.</div>
+            ) : (
+              integratedBanners.slice(0, 8).map((banner) => (
+                <div key={banner.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{banner.title_text || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-500">Orden #{banner.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => toggleIntegratedBanner(banner.id)}
+                    className={`rounded px-2 py-1 text-[11px] ${banner.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                  >
+                    {banner.is_active ? "Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Productos destacados</h3>
+              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadIntegratedModules}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Refrescar
+              </button>
+              <a
+                href={`/${locale}/featured-products`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Abrir completo ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="p-3 text-xs text-zinc-500">Cargando destacados…</div>
+            ) : integratedFeatured.length === 0 ? (
+              <div className="p-3 text-xs text-zinc-500">No hay productos destacados configurados.</div>
+            ) : (
+              integratedFeatured.slice(0, 8).map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{item.title || item.product?.title || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-500">Orden #{item.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => toggleIntegratedFeatured(item.id)}
+                    className={`rounded px-2 py-1 text-[11px] ${item.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                  >
+                    {item.is_active ? "Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

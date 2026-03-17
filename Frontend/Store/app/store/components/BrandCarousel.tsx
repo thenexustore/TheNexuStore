@@ -2,6 +2,8 @@
 
 import GenericCarousel from "./GenericCarousel";
 
+const DEFAULT_BRAND_ITEMS_PER_VIEW = { mobile: 2, tablet: 4, desktop: 6 };
+
 interface BrandCarouselProps {
   title: string;
   items?: Array<{
@@ -14,6 +16,7 @@ interface BrandCarouselProps {
   }>;
   autoplay?: boolean;
   autoplayIntervalMs?: number;
+  itemsPerView?: { mobile: number; tablet: number; desktop: number };
 }
 
 export default function BrandCarousel({
@@ -21,6 +24,7 @@ export default function BrandCarousel({
   items,
   autoplay = true,
   autoplayIntervalMs = 4500,
+  itemsPerView = DEFAULT_BRAND_ITEMS_PER_VIEW,
 }: BrandCarouselProps) {
   return (
     <GenericCarousel
@@ -31,7 +35,7 @@ export default function BrandCarousel({
       maxItems={12}
       autoplay={autoplay}
       autoplayIntervalMs={autoplayIntervalMs}
-      itemsPerView={{ mobile: 2, tablet: 4, desktop: 6 }}
+      itemsPerView={itemsPerView}
     />
   );
 }

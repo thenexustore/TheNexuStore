@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { CategoryTreeNode } from "../lib/products";
+import { getCategoryIcon } from "../lib/category-icons";
 
 type Props = {
   open: boolean;
@@ -61,8 +62,16 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
                     : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
                 }`}
               >
-                <span className="font-medium">{parent.name}</span>
-                <ChevronRight className="h-4 w-4" />
+                <span className="flex items-center gap-2">
+                  {(() => { const Icon = getCategoryIcon(parent.slug); return Icon ? <Icon className="h-4 w-4 flex-shrink-0" /> : null; })()}
+                  <span className="font-medium">{parent.name}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  {parent.children.length > 0 && (
+                    <span className="text-xs opacity-60">({parent.children.length})</span>
+                  )}
+                  <ChevronRight className="h-4 w-4" />
+                </span>
               </button>
             );
           })}
@@ -152,7 +161,7 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
           </>
         ) : (
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-            Esta categoría no tiene subcategorías.
+            Próximamente: estamos preparando los productos de esta categoría.
           </p>
         )}
       </section>

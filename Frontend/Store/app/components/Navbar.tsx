@@ -259,7 +259,8 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white text-black">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 glass text-black shadow-sm">
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#0B123A] via-indigo-600 to-[#0B123A]" />
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 md:min-h-[74px] md:flex-nowrap md:gap-4">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -297,7 +298,7 @@ export default function Navbar() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => search.length >= 2 && setShowSearchResults(true)}
                 placeholder={t("searchPlaceholder")}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-5 py-0 pr-12 text-sm outline-none transition-all focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/20"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-0 pr-12 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:bg-white"
               />
               <button
                 type="submit"
@@ -307,7 +308,7 @@ export default function Navbar() {
               </button>
 
               {showSearchResults && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-300 z-[9999]">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[9999] overflow-hidden">
                   <div className="max-h-[70vh] overflow-y-auto">
                     {searchLoading ? (
                       <div className="p-4 text-center text-gray-500">
@@ -540,13 +541,13 @@ export default function Navbar() {
             <Link
               href="/cart"
               onClick={closeMobilePanels}
-              className="relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
+              className="relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-slate-100"
             >
-              <ShoppingCart className="h-5 w-5 text-gray-700 sm:h-6 sm:w-6" />
+              <ShoppingCart className="h-5 w-5 text-slate-700 sm:h-6 sm:w-6" />
               {displayCartCount > 0 && (
-                <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white sm:text-xs">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
                   {displayCartCount > 9 ? "9+" : displayCartCount}
-                </div>
+                </span>
               )}
               {cartLoading && displayCartCount === 0 && (
                 <div className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center">
@@ -580,7 +581,7 @@ export default function Navbar() {
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-[90vw] max-w-80 bg-white shadow-xl transform transition-transform duration-300 sm:w-[86vw] ${
+        className={`fixed top-0 left-0 z-50 h-full w-[88vw] max-w-80 bg-white/95 backdrop-blur-md shadow-2xl transform transition-transform duration-300 ease-in-out sm:w-[80vw] ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

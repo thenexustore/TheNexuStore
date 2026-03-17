@@ -11,19 +11,27 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "@/app/lib/admin-branding";
 import StoreBrandLogo from "./StoreBrandLogo";
+import { ArrowUp } from "lucide-react";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const t = useTranslations("footer");
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
+  useEffect(() => {
+    const handleScroll = () => setShowBackToTop(window.scrollY > 400);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const socialLinks = [
-    { Icon: FacebookIcon, url: "https://www.facebook.com/people/Nexus-SP-Solutions/61574722507921/?locale=es_ES" },
-    { Icon: InstagramIcon, url: "https://www.instagram.com/nexusspsolutions/" },
-    { Icon: LinkedInIcon, url: "https://www.linkedin.com/company/nexus-sp-solutions/" },
-    { Icon: XIcon, url: "https://x.com/nexusspsolution" }
+    { Icon: FacebookIcon, url: "https://www.facebook.com/people/Nexus-SP-Solutions/61574722507921/?locale=es_ES", label: "Facebook" },
+    { Icon: InstagramIcon, url: "https://www.instagram.com/nexusspsolutions/", label: "Instagram" },
+    { Icon: LinkedInIcon, url: "https://www.linkedin.com/company/nexus-sp-solutions/", label: "LinkedIn" },
+    { Icon: XIcon, url: "https://x.com/nexusspsolution", label: "X" }
   ];
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -33,85 +41,123 @@ export default function Footer() {
     }
   };
 
-  const handleSocialClick = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const openLocationMap = () => {
-    const address = "Paseo de las Palmeras, 3, Local B, 51001 Ceuta";
-    const encodedAddress = encodeURIComponent(address);
-    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-    window.open(mapUrl, "_blank", "noopener,noreferrer");
-  };
-
-  const callPhone = () => {
-    window.location.href = "tel:+34656806899";
-  };
-
-  const sendEmail = () => {
-    window.location.href = "mailto:administracion@nexusssolutions.com";
-  };
+  const address = "Paseo de las Palmeras, 3, Local B, 51001 Ceuta";
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
   return (
-    <footer className="w-full bg-black text-white">
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
-          <div>
-            <StoreBrandLogo branding={storeBranding} alt="Logo" className="w-auto mb-4" height={36} />
-            <h3 className="text-lg font-semibold mb-4">{t("title")}</h3>
-            <form
-              onSubmit={handleSubscribe}
-              className="flex flex-col sm:flex-row gap-3 max-w-md"
-            >
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("placeholder")}
-                className="w-full rounded-full px-5 py-3 bg-transparent border border-white/30 text-sm outline-none focus:border-white transition"
-                required
-              />
-              <button
-                type="submit"
-                className="rounded-full bg-white text-black px-6 py-3 text-sm font-medium hover:bg-gray-200 transition"
+    <>
+      {/* Back to top button */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          aria-label="Back to top"
+          className="fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-[#0B123A] text-white shadow-lg hover:bg-[#1a245a] transition-all duration-200 hover:scale-110 active:scale-95"
+        >
+          <ArrowUp size={20} />
+        </button>
+      )}
+
+      <footer className="w-full bg-[#0B123A] text-white">
+        <div className="max-w-7xl mx-auto px-6 py-14">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 items-start">
+            {/* Brand + Newsletter */}
+            <div className="lg:col-span-2">
+              <StoreBrandLogo branding={storeBranding} alt="Logo" className="w-auto mb-5" height={36} />
+              <h3 className="text-base font-semibold mb-3">{t("title")}</h3>
+              <form
+                onSubmit={handleSubscribe}
+                className="flex flex-col sm:flex-row gap-2 max-w-md"
               >
-                {t("subscribe")}
-              </button>
-            </form>
-          </div>
-
-          <div className="md:justify-self-end w-full md:max-w-sm">
-            <h3 className="text-lg font-semibold mb-4">{t("contact")}</h3>
-            <div className="space-y-3 text-sm text-white/70">
-              <div className="flex items-start gap-3"><LocationOnIcon sx={{ fontSize: 16 }} /><span>Paseo de las Palmeras, 3, Local B, 51001 Ceuta</span></div>
-              <div className="flex items-center gap-3"><MailIcon sx={{ fontSize: 16 }} /><span>administracion@nexusssolutions.com</span></div>
-              <div className="flex items-center gap-3"><PhoneIcon sx={{ fontSize: 16 }} /><span>+34 656 806 899</span></div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t("placeholder")}
+                  className="flex-1 rounded-xl px-4 py-3 bg-white/10 border border-white/20 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/60 focus:bg-white/15 transition-all"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-white text-[#0B123A] px-6 py-3 text-sm font-semibold hover:bg-slate-100 transition-all duration-200 whitespace-nowrap"
+                >
+                  {t("subscribe")}
+                </button>
+              </form>
             </div>
-            <div className="flex gap-5 pt-5 text-white/80">{socialLinks.map(({ Icon, url }, i) => <Icon key={i} sx={{ fontSize: 18 }} className="cursor-pointer hover:text-white transition" onClick={() => window.open(url, "_blank", "noopener,noreferrer")} />)}</div>
-          </div>
-        </div>
-      </div>
-      <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/60 text-center md:text-left">
-          <p>
-            © {new Date().getFullYear()} Sánchez Peinado Solutions SL —{" "}
-            <span className="font-semibold text-white">NEXUS SP Solutions</span>
-            . {t("rights")}
-          </p>
 
-          <div className="flex flex-wrap justify-center gap-6">
-            <span className="cursor-pointer hover:text-white transition">
-              {t("legal")}
-            </span>
-            <span className="cursor-pointer hover:text-white transition">
-              {t("privacy")}
-            </span>
-            <span className="cursor-pointer hover:text-white transition">
-              {t("terms")}
-            </span>
+            {/* Contact */}
+            <div>
+              <h3 className="text-base font-semibold mb-4">{t("contact")}</h3>
+              <div className="space-y-3 text-sm text-white/70">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-3 hover:text-white transition-colors group"
+                >
+                  <LocationOnIcon sx={{ fontSize: 16 }} className="mt-0.5 group-hover:text-indigo-300 transition-colors" />
+                  <span>{address}</span>
+                </a>
+                <a
+                  href="mailto:administracion@nexusssolutions.com"
+                  className="flex items-center gap-3 hover:text-white transition-colors group"
+                >
+                  <MailIcon sx={{ fontSize: 16 }} className="group-hover:text-indigo-300 transition-colors" />
+                  <span>administracion@nexusssolutions.com</span>
+                </a>
+                <a
+                  href="tel:+34656806899"
+                  className="flex items-center gap-3 hover:text-white transition-colors group"
+                >
+                  <PhoneIcon sx={{ fontSize: 16 }} className="group-hover:text-indigo-300 transition-colors" />
+                  <span>+34 656 806 899</span>
+                </a>
+              </div>
+
+              <div className="flex gap-4 pt-5">
+                {socialLinks.map(({ Icon, url, label }) => (
+                  <a
+                    key={label}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="text-white/60 hover:text-white hover:scale-110 transition-all duration-200"
+                  >
+                    <Icon sx={{ fontSize: 20 }} />
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+
+        <div className="border-t border-white/10">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/50 text-center md:text-left">
+            <p>
+              © {new Date().getFullYear()} Sánchez Peinado Solutions SL —{" "}
+              <span className="font-semibold text-white/80">NEXUS SP Solutions</span>
+              . {t("rights")}
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-6">
+              <span className="cursor-pointer hover:text-white transition-colors">
+                {t("legal")}
+              </span>
+              <span className="cursor-pointer hover:text-white transition-colors">
+                {t("privacy")}
+              </span>
+              <span className="cursor-pointer hover:text-white transition-colors">
+                {t("terms")}
+              </span>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </>
   );
 }

@@ -341,7 +341,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       )}
 
       <Link href={`/products/${product.slug}`} className="block p-4 focus-ring">
-        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-50 mb-4">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gray-50 mb-4">
           <img
             src={imageSrc}
             alt={product.title}
@@ -353,6 +353,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               objectFit: "contain",
               padding: "2px",
             }}
+            className="transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = "/No_Image_Available.png";

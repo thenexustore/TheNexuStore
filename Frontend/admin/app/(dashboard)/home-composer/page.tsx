@@ -637,6 +637,9 @@ export default function HomeComposerPage() {
       });
 
       await loadSections(activeLayoutId);
+      if (selectedSection.type === "HERO_CAROUSEL") {
+        await loadIntegratedModules();
+      }
       toast.success("Bloque guardado");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar el bloque");
@@ -692,6 +695,9 @@ export default function HomeComposerPage() {
       await homeBuilderApi.createItem(selectedSection.id, basePayload);
       const data = (await homeBuilderApi.listItems(selectedSection.id)) as HomeSectionItem[];
       setItems([...data].sort((a, b) => a.position - b.position));
+      if (currentTarget === "banners") {
+        await loadIntegratedModules();
+      }
       toast.success("Ítem añadido");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo añadir el ítem");

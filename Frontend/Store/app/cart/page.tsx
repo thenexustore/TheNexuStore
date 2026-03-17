@@ -159,7 +159,7 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-white py-6 pb-28 text-black sm:py-8 sm:pb-8">
-      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-8">
         {isLegacyCart && user && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center justify-between">

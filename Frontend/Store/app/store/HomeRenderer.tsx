@@ -206,8 +206,8 @@ function SmartImage({
 
 function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="w-full max-w-7xl px-3 sm:px-6">
-      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{title}</h2> : null}
+    <section className="w-full mx-auto max-w-7xl px-0 sm:px-0">
+      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">{title}</h2> : null}
       {subtitle ? <p className="mb-5 text-sm text-slate-600">{subtitle}</p> : null}
       {children}
     </section>
@@ -306,7 +306,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   return (
     <SectionShell title={title} subtitle={subtitle}>
       <div
-        className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px]"
+        className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px] lg:h-[500px] xl:h-[560px]"
         onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
         onMouseLeave={() => { if (pauseOnHover) setIsPaused(false); }}
       >

@@ -144,7 +144,7 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-[#f9fafb] text-slate-900 pb-20">
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b pb-6">
           <div>
@@ -194,7 +194,7 @@ export default function AccountPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Avatar & Basic Info */}
           <div className="lg:col-span-1">
-            <div className="rounded-xl border bg-white p-6 text-center">
+            <div className="rounded-xl border bg-white p-6 text-center lg:sticky lg:top-24">
               <div className="relative mx-auto w-32 h-32 mb-4">
                 <img
                   src={profile.profile_image || "https://ui-avatars.com/api/?name=" + profile.first_name}

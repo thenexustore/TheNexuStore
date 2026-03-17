@@ -226,11 +226,11 @@ export function SidebarFilters({
     price[1] !== maxPrice;
 
   return (
-    <div className="w-64 space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Filters</h3>
         {active && (
-          <button onClick={clearAll} className="text-sm text-blue-600">
+          <button onClick={clearAll} className="text-sm text-[#0B123A] hover:text-[#1a245a] font-medium">
             Clear all
           </button>
         )}

@@ -66,22 +66,24 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6 lg:px-8">
       <div className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-800 p-5 text-white shadow-sm sm:p-8">
-        <h1 className="break-words text-2xl font-bold sm:text-3xl">{t("all")}</h1>
+        <h1 className="break-words text-2xl font-bold sm:text-3xl lg:text-4xl">{t("all")}</h1>
         <p className="mt-2 text-sm text-indigo-100 sm:text-base">
           {t("found", {count: productsResponse?.total || 0})}
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
         {filterOptions && (
-          <div className="hidden lg:block w-64 flex-shrink-0">
+          <div className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
+            <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <SidebarFilters
               filterOptions={filterOptions}
               filters={filters}
               onFilterChange={handleFilterChange}
             />
+            </div>
           </div>
         )}
 
@@ -131,7 +133,7 @@ export default function ProductsPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 sm:gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5">
                 {productsResponse?.products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

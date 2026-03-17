@@ -141,7 +141,7 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 pb-24 pt-6 text-black sm:px-6 sm:pb-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 pb-24 pt-6 text-black sm:px-6 sm:pb-6 lg:px-8">
       <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
         <Link href="/" className="hover:underline">
           {t("home")}
@@ -470,8 +470,8 @@ export default function ProductPage() {
 
       {relatedProducts.length > 0 && (
         <div>
-          <h2 className="mb-6 text-2xl font-bold">{t("relatedProducts")}</h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <h2 className="mb-6 text-2xl font-bold lg:text-3xl">{t("relatedProducts")}</h2>
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5 lg:gap-6">
             {relatedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

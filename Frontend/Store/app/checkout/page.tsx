@@ -285,7 +285,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-white py-6 pb-28 text-black sm:py-8 sm:pb-8">
-      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-8">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:mb-8 sm:p-6">
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{t("title")}</h1>
           <p className="mt-2 text-sm text-slate-600">{t("secureNote")}</p>

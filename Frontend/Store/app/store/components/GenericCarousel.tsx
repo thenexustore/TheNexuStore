@@ -229,9 +229,10 @@ export default function GenericCarousel({
   }, [autoplay, autoplayIntervalMs, isHovering, page, pageCount, scrollToPage]);
 
   return (
-    <section className="w-full px-4 sm:px-6">
+    <section className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">{title}</h2>
         {pageCount > 1 ? (
           <div className="flex items-center gap-2">
             <button
@@ -264,7 +265,7 @@ export default function GenericCarousel({
         <>
           <div
             ref={scrollRef}
-            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 lg:gap-5"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
@@ -362,6 +363,7 @@ export default function GenericCarousel({
           ) : null}
         </>
       )}
+      </div>
     </section>
   );
 }

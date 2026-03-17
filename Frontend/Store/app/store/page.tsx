@@ -173,8 +173,8 @@ export default async function StorePage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-12">
-      <div className="mx-auto w-full max-w-[1440px] space-y-10 px-2 sm:px-4 sm:space-y-14">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-8 sm:pb-12 lg:pb-16">
+      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8 sm:space-y-12 lg:space-y-16">
         {shouldRenderDynamic ? (
           <Suspense>
             <HomeDynamicSections initialSections={initialDynamicSections} />

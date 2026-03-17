@@ -599,6 +599,49 @@ describe('HomeLayoutService section ordering integrity', () => {
     ).rejects.toThrow('Section ids must be unique');
   });
 
+
+  it('rejects reorder payload with duplicated positions', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+
+    await expect(
+      service.reorderSections({
+        items: [
+          { id: 'sec-1', position: 1 },
+          { id: 'sec-2', position: 1 },
+        ],
+      }),
+    ).rejects.toThrow('Section positions must be unique');
+  });
+
+  it('rejects reorder payload with non-positive positions', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+
+    await expect(
+      service.reorderSections({
+        items: [
+          { id: 'sec-1', position: 0 },
+          { id: 'sec-2', position: 2 },
+        ],
+      }),
+    ).rejects.toThrow('positions must be positive integers');
+  });
+
   it('reorders sections and normalizes contiguous positions', async () => {
     const prisma = {
       homePageSection: {

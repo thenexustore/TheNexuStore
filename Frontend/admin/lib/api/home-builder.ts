@@ -12,13 +12,17 @@ export class HomeBuilderApiError extends Error {
 
 async function req(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('admin_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
+    headers,
     cache: 'no-store',
   });
   const json = await res.json().catch(() => null);
@@ -42,7 +46,7 @@ export const homeBuilderApi = {
   updateSection: (id: string, payload: Record<string, any>) => req(`/admin/home/sections/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteSection: (id: string) => req(`/admin/home/sections/${id}`, { method: 'DELETE' }),
   moveSection: (id: string, position: number) => req(`/admin/home/sections/${id}/move`, { method: 'POST', body: JSON.stringify({ position }) }),
-  reorderSections: (items: Array<{ id: string; position: number }>) => req('/admin/home/sections/reorder', { method: 'POST', body: JSON.stringify({ items }) }),
+  reorderSections: (items: Array<{ id: string; position: number }>) => req('/admin/home/sections/reorder', { method: 'POST', body: JSON.stringify({ items: items.map((item) => ({ id: item.id, position: Math.floor(Number(item.position) || 0) })) }) }),
 
   listItems: (sectionId: string) => req(`/admin/home/sections/${sectionId}/items`),
   createItem: (sectionId: string, payload: Record<string, any>) => req(`/admin/home/sections/${sectionId}/items`, { method: 'POST', body: JSON.stringify(payload) }),

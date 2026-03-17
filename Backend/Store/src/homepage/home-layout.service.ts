@@ -429,17 +429,36 @@ export class HomeLayoutService {
         }),
       ),
     );
+    await this.reindexLayoutSections(section.layout_id);
     this.invalidateCache();
     return this.listSections(section.layout_id);
   }
 
   async reorderSections(dto: { items: Array<{ id: string; position: number }> }) {
-    const items = Array.isArray(dto?.items) ? dto.items : [];
+    const items = Array.isArray(dto?.items)
+      ? dto.items.map((item) => ({
+          id: String(item?.id || '').trim(),
+          position: Number(item?.position),
+        }))
+      : [];
+
     if (!items.length) throw new BadRequestException('items is required');
+
+    const hasInvalidPosition = items.some(
+      (item) => !Number.isFinite(item.position) || item.position < 1,
+    );
+    if (hasInvalidPosition) {
+      throw new BadRequestException('positions must be positive integers');
+    }
 
     const uniqueIds = Array.from(new Set(items.map((item) => item.id).filter(Boolean)));
     if (uniqueIds.length !== items.length) {
       throw new BadRequestException('Section ids must be unique');
+    }
+
+    const uniquePositions = new Set(items.map((item) => Math.floor(item.position)));
+    if (uniquePositions.size !== items.length) {
+      throw new BadRequestException('Section positions must be unique');
     }
 
     const sections = await this.prisma.homePageSection.findMany({
@@ -456,8 +475,12 @@ export class HomeLayoutService {
       throw new BadRequestException('All sections must belong to the same layout');
     }
 
+    const normalizedItems = [...items]
+      .map((item) => ({ ...item, position: Math.floor(item.position) }))
+      .sort((a, b) => a.position - b.position);
+
     await this.prisma.$transaction(
-      items.map((item) =>
+      normalizedItems.map((item) =>
         this.prisma.homePageSection.update({
           where: { id: item.id },
           data: { position: item.position },

@@ -549,13 +549,16 @@ export default function HomeComposerPage() {
   };
 
   const moveSection = async (section: HomeSection, direction: -1 | 1) => {
-    const currentIndex = sections.findIndex((x) => x.id === section.id);
+    if (saving) return;
+
+    const orderedSections = [...sections].sort(byPosition);
+    const currentIndex = orderedSections.findIndex((x) => x.id === section.id);
     if (currentIndex < 0) return;
 
     const nextIndex = currentIndex + direction;
-    if (nextIndex < 0 || nextIndex >= sections.length) return;
+    if (nextIndex < 0 || nextIndex >= orderedSections.length) return;
 
-    const reordered = [...sections];
+    const reordered = [...orderedSections];
     const [moved] = reordered.splice(currentIndex, 1);
     reordered.splice(nextIndex, 0, moved);
     const payload = reordered.map((entry, index) => ({ id: entry.id, position: index + 1 }));

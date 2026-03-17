@@ -159,7 +159,7 @@ export class HomeLayoutService {
       next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
       next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
       next.show_names = this.asBoolean(next.show_names, true);
-      next.show_top_badges = this.asBoolean(next.show_top_badges, true);
+      next.show_top_badges = this.asBoolean(next.show_top_badges, false);
       next.image_fit = next.image_fit === 'cover' ? 'cover' : 'contain';
       next.card_style = next.card_style === 'elevated' ? 'elevated' : 'minimal';
       next.auto_strategy = ['demand', 'alphabetical', 'manual_sort'].includes(String(next.auto_strategy))
@@ -894,6 +894,28 @@ export class HomeLayoutService {
         .slice(0, requestedLimit)
         .map((entry) => entry.category);
 
+      const parentIds = categories.map((category) => category.id);
+      const childRows = parentIds.length
+        ? ((await this.prisma.category.findMany({
+            where: {
+              is_active: true,
+              parent_id: { in: parentIds },
+            },
+            select: {
+              id: true,
+              parent_id: true,
+            },
+          })) || [])
+        : [];
+
+      const childIdsByParent = new Map<string, string[]>();
+      for (const row of childRows) {
+        if (!row.parent_id) continue;
+        const current = childIdsByParent.get(row.parent_id) || [];
+        current.push(row.id);
+        childIdsByParent.set(row.parent_id, current);
+      }
+
       const categoriesWithImage = await Promise.all(
         categories.map(async (category) => {
           const existingImage =
@@ -902,12 +924,17 @@ export class HomeLayoutService {
             return { ...category, image_url: existingImage };
           }
 
+          const relatedCategoryIds = [
+            category.id,
+            ...(childIdsByParent.get(category.id) || []),
+          ];
+
           const candidateProducts = await this.prisma.product.findMany({
             where: {
               status: 'ACTIVE',
               OR: [
-                { main_category_id: category.id },
-                { categories: { some: { category_id: category.id } } },
+                { main_category_id: { in: relatedCategoryIds } },
+                { categories: { some: { category_id: { in: relatedCategoryIds } } } },
               ],
               media: { some: {} },
             },

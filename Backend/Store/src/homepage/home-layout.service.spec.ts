@@ -498,6 +498,61 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
   });
 
 
+
+  it('derives parent category image from active child category products', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-strip-sec',
+            type: 'CATEGORY_STRIP',
+            title: 'Categories',
+            subtitle: null,
+            variant: null,
+            config: { mode: 'auto', limit: 1 },
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      category: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            { id: 'parent-network', name: 'Redes y servidores', slug: 'redes-servidores', sort_order: 1, is_active: true, parent_id: null },
+          ])
+          .mockResolvedValueOnce([
+            { id: 'child-switches', parent_id: 'parent-network' },
+          ]),
+      },
+      product: {
+        count: jest.fn().mockResolvedValue(7),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'p-switch', title: 'Switch de red 24 puertos', slug: 'switch-red', media: [{ url: '/switch-parent.jpg' }] },
+        ]),
+      },
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-cats',
+      locale: 'es',
+      name: 'Categories layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const section = payload.sections[0] as any;
+    expect(section.resolved[0].image_url).toBe('/switch-parent.jpg');
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { main_category_id: { in: ['parent-network', 'child-switches'] } },
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('prefers parent categories with active children in CATEGORY_STRIP auto mode', async () => {
     const prisma = {
       homePageSection: {

@@ -421,7 +421,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   const showNames = config?.show_names !== false;
   const imageFitClass = String(config?.image_fit || 'contain') === 'cover' ? 'object-cover' : 'object-contain';
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
-  const showTopBadges = config?.show_top_badges !== false;
+  const showTopBadges = config?.show_top_badges === true;
   const ctaText = (asText(config?.cta_text, 'Explorar').trim() || 'Explorar').slice(0, 24);
   const cardToneClass = elevatedCards
     ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'

@@ -11,6 +11,8 @@ import {
   fetchFeaturedProducts,
   toggleFeaturedProductStatus,
 } from "@/lib/api/featured-products";
+import { fetchCategories, type Category } from "@/lib/api/categories";
+import { fetchBrands, type Brand } from "@/lib/api/brands";
 import CanvasSections from "@/app/components/home-composer/CanvasSections";
 import CuratedItemsPanel from "@/app/components/home-composer/CuratedItemsPanel";
 import { HomeOption, HomeSection, HomeSectionItem, HomeSectionType } from "@/app/components/home-composer/types";
@@ -156,6 +158,16 @@ function asNumber(value: unknown, fallback: number) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+function parseIds(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 function pickImageFileAsDataUrl(): Promise<string | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -205,6 +217,8 @@ export default function HomeComposerPage() {
   const [integratedBanners, setIntegratedBanners] = useState<IntegratedBanner[]>([]);
   const [integratedFeatured, setIntegratedFeatured] = useState<IntegratedFeatured[]>([]);
   const [integratedLoading, setIntegratedLoading] = useState(false);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -224,6 +238,41 @@ export default function HomeComposerPage() {
       return null;
     }
   }, [draft]);
+
+  const categoryTree = useMemo(() => {
+    const parentBuckets = new Map<string, Category[]>();
+    const roots: Category[] = [];
+
+    allCategories.forEach((category) => {
+      if (category.parent_id) {
+        const bucket = parentBuckets.get(category.parent_id) || [];
+        bucket.push(category);
+        parentBuckets.set(category.parent_id, bucket);
+        return;
+      }
+      roots.push(category);
+    });
+
+    const bySort = (a: Category, b: Category) => {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+    };
+
+    return roots.sort(bySort).map((parent) => ({
+      parent,
+      children: (parentBuckets.get(parent.id) || []).sort(bySort),
+    }));
+  }, [allCategories]);
+
+  const selectedCategoryIds = useMemo(() => {
+    if (!parsedDraftConfig) return [];
+    return [...new Set(parseIds(parsedDraftConfig.categoryIds || parsedDraftConfig.categoryId))];
+  }, [parsedDraftConfig]);
+
+  const selectedBrandIds = useMemo(() => {
+    if (!parsedDraftConfig) return [];
+    return [...new Set(parseIds(parsedDraftConfig.brandIds || parsedDraftConfig.brandId))];
+  }, [parsedDraftConfig]);
 
   const currentTarget = useMemo<"products" | "brands" | "categories" | "banners" | null>(() => {
     if (!selectedSection) return null;
@@ -390,6 +439,21 @@ export default function HomeComposerPage() {
     };
     void run();
   }, [loadLayouts, loadActiveDiagnostics, loadIntegratedModules]);
+
+  useEffect(() => {
+    const loadTaxonomy = async () => {
+      try {
+        const [categories, brands] = await Promise.all([fetchCategories(), fetchBrands()]);
+        setAllCategories(categories || []);
+        setAllBrands(brands || []);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[home-composer] failed to load category/brand selectors", error);
+        }
+      }
+    };
+    void loadTaxonomy();
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -630,6 +694,36 @@ export default function HomeComposerPage() {
     setDraft({
       ...draft,
       configText: JSON.stringify(nextConfig, null, 2),
+    });
+  };
+
+  const toggleCategorySelection = (categoryId: string) => {
+    if (!parsedDraftConfig) return;
+    const current = new Set(selectedCategoryIds);
+    if (current.has(categoryId)) {
+      current.delete(categoryId);
+    } else {
+      current.add(categoryId);
+    }
+    updateDraftConfig({
+      ...parsedDraftConfig,
+      categoryIds: Array.from(current),
+      categoryId: null,
+    });
+  };
+
+  const toggleBrandSelection = (brandId: string) => {
+    if (!parsedDraftConfig) return;
+    const current = new Set(selectedBrandIds);
+    if (current.has(brandId)) {
+      current.delete(brandId);
+    } else {
+      current.add(brandId);
+    }
+    updateDraftConfig({
+      ...parsedDraftConfig,
+      brandIds: Array.from(current),
+      brandId: null,
     });
   };
 
@@ -1341,37 +1435,74 @@ export default function HomeComposerPage() {
                       </select>
                     </label>
 
-                    <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Category IDs (coma separada)</span>
-                      <input
-                        value={String(config.categoryIds || config.categoryId || "")}
-                        onChange={(event) =>
-                          updateDraftConfig({
-                            ...config,
-                            categoryIds: event.target.value,
-                            categoryId: null,
-                          })
-                        }
-                        placeholder="cat-parent-1,cat-parent-2"
-                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                      />
-                    </label>
+                    <div className="text-sm md:col-span-2">
+                      <div className="mb-1 block text-zinc-500">Selector de categorías (padre/hijas)</div>
+                      <div className="max-h-52 space-y-2 overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 p-2">
+                        {categoryTree.length === 0 ? (
+                          <p className="text-xs text-zinc-500">No hay categorías disponibles para seleccionar.</p>
+                        ) : (
+                          categoryTree.map(({ parent, children }) => (
+                            <div key={parent.id} className="rounded-md border border-zinc-200 bg-white p-2">
+                              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCategoryIds.includes(parent.id)}
+                                  onChange={() => toggleCategorySelection(parent.id)}
+                                />
+                                {parent.name}
+                                <span className="text-xs text-zinc-500">({parent.id})</span>
+                              </label>
+                              {children.length ? (
+                                <div className="mt-2 grid gap-1 pl-5">
+                                  {children.map((child) => (
+                                    <label key={child.id} className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedCategoryIds.includes(child.id)}
+                                        onChange={() => toggleCategorySelection(child.id)}
+                                      />
+                                      {child.name}
+                                      <span className="text-[11px] text-zinc-500">({child.id})</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Seleccionadas: {selectedCategoryIds.length ? selectedCategoryIds.join(", ") : "ninguna"}.
+                      </p>
+                    </div>
 
-                    <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Brand IDs (coma separada)</span>
-                      <input
-                        value={String(config.brandIds || config.brandId || "")}
-                        onChange={(event) =>
-                          updateDraftConfig({
-                            ...config,
-                            brandIds: event.target.value,
-                            brandId: null,
-                          })
-                        }
-                        placeholder="brand-1,brand-2"
-                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-                      />
-                    </label>
+                    <div className="text-sm md:col-span-2">
+                      <div className="mb-1 block text-zinc-500">Selector de marcas</div>
+                      <div className="max-h-40 overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 p-2">
+                        <div className="grid gap-1 sm:grid-cols-2">
+                          {allBrands.length === 0 ? (
+                            <p className="text-xs text-zinc-500">No hay marcas disponibles.</p>
+                          ) : (
+                            [...allBrands]
+                              .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+                              .map((brand) => (
+                                <label key={brand.id} className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedBrandIds.includes(brand.id)}
+                                    onChange={() => toggleBrandSelection(brand.id)}
+                                  />
+                                  {brand.name}
+                                  <span className="text-[11px] text-zinc-500">({brand.id})</span>
+                                </label>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Seleccionadas: {selectedBrandIds.length ? selectedBrandIds.join(", ") : "ninguna"}.
+                      </p>
+                    </div>
 
                     <label className="flex items-center gap-2 text-sm text-zinc-700">
                       <input

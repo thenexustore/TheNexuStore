@@ -51,6 +51,15 @@ function ActionLink({ href, className, children, style }: { href: string; classN
 }
 
 const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+const uniqueBy = <T,>(items: T[], getKey: (item: T, index: number) => string): T[] => {
+  const seen = new Set<string>();
+  return items.filter((item, index) => {
+    const key = getKey(item, index);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 const asText = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
 const normalizeCategoryLabel = (value: string): string => value
   .replace(/,(?=\S)/g, ', ')
@@ -415,7 +424,10 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
 }
 
 function CategoryStrip({ title, subtitle, categories, config }: { title?: string; subtitle?: string; categories: unknown[]; config?: Record<string, unknown> }) {
-  const list = toArray<Record<string, unknown>>(categories);
+  const list = uniqueBy(
+    toArray<Record<string, unknown>>(categories),
+    (cat, idx) => asText(cat.id) || asText(cat.slug) || asText(cat.name) || `cat-${idx}`,
+  );
   const mobileCols = Math.max(2, Math.min(4, Number(config?.items_mobile || 2)));
   const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
   const showNames = config?.show_names !== false;
@@ -488,9 +500,12 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
 }
 
 function ProductCarousel({ title, subtitle, products, config }: { title?: string; subtitle?: string; products: unknown[]; config?: Record<string, unknown> }) {
-  const list = toArray<Record<string, unknown>>(products);
+  const list = uniqueBy(
+    toArray<Record<string, unknown>>(products),
+    (product, idx) => asText(product.id) || asText(product.slug) || asText(product.title) || `product-${idx}`,
+  );
   const mobileItems = Math.max(1, Number(config?.items_mobile || 2));
-  const desktopItems = Math.max(mobileItems, Number(config?.items_desktop || 4));
+  const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.items_desktop || 4)));
   const mobileCardPx = Math.max(168, Math.floor(360 / mobileItems));
   const desktopCardPx = Math.max(205, Math.floor(1160 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;

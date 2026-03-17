@@ -574,6 +574,30 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
 
   const useGridFallback = list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3));
 
+  const sourceLabel = {
+    NEW_ARRIVALS: 'Novedades',
+    BEST_DEALS: 'Ofertas activas',
+    FEATURED: 'Selección destacada',
+    CATEGORY: 'Categoría',
+    BRAND: 'Marca',
+    BEST_SELLERS: 'Más vendidos',
+  }[source] || 'Selección';
+
+  const scopeLabel = {
+    parent_only: 'Solo categorías padre',
+    children_only: 'Solo categorías hijas',
+    parent_and_descendants: 'Padre + descendientes',
+  }[categoryScope] || 'Reglas automáticas';
+
+  const contextualChips = [
+    sourceLabel,
+    source === 'CATEGORY' ? scopeLabel : null,
+    categoryIds.length ? `${categoryIds.length} categorías` : null,
+    brandIds.length ? `${brandIds.length} marcas` : null,
+  ].filter(Boolean);
+
+  const useGridFallback = list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3));
+
   const syncRailState = () => {
     const rail = railRef.current;
     if (!rail) return;

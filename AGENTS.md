@@ -132,6 +132,17 @@ Redsys logic is security-sensitive (signatures, callbacks, order state transitio
 - [ ] Explain key risks and non-obvious side effects.
 - [ ] Provide manual QA steps covering user-visible behavior.
 
+## Autonomy / Execution Continuity
+- Work autonomously until the full task/module is complete.
+- Do not stop after one subtask if more planned work remains.
+- After finishing each subtask, continue automatically to the next one until the full DoD is satisfied.
+- Only stop for a real external blocker: missing credentials, missing access, destructive ambiguity in production, or a requirement conflict that cannot be resolved safely.
+- If several valid options exist, choose the safest MVP-compatible option and continue.
+- Prefer end-to-end completion over partial delivery.
+- When an error appears, debug it, fix it, re-run the relevant checks, and continue.
+- Do not ask for confirmation between normal implementation steps.
+- Always end with: summary, files changed, checks run, risks, manual QA, and the next immediate task.
+
 ## Definition of Done for any Codex task
 1. Change is minimal and scoped.
 2. Relevant automated checks pass (or failures are explained).

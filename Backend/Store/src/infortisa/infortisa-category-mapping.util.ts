@@ -83,7 +83,13 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
     key: 'impresion-escaneado',
     label: 'Impresión y escaneado',
     sortOrder: 40,
-    familyKeywords: ['impresion', 'impresión', 'printing', 'escaneado', 'scanner'],
+    familyKeywords: [
+      'impresion',
+      'impresión',
+      'printing',
+      'escaneado',
+      'scanner',
+    ],
     subfamilyKeywords: [
       'impresora',
       'multifuncion',
@@ -167,7 +173,13 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
     key: 'software-seguridad',
     label: 'Software y seguridad',
     sortOrder: 70,
-    familyKeywords: ['software', 'licencia', 'suscripcion', 'seguridad', 'security'],
+    familyKeywords: [
+      'software',
+      'licencia',
+      'suscripcion',
+      'seguridad',
+      'security',
+    ],
     subfamilyKeywords: [
       'antivirus',
       'backup',
@@ -254,13 +266,12 @@ export function recommendParentCategory(
     return DEFAULT_PARENT_CATEGORY;
   }
 
-  const scored = MENU_PARENT_TAXONOMY
-    .map((category) => ({
-      key: category.key,
-      label: category.label,
-      score: scoreCategory(family, subfamily, category),
-      sortOrder: category.sortOrder,
-    }))
+  const scored = MENU_PARENT_TAXONOMY.map((category) => ({
+    key: category.key,
+    label: category.label,
+    score: scoreCategory(family, subfamily, category),
+    sortOrder: category.sortOrder,
+  }))
     .filter((row) => row.score > 0)
     .sort((a, b) => {
       if (b.score === a.score) return a.sortOrder - b.sortOrder;
@@ -277,15 +288,18 @@ export function recommendParentCategory(
   };
 }
 
-
-
-
 const KNOWN_PARENT_CATEGORY_SLUGS = new Set<string>([
-  ...MENU_PARENT_TAXONOMY.map((category) => slugifyCategory(category.label)),
+  ...MENU_PARENT_TAXONOMY.flatMap((category) => [
+    slugifyCategory(category.label),
+    slugifyCategory(category.key),
+  ]),
   slugifyCategory(DEFAULT_PARENT_CATEGORY.label),
+  slugifyCategory(DEFAULT_PARENT_CATEGORY.key),
 ]);
 
-export function isKnownParentCategorySlug(slug: string | null | undefined): boolean {
+export function isKnownParentCategorySlug(
+  slug: string | null | undefined,
+): boolean {
   if (!slug) return false;
   return KNOWN_PARENT_CATEGORY_SLUGS.has(slug);
 }

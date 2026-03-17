@@ -426,7 +426,14 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
 function CategoryStrip({ title, subtitle, categories, config }: { title?: string; subtitle?: string; categories: unknown[]; config?: Record<string, unknown> }) {
   const list = uniqueBy(
     toArray<Record<string, unknown>>(categories),
-    (cat, idx) => asText(cat.id) || asText(cat.slug) || asText(cat.name) || `cat-${idx}`,
+    (cat, idx) => {
+      const rawName = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, '')).toLowerCase();
+      const slug = asText(cat.slug).trim().toLowerCase();
+      const href = asText(cat.href).trim().toLowerCase();
+      const normalizedPath = href ? href.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '') : '';
+      const primaryKey = slug || normalizedPath || rawName;
+      return primaryKey || asText(cat.id) || `cat-${idx}`;
+    },
   );
   const mobileCols = Math.max(2, Math.min(4, Number(config?.items_mobile || 2)));
   const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
@@ -550,53 +557,33 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
-  const sourceLabel = {
-    NEW_ARRIVALS: 'Novedades',
-    BEST_DEALS: 'Ofertas activas',
-    FEATURED: 'Selección destacada',
-    CATEGORY: 'Categoría',
-    BRAND: 'Marca',
-    BEST_SELLERS: 'Más vendidos',
-  }[source] || 'Selección';
+  const carouselMeta = useMemo(() => {
+    const sourceLabel = {
+      NEW_ARRIVALS: 'Novedades',
+      BEST_DEALS: 'Ofertas activas',
+      FEATURED: 'Selección destacada',
+      CATEGORY: 'Categoría',
+      BRAND: 'Marca',
+      BEST_SELLERS: 'Más vendidos',
+    }[source] || 'Selección';
 
-  const scopeLabel = {
-    parent_only: 'Solo categorías padre',
-    children_only: 'Solo categorías hijas',
-    parent_and_descendants: 'Padre + descendientes',
-  }[categoryScope] || 'Reglas automáticas';
+    const scopeLabel = {
+      parent_only: 'Solo categorías padre',
+      children_only: 'Solo categorías hijas',
+      parent_and_descendants: 'Padre + descendientes',
+    }[categoryScope] || 'Reglas automáticas';
 
-  const contextualChips = [
-    sourceLabel,
-    source === 'CATEGORY' ? scopeLabel : null,
-    categoryIds.length ? `${categoryIds.length} categorías` : null,
-    brandIds.length ? `${brandIds.length} marcas` : null,
-  ].filter(Boolean);
-
-  const useGridFallback = list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3));
-
-  const sourceLabel = {
-    NEW_ARRIVALS: 'Novedades',
-    BEST_DEALS: 'Ofertas activas',
-    FEATURED: 'Selección destacada',
-    CATEGORY: 'Categoría',
-    BRAND: 'Marca',
-    BEST_SELLERS: 'Más vendidos',
-  }[source] || 'Selección';
-
-  const scopeLabel = {
-    parent_only: 'Solo categorías padre',
-    children_only: 'Solo categorías hijas',
-    parent_and_descendants: 'Padre + descendientes',
-  }[categoryScope] || 'Reglas automáticas';
-
-  const contextualChips = [
-    sourceLabel,
-    source === 'CATEGORY' ? scopeLabel : null,
-    categoryIds.length ? `${categoryIds.length} categorías` : null,
-    brandIds.length ? `${brandIds.length} marcas` : null,
-  ].filter(Boolean);
-
-  const useGridFallback = list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3));
+    return {
+      contextualChips: [
+        sourceLabel,
+        source === 'CATEGORY' ? scopeLabel : null,
+        categoryIds.length ? `${categoryIds.length} categorías` : null,
+        brandIds.length ? `${brandIds.length} marcas` : null,
+      ].filter(Boolean),
+      useGridFallback:
+        list.length > 0 && list.length <= Math.max(2, Math.min(desktopItems, 3)),
+    };
+  }, [brandIds.length, categoryIds.length, categoryScope, desktopItems, list.length, source]);
 
   const syncRailState = () => {
     const rail = railRef.current;
@@ -726,7 +713,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-2">
             <div className="flex flex-wrap gap-1.5">
-              {contextualChips.map((chip, idx) => (
+              {carouselMeta.contextualChips.map((chip, idx) => (
                 <span key={`${chip}-${idx}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">{chip}</span>
               ))}
             </div>
@@ -737,7 +724,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
             <ActionLink href={collectionHref} className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">
               {viewAllLabel} <span aria-hidden className="ml-1">→</span>
             </ActionLink>
-            {list.length > 1 && showArrows && !useGridFallback ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+            {list.length > 1 && showArrows && !carouselMeta.useGridFallback ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
           </div>
         </div>
 
@@ -752,7 +739,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
               </div>
             ))}
           </div>
-        ) : useGridFallback ? (
+        ) : carouselMeta.useGridFallback ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {list.map((product, idx) => renderCard(product, idx))}
           </div>
@@ -767,7 +754,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
               onTouchEnd={() => setIsPaused(false)}
               onFocusCapture={() => setIsPaused(true)}
               onBlurCapture={() => setIsPaused(false)}
-              className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scroll-padding-left:8px]"
+              className="flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scroll-padding-left:8px] active:cursor-grabbing"
             >
               {list.map((product, idx) => renderCard(product, idx))}
             </div>

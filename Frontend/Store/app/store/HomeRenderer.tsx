@@ -424,17 +424,21 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
 }
 
 function CategoryStrip({ title, subtitle, categories, config }: { title?: string; subtitle?: string; categories: unknown[]; config?: Record<string, unknown> }) {
-  const list = uniqueBy(
-    toArray<Record<string, unknown>>(categories),
-    (cat, idx) => {
-      const rawName = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, '')).toLowerCase();
-      const slug = asText(cat.slug).trim().toLowerCase();
-      const href = asText(cat.href).trim().toLowerCase();
-      const normalizedPath = href ? href.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '') : '';
-      const primaryKey = slug || normalizedPath || rawName;
-      return primaryKey || asText(cat.id) || `cat-${idx}`;
-    },
-  );
+  const rawList = toArray<Record<string, unknown>>(categories);
+  const bySemanticSource = uniqueBy(rawList, (cat, idx) => {
+    const slug = asText(cat.slug).trim().toLowerCase();
+    const href = asText(cat.href).trim().toLowerCase();
+    const normalizedPath = href
+      ? href.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
+      : '';
+    return slug || normalizedPath || asText(cat.id) || `cat-${idx}`;
+  });
+  const list = uniqueBy(bySemanticSource, (cat, idx) => {
+    const rawName = normalizeCategoryLabel(
+      asText(cat.item_label) || asText(cat.name, ''),
+    ).toLowerCase();
+    return rawName || asText(cat.slug).trim().toLowerCase() || `cat-name-${idx}`;
+  });
   const mobileCols = Math.max(2, Math.min(4, Number(config?.items_mobile || 2)));
   const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
   const showNames = config?.show_names !== false;

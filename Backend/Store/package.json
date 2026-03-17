@@ -21,13 +21,14 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "infortisa:backfill-slugs": "ts-node scripts/backfill-infortisa-slugs.ts",
     "prisma:generate": "prisma generate",
-    "prebuild": "npm run prisma:generate",
+    "prebuild": "npm run prisma:generate && npm run check:home-controller-duplicates",
     "prestart": "npm run prisma:generate",
     "prestart:prod": "npm run prisma:generate",
     "config:smoke": "node scripts/config-smoke.cjs",
     "smoke:http": "node scripts/http-smoke.cjs",
     "brands:logo:audit": "ts-node scripts/brand-logo-audit.ts",
-    "brands:logo:normalize": "ts-node scripts/brand-logo-audit.ts --apply"
+    "brands:logo:normalize": "ts-node scripts/brand-logo-audit.ts --apply",
+    "check:home-controller-duplicates": "node scripts/check-home-controller-duplicates.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

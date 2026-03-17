@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import HomeRenderer from "./HomeRenderer";
 import HomeDynamicSections from "./HomeDynamicSections";
 import { API_URL } from "../lib/env";
@@ -175,7 +176,9 @@ export default async function StorePage({
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-12">
       <div className="mx-auto w-full max-w-[1440px] space-y-10 px-2 sm:px-4 sm:space-y-14">
         {shouldRenderDynamic ? (
-          <HomeDynamicSections initialSections={initialDynamicSections} />
+          <Suspense>
+            <HomeDynamicSections initialSections={initialDynamicSections} />
+          </Suspense>
         ) : (
           <HomeRenderer payload={data} />
         )}

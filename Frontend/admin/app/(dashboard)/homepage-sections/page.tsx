@@ -532,7 +532,7 @@ export default function HomepageSectionsPage() {
         byId.set(id, { id, label, subtitle });
         if (slug) seenSlugs.add(slug);
       }
-};
+    };
 
 
     for (const item of queryCatalogs.categories) {

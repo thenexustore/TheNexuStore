@@ -219,6 +219,8 @@ export default function HomeComposerPage() {
   const [integratedLoading, setIntegratedLoading] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -274,6 +276,48 @@ export default function HomeComposerPage() {
     return [...new Set(parseIds(parsedDraftConfig.brandIds || parsedDraftConfig.brandId))];
   }, [parsedDraftConfig]);
 
+  const normalizedCategoryFilter = categoryFilter.trim().toLowerCase();
+  const normalizedBrandFilter = brandFilter.trim().toLowerCase();
+
+  const filteredCategoryTree = useMemo(() => {
+    if (!normalizedCategoryFilter) return categoryTree;
+    return categoryTree
+      .map(({ parent, children }) => {
+        const parentMatch = `${parent.name} ${parent.slug}`.toLowerCase().includes(normalizedCategoryFilter);
+        if (parentMatch) return { parent, children };
+        const matchingChildren = children.filter((child) => `${child.name} ${child.slug}`.toLowerCase().includes(normalizedCategoryFilter));
+        return { parent, children: matchingChildren };
+      })
+      .filter(({ parent, children }) => children.length > 0 || `${parent.name} ${parent.slug}`.toLowerCase().includes(normalizedCategoryFilter));
+  }, [categoryTree, normalizedCategoryFilter]);
+
+  const filteredBrands = useMemo(() => {
+    const sorted = [...allBrands].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+    if (!normalizedBrandFilter) return sorted;
+    return sorted.filter((brand) => `${brand.name} ${brand.slug}`.toLowerCase().includes(normalizedBrandFilter));
+  }, [allBrands, normalizedBrandFilter]);
+
+  const selectedCategoryMeta = useMemo(() => {
+    const index = new Map(allCategories.map((category) => [category.id, category]));
+    return selectedCategoryIds
+      .map((id) => index.get(id))
+      .filter((entry): entry is Category => Boolean(entry));
+  }, [allCategories, selectedCategoryIds]);
+
+  const selectedBrandMeta = useMemo(() => {
+    const index = new Map(allBrands.map((brand) => [brand.id, brand]));
+    return selectedBrandIds
+      .map((id) => index.get(id))
+      .filter((entry): entry is Brand => Boolean(entry));
+  }, [allBrands, selectedBrandIds]);
+
+  useEffect(() => {
+    if (selectedSection?.type !== "PRODUCT_CAROUSEL") {
+      setCategoryFilter("");
+      setBrandFilter("");
+    }
+  }, [selectedSection?.type]);
+
   const currentTarget = useMemo<"products" | "brands" | "categories" | "banners" | null>(() => {
     if (!selectedSection) return null;
     if (selectedSection.type === "PRODUCT_CAROUSEL") return "products";
@@ -305,6 +349,11 @@ export default function HomeComposerPage() {
   const curatedRemaining = useMemo(() => {
     return Math.max(0, curatedLimit - items.length);
   }, [curatedLimit, items.length]);
+
+  const selectedSectionDiagnostic = useMemo(() => {
+    if (!selectedSection || !activeDiagnostics) return null;
+    return activeDiagnostics.sections.find((section) => section.id === selectedSection.id) || null;
+  }, [activeDiagnostics, selectedSection]);
 
   const isDraftDirty = useMemo(() => {
     if (!selectedSection || !draft || !parsedDraftConfig) return false;
@@ -1244,6 +1293,22 @@ export default function HomeComposerPage() {
               {selectedSection.type === "PRODUCT_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
                   <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de productos</div>
+                  {selectedSectionDiagnostic ? (
+                    <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                      <div className="font-medium text-zinc-900">Diagnóstico en tiempo real</div>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white px-2 py-1">Resultados: {selectedSectionDiagnostic.resolved_count}</span>
+                        {selectedSectionDiagnostic.fallback_reason ? (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Fallback: {selectedSectionDiagnostic.fallback_reason}</span>
+                        ) : null}
+                        {selectedSectionDiagnostic.warnings.length ? (
+                          <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Warnings: {selectedSectionDiagnostic.warnings.length}</span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Sin warnings</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Modo</span>
@@ -1436,12 +1501,36 @@ export default function HomeComposerPage() {
                     </label>
 
                     <div className="text-sm md:col-span-2">
-                      <div className="mb-1 block text-zinc-500">Selector de categorías (padre/hijas)</div>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="block text-zinc-500">Selector de categorías (padre/hijas)</span>
+                        <input
+                          value={categoryFilter}
+                          onChange={(event) => setCategoryFilter(event.target.value)}
+                          placeholder="Buscar categoría..."
+                          className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+                        />
+                      </div>
+
+                      {selectedCategoryMeta.length ? (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {selectedCategoryMeta.map((category) => (
+                            <button
+                              key={`cat-chip-${category.id}`}
+                              type="button"
+                              onClick={() => toggleCategorySelection(category.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                            >
+                              {category.name} <span aria-hidden>×</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
                       <div className="max-h-52 space-y-2 overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 p-2">
-                        {categoryTree.length === 0 ? (
+                        {filteredCategoryTree.length === 0 ? (
                           <p className="text-xs text-zinc-500">No hay categorías disponibles para seleccionar.</p>
                         ) : (
-                          categoryTree.map(({ parent, children }) => (
+                          filteredCategoryTree.map(({ parent, children }) => (
                             <div key={parent.id} className="rounded-md border border-zinc-200 bg-white p-2">
                               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800">
                                 <input
@@ -1477,15 +1566,37 @@ export default function HomeComposerPage() {
                     </div>
 
                     <div className="text-sm md:col-span-2">
-                      <div className="mb-1 block text-zinc-500">Selector de marcas</div>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="block text-zinc-500">Selector de marcas</span>
+                        <input
+                          value={brandFilter}
+                          onChange={(event) => setBrandFilter(event.target.value)}
+                          placeholder="Buscar marca..."
+                          className="w-44 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+                        />
+                      </div>
+
+                      {selectedBrandMeta.length ? (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {selectedBrandMeta.map((brand) => (
+                            <button
+                              key={`brand-chip-${brand.id}`}
+                              type="button"
+                              onClick={() => toggleBrandSelection(brand.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                            >
+                              {brand.name} <span aria-hidden>×</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
                       <div className="max-h-40 overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 p-2">
                         <div className="grid gap-1 sm:grid-cols-2">
-                          {allBrands.length === 0 ? (
+                          {filteredBrands.length === 0 ? (
                             <p className="text-xs text-zinc-500">No hay marcas disponibles.</p>
                           ) : (
-                            [...allBrands]
-                              .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
-                              .map((brand) => (
+                            filteredBrands.map((brand) => (
                                 <label key={brand.id} className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700">
                                   <input
                                     type="checkbox"

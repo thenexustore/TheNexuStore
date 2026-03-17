@@ -642,6 +642,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.resolved.map((x: any) => x.slug)).toEqual(['alpha', 'beta', 'zeta']);
   });
 
+<<<<<<< codex/audit-and-fix-media-resolution-for-homepage-rx43iu
   it('fills CATEGORY_STRIP auto mode with child categories when parent pool is below configured limit', async () => {
     const prisma = {
       homePageSection: {
@@ -694,6 +695,8 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     );
   });
 
+=======
+>>>>>>> main
 
   it('supports CATEGORY source with parent_and_descendants scope for product carousel', async () => {
     const prisma = {

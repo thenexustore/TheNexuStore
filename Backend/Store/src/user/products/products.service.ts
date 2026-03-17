@@ -27,6 +27,7 @@ import {
   slugifyCategory,
 } from '../../infortisa/infortisa-category-mapping.util';
 import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
+import { buildCategoryTaxonomyTree } from '../categories/category-taxonomy.util';
 import { PricingService } from '../../pricing/pricing.service';
 
 @Injectable()
@@ -37,63 +38,25 @@ export class ProductsService {
   ) {}
 
   async getMenuTree() {
-    const [parents, children] = await Promise.all([
-      this.prisma.category.findMany({
-        where: { is_active: true, parent_id: null },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          sort_order: true,
-        },
-        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
-      }),
-      this.prisma.category.findMany({
-        where: {
-          is_active: true,
-          parent_id: { not: null },
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          parent_id: true,
-          sort_order: true,
-          _count: {
-            select: {
-              products: true,
-            },
-          },
-        },
-        orderBy: [{ parent_id: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }],
-      }),
-    ]);
+    const rows = await this.prisma.category.findMany({
+      where: { is_active: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        parent_id: true,
+        sort_order: true,
+      },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+    });
 
-    const parentById = new Map(parents.map((parent) => [parent.id, parent]));
-    const groups = parents.map((parent) => ({
+    const tree = buildCategoryTaxonomyTree(rows, 2);
+    const groups = tree.map((parent) => ({
       parent_id: parent.id,
       parent_name: parent.name,
       parent_slug: parent.slug,
       sort_order: parent.sort_order,
-      children: [] as Array<{
-        parent_id: string;
-        parent_name: string;
-        parent_slug: string;
-        child_id: string;
-        child_name: string;
-        child_slug: string;
-        sort_order: number;
-        product_count: number;
-      }>,
-    }));
-    const groupByParent = new Map(groups.map((group) => [group.parent_id, group]));
-
-    for (const child of children) {
-      if (!child.parent_id) continue;
-      const parent = parentById.get(child.parent_id);
-      const group = groupByParent.get(child.parent_id);
-      if (!parent || !group) continue;
-      group.children.push({
+      children: parent.children.map((child) => ({
         parent_id: parent.id,
         parent_name: parent.name,
         parent_slug: parent.slug,
@@ -101,34 +64,21 @@ export class ProductsService {
         child_name: child.name,
         child_slug: child.slug,
         sort_order: child.sort_order,
-        product_count: child._count.products,
-      });
-    }
+        product_count: 0,
+      })),
+    }));
 
     return {
-      parents: parents.map((parent) => ({
-        parent_id: parent.id,
-        parent_name: parent.name,
-        parent_slug: parent.slug,
+      parents: groups.map((parent) => ({
+        parent_id: parent.parent_id,
+        parent_name: parent.parent_name,
+        parent_slug: parent.parent_slug,
         sort_order: parent.sort_order,
       })),
       groups,
-      tree: groups.map((group) => ({
-        id: group.parent_id,
-        name: group.parent_name,
-        slug: group.parent_slug,
-        sort_order: group.sort_order,
-        children: group.children.map((child) => ({
-          id: child.child_id,
-          name: child.child_name,
-          slug: child.child_slug,
-          sort_order: child.sort_order,
-          product_count: child.product_count,
-        })),
-      })),
+      tree,
     };
   }
-
 
   private calculateDiscountPercentage(
     price: number,
@@ -143,8 +93,6 @@ export class ProductsService {
     if (quantity < 10) return 'LOW_STOCK';
     return 'IN_STOCK';
   }
-
-
 
   async getDealsProducts(
     limit: number = 48,
@@ -209,52 +157,54 @@ export class ProductsService {
         },
       });
 
-      const dealsDraft: Array<ProductListItemDto | null> = products.map((product) => {
-        const defaultSku = product.skus[0];
-        const price = defaultSku?.prices?.[0];
-        const inventory = defaultSku?.inventory?.[0];
+      const dealsDraft: Array<ProductListItemDto | null> = products.map(
+        (product) => {
+          const defaultSku = product.skus[0];
+          const price = defaultSku?.prices?.[0];
+          const inventory = defaultSku?.inventory?.[0];
 
-        if (!price) return null;
+          if (!price) return null;
 
-        const priceValue = Number(price.sale_price);
-        const compareAtPrice = price.compare_at_price
-          ? Number(price.compare_at_price)
-          : undefined;
+          const priceValue = Number(price.sale_price);
+          const compareAtPrice = price.compare_at_price
+            ? Number(price.compare_at_price)
+            : undefined;
 
-        if (!compareAtPrice || compareAtPrice <= priceValue) return null;
+          if (!compareAtPrice || compareAtPrice <= priceValue) return null;
 
-        const discountPct = this.calculateDiscountPercentage(
-          priceValue,
-          compareAtPrice,
-        );
+          const discountPct = this.calculateDiscountPercentage(
+            priceValue,
+            compareAtPrice,
+          );
 
-        const stockQuantity = inventory?.qty_on_hand || 0;
+          const stockQuantity = inventory?.qty_on_hand || 0;
 
-        return {
-          id: product.id,
-          title: product.title,
-          slug: product.slug,
-          brand_name: product.brand.name,
-          brand_slug: product.brand.slug,
-          category_name: product.main_category?.name || 'Uncategorized',
-          category_slug: product.main_category?.slug || 'uncategorized',
-          sku_code: defaultSku?.sku_code || 'N/A',
-          sku_id: defaultSku?.id || '',
-          price: priceValue,
-          compare_at_price: compareAtPrice,
-          discount_pct: discountPct,
-          discount_percentage: discountPct,
-          stock_quantity: stockQuantity,
-          stock_status: this.getStockStatus(stockQuantity),
-          short_description: product.short_description || undefined,
-          thumbnail: product.media[0]?.url || '',
-          rating_avg: product.rating_avg
-            ? Number(product.rating_avg)
-            : undefined,
-          rating_count: product.rating_count,
-          is_featured: product.main_category?.slug === 'featured',
-        };
-      });
+          return {
+            id: product.id,
+            title: product.title,
+            slug: product.slug,
+            brand_name: product.brand.name,
+            brand_slug: product.brand.slug,
+            category_name: product.main_category?.name || 'Uncategorized',
+            category_slug: product.main_category?.slug || 'uncategorized',
+            sku_code: defaultSku?.sku_code || 'N/A',
+            sku_id: defaultSku?.id || '',
+            price: priceValue,
+            compare_at_price: compareAtPrice,
+            discount_pct: discountPct,
+            discount_percentage: discountPct,
+            stock_quantity: stockQuantity,
+            stock_status: this.getStockStatus(stockQuantity),
+            short_description: product.short_description || undefined,
+            thumbnail: product.media[0]?.url || '',
+            rating_avg: product.rating_avg
+              ? Number(product.rating_avg)
+              : undefined,
+            rating_count: product.rating_count,
+            is_featured: product.main_category?.slug === 'featured',
+          };
+        },
+      );
 
       const deals = dealsDraft
         .filter((product): product is ProductListItemDto => product !== null)
@@ -551,7 +501,11 @@ export class ProductsService {
                 select: { products: { where: { product: where } } },
               },
             },
-            orderBy: [{ parent_id: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }],
+            orderBy: [
+              { parent_id: 'asc' },
+              { sort_order: 'asc' },
+              { name: 'asc' },
+            ],
           }),
           this.prisma.brand.findMany({
             where: {
@@ -576,26 +530,24 @@ export class ProductsService {
           }),
         ]);
 
-      const sortedCategories = categoriesResult
-        .slice()
-        .sort((a, b) => {
-          const aParentSort = a.parent?.sort_order ?? a.sort_order ?? 9999;
-          const bParentSort = b.parent?.sort_order ?? b.sort_order ?? 9999;
-          if (aParentSort !== bParentSort) return aParentSort - bParentSort;
+      const sortedCategories = categoriesResult.slice().sort((a, b) => {
+        const aParentSort = a.parent?.sort_order ?? a.sort_order ?? 9999;
+        const bParentSort = b.parent?.sort_order ?? b.sort_order ?? 9999;
+        if (aParentSort !== bParentSort) return aParentSort - bParentSort;
 
-          const aParentName = a.parent?.name || a.name;
-          const bParentName = b.parent?.name || b.name;
-          const parentCmp = aParentName.localeCompare(bParentName, 'es', {
-            sensitivity: 'base',
-          });
-          if (parentCmp !== 0) return parentCmp;
-
-          const aSort = a.sort_order ?? 9999;
-          const bSort = b.sort_order ?? 9999;
-          if (aSort !== bSort) return aSort - bSort;
-
-          return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+        const aParentName = a.parent?.name || a.name;
+        const bParentName = b.parent?.name || b.name;
+        const parentCmp = aParentName.localeCompare(bParentName, 'es', {
+          sensitivity: 'base',
         });
+        if (parentCmp !== 0) return parentCmp;
+
+        const aSort = a.sort_order ?? 9999;
+        const bSort = b.sort_order ?? 9999;
+        if (aSort !== bSort) return aSort - bSort;
+
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+      });
 
       const attributeFilters = await this.getAttributeFilters(where);
 
@@ -1323,7 +1275,7 @@ export class ProductsService {
       infortisaSubfamily,
     );
 
-    const parentCategorySlug = slugifyCategory(recommendedParent.label);
+    const parentCategorySlug = slugifyCategory(recommendedParent.key);
     const parentCategorySortOrder = getParentCategorySortOrder(
       recommendedParent.label,
     );
@@ -1364,7 +1316,9 @@ export class ProductsService {
     const shouldReparent = shouldReparentImportedCategory({
       isNewCategory: !existingCategory,
       isParentLocked: Boolean(existingCategory?.parent_locked),
-      hasKnownCurrentParent: isKnownParentCategorySlug(existingCategory?.parent?.slug),
+      hasKnownCurrentParent: isKnownParentCategorySlug(
+        existingCategory?.parent?.slug,
+      ),
       currentParentSlug: existingCategory?.parent?.slug,
       recommendedParentSlug: parentCategory.slug,
     });
@@ -1373,7 +1327,9 @@ export class ProductsService {
       ? await this.prisma.category.update({
           where: { slug: categorySlug },
           data: {
-            parent_id: shouldReparent ? parentCategory.id : existingCategory.parent_id,
+            parent_id: shouldReparent
+              ? parentCategory.id
+              : existingCategory.parent_id,
             name: categoryName,
             is_active: true,
           },

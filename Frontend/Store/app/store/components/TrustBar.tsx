@@ -18,6 +18,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   "refresh-ccw": RefreshCcw,
   headset: Headset,
   card: CreditCard,
+  payment: CreditCard,
   badge: BadgeCheck,
 };
 

@@ -278,6 +278,7 @@ export default function GenericCarousel({
                       className="snap-start rounded-xl border bg-white p-3"
                       style={{
                         flexBasis: `calc((100% - ${(perView - 1) * 12}px) / ${perView})`,
+                        flexShrink: 0,
                       }}
                     >
                       <div className="relative mb-2 aspect-square">
@@ -305,6 +306,7 @@ export default function GenericCarousel({
                       className="snap-start rounded-xl border bg-white p-3 text-center"
                       style={{
                         flexBasis: `calc((100% - ${(perView - 1) * 12}px) / ${perView})`,
+                        flexShrink: 0,
                       }}
                     >
                       <div className="relative mx-auto mb-2 h-10 w-24">
@@ -334,6 +336,7 @@ export default function GenericCarousel({
                       className="snap-start rounded-xl border bg-white px-4 py-6 text-center text-sm font-semibold"
                       style={{
                         flexBasis: `calc((100% - ${(perView - 1) * 12}px) / ${perView})`,
+                        flexShrink: 0,
                       }}
                     >
                       {category.name}

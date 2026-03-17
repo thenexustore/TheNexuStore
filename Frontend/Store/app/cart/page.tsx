@@ -506,7 +506,7 @@ export default function CartPage() {
           </div>
         </div>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 fixed-bottom-bar backdrop-blur lg:hidden">
         <button
           onClick={() => router.push("/checkout")}
           disabled={cart.summary.checkout_available === false}

@@ -574,7 +574,7 @@ export default function CheckoutPage() {
           </div>
 
           <div>
-            <div className="sticky bottom-0 rounded-xl bg-white p-4 shadow-sm sm:p-6 lg:top-8">
+            <div className="rounded-xl bg-white p-4 shadow-sm sm:p-6 lg:sticky lg:top-8">
               <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
               <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:p-4">
@@ -680,7 +680,7 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 fixed-bottom-bar backdrop-blur lg:hidden">
         <button
           type="submit"
           form={CHECKOUT_FORM_ID}

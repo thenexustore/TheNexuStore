@@ -151,7 +151,7 @@ export default function AccountPage() {
             <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
             <p className="text-slate-500 text-sm mt-1">Manage your profile and shipping information.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {!edit ? (
               <button
                 onClick={() => setEdit(true)}

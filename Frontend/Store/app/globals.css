@@ -82,6 +82,25 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Safe-area utilities for devices with notch / home indicator (iPhone X+) */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Fixed bottom bar: add home indicator padding */
+.fixed-bottom-bar {
+  padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+}
+
+/* Minimum touch target size – 44×44 px as recommended by Apple/Google */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

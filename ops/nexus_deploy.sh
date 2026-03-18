@@ -220,7 +220,10 @@ if git -C "$REPO_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; t
   # but we also back it up explicitly in case the gitignore is ever modified.
   BACKEND_STORAGE_DIR="$BACKEND_DIR/storage"
   if [[ -d "$BACKEND_STORAGE_DIR" ]]; then
-    run "cp -a '$BACKEND_STORAGE_DIR' '$BACKUP_DIR/storage_snapshot'"
+    if ! cp -a "$BACKEND_STORAGE_DIR" "$BACKUP_DIR/storage_snapshot"; then
+      echo "[ERROR] Could not backup backend storage to $BACKUP_DIR/storage_snapshot. Aborting to prevent data loss." >&2
+      exit 1
+    fi
   fi
   run "cd '$REPO_DIR' && git clean -fd"
   # Restore storage dir if git clean somehow removed it (e.g., if gitignore was absent)

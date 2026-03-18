@@ -1,3 +1,10 @@
+import {
+  DEFAULT_PARENT_CATEGORY,
+  MENU_PARENT_TAXONOMY,
+  recommendParentCategory,
+  slugifyCategory,
+} from '../../infortisa/infortisa-category-mapping.util';
+
 export type CategoryTaxonomyRow = {
   id: string;
   name: string;
@@ -5,6 +12,11 @@ export type CategoryTaxonomyRow = {
   parent_id: string | null;
   sort_order: number;
 };
+
+export type CategoryTaxonomyLinkRow = Pick<
+  CategoryTaxonomyRow,
+  'id' | 'parent_id'
+>;
 
 export type CategoryTaxonomyNode = {
   id: string;
@@ -17,6 +29,72 @@ export type CategoryTaxonomyNode = {
   path: string;
   children: CategoryTaxonomyNode[];
 };
+
+function resolveCanonicalParentSlug(slug: string): string | null {
+  const normalized = slugifyCategory(slug);
+  const match = MENU_PARENT_TAXONOMY.find((category) => {
+    return (
+      slugifyCategory(category.key) === normalized ||
+      slugifyCategory(category.label) === normalized
+    );
+  });
+
+  return match ? slugifyCategory(match.key) : null;
+}
+
+export function normalizeCategoryTaxonomyRows(
+  rows: CategoryTaxonomyRow[],
+): CategoryTaxonomyRow[] {
+  const clonedRows = rows.map((row) => ({ ...row }));
+  const rowIds = new Set(clonedRows.map((row) => row.id));
+  const parentIdByCanonicalSlug = new Map<string, string>();
+
+  for (const row of clonedRows) {
+    const canonicalSlug = resolveCanonicalParentSlug(row.slug);
+    if (!canonicalSlug) continue;
+
+    row.parent_id = null;
+    parentIdByCanonicalSlug.set(canonicalSlug, row.id);
+  }
+
+  const syntheticParents = MENU_PARENT_TAXONOMY.filter(
+    (category) => !parentIdByCanonicalSlug.has(slugifyCategory(category.key)),
+  ).map((category) => {
+    const canonicalSlug = slugifyCategory(category.key);
+    const syntheticId = `virtual:${canonicalSlug}`;
+    parentIdByCanonicalSlug.set(canonicalSlug, syntheticId);
+
+    return {
+      id: syntheticId,
+      name: category.label,
+      slug: canonicalSlug,
+      parent_id: null,
+      sort_order: category.sortOrder,
+    } satisfies CategoryTaxonomyRow;
+  });
+
+  const normalizedRows = [...syntheticParents, ...clonedRows];
+
+  for (const row of normalizedRows) {
+    const canonicalSlug = resolveCanonicalParentSlug(row.slug);
+    if (canonicalSlug) continue;
+
+    const hasVisibleParent = row.parent_id && rowIds.has(row.parent_id);
+    if (hasVisibleParent) continue;
+
+    const recommendedParent = recommendParentCategory(
+      null,
+      row.slug.replace(/-/g, ' '),
+    );
+    const recommendedSlug =
+      resolveCanonicalParentSlug(recommendedParent.key) ??
+      slugifyCategory(DEFAULT_PARENT_CATEGORY.key);
+
+    row.parent_id = parentIdByCanonicalSlug.get(recommendedSlug) ?? null;
+  }
+
+  return normalizedRows;
+}
 
 function compareRows(a: CategoryTaxonomyRow, b: CategoryTaxonomyRow) {
   return (
@@ -94,7 +172,7 @@ export function buildCategoryTaxonomyTree(
 
 export function getDescendantIds(
   rootId: string,
-  rows: CategoryTaxonomyRow[],
+  rows: CategoryTaxonomyLinkRow[],
 ): string[] {
   const childrenByParent = new Map<string, string[]>();
   for (const row of rows) {

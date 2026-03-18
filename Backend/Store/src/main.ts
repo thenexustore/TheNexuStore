@@ -28,7 +28,13 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  const brandingAssetsDir = join(process.cwd(), 'storage', 'branding', 'assets');
+  const envBrandingStoragePath = process.env.BRANDING_STORAGE_DIR?.trim();
+  if (envBrandingStoragePath && !envBrandingStoragePath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(envBrandingStoragePath)) {
+    throw new Error(`BRANDING_STORAGE_DIR must be an absolute path, got: ${envBrandingStoragePath}`);
+  }
+  const brandingAssetsDir = envBrandingStoragePath
+    ? join(envBrandingStoragePath, 'assets')
+    : join(process.cwd(), 'storage', 'branding', 'assets');
   if (!existsSync(brandingAssetsDir)) {
     mkdirSync(brandingAssetsDir, { recursive: true });
   }

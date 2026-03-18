@@ -56,3 +56,6 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
+
+# Runtime persistent storage (branding assets, settings) – must survive git clean
+/storage

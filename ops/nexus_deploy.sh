@@ -215,7 +215,19 @@ run "cd '$REPO_DIR' && git fetch --all --prune"
 if git -C "$REPO_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
   run "cd '$REPO_DIR' && git checkout '$BRANCH'"
   run "cd '$REPO_DIR' && git reset --hard 'origin/$BRANCH'"
+  # Preserve persistent runtime storage (branding assets, settings) before cleaning.
+  # The storage/ dir is listed in Backend/Store/.gitignore so git clean ignores it,
+  # but we also back it up explicitly in case the gitignore is ever modified.
+  BACKEND_STORAGE_DIR="$BACKEND_DIR/storage"
+  if [[ -d "$BACKEND_STORAGE_DIR" ]]; then
+    run "cp -a '$BACKEND_STORAGE_DIR' '$BACKUP_DIR/storage_snapshot'"
+  fi
   run "cd '$REPO_DIR' && git clean -fd"
+  # Restore storage dir if git clean somehow removed it (e.g., if gitignore was absent)
+  if [[ ! -d "$BACKEND_STORAGE_DIR" && -d "$BACKUP_DIR/storage_snapshot" ]]; then
+    run "cp -a '$BACKUP_DIR/storage_snapshot' '$BACKEND_STORAGE_DIR'"
+    log "Restored backend storage from backup snapshot"
+  fi
 else
   log "WARN: origin/$BRANCH not found. Using local branch state without hard reset."
   run "cd '$REPO_DIR' && git checkout '$BRANCH'"

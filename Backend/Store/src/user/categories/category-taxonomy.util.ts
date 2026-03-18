@@ -37,6 +37,11 @@ type CategoryTaxonomyGroup = {
   keywords: readonly string[];
 };
 
+type CategoryLevel2Input = Pick<CategoryTaxonomyRow, 'name' | 'slug'> & {
+  familyName?: string | null;
+  subfamilyName?: string | null;
+};
+
 const CATEGORY_TAXONOMY_GROUPS: Readonly<
   Record<string, readonly CategoryTaxonomyGroup[]>
 > = {
@@ -123,6 +128,15 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'impresoras-multifuncion',
       label: 'Impresoras y multifunción',
       sortOrder: 10,
+      keywords: [
+        'impresora',
+        'multifuncion',
+        'multifunción',
+        'plotter',
+        'fotocopiadora',
+        'laser',
+        'inkjet',
+      ],
       keywords: ['impresora', 'multifuncion', 'multifunción', 'plotter', 'fotocopiadora'],
     },
     {
@@ -135,6 +149,19 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'consumibles-impresion',
       label: 'Consumibles de impresión',
       sortOrder: 30,
+      keywords: [
+        'consumible',
+        'toner',
+        'tinta',
+        'cartucho',
+        'tambor',
+        'drum',
+        'fusor',
+        'fuser',
+        'rollo',
+        'cinta termica',
+        'papel',
+      ],
       keywords: ['toner', 'tinta', 'cartucho', 'rollo', 'cinta termica', 'papel'],
     },
   ],
@@ -155,6 +182,16 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'rack-energia-cableado',
       label: 'Rack, energía y cableado',
       sortOrder: 30,
+      keywords: [
+        'rack',
+        'sai',
+        'ups',
+        'pdu',
+        'cableado',
+        'patch panel',
+        'fibra optica',
+        'transceiver',
+      ],
       keywords: ['rack', 'sai', 'ups', 'cableado', 'patch panel', 'fibra optica', 'transceiver'],
     },
   ],
@@ -189,6 +226,15 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'audio-home-cinema',
       label: 'Audio y home cinema',
       sortOrder: 20,
+      keywords: [
+        'audio',
+        'barra de sonido',
+        'soundbar',
+        'receptor av',
+        'altavoz',
+        'altavoz bluetooth',
+        'auriculares bluetooth',
+      ],
       keywords: ['barra de sonido', 'soundbar', 'receptor av', 'altavoz bluetooth', 'auriculares bluetooth'],
     },
     {
@@ -203,6 +249,15 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'productividad-licencias',
       label: 'Productividad y licencias',
       sortOrder: 10,
+      keywords: [
+        'office',
+        'ofimatica',
+        'ofimática',
+        'microsoft 365',
+        'licencia',
+        'saas',
+        'cloud',
+      ],
       keywords: ['office', 'microsoft 365', 'licencia', 'saas', 'cloud'],
     },
     {
@@ -273,6 +328,24 @@ function normalizeTaxonomyText(value: string): string {
     .toLowerCase();
 }
 
+function scoreGroupMatch(
+  familyText: string,
+  detailText: string,
+  group: CategoryTaxonomyGroup,
+): number {
+  return group.keywords.reduce((score, keyword) => {
+    const normalizedKeyword = normalizeTaxonomyText(keyword);
+    let nextScore = score;
+
+    if (familyText.includes(normalizedKeyword)) {
+      nextScore += 3;
+    }
+
+    if (detailText.includes(normalizedKeyword)) {
+      nextScore += 1;
+    }
+
+    return nextScore;
 function scoreGroupMatch(text: string, group: CategoryTaxonomyGroup): number {
   return group.keywords.reduce((score, keyword) => {
     return text.includes(normalizeTaxonomyText(keyword)) ? score + 1 : score;
@@ -281,6 +354,13 @@ function scoreGroupMatch(text: string, group: CategoryTaxonomyGroup): number {
 
 function resolveCategoryTaxonomyGroup(
   grandparentSlug: string,
+  row: CategoryLevel2Input,
+): CategoryTaxonomyGroup {
+  const groups = CATEGORY_TAXONOMY_GROUPS[grandparentSlug] ?? [];
+  const familyText = normalizeTaxonomyText(row.familyName ?? '');
+  const detailText = normalizeTaxonomyText(
+    `${row.subfamilyName ?? ''} ${row.name} ${row.slug.replace(/-/g, ' ')}`,
+  );
   row: Pick<CategoryTaxonomyRow, 'name' | 'slug'>,
 ): CategoryTaxonomyGroup {
   const groups = CATEGORY_TAXONOMY_GROUPS[grandparentSlug] ?? [];
@@ -289,6 +369,7 @@ function resolveCategoryTaxonomyGroup(
   const bestMatch = groups
     .map((group) => ({
       group,
+      score: scoreGroupMatch(familyText, detailText, group),
       score: scoreGroupMatch(haystack, group),
     }))
     .filter((entry) => entry.score > 0)
@@ -312,6 +393,7 @@ function resolveCategoryTaxonomyGroup(
 
 export function buildCategoryLevel2Descriptor(
   grandparentSlug: string,
+  row: CategoryLevel2Input,
   row: Pick<CategoryTaxonomyRow, 'name' | 'slug'>,
 ) {
   const group = resolveCategoryTaxonomyGroup(grandparentSlug, row);

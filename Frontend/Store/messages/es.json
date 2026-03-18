@@ -25,6 +25,7 @@
     "viewProducts": "Ver productos",
     "viewProductsOf": "Ver productos de {name}",
     "view": "Ver",
+    "levelIndicator": "Nivel {count}",
     "parentCategories": "Categorías padre",
     "subcategories": "Subcategorías",
     "lowerLevels": "Niveles inferiores",

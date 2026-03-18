@@ -131,18 +131,27 @@ export function CategoryDrawer({
                   {t("searchCategoriesEmptyHint")}
                 </div>
               ) : null}
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {searchResults.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.slug)}
-                    className="w-full rounded-lg border border-slate-200 p-2 text-left text-sm text-slate-700 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                  >
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-xs opacity-80">{item.path}</p>
-                  </button>
-                ))}
-              </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {searchResults.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.slug)}
+                      className="group w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-sm text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition-colors group-hover:bg-white/15 group-hover:text-white">
+                          {t("levelIndicator", { count: item.depth })}
+                        </span>
+                        <ChevronRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
+                      </div>
+                      <p className="font-semibold">{item.name}</p>
+                      <p className="mt-2 text-[11px] font-medium uppercase tracking-wide opacity-60">
+                        {t("currentPath")}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 opacity-80">{item.path}</p>
+                    </button>
+                  ))}
+                </div>
             </div>
           ) : (
             <div className="grid h-full grid-cols-1 md:grid-cols-[280px_320px_1fr]">

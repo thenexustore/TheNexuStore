@@ -16,6 +16,23 @@ function mergeCategoryNodes(
   };
 }
 
+function collapseRedundantChild(node: CategoryTreeNode): CategoryTreeNode {
+  if (node.children.length !== 1) return node;
+
+  const child = node.children[0];
+  if (normalize(child.name) !== normalize(node.name)) return node;
+
+  return {
+    ...node,
+    id: child.id,
+    slug: child.slug,
+    path: child.path ?? node.path,
+    ancestry: child.ancestry ?? node.ancestry,
+    sort_order: child.sort_order ?? node.sort_order,
+    children: child.children,
+  };
+}
+
 function sanitizeSiblingNodes(
   nodes: CategoryTreeNode[],
   parent?: Pick<CategoryTreeNode, "name" | "slug">,
@@ -24,6 +41,10 @@ function sanitizeSiblingNodes(
   const liftedChildren: CategoryTreeNode[] = [];
 
   for (const node of nodes) {
+    const sanitizedNode = collapseRedundantChild({
+      ...node,
+      children: sanitizeSiblingNodes(node.children, node),
+    });
     const sanitizedNode: CategoryTreeNode = {
       ...node,
       children: sanitizeSiblingNodes(node.children, node),

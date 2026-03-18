@@ -1,4 +1,5 @@
 import {
+  buildCategoryLevel2Descriptor,
   buildCategoryTaxonomyTree,
   getDescendantIds,
   normalizeCategoryTaxonomyRows,
@@ -195,6 +196,59 @@ describe('category-taxonomy.util', () => {
       'ssd-nvme',
     ]);
   });
+
+  it('prioritizes family/subfamily context when resolving the level-2 parent', () => {
+    const descriptor = buildCategoryLevel2Descriptor('impresion-escaneado', {
+      familyName: 'Consumibles de impresión',
+      subfamilyName: 'Tóner láser',
+      name: 'Tóner láser',
+      slug: 'toner-laser',
+    });
+
+    expect(descriptor.slug).toBe(
+      'impresion-escaneado-familia-consumibles-impresion',
+    );
+    expect(descriptor.name).toBe('Consumibles de impresión');
+  });
+
+  it.each([
+    {
+      grandparentSlug: 'impresion-escaneado',
+      familyName: 'Consumibles',
+      subfamilyName: 'Tambor de imagen',
+      expectedSlug: 'impresion-escaneado-familia-consumibles-impresion',
+    },
+    {
+      grandparentSlug: 'redes-servidores',
+      familyName: 'Energía',
+      subfamilyName: 'PDU para rack',
+      expectedSlug: 'redes-servidores-familia-rack-energia-cableado',
+    },
+    {
+      grandparentSlug: 'software-seguridad',
+      familyName: 'Ofimática',
+      subfamilyName: 'Microsoft 365 Empresa',
+      expectedSlug: 'software-seguridad-familia-productividad-licencias',
+    },
+    {
+      grandparentSlug: 'tv-audio-video',
+      familyName: 'Audio',
+      subfamilyName: 'Altavoz WiFi multiroom',
+      expectedSlug: 'tv-audio-video-familia-audio-home-cinema',
+    },
+  ])(
+    'matches expected level-2 parent for $familyName / $subfamilyName',
+    ({ grandparentSlug, familyName, subfamilyName, expectedSlug }) => {
+      const descriptor = buildCategoryLevel2Descriptor(grandparentSlug, {
+        familyName,
+        subfamilyName,
+        name: subfamilyName,
+        slug: subfamilyName.toLowerCase().replace(/\s+/g, '-'),
+      });
+
+      expect(descriptor.slug).toBe(expectedSlug);
+    },
+  );
 
   it('deduplicates canonical parent aliases into a single visible root', () => {
     const normalized = normalizeCategoryTaxonomyRows([

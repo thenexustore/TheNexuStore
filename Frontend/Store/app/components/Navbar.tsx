@@ -690,6 +690,7 @@ export default function Navbar() {
         <button
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={closeMobilePanels}
+          aria-label={t("closeMenu")}
           aria-label="Close menu"
         />
       )}
@@ -725,6 +726,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => setCategorySearch("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                aria-label={t("clearSearch")}
                 aria-label="Limpiar búsqueda de categorías"
               >
                 <X className="h-4 w-4" />
@@ -759,6 +761,88 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {activeMobileNode ? (
+                    <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={handleMobileCategoryBack}
+                          className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#0B123A]"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          {t("back")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMobileCategoryPath([])}
+                          className="text-xs font-medium text-slate-500 hover:text-[#0B123A]"
+                        >
+                          {t("home")}
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-500">{t("currentPath")}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {activeMobilePath.map((item, index) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleMobileCategoryJump(index)}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-[#0B123A] hover:text-[#0B123A]"
+                          >
+                            {item.name}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCategoryClick(activeMobileNode.slug)}
+                        className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A]"
+                      >
+                        {t("viewAllInCategory", { name: activeMobileNode.name })}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {visibleMobileTreeCategories.map((category) => (
+                      <div
+                        key={category.id}
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleMobileCategorySelect(category)}
+                          className="flex flex-1 items-center justify-between gap-3 text-left px-3 py-2.5 rounded-md text-gray-700 hover:bg-gray-50 hover:text-[#0B123A] transition-colors font-medium"
+                        >
+                          <span className="min-w-0">
+                            <span className="block">{category.name}</span>
+                              {category.children.length > 0 ? (
+                                <span className="mt-1 block text-xs font-normal text-slate-500">
+                                  {t("exploreSubcategories", {
+                                    count: category.children.length,
+                                  })}
+                                </span>
+                              ) : (
+                                <span className="mt-1 block text-xs font-normal text-slate-500">
+                                  {t("viewProducts")}
+                                </span>
+                              )}
+                          </span>
+                          {category.children.length > 0 ? (
+                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                          ) : null}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCategoryClick(category.slug)}
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0B123A] hover:text-[#0B123A]"
+                          aria-label={t("viewProductsOf", {
+                            name: category.name,
+                          })}
+                        >
+                          {t("view")}
+                        </button>
+                      </div>
+                    ))}
                   {filteredCategories.map((category) => {
                     return (
                       <button

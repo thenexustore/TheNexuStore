@@ -1386,6 +1386,10 @@ export class ProductsService {
     const childSlugPart = slugifyCategory(categoryName) || 'general';
     const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
     const level2Descriptor = buildCategoryLevel2Descriptor(parentCategorySlug, {
+      familyName: infortisaFamily,
+      name: categoryName,
+      slug: categorySlug,
+      subfamilyName: infortisaSubfamily,
       name: categoryName,
       slug: categorySlug,
     });

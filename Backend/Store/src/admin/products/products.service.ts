@@ -1229,6 +1229,7 @@ export class ProductsService {
             {
               name: Category as string,
               slug: categorySlug,
+              subfamilyName: Category as string,
             },
           );
           const level2Category = await this.prisma.category.upsert({
@@ -1636,6 +1637,7 @@ export class ProductsService {
             {
               name: Category as string,
               slug: categorySlug,
+              subfamilyName: Category as string,
             },
           );
           const level2Category = await this.prisma.category.upsert({

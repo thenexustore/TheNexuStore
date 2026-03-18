@@ -24,7 +24,7 @@
   - Returns matching categories with path and ancestor metadata for drawer search UX.
 
 - `GET /admin/categories/taxonomy-status` (admin auth required)
-  - Returns taxonomy health: parents status, orphaned categories, and aggregate stats.
+  - Returns taxonomy health: parents status, orphaned categories, direct hijos colgando del abuelo, mismatched padre inference, redundant navigation candidates, aggregate stats, and summary groupings by padre actual/esperado to prioritize fixes.
   - Useful for auditing after bulk imports.
 
 ## Cache invalidation
@@ -54,6 +54,7 @@ npm run categories:backfill-level2
 
 - Default mode is **dry-run**.
 - Add `--json` if you want a machine-readable audit report of the affected categorías hijo.
+- Add `--output ./ruta/reporte.json` if you want to persist that audit payload to a file for later review.
 - To persist changes for real:
 
 ```bash
@@ -66,6 +67,7 @@ The backfill will:
 - create the inferred padre category with the `*-familia-*` slug pattern if missing,
 - and reparent the legacy hijo category under that padre.
 - In non-JSON mode it also prints a preview of affected categories; in JSON mode it emits the full audit payload.
+- With `--output`, it writes that same audit payload to disk.
 
 ## Store UX
 

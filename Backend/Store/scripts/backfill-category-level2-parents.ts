@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { writeFile } from 'fs/promises';
 import {
   buildCategoryLevel2Descriptor,
   resolveCanonicalParentSlug,
@@ -14,11 +15,13 @@ const prisma = new PrismaClient();
 
 function printHelp() {
   console.log(`Usage:
+  ts-node scripts/backfill-category-level2-parents.ts [--apply] [--json] [--output <file>]
   ts-node scripts/backfill-category-level2-parents.ts [--apply] [--json]
 
 Options:
   --apply    Persist changes. Without this flag the script runs in dry-run mode.
   --json     Emit a machine-readable audit report with the affected categories.
+  --output   Write the JSON audit payload to a file.
   --help     Show this help message.
 `);
 }
@@ -62,6 +65,8 @@ async function ensureCanonicalParent(canonicalSlug: string) {
 }
 
 async function main() {
+  const rawArgs = process.argv.slice(2);
+  const args = new Set(rawArgs);
   const args = new Set(process.argv.slice(2));
   if (args.has('--help')) {
     printHelp();
@@ -70,6 +75,16 @@ async function main() {
 
   const apply = args.has('--apply');
   const json = args.has('--json');
+  const outputArgIndex = rawArgs.findIndex((arg) => arg === '--output');
+  const outputEqualsArg = rawArgs.find((arg) => arg.startsWith('--output='));
+  const outputPath =
+    (outputArgIndex >= 0 ? rawArgs[outputArgIndex + 1] : undefined) ??
+    outputEqualsArg?.slice('--output='.length);
+  if ((outputArgIndex >= 0 || outputEqualsArg) && !outputPath) {
+    throw new Error(
+      '[backfill-category-level2-parents] --output requires a file path',
+    );
+  }
   const categories = await prisma.category.findMany({
     select: {
       id: true,
@@ -151,6 +166,7 @@ async function main() {
     const level2Descriptor = buildCategoryLevel2Descriptor(canonicalSlug, {
       name: category.name,
       slug: category.slug,
+      subfamilyName: category.name,
     });
 
     const existingLevel2 = await prisma.category.findUnique({
@@ -219,6 +235,27 @@ async function main() {
     `[backfill-category-level2-parents] mode=${apply ? 'apply' : 'dry-run'} scanned=${scanned} candidates=${candidates} created_level2=${createdLevel2} reparented=${updated} already_compliant=${alreadyCompliant}`,
   );
 
+  const auditPayload = {
+    summary: {
+      mode: apply ? 'apply' : 'dry-run',
+      scanned,
+      candidates,
+      created_level2: createdLevel2,
+      reparented: updated,
+      already_compliant: alreadyCompliant,
+    },
+    affected_categories: auditRows,
+  };
+
+  if (outputPath) {
+    await writeFile(outputPath, JSON.stringify(auditPayload, null, 2));
+    console.log(
+      `[backfill-category-level2-parents] audit report written to ${outputPath}`,
+    );
+  }
+
+  if (json) {
+    console.log(JSON.stringify(auditPayload, null, 2));
   if (json) {
     console.log(
       JSON.stringify(

@@ -1,6 +1,8 @@
 import {
+  buildCategoryLevel2Descriptor,
   buildCategoryTaxonomyTree,
   getDescendantIds,
+  normalizeCategoryTaxonomyRows,
 } from './category-taxonomy.util';
 
 describe('category-taxonomy.util', () => {
@@ -117,5 +119,176 @@ describe('category-taxonomy.util', () => {
     ];
     const tree = buildCategoryTaxonomyTree(unordered, 3);
     expect(tree.map((n) => n.slug)).toEqual(['a', 'm', 'z']);
+  });
+
+  it('reparents orphaned roots under canonical parent buckets and seeds missing parents virtually', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'leaf-ups',
+        name: 'Accesorios SAI',
+        slug: 'accesorios-sai',
+        parent_id: null,
+        sort_order: 10,
+      },
+      {
+        id: 'leaf-printer',
+        name: 'Accesorios Impresora',
+        slug: 'accesorios-impresora',
+        parent_id: null,
+        sort_order: 20,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const networking = tree.find((node) => node.slug === 'redes-servidores');
+    const printing = tree.find((node) => node.slug === 'impresion-escaneado');
+
+    expect(networking?.children.map((node) => node.slug)).toContain(
+      'redes-servidores-familia-rack-energia-cableado',
+    );
+    expect(
+      networking?.children[0]?.children.map((node) => node.slug),
+    ).toContain('accesorios-sai');
+    expect(printing?.children.map((node) => node.slug)).toContain(
+      'impresion-escaneado-familia-impresoras-multifuncion',
+    );
+    expect(
+      printing?.children[0]?.children.map((node) => node.slug),
+    ).toContain('accesorios-impresora');
+  });
+
+  it('creates synthetic level-2 parent buckets under canonical grandparents', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'cpu',
+        name: 'Procesadores',
+        slug: 'procesadores',
+        parent_id: 'canonical-parent',
+        sort_order: 10,
+      },
+      {
+        id: 'ssd',
+        name: 'SSD NVMe',
+        slug: 'ssd-nvme',
+        parent_id: 'canonical-parent',
+        sort_order: 20,
+      },
+      {
+        id: 'canonical-parent',
+        name: 'Componentes y almacenamiento',
+        slug: 'componentes-almacenamiento',
+        parent_id: null,
+        sort_order: 20,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const root = tree.find((node) => node.slug === 'componentes-almacenamiento');
+
+    expect(root?.children.map((node) => node.slug)).toEqual([
+      'componentes-almacenamiento-familia-componentes-pc',
+      'componentes-almacenamiento-familia-memoria-almacenamiento',
+    ]);
+    expect(root?.children[0]?.children.map((node) => node.slug)).toEqual([
+      'procesadores',
+    ]);
+    expect(root?.children[1]?.children.map((node) => node.slug)).toEqual([
+      'ssd-nvme',
+    ]);
+  });
+
+  it('prioritizes family/subfamily context when resolving the level-2 parent', () => {
+    const descriptor = buildCategoryLevel2Descriptor('impresion-escaneado', {
+      familyName: 'Consumibles de impresión',
+      subfamilyName: 'Tóner láser',
+      name: 'Tóner láser',
+      slug: 'toner-laser',
+    });
+
+    expect(descriptor.slug).toBe(
+      'impresion-escaneado-familia-consumibles-impresion',
+    );
+    expect(descriptor.name).toBe('Consumibles de impresión');
+  });
+
+  it.each([
+    {
+      grandparentSlug: 'impresion-escaneado',
+      familyName: 'Consumibles',
+      subfamilyName: 'Tambor de imagen',
+      expectedSlug: 'impresion-escaneado-familia-consumibles-impresion',
+    },
+    {
+      grandparentSlug: 'redes-servidores',
+      familyName: 'Energía',
+      subfamilyName: 'PDU para rack',
+      expectedSlug: 'redes-servidores-familia-rack-energia-cableado',
+    },
+    {
+      grandparentSlug: 'software-seguridad',
+      familyName: 'Ofimática',
+      subfamilyName: 'Microsoft 365 Empresa',
+      expectedSlug: 'software-seguridad-familia-productividad-licencias',
+    },
+    {
+      grandparentSlug: 'tv-audio-video',
+      familyName: 'Audio',
+      subfamilyName: 'Altavoz WiFi multiroom',
+      expectedSlug: 'tv-audio-video-familia-audio-home-cinema',
+    },
+  ])(
+    'matches expected level-2 parent for $familyName / $subfamilyName',
+    ({ grandparentSlug, familyName, subfamilyName, expectedSlug }) => {
+      const descriptor = buildCategoryLevel2Descriptor(grandparentSlug, {
+        familyName,
+        subfamilyName,
+        name: subfamilyName,
+        slug: subfamilyName.toLowerCase().replace(/\s+/g, '-'),
+      });
+
+      expect(descriptor.slug).toBe(expectedSlug);
+    },
+  );
+
+  it('deduplicates canonical parent aliases into a single visible root', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'canonical-parent',
+        name: 'Ordenadores y portátiles',
+        slug: 'ordenadores-portatiles',
+        parent_id: null,
+        sort_order: 10,
+      },
+      {
+        id: 'alias-parent',
+        name: 'Ordenadores y portátiles',
+        slug: 'ordenadores-y-portatiles',
+        parent_id: null,
+        sort_order: 11,
+      },
+      {
+        id: 'child-row',
+        name: 'Portátiles',
+        slug: 'portatiles',
+        parent_id: 'alias-parent',
+        sort_order: 1,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const canonical = tree.find((node) => node.slug === 'ordenadores-portatiles');
+
+    expect(
+      tree.filter((node) => node.slug === 'ordenadores-portatiles'),
+    ).toHaveLength(1);
+    expect(canonical?.children.map((node) => node.slug)).toContain(
+      'ordenadores-portatiles-familia-portatiles',
+    );
+    expect(
+      canonical?.children[0]?.children.map((node) => node.slug),
+    ).toContain('portatiles');
+    expect(canonical?.children.map((node) => node.slug)).not.toContain(
+      'ordenadores-y-portatiles',
+    );
   });
 });

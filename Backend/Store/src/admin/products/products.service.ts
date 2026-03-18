@@ -10,6 +10,7 @@ import {
   isKnownParentCategorySlug,
 } from '../../infortisa/infortisa-category-mapping.util';
 import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
+import { buildCategoryLevel2Descriptor } from '../../user/categories/category-taxonomy.util';
 
 @Injectable()
 export class ProductsService {
@@ -1223,6 +1224,32 @@ export class ProductsService {
           const childSlugPart =
             slugifyCategory(Category as string) || 'general';
           const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
+          const level2Descriptor = buildCategoryLevel2Descriptor(
+            parentCategorySlug,
+            {
+              name: Category as string,
+              slug: categorySlug,
+              subfamilyName: Category as string,
+            },
+          );
+          const level2Category = await this.prisma.category.upsert({
+            where: { slug: level2Descriptor.slug },
+            update: {
+              name: level2Descriptor.name,
+              parent_id: parentCategory.id,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+            create: {
+              parent_id: parentCategory.id,
+              name: level2Descriptor.name,
+              slug: level2Descriptor.slug,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+          });
 
           const existingCategory = await this.prisma.category.findUnique({
             where: { slug: categorySlug },
@@ -1251,7 +1278,7 @@ export class ProductsService {
                 where: { slug: categorySlug },
                 data: {
                   parent_id: shouldReparent
-                    ? parentCategory.id
+                    ? level2Category.id
                     : existingCategory.parent_id,
                   name: Category as string,
                   is_active: true,
@@ -1259,7 +1286,7 @@ export class ProductsService {
               })
             : await this.prisma.category.create({
                 data: {
-                  parent_id: parentCategory.id,
+                  parent_id: level2Category.id,
                   name: Category as string,
                   slug: categorySlug,
                   is_active: true,
@@ -1605,6 +1632,32 @@ export class ProductsService {
           const childSlugPart =
             slugifyCategory(Category as string) || 'general';
           const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
+          const level2Descriptor = buildCategoryLevel2Descriptor(
+            parentCategorySlug,
+            {
+              name: Category as string,
+              slug: categorySlug,
+              subfamilyName: Category as string,
+            },
+          );
+          const level2Category = await this.prisma.category.upsert({
+            where: { slug: level2Descriptor.slug },
+            update: {
+              name: level2Descriptor.name,
+              parent_id: parentCategory.id,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+            create: {
+              parent_id: parentCategory.id,
+              name: level2Descriptor.name,
+              slug: level2Descriptor.slug,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+          });
 
           const existingCategory = await this.prisma.category.findUnique({
             where: { slug: categorySlug },
@@ -1633,7 +1686,7 @@ export class ProductsService {
                 where: { slug: categorySlug },
                 data: {
                   parent_id: shouldReparent
-                    ? parentCategory.id
+                    ? level2Category.id
                     : existingCategory.parent_id,
                   name: Category as string,
                   is_active: true,
@@ -1641,7 +1694,7 @@ export class ProductsService {
               })
             : await this.prisma.category.create({
                 data: {
-                  parent_id: parentCategory.id,
+                  parent_id: level2Category.id,
                   name: Category as string,
                   slug: categorySlug,
                   is_active: true,

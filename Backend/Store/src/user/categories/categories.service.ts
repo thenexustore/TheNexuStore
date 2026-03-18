@@ -82,6 +82,9 @@ export class CategoriesService {
     const maxDepth = Number.parseInt(normalized.maxDepth, 10);
     const rows = await this.getVisibleCategories();
     const items = buildCategoryTaxonomyTree(rows, maxDepth);
+    const virtualParentCount = rows.filter((row) =>
+      row.id.startsWith('virtual:'),
+    ).length;
 
     if (items.length === 0 && rows.length > 0) {
       this.logger.warn(
@@ -96,6 +99,11 @@ export class CategoriesService {
         locale: normalized.locale,
         includeEmpty: normalized.includeEmpty === 'true',
         includeCounts: normalized.includeCounts === 'true',
+        normalization: {
+          normalized_rows: rows.length,
+          root_nodes: items.length,
+          virtual_parents: virtualParentCount,
+        },
       },
     };
 

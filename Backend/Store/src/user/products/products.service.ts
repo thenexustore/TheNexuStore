@@ -28,8 +28,11 @@ import {
 } from '../../infortisa/infortisa-category-mapping.util';
 import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
 import {
+  buildCategoryLevel2Descriptor,
   buildCategoryTaxonomyTree,
   getDescendantIds,
+  normalizeCategoryTaxonomyRows,
+  resolveCanonicalParentSlug,
 } from '../categories/category-taxonomy.util';
 import { PricingService } from '../../pricing/pricing.service';
 
@@ -41,19 +44,21 @@ export class ProductsService {
   ) {}
 
   async getMenuTree() {
-    const rows = await this.prisma.category.findMany({
-      where: { is_active: true },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        parent_id: true,
-        sort_order: true,
-      },
-      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
-    });
+    const rows = normalizeCategoryTaxonomyRows(
+      await this.prisma.category.findMany({
+        where: { is_active: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          parent_id: true,
+          sort_order: true,
+        },
+        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+      }),
+    );
 
-    const tree = buildCategoryTaxonomyTree(rows, 2);
+    const tree = buildCategoryTaxonomyTree(rows, 3);
     const groups = tree.map((parent) => ({
       parent_id: parent.id,
       parent_name: parent.name,
@@ -122,44 +127,37 @@ export class ProductsService {
     );
     if (!normalizedValues.length) return [];
 
-    const [selectedCategories, taxonomyRows] = await Promise.all([
-      this.prisma.category.findMany({
-        where: {
-          is_active: true,
-          OR: [
-            { slug: { in: normalizedValues } },
-            { id: { in: normalizedValues } },
-          ],
-        },
-        select: { id: true },
-      }),
-      this.prisma.category.findMany({
+    const taxonomyRows = normalizeCategoryTaxonomyRows(
+      await this.prisma.category.findMany({
         where: { is_active: true },
-        select: { id: true, name: true, slug: true, parent_id: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          parent_id: true,
+          sort_order: true,
+        },
+        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       }),
-    ]);
+    );
 
-    const selectedIds = new Set(selectedCategories.map((category) => category.id));
+    const canonicalRequestedSlugs = new Set(
+      normalizedValues
+        .map((value) => resolveCanonicalParentSlug(value))
+        .filter((value): value is string => Boolean(value)),
+    );
 
-    if (selectedCategories.length === 0) {
-      const virtualParentSlugs = normalizedValues.filter((value) =>
-        isKnownParentCategorySlug(value),
-      );
-
-      if (virtualParentSlugs.length === 0) return [];
-
-      for (const row of taxonomyRows) {
-        const recommendedParent = recommendParentCategory(
-          null,
-          row.slug.replace(/-/g, ' '),
-        );
-        if (
-          virtualParentSlugs.includes(slugifyCategory(recommendedParent.key))
-        ) {
-          selectedIds.add(row.id);
-        }
-      }
-    }
+    const selectedIds = new Set(
+      taxonomyRows
+        .filter((row) => {
+          return (
+            normalizedValues.includes(row.id) ||
+            normalizedValues.includes(row.slug) ||
+            canonicalRequestedSlugs.has(row.slug)
+          );
+        })
+        .map((row) => row.id),
+    );
 
     if (selectedIds.size === 0) return [];
 
@@ -1387,6 +1385,26 @@ export class ProductsService {
     const categoryName = infortisaSubfamily;
     const childSlugPart = slugifyCategory(categoryName) || 'general';
     const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
+    const level2Descriptor = buildCategoryLevel2Descriptor(parentCategorySlug, {
+      name: categoryName,
+      slug: categorySlug,
+    });
+    const level2Category = await this.prisma.category.upsert({
+      where: { slug: level2Descriptor.slug },
+      update: {
+        name: level2Descriptor.name,
+        parent_id: parentCategory.id,
+        is_active: true,
+        sort_order: parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+      },
+      create: {
+        parent_id: parentCategory.id,
+        name: level2Descriptor.name,
+        slug: level2Descriptor.slug,
+        is_active: true,
+        sort_order: parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+      },
+    });
 
     const existingCategory = await this.prisma.category.findUnique({
       where: { slug: categorySlug },
@@ -1417,7 +1435,7 @@ export class ProductsService {
           where: { slug: categorySlug },
           data: {
             parent_id: shouldReparent
-              ? parentCategory.id
+              ? level2Category.id
               : existingCategory.parent_id,
             name: categoryName,
             is_active: true,
@@ -1425,7 +1443,7 @@ export class ProductsService {
         })
       : await this.prisma.category.create({
           data: {
-            parent_id: parentCategory.id,
+            parent_id: level2Category.id,
             name: categoryName,
             slug: categorySlug,
             is_active: true,

@@ -20,6 +20,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "infortisa:backfill-slugs": "ts-node scripts/backfill-infortisa-slugs.ts",
+    "categories:backfill-level2": "ts-node scripts/backfill-category-level2-parents.ts",
     "prisma:generate": "prisma generate",
     "prebuild": "npm run prisma:generate && npm run check:home-controller-duplicates",
     "prestart": "npm run prisma:generate",

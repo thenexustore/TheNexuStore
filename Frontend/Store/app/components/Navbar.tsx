@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  ChevronLeft,
+  ChevronRight,
   Menu,
   Search,
   ShoppingCart,
@@ -57,6 +59,7 @@ export default function Navbar() {
     CategorySearchResult[]
   >([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
+  const [mobileCategoryPath, setMobileCategoryPath] = useState<string[]>([]);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() =>
     loadStoreBranding(),
   );
@@ -65,16 +68,32 @@ export default function Navbar() {
   const locale = useLocale();
   const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
+  const mobileCategorySearchRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const canonicalCategoryTree = useMemo(
     () => normalizeCategoryTree(categoryTreeState),
     [categoryTreeState],
   );
   const filteredCategories = canonicalCategoryTree;
+  const activeMobilePath = useMemo(() => {
+    const path: CategoryTreeNode[] = [];
+    let level = canonicalCategoryTree;
+
+    for (const id of mobileCategoryPath) {
+      const matched = level.find((item) => item.id === id);
+      if (!matched) break;
+      path.push(matched);
+      level = matched.children;
+    }
+
+    return path;
+  }, [canonicalCategoryTree, mobileCategoryPath]);
+  const activeMobileNode = activeMobilePath[activeMobilePath.length - 1];
+  const visibleMobileTreeCategories = activeMobileNode?.children ?? filteredCategories;
   const visibleMobileCategories =
     categorySearch.trim().length >= 2
       ? categorySearchResults
-      : filteredCategories;
+      : visibleMobileTreeCategories;
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -223,6 +242,7 @@ export default function Navbar() {
     setCategorySearch("");
     setCategorySearchResults([]);
     setCategorySearchLoading(false);
+    setMobileCategoryPath([]);
   };
 
   const handleProductClick = (product: Product) => {
@@ -247,6 +267,23 @@ export default function Navbar() {
       `/products?category=${encodeURIComponent(resolveCategoryScopeSlug({ slug: categorySlug }))}`,
     );
     closeMobilePanels();
+  };
+
+  const handleMobileCategorySelect = (category: CategoryTreeNode) => {
+    if (category.children.length > 0) {
+      setMobileCategoryPath((current) => [...current, category.id]);
+      return;
+    }
+
+    handleCategoryClick(category.slug);
+  };
+
+  const handleMobileCategoryBack = () => {
+    setMobileCategoryPath((current) => current.slice(0, -1));
+  };
+
+  const handleMobileCategoryJump = (index: number) => {
+    setMobileCategoryPath((current) => current.slice(0, index + 1));
   };
 
   const handleLogout = async () => {
@@ -276,6 +313,28 @@ export default function Navbar() {
 
     return () => clearTimeout(timer);
   }, [categorySearch]);
+
+  useEffect(() => {
+    if (categorySearch.trim().length >= 2) {
+      setMobileCategoryPath([]);
+    }
+  }, [categorySearch]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const timer = window.setTimeout(() => {
+      mobileCategorySearchRef.current?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timer);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    if (!mobileCategoryPath.length) return;
+    if (activeMobilePath.length === mobileCategoryPath.length) return;
+    setMobileCategoryPath(activeMobilePath.map((item) => item.id));
+  }, [activeMobilePath, mobileCategoryPath]);
 
   const displayCartCount = cartLoading ? legacyCartCount : cartCount;
 
@@ -654,6 +713,7 @@ export default function Navbar() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
+              ref={mobileCategorySearchRef}
               type="text"
               value={categorySearch}
               onChange={(e) => setCategorySearch(e.target.value)}

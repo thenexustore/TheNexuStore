@@ -143,11 +143,57 @@ describe('category-taxonomy.util', () => {
     const printing = tree.find((node) => node.slug === 'impresion-escaneado');
 
     expect(networking?.children.map((node) => node.slug)).toContain(
-      'accesorios-sai',
+      'redes-servidores-familia-rack-energia-cableado',
     );
+    expect(
+      networking?.children[0]?.children.map((node) => node.slug),
+    ).toContain('accesorios-sai');
     expect(printing?.children.map((node) => node.slug)).toContain(
-      'accesorios-impresora',
+      'impresion-escaneado-familia-impresoras-multifuncion',
     );
+    expect(
+      printing?.children[0]?.children.map((node) => node.slug),
+    ).toContain('accesorios-impresora');
+  });
+
+  it('creates synthetic level-2 parent buckets under canonical grandparents', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'cpu',
+        name: 'Procesadores',
+        slug: 'procesadores',
+        parent_id: 'canonical-parent',
+        sort_order: 10,
+      },
+      {
+        id: 'ssd',
+        name: 'SSD NVMe',
+        slug: 'ssd-nvme',
+        parent_id: 'canonical-parent',
+        sort_order: 20,
+      },
+      {
+        id: 'canonical-parent',
+        name: 'Componentes y almacenamiento',
+        slug: 'componentes-almacenamiento',
+        parent_id: null,
+        sort_order: 20,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const root = tree.find((node) => node.slug === 'componentes-almacenamiento');
+
+    expect(root?.children.map((node) => node.slug)).toEqual([
+      'componentes-almacenamiento-familia-componentes-pc',
+      'componentes-almacenamiento-familia-memoria-almacenamiento',
+    ]);
+    expect(root?.children[0]?.children.map((node) => node.slug)).toEqual([
+      'procesadores',
+    ]);
+    expect(root?.children[1]?.children.map((node) => node.slug)).toEqual([
+      'ssd-nvme',
+    ]);
   });
 
   it('deduplicates canonical parent aliases into a single visible root', () => {
@@ -181,7 +227,12 @@ describe('category-taxonomy.util', () => {
     expect(
       tree.filter((node) => node.slug === 'ordenadores-portatiles'),
     ).toHaveLength(1);
-    expect(canonical?.children.map((node) => node.slug)).toContain('portatiles');
+    expect(canonical?.children.map((node) => node.slug)).toContain(
+      'ordenadores-portatiles-familia-portatiles',
+    );
+    expect(
+      canonical?.children[0]?.children.map((node) => node.slug),
+    ).toContain('portatiles');
     expect(canonical?.children.map((node) => node.slug)).not.toContain(
       'ordenadores-y-portatiles',
     );

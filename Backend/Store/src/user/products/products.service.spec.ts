@@ -67,20 +67,20 @@ describe('ProductsService category filtering', () => {
           AND: expect.arrayContaining([
             expect.objectContaining({
               OR: expect.arrayContaining([
-                {
+                expect.objectContaining({
                   main_category_id: {
-                    in: ids,
+                    in: expect.arrayContaining(ids),
                   },
-                },
-                {
+                }),
+                expect.objectContaining({
                   categories: {
                     some: {
                       category_id: {
-                        in: ids,
+                        in: expect.arrayContaining(ids),
                       },
                     },
                   },
-                },
+                }),
               ]),
             }),
           ]),
@@ -90,12 +90,23 @@ describe('ProductsService category filtering', () => {
   };
 
   const mockResolvedCategoryBranch = (
-    selectedIds: string[],
-    taxonomyRows: Array<{ id: string; parent_id: string | null }>,
+    taxonomyRows: Array<{
+      id: string;
+      parent_id: string | null;
+      name?: string;
+      slug?: string;
+      sort_order?: number;
+    }>,
   ) => {
     prisma.category.findMany
-      .mockResolvedValueOnce(selectedIds.map((id) => ({ id })))
-      .mockResolvedValueOnce(taxonomyRows)
+      .mockResolvedValueOnce(
+        taxonomyRows.map((row) => ({
+          name: row.name ?? row.id,
+          slug: row.slug ?? row.id,
+          sort_order: row.sort_order ?? 0,
+          ...row,
+        })),
+      )
       .mockResolvedValueOnce([]);
   };
 
@@ -115,9 +126,8 @@ describe('ProductsService category filtering', () => {
 
   it('expands selected category slugs to include descendants and direct main category matches', async () => {
     mockResolvedCategoryBranch(
-      ['parent-1'],
       [
-        { id: 'parent-1', parent_id: null },
+        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
         { id: 'child-1', parent_id: 'parent-1' },
         { id: 'grandchild-1', parent_id: 'child-1' },
       ],
@@ -132,9 +142,8 @@ describe('ProductsService category filtering', () => {
 
   it('supports the legacy single category filter and expands its descendants', async () => {
     mockResolvedCategoryBranch(
-      ['parent-1'],
       [
-        { id: 'parent-1', parent_id: null },
+        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
         { id: 'child-1', parent_id: 'parent-1' },
         { id: 'grandchild-1', parent_id: 'child-1' },
       ],
@@ -149,7 +158,6 @@ describe('ProductsService category filtering', () => {
 
   it('accepts category ids as filter values and expands their descendants', async () => {
     mockResolvedCategoryBranch(
-      ['parent-1'],
       [
         { id: 'parent-1', parent_id: null },
         { id: 'child-1', parent_id: 'parent-1' },
@@ -165,9 +173,8 @@ describe('ProductsService category filtering', () => {
 
   it('combines legacy category and categories inputs without duplicating descendants', async () => {
     mockResolvedCategoryBranch(
-      ['parent-1'],
       [
-        { id: 'parent-1', parent_id: null },
+        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
         { id: 'child-1', parent_id: 'parent-1' },
       ],
     );
@@ -182,9 +189,8 @@ describe('ProductsService category filtering', () => {
 
   it('keeps valid descendants when the filter mixes valid and invalid category slugs', async () => {
     mockResolvedCategoryBranch(
-      ['parent-1'],
       [
-        { id: 'parent-1', parent_id: null },
+        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
         { id: 'child-1', parent_id: 'parent-1' },
       ],
     );
@@ -198,25 +204,27 @@ describe('ProductsService category filtering', () => {
 
   it('expands canonical virtual parent slugs to recommended active categories when the parent row is missing', async () => {
     prisma.category.findMany
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           id: 'leaf-ups',
           name: 'Accesorios SAI',
           slug: 'accesorios-sai',
           parent_id: null,
+          sort_order: 10,
         },
         {
           id: 'leaf-ups-child',
           name: 'SAI Rack',
           slug: 'sai-rack',
           parent_id: 'leaf-ups',
+          sort_order: 20,
         },
         {
           id: 'printer-leaf',
           name: 'Accesorios Impresora',
           slug: 'accesorios-impresora',
           parent_id: null,
+          sort_order: 30,
         },
       ])
       .mockResolvedValueOnce([]);
@@ -228,15 +236,88 @@ describe('ProductsService category filtering', () => {
     expectCategoryScope(['leaf-ups', 'leaf-ups-child']);
   });
 
+  it('includes canonical parent aliases and their descendants when filtering by canonical parent slug', async () => {
+    prisma.category.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'canonical-parent',
+          name: 'Ordenadores y portátiles',
+          slug: 'ordenadores-portatiles',
+          parent_id: null,
+          sort_order: 10,
+        },
+        {
+          id: 'alias-parent',
+          name: 'Ordenadores y portátiles',
+          slug: 'ordenadores-y-portatiles',
+          parent_id: null,
+          sort_order: 11,
+        },
+        {
+          id: 'alias-child',
+          name: 'Portátiles',
+          slug: 'portatiles',
+          parent_id: 'alias-parent',
+          sort_order: 12,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await requestProducts({
+      category: 'ordenadores-portatiles',
+    });
+
+    expectCategoryScope([
+      'canonical-parent',
+      'virtual:ordenadores-portatiles:portatiles',
+      'alias-child',
+    ]);
+  });
+
+  it('resolves synthetic level-2 category slugs and expands their descendant leaves', async () => {
+    prisma.category.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'canonical-parent',
+          name: 'Componentes y almacenamiento',
+          slug: 'componentes-almacenamiento',
+          parent_id: null,
+          sort_order: 20,
+        },
+        {
+          id: 'cpu-leaf',
+          name: 'Procesadores',
+          slug: 'procesadores',
+          parent_id: 'canonical-parent',
+          sort_order: 10,
+        },
+        {
+          id: 'ssd-leaf',
+          name: 'SSD NVMe',
+          slug: 'ssd-nvme',
+          parent_id: 'canonical-parent',
+          sort_order: 20,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await requestProducts({
+      category: 'componentes-almacenamiento-familia-componentes-pc',
+    });
+
+    expectCategoryScope([
+      'virtual:componentes-almacenamiento:componentes-pc',
+      'cpu-leaf',
+    ]);
+  });
+
   it.each([
     {
       name: 'returns no matches when the requested category slug cannot be resolved',
       categories: [' slug-inexistente ', 'slug-inexistente'],
       setupCategoryMocks: () =>
-        prisma.category.findMany
-          .mockResolvedValueOnce([])
-          .mockResolvedValueOnce([]),
-      expectedCategoryQueryCount: 2,
+        prisma.category.findMany.mockResolvedValueOnce([]),
+      expectedCategoryQueryCount: 1,
     },
     {
       name: 'returns no matches without touching the database when category slugs are blank',

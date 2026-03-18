@@ -24,9 +24,23 @@ const DEFAULT_BRANDING: Required<BrandingSettingsPayload> = {
 
 @Injectable()
 export class BrandingService {
-  private readonly storageDir = join(process.cwd(), 'storage', 'branding');
-  private readonly settingsPath = join(this.storageDir, 'settings.json');
-  private readonly assetsDir = join(this.storageDir, 'assets');
+  private readonly storageDir: string;
+  private readonly settingsPath: string;
+  private readonly assetsDir: string;
+
+  constructor() {
+    const envPath = process.env.BRANDING_STORAGE_DIR?.trim();
+    if (envPath) {
+      if (!envPath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(envPath)) {
+        throw new Error(`BRANDING_STORAGE_DIR must be an absolute path, got: ${envPath}`);
+      }
+      this.storageDir = envPath;
+    } else {
+      this.storageDir = join(process.cwd(), 'storage', 'branding');
+    }
+    this.settingsPath = join(this.storageDir, 'settings.json');
+    this.assetsDir = join(this.storageDir, 'assets');
+  }
 
   private normalize(input: BrandingSettingsPayload): Required<BrandingSettingsPayload> {
     return {

@@ -137,6 +137,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'laser',
         'inkjet',
       ],
+      keywords: ['impresora', 'multifuncion', 'multifunción', 'plotter', 'fotocopiadora'],
     },
     {
       key: 'escaneres-etiquetado',
@@ -161,6 +162,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'cinta termica',
         'papel',
       ],
+      keywords: ['toner', 'tinta', 'cartucho', 'rollo', 'cinta termica', 'papel'],
     },
   ],
   'redes-servidores': [
@@ -190,6 +192,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'fibra optica',
         'transceiver',
       ],
+      keywords: ['rack', 'sai', 'ups', 'cableado', 'patch panel', 'fibra optica', 'transceiver'],
     },
   ],
   'telefonia-movilidad': [
@@ -232,6 +235,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'altavoz bluetooth',
         'auriculares bluetooth',
       ],
+      keywords: ['barra de sonido', 'soundbar', 'receptor av', 'altavoz bluetooth', 'auriculares bluetooth'],
     },
     {
       key: 'proyeccion-streaming-soportes',
@@ -254,6 +258,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'saas',
         'cloud',
       ],
+      keywords: ['office', 'microsoft 365', 'licencia', 'saas', 'cloud'],
     },
     {
       key: 'seguridad-backup',
@@ -341,6 +346,9 @@ function scoreGroupMatch(
     }
 
     return nextScore;
+function scoreGroupMatch(text: string, group: CategoryTaxonomyGroup): number {
+  return group.keywords.reduce((score, keyword) => {
+    return text.includes(normalizeTaxonomyText(keyword)) ? score + 1 : score;
   }, 0);
 }
 
@@ -353,11 +361,16 @@ function resolveCategoryTaxonomyGroup(
   const detailText = normalizeTaxonomyText(
     `${row.subfamilyName ?? ''} ${row.name} ${row.slug.replace(/-/g, ' ')}`,
   );
+  row: Pick<CategoryTaxonomyRow, 'name' | 'slug'>,
+): CategoryTaxonomyGroup {
+  const groups = CATEGORY_TAXONOMY_GROUPS[grandparentSlug] ?? [];
+  const haystack = normalizeTaxonomyText(`${row.name} ${row.slug.replace(/-/g, ' ')}`);
 
   const bestMatch = groups
     .map((group) => ({
       group,
       score: scoreGroupMatch(familyText, detailText, group),
+      score: scoreGroupMatch(haystack, group),
     }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => {
@@ -381,6 +394,7 @@ function resolveCategoryTaxonomyGroup(
 export function buildCategoryLevel2Descriptor(
   grandparentSlug: string,
   row: CategoryLevel2Input,
+  row: Pick<CategoryTaxonomyRow, 'name' | 'slug'>,
 ) {
   const group = resolveCategoryTaxonomyGroup(grandparentSlug, row);
 

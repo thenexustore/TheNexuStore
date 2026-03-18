@@ -27,7 +27,10 @@ import {
   slugifyCategory,
 } from '../../infortisa/infortisa-category-mapping.util';
 import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
-import { buildCategoryTaxonomyTree } from '../categories/category-taxonomy.util';
+import {
+  buildCategoryTaxonomyTree,
+  getDescendantIds,
+} from '../categories/category-taxonomy.util';
 import { PricingService } from '../../pricing/pricing.service';
 
 @Injectable()
@@ -92,6 +95,79 @@ export class ProductsService {
     if (quantity <= 0) return 'OUT_OF_STOCK';
     if (quantity < 10) return 'LOW_STOCK';
     return 'IN_STOCK';
+  }
+
+  private buildEmptyProductsResponse(
+    page: number,
+    limit: number,
+  ): ProductsListResponseDto {
+    return {
+      products: [],
+      total: 0,
+      page,
+      limit,
+      total_pages: 0,
+      filters: {
+        categories: [],
+        brands: [],
+        price_range: { min: 0, max: 0 },
+        attributes: [],
+      },
+    };
+  }
+
+  private async resolveCategoryFilterIds(values: string[]): Promise<string[]> {
+    const normalizedValues = Array.from(
+      new Set(values.map((value) => value.trim()).filter(Boolean)),
+    );
+    if (!normalizedValues.length) return [];
+
+    const [selectedCategories, taxonomyRows] = await Promise.all([
+      this.prisma.category.findMany({
+        where: {
+          is_active: true,
+          OR: [
+            { slug: { in: normalizedValues } },
+            { id: { in: normalizedValues } },
+          ],
+        },
+        select: { id: true },
+      }),
+      this.prisma.category.findMany({
+        where: { is_active: true },
+        select: { id: true, name: true, slug: true, parent_id: true },
+      }),
+    ]);
+
+    const selectedIds = new Set(selectedCategories.map((category) => category.id));
+
+    if (selectedCategories.length === 0) {
+      const virtualParentSlugs = normalizedValues.filter((value) =>
+        isKnownParentCategorySlug(value),
+      );
+
+      if (virtualParentSlugs.length === 0) return [];
+
+      for (const row of taxonomyRows) {
+        const recommendedParent = recommendParentCategory(
+          null,
+          row.slug.replace(/-/g, ' '),
+        );
+        if (
+          virtualParentSlugs.includes(slugifyCategory(recommendedParent.key))
+        ) {
+          selectedIds.add(row.id);
+        }
+      }
+    }
+
+    if (selectedIds.size === 0) return [];
+
+    const descendantIds = [...selectedIds].flatMap((categoryId) =>
+      getDescendantIds(categoryId, taxonomyRows),
+    );
+
+    return Array.from(new Set(descendantIds));
   }
 
   async getDealsProducts(
@@ -224,6 +300,7 @@ export class ProductsService {
         page = 1,
         limit = 20,
         search,
+        category,
         brand,
         categories,
         sort_by = ProductSortBy.NEWEST,
@@ -234,6 +311,10 @@ export class ProductsService {
         featured_only = false,
         attributes = [],
       } = dto;
+      const categoryFilters = [
+        ...(category ? [category] : []),
+        ...(categories ?? []),
+      ];
 
       const skip = (page - 1) * limit;
       const where: any = {};
@@ -261,20 +342,28 @@ export class ProductsService {
         };
       }
 
-      if (categories && categories.length > 0) {
-        const categoryRecords = await this.prisma.category.findMany({
-          where: { slug: { in: categories } },
-          select: { id: true },
-        });
-
-        if (categoryRecords.length > 0) {
-          const categoryIds = categoryRecords.map((c) => c.id);
-          where.categories = {
-            some: {
-              category_id: { in: categoryIds },
-            },
-          };
+      if (categoryFilters.length > 0) {
+        const categoryIds =
+          await this.resolveCategoryFilterIds(categoryFilters);
+        if (categoryIds.length === 0) {
+          return this.buildEmptyProductsResponse(page, limit);
         }
+
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              { main_category_id: { in: categoryIds } },
+              {
+                categories: {
+                  some: {
+                    category_id: { in: categoryIds },
+                  },
+                },
+              },
+            ],
+          },
+        ];
       }
 
       if (featured_only) {

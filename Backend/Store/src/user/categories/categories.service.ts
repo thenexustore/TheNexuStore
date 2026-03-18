@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import {
   buildCategoryTaxonomyTree,
+  normalizeCategoryTaxonomyRows,
   type CategoryTaxonomyNode,
   type CategoryTaxonomyRow,
   sortCategoryRows,
@@ -50,7 +51,7 @@ export class CategoriesService {
   }
 
   private async getVisibleCategories(): Promise<CategoryTaxonomyRow[]> {
-    return this.prisma.category.findMany({
+    const rows = await this.prisma.category.findMany({
       where: { is_active: true },
       select: {
         id: true,
@@ -61,6 +62,8 @@ export class CategoriesService {
       },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
     });
+
+    return normalizeCategoryTaxonomyRows(rows);
   }
 
   async getCategoryTree(query: TreeQuery) {

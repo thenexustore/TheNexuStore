@@ -1,3 +1,10 @@
+import {
+  DEFAULT_PARENT_CATEGORY,
+  MENU_PARENT_TAXONOMY,
+  recommendParentCategory,
+  slugifyCategory,
+} from '../../infortisa/infortisa-category-mapping.util';
+
 export type CategoryTaxonomyRow = {
   id: string;
   name: string;
@@ -5,6 +12,11 @@ export type CategoryTaxonomyRow = {
   parent_id: string | null;
   sort_order: number;
 };
+
+export type CategoryTaxonomyLinkRow = Pick<
+  CategoryTaxonomyRow,
+  'id' | 'parent_id'
+>;
 
 export type CategoryTaxonomyNode = {
   id: string;
@@ -17,6 +29,104 @@ export type CategoryTaxonomyNode = {
   path: string;
   children: CategoryTaxonomyNode[];
 };
+
+function resolveCanonicalParentSlug(slug: string): string | null {
+  const normalized = slugifyCategory(slug);
+  const match = MENU_PARENT_TAXONOMY.find((category) => {
+    return (
+      slugifyCategory(category.key) === normalized ||
+      slugifyCategory(category.label) === normalized
+    );
+  });
+
+  return match ? slugifyCategory(match.key) : null;
+}
+
+export function normalizeCategoryTaxonomyRows(
+  rows: CategoryTaxonomyRow[],
+): CategoryTaxonomyRow[] {
+  const clonedRows = rows.map((row) => ({ ...row }));
+  const rowIds = new Set(clonedRows.map((row) => row.id));
+  const parentIdByCanonicalSlug = new Map<string, string>();
+  const aliasRowIds = new Set<string>();
+  const aliasTargets = new Map<string, string>();
+
+  for (const category of MENU_PARENT_TAXONOMY) {
+    const canonicalSlug = slugifyCategory(category.key);
+    const matches = clonedRows.filter(
+      (row) => resolveCanonicalParentSlug(row.slug) === canonicalSlug,
+    );
+
+    if (matches.length === 0) continue;
+
+    const anchor =
+      matches.find((row) => slugifyCategory(row.slug) === canonicalSlug) ??
+      matches.sort((a, b) => a.sort_order - b.sort_order)[0];
+
+    anchor.parent_id = null;
+    parentIdByCanonicalSlug.set(canonicalSlug, anchor.id);
+
+    for (const match of matches) {
+      if (match.id === anchor.id) continue;
+      aliasRowIds.add(match.id);
+      aliasTargets.set(match.id, anchor.id);
+    }
+  }
+
+  for (const row of clonedRows) {
+    if (row.parent_id && aliasTargets.has(row.parent_id)) {
+      row.parent_id = aliasTargets.get(row.parent_id)!;
+    }
+  }
+
+  for (const row of clonedRows) {
+    if (aliasRowIds.has(row.id)) continue;
+
+    const canonicalSlug = resolveCanonicalParentSlug(row.slug);
+    if (!canonicalSlug) continue;
+  }
+
+  const syntheticParents = MENU_PARENT_TAXONOMY.filter(
+    (category) => !parentIdByCanonicalSlug.has(slugifyCategory(category.key)),
+  ).map((category) => {
+    const canonicalSlug = slugifyCategory(category.key);
+    const syntheticId = `virtual:${canonicalSlug}`;
+    parentIdByCanonicalSlug.set(canonicalSlug, syntheticId);
+
+    return {
+      id: syntheticId,
+      name: category.label,
+      slug: canonicalSlug,
+      parent_id: null,
+      sort_order: category.sortOrder,
+    } satisfies CategoryTaxonomyRow;
+  });
+
+  const normalizedRows = [
+    ...syntheticParents,
+    ...clonedRows.filter((row) => !aliasRowIds.has(row.id)),
+  ];
+
+  for (const row of normalizedRows) {
+    const canonicalSlug = resolveCanonicalParentSlug(row.slug);
+    if (canonicalSlug) continue;
+
+    const hasVisibleParent = row.parent_id && rowIds.has(row.parent_id);
+    if (hasVisibleParent) continue;
+
+    const recommendedParent = recommendParentCategory(
+      null,
+      row.slug.replace(/-/g, ' '),
+    );
+    const recommendedSlug =
+      resolveCanonicalParentSlug(recommendedParent.key) ??
+      slugifyCategory(DEFAULT_PARENT_CATEGORY.key);
+
+    row.parent_id = parentIdByCanonicalSlug.get(recommendedSlug) ?? null;
+  }
+
+  return normalizedRows;
+}
 
 function compareRows(a: CategoryTaxonomyRow, b: CategoryTaxonomyRow) {
   return (
@@ -94,7 +204,7 @@ export function buildCategoryTaxonomyTree(
 
 export function getDescendantIds(
   rootId: string,
-  rows: CategoryTaxonomyRow[],
+  rows: CategoryTaxonomyLinkRow[],
 ): string[] {
   const childrenByParent = new Map<string, string[]>();
   for (const row of rows) {

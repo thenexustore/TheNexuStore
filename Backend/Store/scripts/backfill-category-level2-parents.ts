@@ -16,7 +16,6 @@ const prisma = new PrismaClient();
 function printHelp() {
   console.log(`Usage:
   ts-node scripts/backfill-category-level2-parents.ts [--apply] [--json] [--output <file>]
-  ts-node scripts/backfill-category-level2-parents.ts [--apply] [--json]
 
 Options:
   --apply    Persist changes. Without this flag the script runs in dry-run mode.
@@ -67,7 +66,6 @@ async function ensureCanonicalParent(canonicalSlug: string) {
 async function main() {
   const rawArgs = process.argv.slice(2);
   const args = new Set(rawArgs);
-  const args = new Set(process.argv.slice(2));
   if (args.has('--help')) {
     printHelp();
     return;

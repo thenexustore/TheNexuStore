@@ -137,7 +137,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'laser',
         'inkjet',
       ],
-      keywords: ['impresora', 'multifuncion', 'multifunción', 'plotter', 'fotocopiadora'],
     },
     {
       key: 'escaneres-etiquetado',
@@ -162,7 +161,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'cinta termica',
         'papel',
       ],
-      keywords: ['toner', 'tinta', 'cartucho', 'rollo', 'cinta termica', 'papel'],
     },
   ],
   'redes-servidores': [
@@ -192,7 +190,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'fibra optica',
         'transceiver',
       ],
-      keywords: ['rack', 'sai', 'ups', 'cableado', 'patch panel', 'fibra optica', 'transceiver'],
     },
   ],
   'telefonia-movilidad': [
@@ -235,7 +232,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'altavoz bluetooth',
         'auriculares bluetooth',
       ],
-      keywords: ['barra de sonido', 'soundbar', 'receptor av', 'altavoz bluetooth', 'auriculares bluetooth'],
     },
     {
       key: 'proyeccion-streaming-soportes',
@@ -258,7 +254,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'saas',
         'cloud',
       ],
-      keywords: ['office', 'microsoft 365', 'licencia', 'saas', 'cloud'],
     },
     {
       key: 'seguridad-backup',

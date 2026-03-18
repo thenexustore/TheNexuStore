@@ -6,6 +6,11 @@ export type CategoryTaxonomyRow = {
   sort_order: number;
 };
 
+export type CategoryTaxonomyLinkRow = Pick<
+  CategoryTaxonomyRow,
+  'id' | 'parent_id'
+>;
+
 export type CategoryTaxonomyNode = {
   id: string;
   name: string;
@@ -94,7 +99,7 @@ export function buildCategoryTaxonomyTree(
 
 export function getDescendantIds(
   rootId: string,
-  rows: CategoryTaxonomyRow[],
+  rows: CategoryTaxonomyLinkRow[],
 ): string[] {
   const childrenByParent = new Map<string, string[]>();
   for (const row of rows) {

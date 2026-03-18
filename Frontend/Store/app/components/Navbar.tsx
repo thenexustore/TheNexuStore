@@ -3,14 +3,33 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Menu, Search, ShoppingCart, MessageCircle, User, X } from "lucide-react";
+import {
+  Menu,
+  Search,
+  ShoppingCart,
+  MessageCircle,
+  User,
+  X,
+} from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
-import { productAPI, Product, CategorySearchResult, CategoryTreeNode } from "../lib/products";
+import {
+  productAPI,
+  Product,
+  CategorySearchResult,
+  CategoryTreeNode,
+} from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
-import { normalizeCategoryTree, resolveCategoryScopeSlug } from "../lib/category-navigation";
-import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
+import {
+  normalizeCategoryTree,
+  resolveCategoryScopeSlug,
+} from "../lib/category-navigation";
+import {
+  loadStoreBranding,
+  subscribeStoreBranding,
+  type StoreBranding,
+} from "../lib/admin-branding";
 import StoreBrandLogo from "./StoreBrandLogo";
 
 type User = {
@@ -21,12 +40,6 @@ type User = {
   last_name?: string;
   email?: string;
   profile_image?: string;
-};
-
-type NavbarCategory = {
-  id: string;
-  name: string;
-  slug: string;
 };
 
 export default function Navbar() {
@@ -40,9 +53,13 @@ export default function Navbar() {
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
-  const [categorySearchResults, setCategorySearchResults] = useState<CategorySearchResult[]>([]);
+  const [categorySearchResults, setCategorySearchResults] = useState<
+    CategorySearchResult[]
+  >([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
-  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
+  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() =>
+    loadStoreBranding(),
+  );
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
@@ -54,6 +71,10 @@ export default function Navbar() {
     [categoryTreeState],
   );
   const filteredCategories = canonicalCategoryTree;
+  const visibleMobileCategories =
+    categorySearch.trim().length >= 2
+      ? categorySearchResults
+      : filteredCategories;
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -199,6 +220,9 @@ export default function Navbar() {
     setCategoryPanelOpen(false);
     setSidebarOpen(false);
     setShowSearchResults(false);
+    setCategorySearch("");
+    setCategorySearchResults([]);
+    setCategorySearchLoading(false);
   };
 
   const handleProductClick = (product: Product) => {
@@ -219,7 +243,9 @@ export default function Navbar() {
   };
 
   const handleCategoryClick = (categorySlug: string) => {
-    router.push(`/products?categories=${encodeURIComponent(resolveCategoryScopeSlug({ slug: categorySlug }))}`);
+    router.push(
+      `/products?category=${encodeURIComponent(resolveCategoryScopeSlug({ slug: categorySlug }))}`,
+    );
     closeMobilePanels();
   };
 
@@ -227,8 +253,6 @@ export default function Navbar() {
     await logout();
     setUser(null);
   };
-
-
 
   useEffect(() => {
     if (categorySearch.trim().length < 2) {
@@ -255,7 +279,11 @@ export default function Navbar() {
 
   const displayCartCount = cartLoading ? legacyCartCount : cartCount;
 
-  const userInitial = ((user?.firstName ?? user?.first_name ?? user?.email ?? "U").trim().charAt(0) || "U").toUpperCase();
+  const userInitial = (
+    (user?.firstName ?? user?.first_name ?? user?.email ?? "U")
+      .trim()
+      .charAt(0) || "U"
+  ).toUpperCase();
 
   return (
     <>
@@ -271,7 +299,12 @@ export default function Navbar() {
 
           <Link href="/" className="min-w-0 flex-shrink-0">
             <div className="flex h-11 w-24 items-center justify-center rounded-lg sm:w-32">
-              <StoreBrandLogo branding={storeBranding} alt="logo" className="h-8 w-auto" height={32} />
+              <StoreBrandLogo
+                branding={storeBranding}
+                alt="logo"
+                className="h-8 w-auto"
+                height={32}
+              />
             </div>
           </Link>
 
@@ -287,7 +320,10 @@ export default function Navbar() {
             </button>
           </div>
 
-          <div className="order-3 w-full basis-full md:order-none md:basis-auto md:flex-1 md:min-w-0 md:px-1" ref={searchRef}>
+          <div
+            className="order-3 w-full basis-full md:order-none md:basis-auto md:flex-1 md:min-w-0 md:px-1"
+            ref={searchRef}
+          >
             <form
               onSubmit={handleSearchSubmit}
               className="relative w-full md:mx-auto md:max-w-xl lg:max-w-2xl"
@@ -319,7 +355,9 @@ export default function Navbar() {
                       <>
                         <div className="p-3 border-b border-gray-100 bg-gray-50 sticky top-0">
                           <p className="text-sm font-medium text-gray-700">
-                            {t("productsFound", {count: searchResults.length})}
+                            {t("productsFound", {
+                              count: searchResults.length,
+                            })}
                           </p>
                         </div>
                         <div className="divide-y divide-gray-100">
@@ -330,11 +368,19 @@ export default function Navbar() {
                               className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
                             >
                               <div className="relative h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
-                                {product.compare_at_price && product.compare_at_price > product.price && (
-                                  <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-                                    -{Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)}%
-                                  </span>
-                                )}
+                                {product.compare_at_price &&
+                                  product.compare_at_price > product.price && (
+                                    <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                                      -
+                                      {Math.round(
+                                        ((product.compare_at_price -
+                                          product.price) /
+                                          product.compare_at_price) *
+                                          100,
+                                      )}
+                                      %
+                                    </span>
+                                  )}
                                 <img
                                   src={
                                     product.thumbnail &&
@@ -364,18 +410,21 @@ export default function Navbar() {
                                   <div className="flex items-center gap-2">
                                     <p
                                       className={`text-sm font-extrabold ${
-                                        product.compare_at_price && product.compare_at_price > product.price
+                                        product.compare_at_price &&
+                                        product.compare_at_price > product.price
                                           ? "text-red-600"
                                           : "text-[#0B123A]"
                                       }`}
                                     >
                                       €{product.price.toFixed(2)}
                                     </p>
-                                    {product.compare_at_price && product.compare_at_price > product.price && (
-                                      <p className="text-xs text-black/70 line-through">
-                                        €{product.compare_at_price.toFixed(2)}
-                                      </p>
-                                    )}
+                                    {product.compare_at_price &&
+                                      product.compare_at_price >
+                                        product.price && (
+                                        <p className="text-xs text-black/70 line-through">
+                                          €{product.compare_at_price.toFixed(2)}
+                                        </p>
+                                      )}
                                   </div>
                                   {product.rating_avg && (
                                     <div className="flex items-center text-xs text-gray-600">
@@ -469,21 +518,21 @@ export default function Navbar() {
                   <User className="h-5 w-5 text-gray-700" />
                 </Link>
                 <div className="hidden items-center gap-2 md:flex md:gap-3">
-                <Link
-                  href="/login"
-                  onClick={closeMobilePanels}
-                  className="whitespace-nowrap text-sm font-medium text-gray-700 transition-colors hover:text-[#0B123A]"
-                >
-                  {t("signIn")}
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={closeMobilePanels}
-                  className="flex h-11 items-center rounded-lg bg-[#0B123A] px-3 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-[#1a245a] sm:px-4"
-                >
-                  {t("signUp")}
-                </Link>
-              </div>
+                  <Link
+                    href="/login"
+                    onClick={closeMobilePanels}
+                    className="whitespace-nowrap text-sm font-medium text-gray-700 transition-colors hover:text-[#0B123A]"
+                  >
+                    {t("signIn")}
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={closeMobilePanels}
+                    className="flex h-11 items-center rounded-lg bg-[#0B123A] px-3 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-[#1a245a] sm:px-4"
+                  >
+                    {t("signUp")}
+                  </Link>
+                </div>
               </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
@@ -516,7 +565,9 @@ export default function Navbar() {
                 const nextLocale = locale === "en" ? "es" : "en";
                 router.replace(pathname, { locale: nextLocale });
               }}
-              aria-label={locale === "en" ? "Cambiar a español" : "Switch to English"}
+              aria-label={
+                locale === "en" ? "Cambiar a español" : "Switch to English"
+              }
             >
               {locale.toUpperCase()}
             </button>
@@ -535,7 +586,9 @@ export default function Navbar() {
               }}
             >
               <div className="absolute inset-0 bg-black/20" />
-              <span className="relative z-10 text-xs font-bold text-white">{locale.toUpperCase()}</span>
+              <span className="relative z-10 text-xs font-bold text-white">
+                {locale.toUpperCase()}
+              </span>
             </button>
 
             <Link
@@ -560,7 +613,9 @@ export default function Navbar() {
       </header>
 
       <CategoryDrawer
-        key={categoryPanelOpen ? "category-drawer-open" : "category-drawer-closed"}
+        key={
+          categoryPanelOpen ? "category-drawer-open" : "category-drawer-closed"
+        }
         open={categoryPanelOpen}
         loading={categoriesLoading}
         tree={canonicalCategoryTree}
@@ -568,14 +623,14 @@ export default function Navbar() {
         searchResults={categorySearchResults}
         searchLoading={categorySearchLoading}
         onQueryChange={setCategorySearch}
-        onClose={() => setCategoryPanelOpen(false)}
+        onClose={closeMobilePanels}
         onNavigate={handleCategoryClick}
       />
 
       {sidebarOpen && (
         <button
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeMobilePanels}
           aria-label="Close menu"
         />
       )}
@@ -588,7 +643,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-bold text-black">{t("categories")}</h2>
           <button
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeMobilePanels}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
           >
             <X size={24} />
@@ -603,8 +658,18 @@ export default function Navbar() {
               value={categorySearch}
               onChange={(e) => setCategorySearch(e.target.value)}
               placeholder={t("searchCategories")}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
+              className="w-full pl-10 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
             />
+            {categorySearch ? (
+              <button
+                type="button"
+                onClick={() => setCategorySearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                aria-label="Limpiar búsqueda de categorías"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -614,18 +679,39 @@ export default function Navbar() {
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
               </div>
-            ) : (categorySearch.trim().length >= 2 ? categorySearchResults : filteredCategories).length > 0 ? (
-              <div className="space-y-1">
-                {(categorySearch.trim().length >= 2 ? categorySearchResults : filteredCategories).map((category: NavbarCategory) => (
-                  <button
-                    key={category.id}
-                    onClick={() => handleCategoryClick(category.slug)}
-                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
-                  >
-                    <span>{category.name}</span>
-                  </button>
-                ))}
-              </div>
+            ) : visibleMobileCategories.length > 0 ? (
+              categorySearch.trim().length >= 2 ? (
+                <div className="space-y-2">
+                  {categorySearchResults.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => handleCategoryClick(category.slug)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left transition-colors hover:border-[#0B123A] hover:bg-slate-50"
+                    >
+                      <p className="font-medium text-slate-800">
+                        {category.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {category.path}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredCategories.map((category) => {
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => handleCategoryClick(category.slug)}
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
+                      >
+                        <span>{category.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
             ) : (
               <div className="text-center py-8 text-gray-500">
                 {categorySearch

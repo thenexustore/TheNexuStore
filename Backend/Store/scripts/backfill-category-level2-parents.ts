@@ -254,6 +254,24 @@ async function main() {
 
   if (json) {
     console.log(JSON.stringify(auditPayload, null, 2));
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          summary: {
+            mode: apply ? 'apply' : 'dry-run',
+            scanned,
+            candidates,
+            created_level2: createdLevel2,
+            reparented: updated,
+            already_compliant: alreadyCompliant,
+          },
+          affected_categories: auditRows,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 

@@ -141,7 +141,7 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 pb-24 pt-6 text-black sm:px-6 sm:pb-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 pb-24 pt-6 text-black sm:px-6 sm:pb-6 lg:px-8">
       <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
         <Link href="/" className="hover:underline">
           {t("home")}
@@ -322,9 +322,9 @@ export default function ProductPage() {
               <h3 className="mb-2 font-medium">{t("specifications")}</h3>
               <div className="space-y-1">
                 {product.attributes.map((attr) => (
-                  <div key={attr.key} className="flex">
-                    <span className="w-32 text-gray-600">{attr.name}:</span>
-                    <span>{attr.values.join(", ")}</span>
+                  <div key={attr.key} className="flex gap-2">
+                    <span className="w-28 shrink-0 text-gray-600">{attr.name}:</span>
+                    <span className="min-w-0 break-words">{attr.values.join(", ")}</span>
                   </div>
                 ))}
               </div>
@@ -390,10 +390,10 @@ export default function ProductPage() {
               <button
                 onClick={handleAddToCart}
                 disabled={isOutOfStock || addingToCart}
-                className={`hidden w-full rounded px-6 py-3 font-medium transition-all md:block md:flex-1 ${
+                className={`hidden w-full rounded-xl px-6 py-3 font-semibold transition-all md:block md:flex-1 ${
                   isOutOfStock || addingToCart
                     ? "cursor-not-allowed bg-gray-300 text-gray-500"
-                    : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
+                    : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
                 }`}
               >
                 {addingToCart ? (
@@ -454,14 +454,14 @@ export default function ProductPage() {
       </div>
 
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 fixed-bottom-bar backdrop-blur md:hidden">
         <button
           onClick={handleAddToCart}
           disabled={isOutOfStock || addingToCart}
-          className={`w-full rounded-lg px-6 py-3 text-sm font-semibold transition-all ${
+          className={`w-full rounded-xl px-6 py-3 text-sm font-semibold transition-all ${
             isOutOfStock || addingToCart
               ? "cursor-not-allowed bg-gray-300 text-gray-500"
-              : "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
           }`}
         >
           {addingToCart ? t("adding") : isOutOfStock ? t("outOfStock") : t("addToCart")}
@@ -470,8 +470,8 @@ export default function ProductPage() {
 
       {relatedProducts.length > 0 && (
         <div>
-          <h2 className="mb-6 text-2xl font-bold">{t("relatedProducts")}</h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <h2 className="mb-6 text-2xl font-bold lg:text-3xl">{t("relatedProducts")}</h2>
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5 lg:gap-6">
             {relatedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

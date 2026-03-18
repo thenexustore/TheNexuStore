@@ -290,7 +290,7 @@ export default function Navbar() {
           <div className="order-3 w-full basis-full md:order-none md:basis-auto md:flex-1 md:min-w-0 md:px-1" ref={searchRef}>
             <form
               onSubmit={handleSearchSubmit}
-              className="relative w-full md:mx-auto md:max-w-xl"
+              className="relative w-full md:mx-auto md:max-w-xl lg:max-w-2xl"
             >
               <input
                 value={search}
@@ -449,7 +449,7 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 self-center sm:gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 self-center sm:gap-2 md:gap-3">
             <Link
               href="/chat"
               onClick={closeMobilePanels}

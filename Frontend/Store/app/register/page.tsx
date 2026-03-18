@@ -139,7 +139,7 @@ export default function RegisterPage() {
           />
         </div>
 
-        <div className="bg-white border-[3px] border-black p-8 md:p-12 shadow-[16px_16px_0px_0px_rgba(0,0,0,1)]">
+        <div className="bg-white border-[3px] border-black p-6 sm:p-8 md:p-12 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] sm:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)]">
           {error && (
             <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 text-red-600 text-[10px] font-black uppercase tracking-widest whitespace-pre-wrap break-words">
               {error}
@@ -186,7 +186,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <input
                     placeholder="FIRST_NAME"
                     required

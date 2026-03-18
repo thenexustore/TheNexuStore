@@ -62,7 +62,7 @@ export default function Footer() {
       )}
 
       <footer className="w-full bg-[#0B123A] text-white">
-        <div className="max-w-7xl mx-auto px-6 py-14">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-14">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 items-start">
             {/* Brand + Newsletter */}
             <div className="lg:col-span-2">
@@ -70,7 +70,7 @@ export default function Footer() {
               <h3 className="text-base font-semibold mb-3">{t("title")}</h3>
               <form
                 onSubmit={handleSubscribe}
-                className="flex flex-col sm:flex-row gap-2 max-w-md"
+                className="flex flex-col sm:flex-row gap-2 max-w-md lg:max-w-lg"
               >
                 <input
                   type="email"
@@ -137,7 +137,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/10">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/50 text-center md:text-left">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/50 text-center md:text-left">
             <p>
               © {new Date().getFullYear()} Sánchez Peinado Solutions SL —{" "}
               <span className="font-semibold text-white/80">NEXUS SP Solutions</span>

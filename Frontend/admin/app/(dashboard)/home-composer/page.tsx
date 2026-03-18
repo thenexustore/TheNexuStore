@@ -1167,6 +1167,30 @@ export default function HomeComposerPage() {
                 )}
               </div>
 
+              {selectedSectionDiagnostic ? (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+                  <div className="font-medium text-zinc-900">Diagnóstico en tiempo real (API activa)</div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-white px-2 py-1 border border-zinc-200">Resultados: {selectedSectionDiagnostic.resolved_count}</span>
+                    {selectedSectionDiagnostic.fallback_reason ? (
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Fallback: {selectedSectionDiagnostic.fallback_reason}</span>
+                    ) : null}
+                    {selectedSectionDiagnostic.warnings.length ? (
+                      <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">⚠ {selectedSectionDiagnostic.warnings.length} warning{selectedSectionDiagnostic.warnings.length > 1 ? "s" : ""}</span>
+                    ) : (
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Sin warnings</span>
+                    )}
+                  </div>
+                  {selectedSectionDiagnostic.warnings.length ? (
+                    <ul className="mt-2 space-y-1 list-disc list-inside text-amber-800">
+                      {selectedSectionDiagnostic.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+
               {selectedSection.type === "HERO_CAROUSEL" ? (
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
                   Este bloque está vinculado al módulo interno de <strong>Banners</strong>. El título, subtítulo, CTA e imagen se editan en cada banner individual.
@@ -1293,22 +1317,6 @@ export default function HomeComposerPage() {
               {selectedSection.type === "PRODUCT_CAROUSEL" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
                   <div className="mb-3 text-sm font-medium">Controles rápidos: Carrusel de productos</div>
-                  {selectedSectionDiagnostic ? (
-                    <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
-                      <div className="font-medium text-zinc-900">Diagnóstico en tiempo real</div>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-white px-2 py-1">Resultados: {selectedSectionDiagnostic.resolved_count}</span>
-                        {selectedSectionDiagnostic.fallback_reason ? (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">Fallback: {selectedSectionDiagnostic.fallback_reason}</span>
-                        ) : null}
-                        {selectedSectionDiagnostic.warnings.length ? (
-                          <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Warnings: {selectedSectionDiagnostic.warnings.length}</span>
-                        ) : (
-                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Sin warnings</span>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Modo</span>
@@ -2028,9 +2036,29 @@ export default function HomeComposerPage() {
                 </>
               ) : null}
 
-              {selectedSection.type === "CUSTOM_HTML" ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Este bloque no renderiza HTML libre en Store público por seguridad. Úsalo solo como marcador de migración.
+              {selectedSection.type === "CUSTOM_HTML" && parsedDraftConfig ? (
+                <div className="rounded-xl border border-zinc-200 p-3">
+                  <div className="mb-3 text-sm font-medium">Controles rápidos: Bloque HTML personalizado</div>
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 mb-3">
+                    El HTML se <strong>sanitiza automáticamente</strong> en Store antes de renderizarse (se eliminan scripts, iframes y atributos peligrosos). Solo se permiten tags seguros (p, strong, a, h1–h6, img, table, div, span, etc.).
+                  </div>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-zinc-500">Contenido HTML</span>
+                    <textarea
+                      value={String(config.html || "")}
+                      onChange={(event) =>
+                        updateDraftConfig({ ...config, html: event.target.value })
+                      }
+                      rows={10}
+                      placeholder="<p>Tu contenido HTML aquí…</p>"
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
+                    />
+                  </label>
+                  {!String(config.html || "").trim() ? (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      El bloque está vacío y no mostrará nada en Store.
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

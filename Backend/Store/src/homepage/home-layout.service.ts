@@ -204,6 +204,14 @@ export class HomeLayoutService {
       next.items = Array.isArray(next.items) ? next.items : [];
     }
 
+    if (type === HomeSectionType.CUSTOM_HTML) {
+      // Preserve html as-is; dangerous content is stripped by the client-side
+      // whitelist sanitizer (DOMParser-based) in the Storefront before rendering.
+      // Regex-based server-side stripping is intentionally omitted because it is
+      // incomplete and gives false security — the real protection is the client whitelist.
+      next.html = String(next.html || '').trim();
+    }
+
     return next;
   }
 
@@ -1303,9 +1311,14 @@ export class HomeLayoutService {
         }
 
         if (section.type === HomeSectionType.CUSTOM_HTML) {
-          warnings.push(
-            'CUSTOM_HTML no renderiza HTML libre en Store por seguridad.',
-          );
+          const html = String(normalizedConfig.html || '').trim();
+          if (!html) {
+            warnings.push('CUSTOM_HTML: contenido vacío — el bloque no mostrará nada en Store.');
+          } else {
+            warnings.push(
+              'CUSTOM_HTML: el HTML se sanitiza en Store (whitelist de tags seguros). Verifica que el contenido sea válido.',
+            );
+          }
         }
 
         const resolvedCount = Array.isArray(resolved)

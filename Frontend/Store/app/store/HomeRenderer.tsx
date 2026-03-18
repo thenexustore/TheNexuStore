@@ -92,6 +92,98 @@ const sanitizeImageValue = (value: unknown): string => {
     .replace(/\\\//g, '/');
 };
 
+// --- HTML sanitizer (zero-dependency, whitelist-based, DOMParser-backed) ---
+const HTML_ALLOWED_TAGS = new Set([
+  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li',
+  'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'blockquote',
+  'hr', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'small',
+  'sup', 'sub', 'figure', 'figcaption', 'section', 'article', 'header',
+  'footer', 'main', 'aside', 'nav',
+]);
+const HTML_ALLOWED_ATTRS = new Set([
+  'class', 'id', 'style', 'href', 'src', 'alt', 'title', 'target',
+  'rel', 'width', 'height', 'colspan', 'rowspan', 'aria-label',
+  'aria-hidden', 'role',
+]);
+const HTML_SAFE_HREF = /^(https?:\/\/|\/|mailto:)/i;
+const HTML_SAFE_SRC = /^(https?:\/\/|\/)/i;
+// Tags that must be fully dropped (not substituted with span)
+const HTML_BLOCKED_TAGS = new Set([
+  'script', 'style', 'iframe', 'object', 'embed', 'form',
+  'input', 'button', 'select', 'textarea', 'link', 'meta',
+  'base', 'applet', 'frame', 'frameset',
+]);
+
+function sanitizeHtmlNode(node: Node, doc: Document): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return doc.createTextNode(node.textContent ?? '');
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return null;
+
+  const el = node as Element;
+  const tag = el.tagName.toLowerCase();
+
+  if (HTML_BLOCKED_TAGS.has(tag)) return null;
+
+  const targetTag = HTML_ALLOWED_TAGS.has(tag) ? tag : 'span';
+  const cleanEl = doc.createElement(targetTag);
+
+  for (const attr of Array.from(el.attributes)) {
+    const name = attr.name.toLowerCase();
+    if (!HTML_ALLOWED_ATTRS.has(name)) continue;
+
+    if (name === 'href') {
+      if (!HTML_SAFE_HREF.test(attr.value)) continue;
+      cleanEl.setAttribute('href', attr.value);
+      if (/^https?:\/\//i.test(attr.value)) {
+        cleanEl.setAttribute('target', '_blank');
+        cleanEl.setAttribute('rel', 'noopener noreferrer');
+      }
+      continue;
+    }
+    if (name === 'src') {
+      if (!HTML_SAFE_SRC.test(attr.value)) continue;
+    }
+    if (name === 'style') {
+      // Strip dangerous CSS patterns while preserving valid styles
+      const safe = attr.value
+        .replace(/expression\s*\(/gi, '')
+        .replace(/javascript\s*:/gi, '')
+        .replace(/url\s*\(\s*["']?\s*(?!https?:\/\/|\/)[^)]*["']?\s*\)/gi, '');
+      cleanEl.setAttribute('style', safe);
+      continue;
+    }
+    cleanEl.setAttribute(name, attr.value);
+  }
+
+  for (const child of Array.from(node.childNodes)) {
+    const sanitizedChild = sanitizeHtmlNode(child, doc);
+    if (sanitizedChild) cleanEl.appendChild(sanitizedChild);
+  }
+
+  return cleanEl;
+}
+
+/**
+ * Sanitizes an HTML string using a whitelist of allowed tags and attributes.
+ * Runs in the browser (requires DOMParser). Returns empty string on the server.
+ */
+function sanitizeHtml(dirty: string): string {
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') return '';
+  if (!dirty.trim()) return '';
+
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(dirty, 'text/html');
+  const container = document.createElement('div');
+
+  for (const child of Array.from(parsed.body.childNodes)) {
+    const sanitized = sanitizeHtmlNode(child, document);
+    if (sanitized) container.appendChild(sanitized);
+  }
+
+  return container.innerHTML;
+}
+
 const asSrc = (value: unknown): string => {
   const src = sanitizeImageValue(value);
   if (!src) return FALLBACK_IMG;
@@ -940,11 +1032,22 @@ function ChipsLike({ title, subtitle, items }: { title?: string; subtitle?: stri
 
 
 function CustomHtmlSection({ title, subtitle, content }: { title?: string; subtitle?: string; content: unknown }) {
-  const html = typeof content === 'object' && content && typeof (content as Record<string, unknown>).html === 'string'
+  const rawHtml = typeof content === 'object' && content && typeof (content as Record<string, unknown>).html === 'string'
     ? String((content as Record<string, unknown>).html || '')
     : '';
 
-  if (!html.trim()) {
+  // useEffect + useState(null) is intentional here:
+  // - During SSR, sanitizeHtml returns '' (no DOMParser), so we can't use useMemo
+  //   without causing a server/client hydration mismatch.
+  // - Keeping sanitized=null until after mount lets us safely skip rendering
+  //   until the client-side sanitization has run.
+  const [sanitized, setSanitized] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSanitized(sanitizeHtml(rawHtml));
+  }, [rawHtml]);
+
+  if (!rawHtml.trim()) {
     return (
       <SectionShell title={title} subtitle={subtitle}>
         <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Bloque HTML sin contenido.</div>
@@ -952,11 +1055,26 @@ function CustomHtmlSection({ title, subtitle, content }: { title?: string; subti
     );
   }
 
+  // While waiting for client-side sanitization (SSR hydration window), render nothing
+  if (sanitized === null) return null;
+
+  if (!sanitized.trim()) {
+    return (
+      <SectionShell title={title} subtitle={subtitle}>
+        <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">
+          El HTML fue sanitizado y el resultado está vacío. Revisa el contenido en el administrador.
+        </div>
+      </SectionShell>
+    );
+  }
+
   return (
     <SectionShell title={title} subtitle={subtitle}>
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        El contenido HTML personalizado no se renderiza en storefront público por seguridad. Usa este bloque solo como marcador de migración.
-      </div>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized via whitelist before render */}
+      <div
+        className="prose prose-slate max-w-none"
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
     </SectionShell>
   );
 }

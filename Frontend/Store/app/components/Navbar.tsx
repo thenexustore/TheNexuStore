@@ -244,7 +244,7 @@ export default function Navbar() {
 
   const handleCategoryClick = (categorySlug: string) => {
     router.push(
-      `/products?categories=${encodeURIComponent(resolveCategoryScopeSlug({ slug: categorySlug }))}`,
+      `/products?category=${encodeURIComponent(resolveCategoryScopeSlug({ slug: categorySlug }))}`,
     );
     closeMobilePanels();
   };

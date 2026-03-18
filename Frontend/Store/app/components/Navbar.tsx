@@ -691,6 +691,7 @@ export default function Navbar() {
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={closeMobilePanels}
           aria-label={t("closeMenu")}
+          aria-label="Close menu"
         />
       )}
 
@@ -726,6 +727,7 @@ export default function Navbar() {
                 onClick={() => setCategorySearch("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 aria-label={t("clearSearch")}
+                aria-label="Limpiar búsqueda de categorías"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -841,6 +843,17 @@ export default function Navbar() {
                         </button>
                       </div>
                     ))}
+                  {filteredCategories.map((category) => {
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => handleCategoryClick(category.slug)}
+                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
+                      >
+                        <span>{category.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )
             ) : (

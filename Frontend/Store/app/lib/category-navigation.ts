@@ -45,6 +45,10 @@ function sanitizeSiblingNodes(
       ...node,
       children: sanitizeSiblingNodes(node.children, node),
     });
+    const sanitizedNode: CategoryTreeNode = {
+      ...node,
+      children: sanitizeSiblingNodes(node.children, node),
+    };
 
     const isParentAlias =
       parent &&

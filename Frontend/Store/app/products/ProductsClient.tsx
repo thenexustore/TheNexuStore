@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import ProductCard from "../components/ProductCard";
@@ -11,12 +12,10 @@ import { Pagination } from "../components/Pagination";
 import { SidebarFilters } from "../components/SidebarFilters";
 import { MobileFilters } from "../components/MobileFilters";
 
-export default function ProductsPage() {
-  const searchParams = useSearchParams();
-  const { updateURL } = useURLSync();
-  const t = useTranslations("products");
-
-  const initialFilters: ProductFilters = {
+function buildFiltersFromSearchParams(
+  searchParams: ReturnType<typeof useSearchParams>,
+): ProductFilters {
+  const filters: ProductFilters = {
     page: parseInt(searchParams.get("page") || "1"),
     limit: 20,
     search: searchParams.get("search") || undefined,
@@ -36,8 +35,21 @@ export default function ProductsPage() {
 
   const categoriesParam = searchParams.get("categories");
   if (categoriesParam) {
-    initialFilters.categories = categoriesParam.split(",");
+    filters.categories = categoriesParam.split(",");
   }
+
+  return filters;
+}
+
+export default function ProductsPage() {
+  const searchParams = useSearchParams();
+  const { updateURL } = useURLSync();
+  const t = useTranslations("products");
+
+  const initialFilters = useMemo(
+    () => buildFiltersFromSearchParams(searchParams),
+    [searchParams],
+  );
 
   const {
     productsResponse,
@@ -47,6 +59,10 @@ export default function ProductsPage() {
     setFilters,
     filterOptions,
   } = useProductData(initialFilters);
+
+  useEffect(() => {
+    setFilters(initialFilters);
+  }, [initialFilters, setFilters]);
 
   const handlePageChange = (page: number) => {
     const newFilters = { ...filters, page };

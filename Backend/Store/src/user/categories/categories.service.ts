@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import {
   buildCategoryTaxonomyTree,
+  normalizeCategoryTaxonomyRows,
   type CategoryTaxonomyNode,
   type CategoryTaxonomyRow,
   sortCategoryRows,
@@ -50,7 +51,7 @@ export class CategoriesService {
   }
 
   private async getVisibleCategories(): Promise<CategoryTaxonomyRow[]> {
-    return this.prisma.category.findMany({
+    const rows = await this.prisma.category.findMany({
       where: { is_active: true },
       select: {
         id: true,
@@ -61,6 +62,8 @@ export class CategoriesService {
       },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
     });
+
+    return normalizeCategoryTaxonomyRows(rows);
   }
 
   async getCategoryTree(query: TreeQuery) {
@@ -79,6 +82,9 @@ export class CategoriesService {
     const maxDepth = Number.parseInt(normalized.maxDepth, 10);
     const rows = await this.getVisibleCategories();
     const items = buildCategoryTaxonomyTree(rows, maxDepth);
+    const virtualParentCount = rows.filter((row) =>
+      row.id.startsWith('virtual:'),
+    ).length;
 
     if (items.length === 0 && rows.length > 0) {
       this.logger.warn(
@@ -93,6 +99,11 @@ export class CategoriesService {
         locale: normalized.locale,
         includeEmpty: normalized.includeEmpty === 'true',
         includeCounts: normalized.includeCounts === 'true',
+        normalization: {
+          normalized_rows: rows.length,
+          root_nodes: items.length,
+          virtual_parents: virtualParentCount,
+        },
       },
     };
 

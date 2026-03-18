@@ -135,14 +135,36 @@ export class ProductsService {
       }),
       this.prisma.category.findMany({
         where: { is_active: true },
-        select: { id: true, parent_id: true },
+        select: { id: true, name: true, slug: true, parent_id: true },
       }),
     ]);
 
-    if (!selectedCategories.length) return [];
+    const selectedIds = new Set(selectedCategories.map((category) => category.id));
 
-    const descendantIds = selectedCategories.flatMap((category) =>
-      getDescendantIds(category.id, taxonomyRows),
+    if (selectedCategories.length === 0) {
+      const virtualParentSlugs = normalizedValues.filter((value) =>
+        isKnownParentCategorySlug(value),
+      );
+
+      if (virtualParentSlugs.length === 0) return [];
+
+      for (const row of taxonomyRows) {
+        const recommendedParent = recommendParentCategory(
+          null,
+          row.slug.replace(/-/g, ' '),
+        );
+        if (
+          virtualParentSlugs.includes(slugifyCategory(recommendedParent.key))
+        ) {
+          selectedIds.add(row.id);
+        }
+      }
+    }
+
+    if (selectedIds.size === 0) return [];
+
+    const descendantIds = [...selectedIds].flatMap((categoryId) =>
+      getDescendantIds(categoryId, taxonomyRows),
     );
 
     return Array.from(new Set(descendantIds));

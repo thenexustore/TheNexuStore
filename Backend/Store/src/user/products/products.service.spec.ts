@@ -196,6 +196,38 @@ describe('ProductsService category filtering', () => {
     expectCategoryScope(['parent-1', 'child-1']);
   });
 
+  it('expands canonical virtual parent slugs to recommended active categories when the parent row is missing', async () => {
+    prisma.category.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'leaf-ups',
+          name: 'Accesorios SAI',
+          slug: 'accesorios-sai',
+          parent_id: null,
+        },
+        {
+          id: 'leaf-ups-child',
+          name: 'SAI Rack',
+          slug: 'sai-rack',
+          parent_id: 'leaf-ups',
+        },
+        {
+          id: 'printer-leaf',
+          name: 'Accesorios Impresora',
+          slug: 'accesorios-impresora',
+          parent_id: null,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await requestProducts({
+      category: 'redes-servidores',
+    });
+
+    expectCategoryScope(['leaf-ups', 'leaf-ups-child']);
+  });
+
   it.each([
     {
       name: 'returns no matches when the requested category slug cannot be resolved',

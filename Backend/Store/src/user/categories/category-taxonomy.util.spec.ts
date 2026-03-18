@@ -1,6 +1,7 @@
 import {
   buildCategoryTaxonomyTree,
   getDescendantIds,
+  normalizeCategoryTaxonomyRows,
 } from './category-taxonomy.util';
 
 describe('category-taxonomy.util', () => {
@@ -117,5 +118,35 @@ describe('category-taxonomy.util', () => {
     ];
     const tree = buildCategoryTaxonomyTree(unordered, 3);
     expect(tree.map((n) => n.slug)).toEqual(['a', 'm', 'z']);
+  });
+
+  it('reparents orphaned roots under canonical parent buckets and seeds missing parents virtually', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'leaf-ups',
+        name: 'Accesorios SAI',
+        slug: 'accesorios-sai',
+        parent_id: null,
+        sort_order: 10,
+      },
+      {
+        id: 'leaf-printer',
+        name: 'Accesorios Impresora',
+        slug: 'accesorios-impresora',
+        parent_id: null,
+        sort_order: 20,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const networking = tree.find((node) => node.slug === 'redes-servidores');
+    const printing = tree.find((node) => node.slug === 'impresion-escaneado');
+
+    expect(networking?.children.map((node) => node.slug)).toContain(
+      'accesorios-sai',
+    );
+    expect(printing?.children.map((node) => node.slug)).toContain(
+      'accesorios-impresora',
+    );
   });
 });

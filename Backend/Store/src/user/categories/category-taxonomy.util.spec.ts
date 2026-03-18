@@ -149,4 +149,41 @@ describe('category-taxonomy.util', () => {
       'accesorios-impresora',
     );
   });
+
+  it('deduplicates canonical parent aliases into a single visible root', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'canonical-parent',
+        name: 'Ordenadores y portátiles',
+        slug: 'ordenadores-portatiles',
+        parent_id: null,
+        sort_order: 10,
+      },
+      {
+        id: 'alias-parent',
+        name: 'Ordenadores y portátiles',
+        slug: 'ordenadores-y-portatiles',
+        parent_id: null,
+        sort_order: 11,
+      },
+      {
+        id: 'child-row',
+        name: 'Portátiles',
+        slug: 'portatiles',
+        parent_id: 'alias-parent',
+        sort_order: 1,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const canonical = tree.find((node) => node.slug === 'ordenadores-portatiles');
+
+    expect(
+      tree.filter((node) => node.slug === 'ordenadores-portatiles'),
+    ).toHaveLength(1);
+    expect(canonical?.children.map((node) => node.slug)).toContain('portatiles');
+    expect(canonical?.children.map((node) => node.slug)).not.toContain(
+      'ordenadores-y-portatiles',
+    );
+  });
 });

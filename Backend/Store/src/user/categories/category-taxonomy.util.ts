@@ -48,13 +48,42 @@ export function normalizeCategoryTaxonomyRows(
   const clonedRows = rows.map((row) => ({ ...row }));
   const rowIds = new Set(clonedRows.map((row) => row.id));
   const parentIdByCanonicalSlug = new Map<string, string>();
+  const aliasRowIds = new Set<string>();
+  const aliasTargets = new Map<string, string>();
+
+  for (const category of MENU_PARENT_TAXONOMY) {
+    const canonicalSlug = slugifyCategory(category.key);
+    const matches = clonedRows.filter(
+      (row) => resolveCanonicalParentSlug(row.slug) === canonicalSlug,
+    );
+
+    if (matches.length === 0) continue;
+
+    const anchor =
+      matches.find((row) => slugifyCategory(row.slug) === canonicalSlug) ??
+      matches.sort((a, b) => a.sort_order - b.sort_order)[0];
+
+    anchor.parent_id = null;
+    parentIdByCanonicalSlug.set(canonicalSlug, anchor.id);
+
+    for (const match of matches) {
+      if (match.id === anchor.id) continue;
+      aliasRowIds.add(match.id);
+      aliasTargets.set(match.id, anchor.id);
+    }
+  }
 
   for (const row of clonedRows) {
+    if (row.parent_id && aliasTargets.has(row.parent_id)) {
+      row.parent_id = aliasTargets.get(row.parent_id)!;
+    }
+  }
+
+  for (const row of clonedRows) {
+    if (aliasRowIds.has(row.id)) continue;
+
     const canonicalSlug = resolveCanonicalParentSlug(row.slug);
     if (!canonicalSlug) continue;
-
-    row.parent_id = null;
-    parentIdByCanonicalSlug.set(canonicalSlug, row.id);
   }
 
   const syntheticParents = MENU_PARENT_TAXONOMY.filter(
@@ -73,7 +102,10 @@ export function normalizeCategoryTaxonomyRows(
     } satisfies CategoryTaxonomyRow;
   });
 
-  const normalizedRows = [...syntheticParents, ...clonedRows];
+  const normalizedRows = [
+    ...syntheticParents,
+    ...clonedRows.filter((row) => !aliasRowIds.has(row.id)),
+  ];
 
   for (const row of normalizedRows) {
     const canonicalSlug = resolveCanonicalParentSlug(row.slug);

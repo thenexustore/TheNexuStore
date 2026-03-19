@@ -24,6 +24,7 @@ import {
   CategoryTreeNode,
 } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
+import { CategorySearchResultCard } from "./CategorySearchResultCard";
 import {
   findCategoryTrailBySlug,
   normalizeCategoryTree,
@@ -102,10 +103,10 @@ export default function Navbar() {
   const activeMobileNode = activeMobilePath[activeMobilePath.length - 1];
   const visibleMobileTreeCategories =
     activeMobileNode?.children ?? filteredCategories;
-  const visibleMobileCategories =
+  const visibleMobileCategoryCount =
     categorySearch.trim().length >= 2
-      ? categorySearchResults
-      : visibleMobileTreeCategories;
+      ? categorySearchResults.length
+      : visibleMobileTreeCategories.length;
 
   // Use context providers
   const { user: authUser, logout } = useAuth();
@@ -756,22 +757,16 @@ export default function Navbar() {
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
               </div>
-            ) : visibleMobileCategories.length > 0 ? (
+            ) : visibleMobileCategoryCount > 0 ? (
               categorySearch.trim().length >= 2 ? (
                 <div className="space-y-2">
                   {categorySearchResults.map((category) => (
-                    <button
+                    <CategorySearchResultCard
                       key={category.id}
-                      onClick={() => handleCategoryClick(category.slug)}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left transition-colors hover:border-[#0B123A] hover:bg-slate-50"
-                    >
-                      <p className="font-medium text-slate-800">
-                        {category.name}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {category.path}
-                      </p>
-                    </button>
+                      item={category}
+                      onClick={handleCategoryClick}
+                      compact
+                    />
                   ))}
                 </div>
               ) : (
@@ -821,6 +816,9 @@ export default function Navbar() {
                           name: activeMobileNode.name,
                         })}
                       </button>
+                      <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
+                        {t("mobileBrowseHint")}
+                      </p>
                     </div>
                   ) : null}
 

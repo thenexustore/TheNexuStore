@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CategorySearchResult, CategoryTreeNode } from "../lib/products";
+import { findCategoryTrailBySlug } from "../lib/category-navigation";
 import { getCategoryIcon } from "../lib/category-icons";
+import { CategorySearchResultCard } from "./CategorySearchResultCard";
 
 type Props = {
   open: boolean;
@@ -36,6 +38,11 @@ export function CategoryDrawer({
   const [activeChildId, setActiveChildId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const activeCategoryTrail = useMemo(
+    () => findCategoryTrailBySlug(tree, activeCategorySlug),
+    [tree, activeCategorySlug],
+  );
+
   const firstParentWithChildren = useMemo(
     () => tree.find((item) => item.children.length > 0) ?? tree[0],
     [tree],
@@ -54,6 +61,30 @@ export function CategoryDrawer({
       activeParent?.children[0],
     [activeParent, activeChildId],
   );
+
+  const handleTrailSelection = (index: number) => {
+    if (index === 0) {
+      const parent = activeCategoryTrail[0];
+      if (!parent) return;
+      setActiveParentId(parent.id);
+      setActiveChildId(parent.children[0]?.id ?? null);
+      return;
+    }
+
+    if (index === 1) {
+      const parent = activeCategoryTrail[0];
+      const child = activeCategoryTrail[1];
+      if (!parent || !child) return;
+      setActiveParentId(parent.id);
+      setActiveChildId(child.id);
+      return;
+    }
+
+    const selected = activeCategoryTrail[index];
+    if (selected) {
+      onNavigate(selected.slug);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -77,37 +108,15 @@ export function CategoryDrawer({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !activeCategorySlug) return;
+    if (!open || activeCategoryTrail.length === 0) return;
 
-    const activeParentFromSlug = tree.find(
-      (parent) =>
-        parent.slug === activeCategorySlug ||
-        parent.children.some(
-          (child) =>
-            child.slug === activeCategorySlug ||
-            child.children.some(
-              (grandchild) => grandchild.slug === activeCategorySlug,
-            ),
-        ),
+    setActiveParentId(activeCategoryTrail[0]?.id ?? null);
+    setActiveChildId(
+      activeCategoryTrail[1]?.id ??
+        activeCategoryTrail[0]?.children[0]?.id ??
+        null,
     );
-
-    if (!activeParentFromSlug) return;
-
-    setActiveParentId(activeParentFromSlug.id);
-
-    const activeChildFromSlug =
-      activeParentFromSlug.children.find(
-        (child) =>
-          child.slug === activeCategorySlug ||
-          child.children.some(
-            (grandchild) => grandchild.slug === activeCategorySlug,
-          ),
-      ) ??
-      activeParentFromSlug.children[0] ??
-      null;
-
-    setActiveChildId(activeChildFromSlug?.id ?? null);
-  }, [open, activeCategorySlug, tree]);
+  }, [open, activeCategoryTrail]);
 
   return (
     <>
@@ -168,208 +177,256 @@ export function CategoryDrawer({
               ) : null}
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {searchResults.map((item) => (
-                  <button
+                  <CategorySearchResultCard
                     key={item.id}
-                    onClick={() => onNavigate(item.slug)}
-                    className="group w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-sm text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition-colors group-hover:bg-white/15 group-hover:text-white">
-                        {t("levelIndicator", { count: item.depth })}
-                      </span>
-                      <ChevronRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
-                    </div>
-                    <p className="font-semibold">{item.name}</p>
-                    <p className="mt-2 text-[11px] font-medium uppercase tracking-wide opacity-60">
-                      {t("currentPath")}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 opacity-80">
-                      {item.path}
-                    </p>
-                  </button>
+                    item={item}
+                    onClick={onNavigate}
+                  />
                 ))}
               </div>
             </div>
           ) : (
-            <div className="grid h-full grid-cols-1 md:grid-cols-[280px_320px_1fr]">
-              <section className="border-r border-slate-200 bg-slate-50/50 p-3">
-                <div className="mb-2 flex items-center justify-between gap-2 px-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {t("parentCategories")}
-                  </p>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                    {tree.length}
-                  </span>
-                </div>
-                <div className="h-full space-y-1 overflow-y-auto pb-4">
-                  {loading ? (
-                    <p className="px-2 text-sm text-slate-500">
-                      {t("loadingCategories")}
-                    </p>
-                  ) : (
-                    tree.map((parent) => {
-                      const isActive = activeParent?.id === parent.id;
-                      const isCurrent = activeCategorySlug === parent.slug;
-                      const ParentIcon = getCategoryIcon(parent.slug);
-                      return (
-                        <button
-                          key={parent.id}
-                          onClick={() => {
-                            setActiveParentId(parent.id);
-                            setActiveChildId(parent.children[0]?.id ?? null);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                            isActive
-                              ? "bg-[#0B123A] text-white"
-                              : isCurrent
-                                ? "bg-indigo-50 text-[#0B123A] ring-1 ring-indigo-200"
-                                : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            {ParentIcon && (
-                              <ParentIcon className="h-4 w-4 flex-shrink-0" />
-                            )}
-                            <span className="font-medium">{parent.name}</span>
-                          </span>
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </section>
-
-              <section className="border-r border-slate-200 p-3">
-                <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t("subcategories")}
-                </p>
-                {activeParent ? (
-                  <div className="mb-3 flex items-center justify-between gap-2 px-2 text-xs text-slate-500">
-                    <p>{t("exploringCurrent", { name: activeParent.name })}</p>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
-                      {activeParent.children.length}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="h-full space-y-1 overflow-y-auto pb-4">
-                  {activeParent ? (
-                    <>
-                      <button
-                        onClick={() => onNavigate(activeParent.slug)}
-                        className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                      >
-                        {t("viewAllInCategory", { name: activeParent.name })}
-                      </button>
-
-                      {activeParent.children.length === 0 ? (
-                        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                          {t("preparingCategory")}
-                        </p>
-                      ) : (
-                        activeParent.children.map((child) => {
-                          const isActive = activeChild?.id === child.id;
-                          const isCurrent = activeCategorySlug === child.slug;
-
-                          return (
-                            <div
-                              key={child.id}
-                              className="flex items-center gap-1"
-                            >
-                              <button
-                                onClick={() => setActiveChildId(child.id)}
-                                className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                                  isActive
-                                    ? "bg-[#0B123A] text-white"
-                                    : isCurrent
-                                      ? "bg-indigo-50 text-[#0B123A] ring-1 ring-indigo-200"
-                                      : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
-                                }`}
-                              >
-                                {child.name}
-                              </button>
-                              <button
-                                onClick={() => onNavigate(child.slug)}
-                                className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                                aria-label={t("viewProductsOf", {
-                                  name: child.name,
-                                })}
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </>
-                  ) : (
-                    <p className="px-2 text-sm text-slate-500">
-                      {t("noDataAvailable")}
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              <section className="p-3">
-                <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t("lowerLevels")}
-                </p>
-                {activeChild ? (
-                  <div className="mb-3 flex flex-wrap items-center gap-2 px-2">
+            <>
+              {activeCategoryTrail.length > 0 ? (
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        {t("currentPath")}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        {
+                          activeCategoryTrail[activeCategoryTrail.length - 1]
+                            ?.name
+                        }
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() =>
-                        setActiveChildId(activeParent?.children[0]?.id ?? null)
+                        onNavigate(
+                          activeCategoryTrail[activeCategoryTrail.length - 1]!
+                            .slug,
+                        )
                       }
-                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-[#0B123A] hover:text-[#0B123A]"
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
                     >
-                      {activeParent?.name}
+                      {t("openCurrentCategory")}
                     </button>
-                    <span className="text-slate-300">/</span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                      {activeChild.name}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeCategoryTrail.map((node, index) => (
+                      <button
+                        key={node.id}
+                        type="button"
+                        onClick={() => handleTrailSelection(index)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${index === activeCategoryTrail.length - 1 ? "border-indigo-300 bg-indigo-50 text-[#0B123A]" : "border-slate-200 bg-white text-slate-600 hover:border-[#0B123A] hover:text-[#0B123A]"}`}
+                      >
+                        {node.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="grid h-full grid-cols-1 md:grid-cols-[280px_320px_1fr]">
+                <section className="border-r border-slate-200 bg-slate-50/50 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2 px-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {t("parentCategories")}
+                    </p>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                      {tree.length}
                     </span>
                   </div>
-                ) : null}
-                <div className="h-full overflow-y-auto pb-4">
-                  {activeChild ? (
-                    <>
-                      <button
-                        onClick={() => onNavigate(activeChild.slug)}
-                        className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                      >
-                        {t("viewAllInCategory", { name: activeChild.name })}
-                      </button>
+                  <div className="h-full space-y-1 overflow-y-auto pb-4">
+                    {loading ? (
+                      <p className="px-2 text-sm text-slate-500">
+                        {t("loadingCategories")}
+                      </p>
+                    ) : (
+                      tree.map((parent) => {
+                        const isActive = activeParent?.id === parent.id;
+                        const isCurrent = activeCategorySlug === parent.slug;
+                        const ParentIcon = getCategoryIcon(parent.slug);
+                        return (
+                          <button
+                            key={parent.id}
+                            onClick={() => {
+                              setActiveParentId(parent.id);
+                              setActiveChildId(parent.children[0]?.id ?? null);
+                            }}
+                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                              isActive
+                                ? "bg-[#0B123A] text-white"
+                                : isCurrent
+                                  ? "bg-indigo-50 text-[#0B123A] ring-1 ring-indigo-200"
+                                  : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              {ParentIcon && (
+                                <ParentIcon className="h-4 w-4 flex-shrink-0" />
+                              )}
+                              <span className="font-medium">{parent.name}</span>
+                            </span>
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </section>
 
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {activeChild.children.map((grandchild) => {
-                          const isCurrent =
-                            activeCategorySlug === grandchild.slug;
-
-                          return (
-                            <button
-                              key={grandchild.id}
-                              onClick={() => onNavigate(grandchild.slug)}
-                              className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                                isCurrent
-                                  ? "border-indigo-300 bg-indigo-50 font-semibold text-[#0B123A]"
-                                  : "border-slate-200 text-slate-700 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                              }`}
-                            >
-                              {grandchild.name}
-                            </button>
-                          );
-                        })}
+                <section className="border-r border-slate-200 p-3">
+                  <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("subcategories")}
+                  </p>
+                  {activeParent ? (
+                    <div className="mb-3 space-y-2 px-2 text-xs text-slate-500">
+                      <div className="flex items-center justify-between gap-2">
+                        <p>
+                          {t("exploringCurrent", { name: activeParent.name })}
+                        </p>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+                          {activeParent.children.length}
+                        </span>
                       </div>
-                    </>
-                  ) : (
-                    <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                      {t("noLowerLevels")}
-                    </p>
-                  )}
-                </div>
-              </section>
-            </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 leading-5 text-slate-600">
+                        {t("chooseSubcategoryHint")}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="h-full space-y-1 overflow-y-auto pb-4">
+                    {activeParent ? (
+                      <>
+                        <button
+                          onClick={() => onNavigate(activeParent.slug)}
+                          className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                        >
+                          {t("viewAllInCategory", { name: activeParent.name })}
+                        </button>
+
+                        {activeParent.children.length === 0 ? (
+                          <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                            {t("preparingCategory")}
+                          </p>
+                        ) : (
+                          activeParent.children.map((child) => {
+                            const isActive = activeChild?.id === child.id;
+                            const isCurrent = activeCategorySlug === child.slug;
+
+                            return (
+                              <div
+                                key={child.id}
+                                className="flex items-center gap-1"
+                              >
+                                <button
+                                  onClick={() => setActiveChildId(child.id)}
+                                  className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                                    isActive
+                                      ? "bg-[#0B123A] text-white"
+                                      : isCurrent
+                                        ? "bg-indigo-50 text-[#0B123A] ring-1 ring-indigo-200"
+                                        : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
+                                  }`}
+                                >
+                                  {child.name}
+                                </button>
+                                <button
+                                  onClick={() => onNavigate(child.slug)}
+                                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                                  aria-label={t("viewProductsOf", {
+                                    name: child.name,
+                                  })}
+                                >
+                                  {t("view")}
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </>
+                    ) : (
+                      <p className="px-2 text-sm text-slate-500">
+                        {t("noDataAvailable")}
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <section className="p-3">
+                  <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("lowerLevels")}
+                  </p>
+                  {activeChild ? (
+                    <div className="mb-3 space-y-2 px-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveChildId(
+                              activeParent?.children[0]?.id ?? null,
+                            )
+                          }
+                          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-[#0B123A] hover:text-[#0B123A]"
+                        >
+                          {activeParent?.name}
+                        </button>
+                        <span className="text-slate-300">/</span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                          {activeChild.name}
+                        </span>
+                        {activeCategorySlug === activeChild.slug ? (
+                          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-[#0B123A]">
+                            {t("currentCategory")}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                        {t("chooseLowerLevelHint")}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="h-full overflow-y-auto pb-4">
+                    {activeChild ? (
+                      <>
+                        <button
+                          onClick={() => onNavigate(activeChild.slug)}
+                          className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                        >
+                          {t("viewAllInCategory", { name: activeChild.name })}
+                        </button>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {activeChild.children.map((grandchild) => {
+                            const isCurrent =
+                              activeCategorySlug === grandchild.slug;
+
+                            return (
+                              <button
+                                key={grandchild.id}
+                                onClick={() => onNavigate(grandchild.slug)}
+                                className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                                  isCurrent
+                                    ? "border-indigo-300 bg-indigo-50 font-semibold text-[#0B123A]"
+                                    : "border-slate-200 text-slate-700 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                                }`}
+                              >
+                                {grandchild.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                        {t("noLowerLevels")}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              </div>
+            </>
           )}
         </div>
       </aside>

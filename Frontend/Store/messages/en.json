@@ -35,7 +35,12 @@
     "loadingCategories": "Loading…",
     "preparingCategory": "Coming soon: we are preparing products for this category.",
     "noDataAvailable": "No data available.",
-    "noLowerLevels": "This subcategory has no lower levels."
+    "noLowerLevels": "This subcategory has no lower levels.",
+    "chooseSubcategoryHint": "Choose a subcategory or open the full listing directly.",
+    "chooseLowerLevelHint": "You can open this full level or go deeper into a more specific category.",
+    "mobileBrowseHint": "Tap the name to explore and use \"View\" to open products directly.",
+    "currentCategory": "Current category",
+    "openCurrentCategory": "Open current category"
   },
   "footer": {
     "title": "Be the first to know.",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { API_URL } from '../lib/env';
@@ -249,6 +249,19 @@ function RailControls({
   );
 }
 
+function handleRailWheel(event: ReactWheelEvent<HTMLDivElement>) {
+  const rail = event.currentTarget;
+  const canScrollHorizontally = rail.scrollWidth > rail.clientWidth + 4;
+  const mostlyVertical = Math.abs(event.deltaY) > Math.abs(event.deltaX);
+
+  if (!canScrollHorizontally || !mostlyVertical) {
+    return;
+  }
+
+  event.preventDefault();
+  rail.scrollBy({ left: event.deltaY, behavior: 'auto' });
+}
+
 function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: string; items: unknown[]; config?: Record<string, unknown> }) {
   const slides = useMemo(
     () =>
@@ -450,6 +463,8 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
   const showTopBadges = config?.show_top_badges === true;
   const ctaText = (asText(config?.cta_text, 'Explorar').trim() || 'Explorar').slice(0, 24);
+  const mobileCardPx = Math.max(176, Math.floor(360 / mobileCols));
+  const desktopCardPx = Math.max(198, Math.floor(1240 / desktopCols));
   const cardToneClass = elevatedCards
     ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
@@ -457,59 +472,62 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
       <div
-        className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(var(--cols-mobile),minmax(0,1fr))] lg:[grid-template-columns:repeat(var(--cols-desktop),minmax(0,1fr))]"
-        style={{
-          ['--cols-mobile' as string]: String(mobileCols),
-          ['--cols-desktop' as string]: String(desktopCols),
-        }}
+        className="-mx-1 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
+        onWheel={handleRailWheel}
       >
-        {list.map((cat, idx) => {
-          const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
-          const imageValue = cat.image_url || cat.image || cat.banner_image;
-          const hasVisual = !isLikelyMissingImage(imageValue);
-          if (!hasVisual) {
-            if (process.env.NODE_ENV !== 'production') {
-              console.warn('[store-home][category-strip] Missing category image', {
-                categoryId: asText(cat.id, `cat-${idx}`),
-                slug: asText(cat.slug),
-                name,
-              });
+        <div className="flex min-w-max gap-3 px-1 sm:gap-4">
+          {list.map((cat, idx) => {
+            const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
+            const imageValue = cat.image_url || cat.image || cat.banner_image;
+            const hasVisual = !isLikelyMissingImage(imageValue);
+            if (!hasVisual) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn('[store-home][category-strip] Missing category image', {
+                  categoryId: asText(cat.id, `cat-${idx}`),
+                  slug: asText(cat.slug),
+                  name,
+                });
+              }
             }
-          }
-          return (
-          <ActionLink
-            key={asText(cat.id, `cat-${idx}`)}
-            href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-            className={`group relative flex min-h-[224px] flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
-          >
-            {showTopBadges && idx < 3 ? (
-              <span className="absolute right-2 top-2 rounded-full border border-indigo-200 bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
-                Top {idx + 1}
-              </span>
-            ) : null}
-            <div className="mx-auto mb-3 mt-1 relative h-28 w-full overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100/70 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
-              {hasVisual ? (
-                <SmartImage
-                  src={asSrc(imageValue)}
-                  alt={name}
-                  className={imageFitClass}
-                  sizes="160px"
-                />
-              ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-400"><span className="text-lg">◻</span><span>Sin imagen</span></div>
-              )}
-            </div>
-            {showNames ? (
-              <p title={name} className="line-clamp-2 min-h-12 break-words text-base font-semibold leading-6 text-slate-800 transition-colors group-hover:text-indigo-700">{name}</p>
-            ) : null}
-            <div className="mt-auto pt-2">
-              <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition group-hover:brightness-110 group-hover:shadow-md">
-                {ctaText} <span aria-hidden>→</span>
-              </div>
-            </div>
-          </ActionLink>
-          );
-        })}
+            return (
+              <ActionLink
+                key={asText(cat.id, `cat-${idx}`)}
+                href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
+                className={`group relative flex min-h-[224px] w-[var(--card-mobile)] flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:w-[var(--card-desktop)] ${cardToneClass}`}
+                style={{
+                  ['--card-mobile' as string]: `${mobileCardPx}px`,
+                  ['--card-desktop' as string]: `${desktopCardPx}px`,
+                }}
+              >
+                {showTopBadges && idx < 3 ? (
+                  <span className="absolute right-2 top-2 rounded-full border border-indigo-200 bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
+                    Top {idx + 1}
+                  </span>
+                ) : null}
+                <div className="relative mx-auto mb-3 mt-1 h-28 w-full overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100/70 p-2 ring-1 ring-slate-100 transition group-hover:ring-indigo-200">
+                  {hasVisual ? (
+                    <SmartImage
+                      src={asSrc(imageValue)}
+                      alt={name}
+                      className={imageFitClass}
+                      sizes="180px"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-400"><span className="text-lg">◻</span><span>Sin imagen</span></div>
+                  )}
+                </div>
+                {showNames ? (
+                  <p title={name} className="line-clamp-2 min-h-12 break-words text-base font-semibold leading-6 text-slate-800 transition-colors group-hover:text-indigo-700">{name}</p>
+                ) : null}
+                <div className="mt-auto pt-3">
+                  <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm transition group-hover:brightness-110 group-hover:shadow-md">
+                    {ctaText} <span aria-hidden>→</span>
+                  </div>
+                </div>
+              </ActionLink>
+            );
+          })}
+        </div>
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
     </SectionShell>
@@ -523,8 +541,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   );
   const mobileItems = Math.max(1, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
   const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
-  const mobileCardPx = Math.max(168, Math.floor(360 / mobileItems));
-  const desktopCardPx = Math.max(205, Math.floor(1160 / desktopItems));
+  const mobileCardPx = Math.max(176, Math.floor(380 / mobileItems));
+  const desktopCardPx = Math.max(228, Math.floor(1240 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -667,7 +685,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       <ActionLink
         key={asText(product.id, `prod-${idx}`)}
         href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-        className="group relative snap-start overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg min-w-[var(--card-mobile)] max-w-[var(--card-mobile)] md:min-w-[var(--card-desktop)] md:max-w-[var(--card-desktop)]"
+        className="group relative flex min-h-[26rem] snap-start flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg min-w-[var(--card-mobile)] max-w-[var(--card-mobile)] md:min-h-[27rem] md:min-w-[var(--card-desktop)] md:max-w-[var(--card-desktop)]"
         style={{
           ['--card-mobile' as string]: `${mobileCardPx}px`,
           ['--card-desktop' as string]: `${desktopCardPx}px`,
@@ -690,28 +708,32 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
           ) : null}
         </div>
 
-        <p className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
-        <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
+        <div className="flex flex-1 flex-col">
+          <p className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
+          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
 
-        <div className="mt-3 flex items-end gap-2">
-          <span className={`text-xl font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
-            {eur.format(Number(product.price || 0))}
-          </span>
-          {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{eur.format(Number(product.compare_at_price || 0))}</span> : null}
-        </div>
+          <div className="mt-3 flex items-end gap-2">
+            <span className={`text-xl font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
+              {eur.format(Number(product.price || 0))}
+            </span>
+            {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{eur.format(Number(product.compare_at_price || 0))}</span> : null}
+          </div>
 
-        <div className="mt-2">
-          {stock <= 0 ? (
-            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">Sin stock temporal</span>
-          ) : stock <= 8 ? (
-            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">¡Solo quedan {stock}!</span>
-          ) : (
-            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">En stock · envío rápido</span>
-          )}
-        </div>
+          <div className="mt-2 min-h-[3rem]">
+            {stock <= 0 ? (
+              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">Sin stock temporal</span>
+            ) : stock <= 8 ? (
+              <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">¡Solo quedan {stock}!</span>
+            ) : (
+              <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">En stock · envío rápido</span>
+            )}
+          </div>
 
-        <div className="mt-3 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition group-hover:border-indigo-200 group-hover:bg-indigo-50 group-hover:text-indigo-700">
-          Ver producto <span aria-hidden className="ml-1">→</span>
+          <div className="mt-auto pt-4">
+            <div className="flex min-h-[3rem] w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-semibold text-slate-700 transition group-hover:border-indigo-200 group-hover:bg-indigo-50 group-hover:text-indigo-700">
+              Ver producto <span aria-hidden className="ml-1">→</span>
+            </div>
+          </div>
         </div>
       </ActionLink>
     );
@@ -755,18 +777,21 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
           </div>
         ) : (
           <>
-            <div
-              ref={railRef}
-              onScroll={syncRailState}
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
-              onTouchStart={() => setIsPaused(true)}
-              onTouchEnd={() => setIsPaused(false)}
-              onFocusCapture={() => setIsPaused(true)}
-              onBlurCapture={() => setIsPaused(false)}
-              className="flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scroll-padding-left:8px] active:cursor-grabbing"
-            >
-              {list.map((product, idx) => renderCard(product, idx))}
+            <div className="-mx-1 px-1">
+              <div
+                ref={railRef}
+                onScroll={syncRailState}
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
+                onTouchStart={() => setIsPaused(true)}
+                onTouchEnd={() => setIsPaused(false)}
+                onFocusCapture={() => setIsPaused(true)}
+                onBlurCapture={() => setIsPaused(false)}
+                onWheel={handleRailWheel}
+                className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-4 pt-2 [scrollbar-width:thin] [scroll-padding-inline:8px] active:cursor-grabbing"
+              >
+                {list.map((product, idx) => renderCard(product, idx))}
+              </div>
             </div>
 
             {list.length > 1 && showDots ? (
@@ -876,7 +901,8 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
         onTouchEnd={() => setIsPaused(false)}
         onFocusCapture={() => setIsPaused(true)}
         onBlurCapture={() => setIsPaused(false)}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]"
+        onWheel={handleRailWheel}
+        className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin]"
       >
         {list.map((brand, idx) => (
           <ActionLink

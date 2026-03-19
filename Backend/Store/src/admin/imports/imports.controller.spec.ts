@@ -16,6 +16,10 @@ describe('ImportsController', () => {
     fullSync: jest.fn(),
     syncStockRealTime: jest.fn(),
     syncImages: jest.fn(),
+    listImportRuns: jest.fn(),
+    getImportRunById: jest.fn(),
+    getImportRunErrors: jest.fn(),
+    getProviderStats: jest.fn(),
   } as unknown as InfortisaSyncService;
 
   const auditLogService = {
@@ -52,7 +56,27 @@ describe('ImportsController', () => {
     });
   });
 
+  it('returns structured import runs', async () => {
+    (infortisaSync.listImportRuns as jest.Mock).mockResolvedValue([{ id: 'run-1' }]);
+
+    await expect(controller.runs()).resolves.toEqual({
+      success: true,
+      data: [{ id: 'run-1' }],
+    });
+  });
+
+  it('returns provider stats', async () => {
+    (infortisaSync.getProviderStats as jest.Mock).mockResolvedValue({ provider: 'infortisa' });
+
+    await expect(controller.providerStats()).resolves.toEqual({
+      success: true,
+      data: { provider: 'infortisa' },
+    });
+  });
+
   it('triggers stock sync and logs execution', async () => {
+    (infortisaSync.syncStockRealTime as jest.Mock).mockResolvedValue({ id: 'run-2' });
+
     const req = {
       user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },
       method: 'POST',
@@ -73,7 +97,7 @@ describe('ImportsController', () => {
       expect.objectContaining({
         action: 'IMPORT_TRIGGERED',
         resource: 'IMPORT_JOB',
-        metadata: expect.objectContaining({ mode: 'stock' }),
+        metadata: expect.objectContaining({ mode: 'stock', run: { id: 'run-2' } }),
       }),
     );
     expect(result.success).toBe(true);

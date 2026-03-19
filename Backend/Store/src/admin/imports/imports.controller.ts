@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
+  Param,
   Post,
   Query,
   Req,
@@ -47,7 +49,7 @@ export class ImportsController {
       images: () => this.infortisaSync.syncImages(),
     };
 
-    await modeHandlers[body.mode]();
+    const runResult = await modeHandlers[body.mode]();
 
     const durationMs = Date.now() - startedAt;
     const detailsParts = [
@@ -86,12 +88,14 @@ export class ImportsController {
         mode: body.mode,
         durationMs,
         ...(body.reason ? { reason: body.reason } : {}),
+        ...(runResult && typeof runResult === 'object' ? { run: runResult } : {}),
       },
     });
 
     return {
       mode: body.mode,
       durationMs,
+      run: runResult,
       ...(body.reason ? { reason: body.reason } : {}),
     };
   }
@@ -123,6 +127,33 @@ export class ImportsController {
         totalPages: Math.ceil(total / limitNum),
       },
     };
+  }
+
+  @Get('runs')
+  async runs() {
+    const items = await this.infortisaSync.listImportRuns();
+    return { success: true, data: items };
+  }
+
+  @Get('runs/:id')
+  async runDetail(@Param('id') id: string) {
+    const item = await this.infortisaSync.getImportRunById(id);
+    if (!item) {
+      throw new NotFoundException('Import run not found');
+    }
+    return { success: true, data: item };
+  }
+
+  @Get('runs/:id/errors')
+  async runErrors(@Param('id') id: string) {
+    const errors = await this.infortisaSync.getImportRunErrors(id);
+    return { success: true, data: errors };
+  }
+
+  @Get('provider-stats')
+  async providerStats() {
+    const stats = await this.infortisaSync.getProviderStats();
+    return { success: true, data: stats };
   }
 
   @Post('run')

@@ -81,10 +81,17 @@ export {
 
 export {
   fetchImportHistory,
+  fetchImportRun,
+  fetchImportRunErrors,
+  fetchImportRuns,
+  fetchProviderStats,
   retryImport,
   triggerImport,
   type ImportHistoryItem,
   type ImportHistoryResponse,
+  type ImportRun,
+  type ImportRunError,
+  type ProviderStatsResponse,
 } from "./imports";
 
 export {

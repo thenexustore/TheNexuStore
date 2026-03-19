@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -25,6 +26,17 @@ import {
 import { UpdateImportIntegrationConfigDto } from './dto/imports-config.dto';
 import { ImportsConfigService } from './imports-config.service';
 
+interface AdminRequestUser {
+  id?: string;
+  email?: string;
+  role?: string;
+  permissions?: string[];
+}
+
+type AdminRequest = Request & {
+  user?: AdminRequestUser;
+};
+
 @Controller('admin/imports')
 @UseGuards(AdminGuard)
 @Roles(StaffRole.ADMIN)
@@ -38,7 +50,7 @@ export class ImportsController {
 
   private async executeImport(
     body: { mode: TriggerImportDto['mode']; reason?: string },
-    req: Request,
+    req: AdminRequest,
     options?: { isRetry?: boolean },
   ) {
     const startedAt = Date.now();
@@ -48,6 +60,7 @@ export class ImportsController {
       () => Promise<unknown>
     > = {
       full: () => this.infortisaSync.fullSync(),
+      incremental: () => this.infortisaSync.syncProductsIncremental(),
       stock: () => this.infortisaSync.syncStockRealTime(),
       images: () => this.infortisaSync.syncImages(),
     };
@@ -108,7 +121,9 @@ export class ImportsController {
     });
 
     await this.auditLogService.logAction({
-      actor: req.user as any,
+      actor: req.user
+        ? { id: req.user.id, email: req.user.email, role: req.user.role }
+        : undefined,
       action: options?.isRetry ? 'IMPORT_RETRY_TRIGGERED' : 'IMPORT_TRIGGERED',
       resource: 'IMPORT_JOB',
       method: req.method,
@@ -120,14 +135,14 @@ export class ImportsController {
         mode: body.mode,
         durationMs,
         ...(body.reason ? { reason: body.reason } : {}),
-        ...(runResult && typeof runResult === 'object' ? { run: runResult } : {}),
+        ...(result && typeof result === 'object' ? { run: result } : {}),
       },
     });
 
     return {
       mode: body.mode,
       durationMs,
-      run: runResult,
+      run: result,
       ...(body.reason ? { reason: body.reason } : {}),
       ...(result && typeof result === 'object'
         ? (result as Record<string, unknown>)
@@ -138,11 +153,11 @@ export class ImportsController {
   @Get('config')
   @Permissions('imports:config:read')
   async config(
-    @Req() req: Request,
+    @Req() req: AdminRequest,
     @Query('includeSecret') includeSecret?: string,
   ) {
-    const permissions = Array.isArray((req.user as any)?.permissions)
-      ? ((req.user as any).permissions as string[])
+    const permissions = Array.isArray(req.user?.permissions)
+      ? req.user.permissions
       : [];
     const canReadSecret =
       permissions.includes('full_access') ||
@@ -231,9 +246,16 @@ export class ImportsController {
     return { success: true, data: stats };
   }
 
+  @Get('runtime-overview')
+  @Permissions('imports:config:read')
+  async runtimeOverview() {
+    const data = await this.infortisaSync.getRuntimeOverview();
+    return { success: true, data };
+  }
+
   @Post('run')
   @Permissions('imports:run')
-  async run(@Body() body: TriggerImportDto, @Req() req: Request) {
+  async run(@Body() body: TriggerImportDto, @Req() req: AdminRequest) {
     const data = await this.executeImport(body, req);
 
     return {
@@ -245,7 +267,7 @@ export class ImportsController {
 
   @Post('retry')
   @Permissions('imports:retry')
-  async retry(@Body() body: RetryImportDto, @Req() req: Request) {
+  async retry(@Body() body: RetryImportDto, @Req() req: AdminRequest) {
     const data = await this.executeImport(body, req, { isRetry: true });
 
     return {

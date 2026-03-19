@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
+import { CronJob } from 'cron';
 import {
   InfortisaCatalogFetchResult,
   InfortisaService,
@@ -11,6 +12,11 @@ import {
   extractInfortisaStock,
   extractLifecycleCode,
 } from './infortisa-normalization.util';
+import {
+  DEFAULT_IMPORT_RUNTIME_SETTINGS,
+  normalizeImportRuntimeSettings,
+  type ImportRuntimeSettings,
+} from './import-runtime-settings';
 
 type SyncMode = 'full' | 'incremental' | 'stock' | 'images';
 
@@ -32,10 +38,28 @@ type ProductBatchStats = {
   incidents: RunErrorInput[];
 };
 
+
+type RuntimeJobOverview = {
+  key: SyncMode;
+  job_name: string;
+  cron: string;
+  enabled_in_settings: boolean;
+  effective_enabled: boolean;
+  registered: boolean;
+  next_run_at: string | null;
+};
+
+type RuntimeOverview = {
+  provider: string;
+  integration_enabled: boolean;
+  settings: ImportRuntimeSettings;
+  jobs: RuntimeJobOverview[];
+};
+
 type ImportRunSummary = {
   id: string;
   provider: string;
-  mode: SyncMode;
+  mode: string;
   started_at: Date;
   finished_at: Date | null;
   status: 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED';
@@ -53,21 +77,202 @@ type ImportRunSummary = {
 };
 
 @Injectable()
-export class InfortisaSyncService {
+export class InfortisaSyncService implements OnModuleInit {
   private readonly logger = new Logger(InfortisaSyncService.name);
-  private readonly BATCH_SIZE = 100;
-  private readonly FULL_SYNC_BATCH_SIZE = 500;
   private readonly PROVIDER = 'infortisa';
   private readonly MAX_INCIDENTS = 10;
   private readonly DEFAULT_LAST_SYNC = '01/01/2024 00:00:00';
+  private readonly STOCK_SYNC_JOB = 'infortisa-stock-sync';
+  private readonly INCREMENTAL_SYNC_JOB = 'infortisa-incremental-sync';
+  private readonly FULL_SYNC_JOB = 'infortisa-full-sync';
+  private readonly IMAGES_SYNC_JOB = 'infortisa-images-sync';
+  private runtimeSettings: ImportRuntimeSettings = DEFAULT_IMPORT_RUNTIME_SETTINGS;
 
   constructor(
     private prisma: PrismaService,
     private infortisa: InfortisaService,
     private products: ProductsService,
+    private schedulerRegistry: SchedulerRegistry,
   ) {}
 
-  @Cron('0 2 * * *')
+  async onModuleInit() {
+    await this.reloadRuntimeSettings();
+  }
+
+  async reloadRuntimeSettings() {
+    const record = await this.prisma.supplierIntegration.findUnique({
+      where: { provider: 'INFORTISA' },
+      select: { is_active: true, settings_json: true },
+    });
+
+    this.runtimeSettings = normalizeImportRuntimeSettings(
+      record?.settings_json && typeof record.settings_json === 'object'
+        ? (record.settings_json as Record<string, unknown>)
+        : undefined,
+    );
+
+    const integrationEnabled = record?.is_active ?? true;
+
+    this.configureCronJob(
+      this.STOCK_SYNC_JOB,
+      this.runtimeSettings.stock_sync_cron,
+      () => void this.syncStockRealTime(),
+      integrationEnabled && this.runtimeSettings.stock_sync_enabled,
+    );
+    this.configureCronJob(
+      this.INCREMENTAL_SYNC_JOB,
+      this.runtimeSettings.incremental_sync_cron,
+      () => void this.syncProductsIncremental(),
+      integrationEnabled && this.runtimeSettings.incremental_sync_enabled,
+    );
+    this.configureCronJob(
+      this.FULL_SYNC_JOB,
+      this.runtimeSettings.full_sync_cron,
+      () => void this.fullSync(),
+      integrationEnabled && this.runtimeSettings.full_sync_enabled,
+    );
+    this.configureCronJob(
+      this.IMAGES_SYNC_JOB,
+      this.runtimeSettings.images_sync_cron,
+      () => void this.syncImages(),
+      integrationEnabled && this.runtimeSettings.images_sync_enabled,
+    );
+  }
+
+
+  private tryGetCronJob(jobName: string) {
+    try {
+      return this.schedulerRegistry.getCronJob(jobName);
+    } catch {
+      return null;
+    }
+  }
+
+  private serializeCronNextRun(job: CronJob | null) {
+    if (!job) {
+      return null;
+    }
+
+    try {
+      const next = (job as any).nextDate?.() ?? (job as any).nextDates?.(1);
+      const value = Array.isArray(next) ? next[0] : next;
+
+      if (!value) {
+        return null;
+      }
+
+      if (typeof value?.toISO === 'function') {
+        return value.toISO();
+      }
+
+      if (typeof value?.toJSDate === 'function') {
+        return value.toJSDate().toISOString();
+      }
+
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+
+      if (typeof value === 'string') {
+        return value;
+      }
+
+      const date = new Date(String(value));
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    } catch {
+      return null;
+    }
+  }
+
+  async getRuntimeOverview(): Promise<RuntimeOverview> {
+    const record = await this.prisma.supplierIntegration.findUnique({
+      where: { provider: 'INFORTISA' },
+      select: { is_active: true, settings_json: true },
+    });
+
+    const settings = normalizeImportRuntimeSettings(
+      record?.settings_json && typeof record.settings_json === 'object'
+        ? (record.settings_json as Record<string, unknown>)
+        : undefined,
+    );
+    const integrationEnabled = record?.is_active ?? true;
+    const jobs: Array<Pick<RuntimeJobOverview, 'key' | 'job_name' | 'cron' | 'enabled_in_settings'>> = [
+      {
+        key: 'stock',
+        job_name: this.STOCK_SYNC_JOB,
+        cron: settings.stock_sync_cron,
+        enabled_in_settings: settings.stock_sync_enabled,
+      },
+      {
+        key: 'incremental',
+        job_name: this.INCREMENTAL_SYNC_JOB,
+        cron: settings.incremental_sync_cron,
+        enabled_in_settings: settings.incremental_sync_enabled,
+      },
+      {
+        key: 'full',
+        job_name: this.FULL_SYNC_JOB,
+        cron: settings.full_sync_cron,
+        enabled_in_settings: settings.full_sync_enabled,
+      },
+      {
+        key: 'images',
+        job_name: this.IMAGES_SYNC_JOB,
+        cron: settings.images_sync_cron,
+        enabled_in_settings: settings.images_sync_enabled,
+      },
+    ];
+
+    return {
+      provider: this.PROVIDER,
+      integration_enabled: integrationEnabled,
+      settings,
+      jobs: jobs.map((job) => {
+        const effectiveEnabled = integrationEnabled && job.enabled_in_settings;
+        const registeredJob = this.tryGetCronJob(job.job_name);
+
+        return {
+          ...job,
+          effective_enabled: effectiveEnabled,
+          registered: Boolean(registeredJob),
+          next_run_at: this.serializeCronNextRun(registeredJob),
+        };
+      }),
+    };
+  }
+
+  private configureCronJob(
+    jobName: string,
+    cronTime: string,
+    onTick: () => void,
+    enabled: boolean,
+  ) {
+    try {
+      const existingJob = this.schedulerRegistry.getCronJob(jobName);
+      existingJob.stop();
+      this.schedulerRegistry.deleteCronJob(jobName);
+    } catch {
+      // no-op when the job does not exist yet
+    }
+
+    if (!enabled) {
+      return;
+    }
+
+    const job = new CronJob(cronTime, onTick, null, false, 'UTC');
+
+    this.schedulerRegistry.addCronJob(jobName, job);
+    job.start();
+  }
+
+  private get stockBatchSize() {
+    return this.runtimeSettings.stock_batch_size;
+  }
+
+  private get fullSyncBatchSize() {
+    return this.runtimeSettings.full_sync_batch_size;
+  }
+
   async fullSync() {
     try {
       this.logger.log('Starting full synchronization');
@@ -82,7 +287,6 @@ export class InfortisaSyncService {
     }
   }
 
-  @Cron('*/5 * * * *')
   async syncStockRealTime() {
     const startedAt = new Date();
     const run = await this.createImportRun({
@@ -96,7 +300,7 @@ export class InfortisaSyncService {
       this.logger.debug('Starting real-time stock sync');
       const lastSync = await this.getLastSync('stock_realtime');
       const items = await this.infortisa.getModifiedStock(lastSync);
-      const batches = this.chunkArray(items, this.BATCH_SIZE);
+      const batches = this.chunkArray(items, this.stockBatchSize);
       let processed = 0;
       let errors = 0;
       const incidents: RunErrorInput[] = [];
@@ -172,7 +376,6 @@ export class InfortisaSyncService {
     }
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
   async syncProductsIncremental() {
     const startedAt = new Date();
     const run = await this.createImportRun({
@@ -259,16 +462,15 @@ export class InfortisaSyncService {
       this.assertCatalogNotProbablyTruncated(catalog);
 
       const allProducts = catalog.items;
-      const batchSize = 500;
-      const totals = { ...this.emptyBatchStats };
+      const totals = this.emptyProductBatchStats();
 
-      for (let i = 0; i < allProducts.length; i += this.FULL_SYNC_BATCH_SIZE) {
-        const batch = allProducts.slice(i, i + this.FULL_SYNC_BATCH_SIZE);
+      for (let i = 0; i < allProducts.length; i += this.fullSyncBatchSize) {
+        const batch = allProducts.slice(i, i + this.fullSyncBatchSize);
         const stats = await this.processProductsBatch(batch, 'full_upsert');
         this.mergeProductBatchStats(totals, stats);
 
-        if (i + this.FULL_SYNC_BATCH_SIZE < allProducts.length) {
-          await this.delay(1000);
+        if (i + this.fullSyncBatchSize < allProducts.length) {
+          await this.delay(this.runtimeSettings.full_sync_batch_delay_ms);
         }
       }
 
@@ -331,7 +533,7 @@ export class InfortisaSyncService {
             none: {},
           },
         },
-        take: 50,
+        take: this.runtimeSettings.image_sync_take,
       });
 
       for (const product of products) {
@@ -528,11 +730,11 @@ export class InfortisaSyncService {
 
   private async createImportRun(input: {
     provider: string;
-    mode: SyncMode;
+    mode: string;
     startedAt: Date;
     requestMeta?: Prisma.InputJsonValue;
   }) {
-    return (this.prisma as any).importRun.create({
+    return this.prisma.importRun.create({
       data: {
         provider: input.provider,
         mode: input.mode,
@@ -546,7 +748,7 @@ export class InfortisaSyncService {
     id: string,
     data: Record<string, unknown>,
   ) {
-    await (this.prisma as any).importRun.update({
+    await this.prisma.importRun.update({
       where: { id },
       data,
     });
@@ -570,7 +772,7 @@ export class InfortisaSyncService {
     },
   ) {
     await this.prisma.$transaction(async (tx) => {
-      await (tx as any).importRun.update({
+      await tx.importRun.update({
         where: { id },
         data: {
           finished_at: input.finishedAt,
@@ -588,7 +790,7 @@ export class InfortisaSyncService {
       });
 
       if (input.incidents.length > 0) {
-        await (tx as any).importRunError.createMany({
+        await tx.importRunError.createMany({
           data: input.incidents.map((incident) => ({
             import_run_id: id,
             sku: incident.sku ?? undefined,
@@ -609,7 +811,7 @@ export class InfortisaSyncService {
     const message = this.extractErrorMessage(error);
 
     await this.prisma.$transaction(async (tx) => {
-      await (tx as any).importRun.update({
+      await tx.importRun.update({
         where: { id },
         data: {
           finished_at: new Date(),
@@ -622,7 +824,7 @@ export class InfortisaSyncService {
         },
       });
 
-      await (tx as any).importRunError.create({
+      await tx.importRunError.create({
         data: {
           import_run_id: id,
           stage: 'run',
@@ -634,7 +836,105 @@ export class InfortisaSyncService {
   }
 
   private async getImportRunSummary(id: string): Promise<ImportRunSummary> {
-    return (this.prisma as any).importRun.findUniqueOrThrow({ where: { id } });
+    return this.prisma.importRun.findUniqueOrThrow({ where: { id } });
+  }
+
+  async listImportRuns(limit = 20) {
+    return this.prisma.importRun.findMany({
+      orderBy: { started_at: 'desc' },
+      take: limit,
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 5,
+        },
+      },
+    });
+  }
+
+  async getImportRunById(id: string) {
+    return this.prisma.importRun.findUnique({
+      where: { id },
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 50,
+        },
+      },
+    });
+  }
+
+  async getImportRunErrors(id: string, limit = 100) {
+    return this.prisma.importRunError.findMany({
+      where: { import_run_id: id },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getProviderStats() {
+    const provider = this.PROVIDER.toLowerCase();
+    const runs = await this.prisma.importRun.findMany({
+      where: { provider },
+      orderBy: { started_at: 'desc' },
+      take: 50,
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 5,
+        },
+      },
+    });
+
+    const latestRun = runs[0] ?? null;
+    const statusCounts = runs.reduce<Record<string, number>>((acc, run) => {
+      acc[run.status] = (acc[run.status] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const aggregates = runs.reduce(
+      (acc, run) => {
+        acc.source_items_received += run.source_items_received ?? 0;
+        acc.processed_count += run.processed_count ?? 0;
+        acc.persisted_count += run.persisted_count ?? 0;
+        acc.validation_skipped_count += run.validation_skipped_count ?? 0;
+        acc.created_count += run.created_count ?? 0;
+        acc.updated_count += run.updated_count ?? 0;
+        acc.skipped_count += run.skipped_count ?? 0;
+        acc.error_count += run.error_count ?? 0;
+        acc.archived_count += run.archived_count ?? 0;
+        return acc;
+      },
+      {
+        source_items_received: 0,
+        processed_count: 0,
+        persisted_count: 0,
+        validation_skipped_count: 0,
+        created_count: 0,
+        updated_count: 0,
+        skipped_count: 0,
+        error_count: 0,
+        archived_count: 0,
+      },
+    );
+
+    const differenceReceivedVsPersisted =
+      aggregates.source_items_received - aggregates.persisted_count;
+    const note =
+      runs.length === 0
+        ? 'No import runs recorded yet.'
+        : differenceReceivedVsPersisted === 0
+          ? `La API devolvió ${aggregates.source_items_received} elementos y el catálogo persistió ${aggregates.persisted_count}.`
+          : `La API devolvió ${aggregates.source_items_received} elementos pero el catálogo persistió ${aggregates.persisted_count}.`;
+
+    return {
+      provider,
+      latestRun,
+      statusCounts,
+      aggregates,
+      difference_received_vs_persisted: differenceReceivedVsPersisted,
+      note,
+    };
   }
 
   private resolveRunStatus(errors: number, validationSkipped: number) {

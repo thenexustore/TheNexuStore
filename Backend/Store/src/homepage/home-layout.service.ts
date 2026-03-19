@@ -43,7 +43,12 @@ export class HomeLayoutService {
     return Math.max(1, Math.min(24, Math.floor(n)));
   }
 
-  private clampRange(value: unknown, min: number, max: number, fallback: number) {
+  private clampRange(
+    value: unknown,
+    min: number,
+    max: number,
+    fallback: number,
+  ) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return fallback;
     return Math.max(min, Math.min(max, Math.floor(numeric)));
@@ -60,7 +65,10 @@ export class HomeLayoutService {
     const text = `${name || ''} ${slug || ''}`.toLowerCase();
     const buckets: Array<{ terms: string[]; score: number }> = [
       { terms: ['portatil', 'portátil', 'laptop', 'notebook'], score: 70 },
-      { terms: ['impresora', 'printer', 'multifuncion', 'multifunción'], score: 55 },
+      {
+        terms: ['impresora', 'printer', 'multifuncion', 'multifunción'],
+        score: 55,
+      },
       { terms: ['monitor', 'pantalla'], score: 50 },
       { terms: ['tablet', 'ipad'], score: 45 },
       { terms: ['teclado', 'keyboard'], score: 35 },
@@ -130,8 +138,6 @@ export class HomeLayoutService {
 
     return next;
   }
-
-
 
   private toProductCard(p: any) {
     const sku = p.skus?.[0];
@@ -285,7 +291,6 @@ export class HomeLayoutService {
     return { success: true };
   }
 
-
   private async reindexLayoutSections(layoutId: string) {
     const sections = await this.prisma.homePageSection.findMany({
       where: { layout_id: layoutId },
@@ -378,7 +383,9 @@ export class HomeLayoutService {
   }
 
   async removeSection(id: string) {
-    const section = await this.prisma.homePageSection.findUnique({ where: { id } });
+    const section = await this.prisma.homePageSection.findUnique({
+      where: { id },
+    });
     if (!section) throw new NotFoundException('Section not found');
 
     await this.prisma.homePageSection.delete({ where: { id } });
@@ -429,7 +436,6 @@ export class HomeLayoutService {
     this.invalidateCache();
     return { success: true };
   }
-
 
   async uploadItemImage(dataUrl: string) {
     if (!dataUrl?.startsWith('data:image/')) {
@@ -511,8 +517,12 @@ export class HomeLayoutService {
     const source = config.source || 'NEW_ARRIVALS';
     const limit = this.clampLimit(config.limit, 12);
     const inStockOnly = config.inStockOnly ?? true;
-    const categoryId = String(config.categoryId || config.query?.categoryId || '').trim();
-    const brandId = String(config.brandId || config.query?.brandId || '').trim();
+    const categoryId = String(
+      config.categoryId || config.query?.categoryId || '',
+    ).trim();
+    const brandId = String(
+      config.brandId || config.query?.brandId || '',
+    ).trim();
     const sortBy = (config.sortBy || config.query?.sortBy || 'newest') as any;
 
     if (config.mode === 'curated') {
@@ -605,7 +615,10 @@ export class HomeLayoutService {
     }
 
     if (source === 'BEST_DEALS') {
-      const deals = await this.productsService.getDealsProducts(limit, inStockOnly);
+      const deals = await this.productsService.getDealsProducts(
+        limit,
+        inStockOnly,
+      );
       if (deals.length) return deals;
 
       // If there are no active discounted products, keep the section useful by
@@ -632,7 +645,11 @@ export class HomeLayoutService {
       const featuredCards = featured
         .map((entry) => entry.product)
         .filter((p) => p?.status === 'ACTIVE')
-        .filter((p) => (inStockOnly ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0 : true))
+        .filter((p) =>
+          inStockOnly
+            ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0
+            : true,
+        )
         .map((product) => this.toProductCard(product));
       if (featuredCards.length) return featuredCards;
     }
@@ -649,32 +666,51 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const [items, activeBanners] = await Promise.all([
-        this.prisma.homePageSectionItem.findMany({
-          where: { section_id: section.id },
-          orderBy: { position: 'asc' },
-          include: { banner: true },
-        }),
+      const items = await this.prisma.homePageSectionItem.findMany({
+        where: { section_id: section.id },
+        orderBy: { position: 'asc' },
+        include: { banner: true },
+      });
+
+      const curatedBannerIds = Array.from(
+        new Set(
+          items
+            .map((item) => item.banner_id || item.banner?.id || null)
+            .filter((bannerId): bannerId is string => Boolean(bannerId)),
+        ),
+      );
+
+      const [curatedActiveBanners, fallbackActiveBanners] = await Promise.all([
+        curatedBannerIds.length
+          ? this.prisma.banner.findMany({
+              where: { is_active: true, id: { in: curatedBannerIds } },
+            })
+          : Promise.resolve([]),
         this.prisma.banner.findMany({
-          where: { is_active: true },
+          where: {
+            is_active: true,
+            ...(curatedBannerIds.length
+              ? { id: { notIn: curatedBannerIds } }
+              : {}),
+          },
           orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
           take: 6,
         }),
       ]);
 
-      if (!activeBanners.length) {
-        return [];
-      }
-
-      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
       const seen = new Set<string>();
+      const curatedBannerById = new Map<string, any>(
+        curatedActiveBanners.map(
+          (banner: any) => [banner.id, banner] as [string, any],
+        ),
+      );
       const curatedOrderedBanners = items
         .map((item) => {
           const bannerId = item.banner_id || item.banner?.id || null;
           if (!bannerId) return null;
-          return activeBannerById.get(bannerId) || null;
+          return curatedBannerById.get(bannerId) || null;
         })
-        .filter((banner): banner is (typeof activeBanners)[number] => {
+        .filter((banner: any): banner is any => {
           if (!banner) return false;
           if (seen.has(banner.id)) return false;
           seen.add(banner.id);
@@ -691,16 +727,19 @@ export class HomeLayoutService {
         );
       }
 
-      const remainingActiveBanners = activeBanners.filter(
-        (banner) => !seen.has(banner.id),
-      );
+      const resolvedBanners = [...curatedOrderedBanners];
+      for (const banner of fallbackActiveBanners) {
+        if (seen.has(banner.id)) continue;
+        seen.add(banner.id);
+        resolvedBanners.push(banner);
+        if (resolvedBanners.length >= 6) break;
+      }
 
-      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
+      return resolvedBanners.map((banner) => ({
         banner_id: banner.id,
         banner,
       }));
     }
-
 
     if (section.type === HomeSectionType.CATEGORY_STRIP) {
       if (config.mode === 'curated') {
@@ -714,7 +753,10 @@ export class HomeLayoutService {
             if (!x.category) return null;
             return {
               ...x.category,
-              image_url: x.image_url || (x.category as any).image_url || (x.category as any).image,
+              image_url:
+                x.image_url ||
+                (x.category as any).image_url ||
+                (x.category as any).image,
               href: x.href || null,
               item_label: x.label || null,
             };
@@ -727,62 +769,125 @@ export class HomeLayoutService {
         take: 64,
         orderBy: [{ sort_order: 'asc' }],
       });
+      const categoryIds = pool.map((category) => category.id);
 
-      const scoredCategories = await Promise.all(
-        pool.map(async (category) => {
-          const activeProducts = await this.prisma.product.count({
-            where: {
-              status: 'ACTIVE',
-              OR: [
-                { main_category_id: category.id },
-                { categories: { some: { category_id: category.id } } },
+      const [
+        mainCategoryCounts,
+        linkedCategoryCounts,
+        mainCategoryImageProducts,
+        linkedCategoryImageProducts,
+      ] = await Promise.all([
+        categoryIds.length
+          ? this.prisma.product.groupBy({
+              by: ['main_category_id'],
+              where: {
+                status: 'ACTIVE',
+                main_category_id: { in: categoryIds },
+              },
+              _count: { _all: true },
+            })
+          : Promise.resolve([]),
+        categoryIds.length
+          ? this.prisma.productCategory.groupBy({
+              by: ['category_id'],
+              where: {
+                category_id: { in: categoryIds },
+                product: { status: 'ACTIVE' },
+              },
+              _count: { _all: true },
+            })
+          : Promise.resolve([]),
+        categoryIds.length
+          ? this.prisma.product.findMany({
+              where: {
+                status: 'ACTIVE',
+                main_category_id: { in: categoryIds },
+                media: { some: {} },
+              },
+              select: {
+                main_category_id: true,
+                created_at: true,
+                media: {
+                  orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+                  select: { url: true },
+                  take: 1,
+                },
+              },
+              orderBy: { created_at: 'desc' },
+            })
+          : Promise.resolve([]),
+        categoryIds.length
+          ? this.prisma.productCategory.findMany({
+              where: {
+                category_id: { in: categoryIds },
+                product: {
+                  status: 'ACTIVE',
+                  media: { some: {} },
+                },
+              },
+              select: {
+                category_id: true,
+                product: {
+                  select: {
+                    created_at: true,
+                    media: {
+                      orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+                      select: { url: true },
+                      take: 1,
+                    },
+                  },
+                },
+              },
+              orderBy: [
+                { product: { created_at: 'desc' } },
+                { sort_order: 'asc' },
               ],
-            },
-          });
+            })
+          : Promise.resolve([]),
+      ]);
 
-          return {
-            category,
-            score:
-              this.categoryDemandKeywordScore(category.name, category.slug) * 5 +
-              activeProducts * 4 -
-              category.sort_order,
-          };
-        }),
-      );
+      const activeProductCounts = new Map<string, number>();
+      for (const entry of mainCategoryCounts) {
+        if (!entry.main_category_id) continue;
+        activeProductCounts.set(entry.main_category_id, entry._count._all);
+      }
+      for (const entry of linkedCategoryCounts) {
+        activeProductCounts.set(
+          entry.category_id,
+          (activeProductCounts.get(entry.category_id) || 0) + entry._count._all,
+        );
+      }
 
-      const categories = scoredCategories
+      const derivedImages = new Map<string, string>();
+      for (const product of mainCategoryImageProducts) {
+        const categoryId = product.main_category_id;
+        const imageUrl = product.media?.[0]?.url || null;
+        if (!categoryId || !imageUrl || derivedImages.has(categoryId)) continue;
+        derivedImages.set(categoryId, imageUrl);
+      }
+      for (const entry of linkedCategoryImageProducts) {
+        const imageUrl = entry.product?.media?.[0]?.url || null;
+        if (!imageUrl || derivedImages.has(entry.category_id)) continue;
+        derivedImages.set(entry.category_id, imageUrl);
+      }
+
+      const categoriesWithScore = pool.map((category) => ({
+        category,
+        score:
+          this.categoryDemandKeywordScore(category.name, category.slug) * 5 +
+          (activeProductCounts.get(category.id) || 0) * 4 -
+          category.sort_order,
+      }));
+
+      return categoriesWithScore
         .sort((a, b) => b.score - a.score)
         .slice(0, requestedLimit)
-        .map((entry) => entry.category);
-
-      const categoriesWithImage = await Promise.all(
-        categories.map(async (category) => {
+        .map(({ category }) => {
           const existingImage =
             (category as any).image_url || (category as any).image || null;
-          if (existingImage) {
-            return { ...category, image_url: existingImage };
-          }
+          const derivedImage =
+            existingImage || derivedImages.get(category.id) || null;
 
-          const firstProduct = await this.prisma.product.findFirst({
-            where: {
-              status: 'ACTIVE',
-              OR: [
-                { main_category_id: category.id },
-                { categories: { some: { category_id: category.id } } },
-              ],
-              media: { some: {} },
-            },
-            select: {
-              media: {
-                orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
-                select: { url: true },
-                take: 1,
-              },
-            },
-            orderBy: { created_at: 'desc' },
-          });
-
-          const derivedImage = firstProduct?.media?.[0]?.url || null;
           if (!derivedImage) {
             this.logger.warn(
               `CATEGORY_STRIP category ${category.id} (${category.slug}) has no image_url and no product media fallback.`,
@@ -793,10 +898,7 @@ export class HomeLayoutService {
             ...category,
             image_url: derivedImage,
           };
-        }),
-      );
-
-      return categoriesWithImage;
+        });
     }
 
     if (section.type === HomeSectionType.BRAND_STRIP) {
@@ -811,7 +913,10 @@ export class HomeLayoutService {
             if (!x.brand) return null;
             return {
               ...x.brand,
-              image_url: x.image_url || (x.brand as any).logo_url || (x.brand as any).image,
+              image_url:
+                x.image_url ||
+                (x.brand as any).logo_url ||
+                (x.brand as any).image,
               href: x.href || null,
               item_label: x.label || null,
             };

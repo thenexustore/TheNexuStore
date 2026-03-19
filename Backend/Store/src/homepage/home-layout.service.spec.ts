@@ -124,9 +124,10 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(payload.sections).toHaveLength(1);
     expect(payload.sections[0].type).toBe('HERO_CAROUSEL');
     expect(Array.isArray(payload.sections[0].resolved)).toBe(true);
-    expect((payload.sections[0].resolved as any[])[0]?.banner?.id).toBe('banner-1');
+    expect((payload.sections[0].resolved as any[])[0]?.banner?.id).toBe(
+      'banner-1',
+    );
   });
-
 
   it('falls back HERO_CAROUSEL to active banners when curated items reference inactive or missing banners', async () => {
     const prisma = {
@@ -291,6 +292,117 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(heroSection.resolved[0]?.banner?.title_text).toBe('Hero 2');
   });
 
+  it('keeps curated hero banners even when they fall outside the fallback top-six ordering', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: { findUnique: jest.fn() },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-curated',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-9',
+            banner: { id: 'banner-9', is_active: true },
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            {
+              id: 'banner-9',
+              sort_order: 9,
+              is_active: true,
+              title_text: 'Curated 9',
+            },
+          ])
+          .mockResolvedValueOnce([
+            {
+              id: 'banner-1',
+              sort_order: 1,
+              is_active: true,
+              title_text: 'Banner 1',
+            },
+            {
+              id: 'banner-2',
+              sort_order: 2,
+              is_active: true,
+              title_text: 'Banner 2',
+            },
+            {
+              id: 'banner-3',
+              sort_order: 3,
+              is_active: true,
+              title_text: 'Banner 3',
+            },
+            {
+              id: 'banner-4',
+              sort_order: 4,
+              is_active: true,
+              title_text: 'Banner 4',
+            },
+            {
+              id: 'banner-5',
+              sort_order: 5,
+              is_active: true,
+              title_text: 'Banner 5',
+            },
+            {
+              id: 'banner-6',
+              sort_order: 6,
+              is_active: true,
+              title_text: 'Banner 6',
+            },
+          ]),
+      },
+    } as any;
+
+    const service = new HomeLayoutService(prisma, {} as any);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(heroSection.resolved.map((x: any) => x.banner_id)).toEqual([
+      'banner-9',
+      'banner-1',
+      'banner-2',
+      'banner-3',
+      'banner-4',
+      'banner-5',
+    ]);
+    expect(prisma.banner.findMany).toHaveBeenNthCalledWith(1, {
+      where: { is_active: true, id: { in: ['banner-9'] } },
+    });
+    expect(prisma.banner.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          is_active: true,
+          id: { notIn: ['banner-9'] },
+        }),
+        take: 6,
+      }),
+    );
+  });
+
   it('falls back BEST_DEALS to featured products when no deals are available', async () => {
     const prisma = {
       homePageSection: {
@@ -378,10 +490,22 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
         ]),
       },
       product: {
-        count: jest.fn().mockResolvedValue(3),
-        findFirst: jest.fn().mockResolvedValue({
-          media: [{ url: '/category-1-cover.jpg' }],
-        }),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { main_category_id: 'cat-1', _count: { _all: 3 } },
+          ]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            main_category_id: 'cat-1',
+            created_at: new Date('2026-01-01T00:00:00Z'),
+            media: [{ url: '/category-1-cover.jpg' }],
+          },
+        ]),
+      },
+      productCategory: {
+        groupBy: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     } as any;
 
@@ -402,7 +526,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(section.type).toBe('CATEGORY_STRIP');
     expect(section.resolved).toHaveLength(1);
     expect(section.resolved[0].image_url).toBe('/category-1-cover.jpg');
-    expect(prisma.product.findFirst).toHaveBeenCalledWith(
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ status: 'ACTIVE' }),
       }),
@@ -426,19 +550,59 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       homePageLayout: { findUnique: jest.fn() },
       category: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'cat-a', name: 'Portátiles', slug: 'portatiles', sort_order: 5, is_active: true, parent_id: null },
-          { id: 'cat-b', name: 'Consumibles varios', slug: 'consumibles', sort_order: 1, is_active: true, parent_id: null },
-          { id: 'cat-c', name: 'Impresoras', slug: 'impresoras', sort_order: 8, is_active: true, parent_id: null },
+          {
+            id: 'cat-a',
+            name: 'Portátiles',
+            slug: 'portatiles',
+            sort_order: 5,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'cat-b',
+            name: 'Consumibles varios',
+            slug: 'consumibles',
+            sort_order: 1,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'cat-c',
+            name: 'Impresoras',
+            slug: 'impresoras',
+            sort_order: 8,
+            is_active: true,
+            parent_id: null,
+          },
         ]),
       },
       product: {
-        count: jest.fn().mockImplementation(({ where }) => {
-          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-a')) return Promise.resolve(8);
-          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-b')) return Promise.resolve(20);
-          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-c')) return Promise.resolve(4);
-          return Promise.resolve(0);
-        }),
-        findFirst: jest.fn().mockResolvedValue({ media: [{ url: '/fallback.jpg' }] }),
+        groupBy: jest.fn().mockResolvedValue([
+          { main_category_id: 'cat-a', _count: { _all: 8 } },
+          { main_category_id: 'cat-b', _count: { _all: 20 } },
+          { main_category_id: 'cat-c', _count: { _all: 4 } },
+        ]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            main_category_id: 'cat-a',
+            created_at: new Date('2026-01-03T00:00:00Z'),
+            media: [{ url: '/fallback-a.jpg' }],
+          },
+          {
+            main_category_id: 'cat-b',
+            created_at: new Date('2026-01-02T00:00:00Z'),
+            media: [{ url: '/fallback-b.jpg' }],
+          },
+          {
+            main_category_id: 'cat-c',
+            created_at: new Date('2026-01-01T00:00:00Z'),
+            media: [{ url: '/fallback-c.jpg' }],
+          },
+        ]),
+      },
+      productCategory: {
+        groupBy: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     } as any;
 
@@ -453,7 +617,10 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     const section = payload.sections[0] as any;
     expect(section.type).toBe('CATEGORY_STRIP');
     expect(section.resolved).toHaveLength(2);
-    expect(section.resolved.map((x: any) => x.slug)).toEqual(['portatiles', 'impresoras']);
+    expect(section.resolved.map((x: any) => x.slug)).toEqual([
+      'portatiles',
+      'impresoras',
+    ]);
   });
 
   it('uses query.categoryId source config for CATEGORY product sections', async () => {
@@ -466,7 +633,11 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
             title: 'Category picks',
             subtitle: null,
             variant: null,
-            config: { source: 'CATEGORY', query: { categoryId: 'cat-123' }, limit: 8 },
+            config: {
+              source: 'CATEGORY',
+              query: { categoryId: 'cat-123' },
+              limit: 8,
+            },
           },
         ]),
       },
@@ -494,17 +665,17 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
   });
 });
 
-
 describe('HomeLayoutService section ordering integrity', () => {
   it('reindexes positions after removing a section', async () => {
     const prisma = {
       homePageSection: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'sec-2', layout_id: 'layout-1' }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'sec-2', layout_id: 'layout-1' }),
         delete: jest.fn().mockResolvedValue({ id: 'sec-2' }),
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'sec-1' },
-          { id: 'sec-3' },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'sec-1' }, { id: 'sec-3' }]),
         update: jest.fn().mockResolvedValue({}),
       },
       $transaction: jest.fn(async (ops) => Promise.all(ops)),
@@ -514,15 +685,25 @@ describe('HomeLayoutService section ordering integrity', () => {
 
     await service.removeSection('sec-2');
 
-    expect(prisma.homePageSection.findUnique).toHaveBeenCalledWith({ where: { id: 'sec-2' } });
-    expect(prisma.homePageSection.delete).toHaveBeenCalledWith({ where: { id: 'sec-2' } });
+    expect(prisma.homePageSection.findUnique).toHaveBeenCalledWith({
+      where: { id: 'sec-2' },
+    });
+    expect(prisma.homePageSection.delete).toHaveBeenCalledWith({
+      where: { id: 'sec-2' },
+    });
     expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ where: { id: 'sec-1' }, data: { position: 1 } }),
+      expect.objectContaining({
+        where: { id: 'sec-1' },
+        data: { position: 1 },
+      }),
     );
     expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ where: { id: 'sec-3' }, data: { position: 2 } }),
+      expect.objectContaining({
+        where: { id: 'sec-3' },
+        data: { position: 2 },
+      }),
     );
   });
 });

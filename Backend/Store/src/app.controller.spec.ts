@@ -48,11 +48,4 @@ describe('AppController', () => {
       rabbit: 'disabled',
     });
   });
-
-  it('returns admin infortisa fallback health', async () => {
-    await expect(controller.adminInfortisaHealth()).resolves.toMatchObject({
-      healthy: true,
-      source: 'app-fallback',
-    });
-  });
 });

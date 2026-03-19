@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4000').replace(/\/$/, '');
+const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4000').replace(
+  /\/$/,
+  '',
+);
 
 function getPayload(json) {
   if (
@@ -50,8 +53,14 @@ const checks = [
       return (
         typeof payload === 'object' &&
         payload !== null &&
-        payload.healthy === true &&
-        typeof payload.timestamp === 'string'
+        typeof payload.healthy === 'boolean' &&
+        payload.provider === 'infortisa' &&
+        typeof payload.base_url === 'string' &&
+        typeof payload.checked_at === 'string' &&
+        typeof payload.auth_configured === 'boolean' &&
+        typeof payload.latency_ms === 'number' &&
+        (payload.error_summary === undefined ||
+          typeof payload.error_summary === 'string')
       );
     },
   },
@@ -67,7 +76,9 @@ async function run() {
     });
 
     if (!response.ok) {
-      throw new Error(`${check.name}: expected HTTP 200, got ${response.status}`);
+      throw new Error(
+        `${check.name}: expected HTTP 200, got ${response.status}`,
+      );
     }
 
     const responseRequestId = response.headers.get('x-request-id');

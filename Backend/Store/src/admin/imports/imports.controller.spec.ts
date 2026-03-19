@@ -2,6 +2,7 @@ import { ImportsController } from './imports.controller';
 import { PrismaService } from '../../common/prisma.service';
 import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
 import { AuditLogService } from '../audit-log.service';
+import { ImportsConfigService } from './imports-config.service';
 
 describe('ImportsController', () => {
   const prisma = {
@@ -16,24 +17,43 @@ describe('ImportsController', () => {
     fullSync: jest.fn(),
     syncStockRealTime: jest.fn(),
     syncImages: jest.fn(),
+    listImportRuns: jest.fn(),
+    getImportRunById: jest.fn(),
+    getImportRunErrors: jest.fn(),
+    getProviderStats: jest.fn(),
   } as unknown as InfortisaSyncService;
 
   const auditLogService = {
     logAction: jest.fn(),
   } as unknown as AuditLogService;
 
+  const importsConfigService = {
+    getConfig: jest.fn(),
+    updateConfig: jest.fn(),
+    testConnection: jest.fn(),
+  } as unknown as ImportsConfigService;
+
   let controller: ImportsController;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new ImportsController(prisma, infortisaSync, auditLogService);
+    controller = new ImportsController(
+      prisma,
+      infortisaSync,
+      auditLogService,
+      importsConfigService,
+    );
   });
 
   it('returns import history with pagination metadata', async () => {
     (prisma.syncLog.findMany as jest.Mock).mockResolvedValue([{ id: 1 }]);
     (prisma.syncLog.count as jest.Mock).mockResolvedValue(1);
 
-    const result = await controller.history({ page: 2, limit: 10, type: 'manual_full' });
+    const result = await controller.history({
+      page: 2,
+      limit: 10,
+      type: 'manual_full',
+    });
 
     expect(prisma.syncLog.findMany).toHaveBeenCalledWith({
       where: { type: 'manual_full' },
@@ -52,7 +72,27 @@ describe('ImportsController', () => {
     });
   });
 
+  it('returns structured import runs', async () => {
+    (infortisaSync.listImportRuns as jest.Mock).mockResolvedValue([{ id: 'run-1' }]);
+
+    await expect(controller.runs()).resolves.toEqual({
+      success: true,
+      data: [{ id: 'run-1' }],
+    });
+  });
+
+  it('returns provider stats', async () => {
+    (infortisaSync.getProviderStats as jest.Mock).mockResolvedValue({ provider: 'infortisa' });
+
+    await expect(controller.providerStats()).resolves.toEqual({
+      success: true,
+      data: { provider: 'infortisa' },
+    });
+  });
+
   it('triggers stock sync and logs execution', async () => {
+    (infortisaSync.syncStockRealTime as jest.Mock).mockResolvedValue({ id: 'run-2' });
+
     const req = {
       user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },
       method: 'POST',
@@ -66,14 +106,16 @@ describe('ImportsController', () => {
     expect(infortisaSync.syncStockRealTime).toHaveBeenCalledTimes(1);
     expect(prisma.syncLog.upsert).toHaveBeenCalledWith({
       where: { type: 'manual_stock' },
-      update: expect.objectContaining({ details: expect.stringContaining('mode=stock') }),
+      update: expect.objectContaining({
+        details: expect.stringContaining('mode=stock'),
+      }),
       create: expect.objectContaining({ type: 'manual_stock' }),
     });
     expect(auditLogService.logAction).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'IMPORT_TRIGGERED',
         resource: 'IMPORT_JOB',
-        metadata: expect.objectContaining({ mode: 'stock' }),
+        metadata: expect.objectContaining({ mode: 'stock', run: { id: 'run-2' } }),
       }),
     );
     expect(result.success).toBe(true);

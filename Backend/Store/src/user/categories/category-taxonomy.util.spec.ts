@@ -360,6 +360,19 @@ describe('category-taxonomy.util', () => {
       subfamilyName: 'Certificado digital y firma electrónica',
       expectedSlug: 'software-seguridad-familia-identidad-firma-compliance',
     },
+    {
+      grandparentSlug: 'ordenadores-portatiles',
+      familyName: 'Computing',
+      subfamilyName: 'Thin client embedded industrial',
+      expectedSlug:
+        'ordenadores-portatiles-familia-clientes-ligeros-industriales',
+    },
+    {
+      grandparentSlug: 'tv-audio-video',
+      familyName: 'AV',
+      subfamilyName: 'Cartelería digital profesional',
+      expectedSlug: 'tv-audio-video-familia-carteleria-videoconferencia',
+    },
   ])(
     'matches expected level-2 parent for $familyName / $subfamilyName',
     ({ grandparentSlug, familyName, subfamilyName, expectedSlug }) => {

@@ -24,6 +24,13 @@ ADMIN_DOMAIN="${ADMIN_DOMAIN:-}"
 SKIP_EXTERNAL_HEALTHCHECKS="${SKIP_EXTERNAL_HEALTHCHECKS:-1}"
 SYNC_FRONTEND_ENV="${SYNC_FRONTEND_ENV:-1}"
 
+for c in git node npm npx sed curl; do
+  command -v "$c" >/dev/null 2>&1 || {
+    echo "[ERROR] Missing command: $c" >&2
+    exit 1
+  }
+done
+
 log() { echo "[$(date +'%F %T')] $*"; }
 run() {
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -76,6 +83,53 @@ require_cmd() {
     echo "[ERROR] Missing command: $1" >&2
     exit 1
   }
+}
+
+validate_infortisa_health() {
+  local url="$1"
+  local payload
+
+  payload="$(curl -fsS "$url")" || return 1
+
+  HEALTH_PAYLOAD="$payload" node <<'NODE'
+const payload = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
+const valid =
+  payload &&
+  typeof payload === 'object' &&
+  payload.provider === 'infortisa' &&
+  typeof payload.base_url === 'string' &&
+  typeof payload.checked_at === 'string' &&
+  typeof payload.auth_configured === 'boolean' &&
+  typeof payload.latency_ms === 'number';
+
+if (!valid) {
+  console.error('Invalid Infortisa health payload shape');
+  process.exit(1);
+}
+
+if (!payload.healthy) {
+  console.error(`Infortisa unhealthy: ${payload.error_summary || 'unknown error'}`);
+  process.exit(1);
+}
+NODE
+}
+
+wait_for_infortisa_health() {
+  local url="$1"
+  local retries="${2:-15}"
+  local delay_s="${3:-2}"
+
+  for ((i = 1; i <= retries; i++)); do
+    if validate_infortisa_health "$url"; then
+      log "Infortisa health check OK: $url"
+      return 0
+    fi
+    log "Waiting for Infortisa health check ($i/$retries): $url"
+    sleep "$delay_s"
+  done
+
+  log "Infortisa health check FAILED: $url"
+  return 1
 }
 
 ensure_repo() {
@@ -310,7 +364,7 @@ run "pm2 save"
 
 if [[ "$DRY_RUN" == "0" ]]; then
   wait_for_url "http://127.0.0.1:4000/admin/health"
-  wait_for_url "http://127.0.0.1:4000/admin/infortisa/health"
+  wait_for_infortisa_health "http://127.0.0.1:4000/admin/infortisa/health"
   wait_for_url "http://127.0.0.1:3000"
   wait_for_url "http://127.0.0.1:3001"
 

@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
+  Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -20,6 +23,8 @@ import {
   RetryImportDto,
   TriggerImportDto,
 } from './dto/imports.dto';
+import { UpdateImportIntegrationConfigDto } from './dto/imports-config.dto';
+import { ImportsConfigService } from './imports-config.service';
 
 @Controller('admin/imports')
 @UseGuards(AdminGuard)
@@ -29,6 +34,7 @@ export class ImportsController {
     private readonly prisma: PrismaService,
     private readonly infortisaSync: InfortisaSyncService,
     private readonly auditLogService: AuditLogService,
+    private readonly importsConfigService: ImportsConfigService,
   ) {}
 
   private async executeImport(
@@ -47,7 +53,7 @@ export class ImportsController {
       images: () => this.infortisaSync.syncImages(),
     };
 
-    await modeHandlers[body.mode]();
+    const result = await modeHandlers[body.mode]();
 
     const durationMs = Date.now() - startedAt;
     const detailsParts = [
@@ -58,6 +64,35 @@ export class ImportsController {
 
     if (body.reason) {
       detailsParts.push(`reason=${body.reason}`);
+    }
+
+    if (result && typeof result === 'object') {
+      const summary = result as Record<string, unknown>;
+      if (typeof summary.sourceItemsReceived === 'number') {
+        detailsParts.push(
+          `source_items_received=${summary.sourceItemsReceived}`,
+        );
+      }
+      if (typeof summary.sourceTotalExpected === 'number') {
+        detailsParts.push(
+          `source_total_expected=${summary.sourceTotalExpected}`,
+        );
+      }
+      if (typeof summary.sourcePageSize === 'number') {
+        detailsParts.push(`source_page_size=${summary.sourcePageSize}`);
+      }
+      if (typeof summary.sourcePages === 'number') {
+        detailsParts.push(`source_pages=${summary.sourcePages}`);
+      }
+      if (typeof summary.created === 'number') {
+        detailsParts.push(`created=${summary.created}`);
+      }
+      if (typeof summary.updated === 'number') {
+        detailsParts.push(`updated=${summary.updated}`);
+      }
+      if (typeof summary.skipped === 'number') {
+        detailsParts.push(`skipped=${summary.skipped}`);
+      }
     }
 
     await this.prisma.syncLog.upsert({
@@ -86,13 +121,58 @@ export class ImportsController {
         mode: body.mode,
         durationMs,
         ...(body.reason ? { reason: body.reason } : {}),
+        ...(result && typeof result === 'object' ? { run: result } : {}),
       },
     });
 
     return {
       mode: body.mode,
       durationMs,
+      run: result,
       ...(body.reason ? { reason: body.reason } : {}),
+      ...(result && typeof result === 'object'
+        ? (result as Record<string, unknown>)
+        : {}),
+    };
+  }
+
+  @Get('config')
+  @Permissions('imports:config:read')
+  async config(
+    @Req() req: Request,
+    @Query('includeSecret') includeSecret?: string,
+  ) {
+    const permissions = Array.isArray((req.user as any)?.permissions)
+      ? ((req.user as any).permissions as string[])
+      : [];
+    const canReadSecret =
+      permissions.includes('full_access') ||
+      permissions.includes('imports:secret:read');
+
+    return {
+      success: true,
+      data: await this.importsConfigService.getConfig({
+        includeSecret: includeSecret === 'true' && canReadSecret,
+        enforceSecretRead: includeSecret === 'true',
+      }),
+    };
+  }
+
+  @Patch('config')
+  @Permissions('imports:config:update')
+  async updateConfig(@Body() body: UpdateImportIntegrationConfigDto) {
+    return {
+      success: true,
+      data: await this.importsConfigService.updateConfig(body),
+    };
+  }
+
+  @Post('config/test-connection')
+  @Permissions('imports:config:read')
+  async testConnection() {
+    return {
+      success: true,
+      data: await this.importsConfigService.testConnection(),
     };
   }
 
@@ -123,6 +203,33 @@ export class ImportsController {
         totalPages: Math.ceil(total / limitNum),
       },
     };
+  }
+
+  @Get('runs')
+  async runs() {
+    const items = await this.infortisaSync.listImportRuns();
+    return { success: true, data: items };
+  }
+
+  @Get('runs/:id')
+  async runDetail(@Param('id') id: string) {
+    const item = await this.infortisaSync.getImportRunById(id);
+    if (!item) {
+      throw new NotFoundException('Import run not found');
+    }
+    return { success: true, data: item };
+  }
+
+  @Get('runs/:id/errors')
+  async runErrors(@Param('id') id: string) {
+    const errors = await this.infortisaSync.getImportRunErrors(id);
+    return { success: true, data: errors };
+  }
+
+  @Get('provider-stats')
+  async providerStats() {
+    const stats = await this.infortisaSync.getProviderStats();
+    return { success: true, data: stats };
   }
 
   @Post('run')

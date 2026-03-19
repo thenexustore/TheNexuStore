@@ -260,6 +260,9 @@ export default function ImportsPage() {
   const latestRun = providerStats?.latestRun ?? runs[0] ?? null;
   const latestIncidents = latestRun ? runErrors[latestRun.id] ?? latestRun.errors ?? [] : [];
 
+  const latestRun = providerStats?.latestRun ?? runs[0] ?? null;
+  const latestIncidents = latestRun ? runErrors[latestRun.id] ?? latestRun.errors ?? [] : [];
+
   return (
     <div className="space-y-6">
       <div>

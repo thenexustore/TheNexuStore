@@ -244,6 +244,22 @@ model Staff {
 }
 
 
+model SupplierIntegration {
+  id                  String   @id @default(uuid())
+  provider            String   @unique
+  display_name        String
+  base_url            String
+  api_key_encrypted   String?
+  api_key_last4       String?
+  is_active           Boolean  @default(true)
+  notes               String?
+  last_healthcheck_at DateTime?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@index([is_active])
+}
+
 model AdminAuditLog {
   id            String           @id @default(uuid())
   actor_id      String?
@@ -853,6 +869,54 @@ model SyncLog {
   type      String   @unique
   last_sync DateTime
   details   String?
+}
+
+enum ImportRunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+model ImportRun {
+  id                    String            @id @default(uuid())
+  provider              String
+  mode                  String
+  started_at            DateTime
+  finished_at           DateTime?
+  status                ImportRunStatus   @default(RUNNING)
+  source_items_received Int               @default(0)
+  processed_count       Int               @default(0)
+  persisted_count       Int               @default(0)
+  validation_skipped_count Int            @default(0)
+  created_count         Int               @default(0)
+  updated_count         Int               @default(0)
+  skipped_count         Int               @default(0)
+  error_count           Int               @default(0)
+  archived_count        Int               @default(0)
+  request_meta_json     Json?
+  result_meta_json      Json?
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  errors                ImportRunError[]
+
+  @@index([provider, started_at(sort: Desc)])
+  @@index([mode, started_at(sort: Desc)])
+  @@index([status, started_at(sort: Desc)])
+}
+
+model ImportRunError {
+  id             String    @id @default(uuid())
+  import_run_id  String
+  sku            String?
+  stage          String?
+  message        String
+  raw_payload_json Json?
+  created_at     DateTime  @default(now())
+  import_run     ImportRun @relation(fields: [import_run_id], references: [id], onDelete: Cascade)
+
+  @@index([import_run_id, created_at(sort: Desc)])
+  @@index([sku, created_at(sort: Desc)])
 }
 
 model CartItem {

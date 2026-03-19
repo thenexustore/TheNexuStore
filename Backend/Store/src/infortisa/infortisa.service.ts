@@ -9,6 +9,9 @@ import {
   normalizeImportRuntimeSettings,
 } from './import-runtime-settings';
 
+const PROVIDER = 'INFORTISA';
+const DEFAULT_BASE_URL = 'https://apiv2.infortisa.com';
+
 export type InfortisaHealthStatus = {
   healthy: boolean;
   provider: 'infortisa';

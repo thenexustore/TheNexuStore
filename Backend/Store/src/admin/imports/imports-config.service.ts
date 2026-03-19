@@ -107,7 +107,7 @@ export class ImportsConfigService {
   }
 
   async getIntegrationRecord() {
-    return this.prisma.supplierIntegration.findUnique({
+    return (this.prisma as any).supplierIntegration.findUnique({
       where: { provider: INTEGRATION_PROVIDER },
     });
   }
@@ -168,7 +168,7 @@ export class ImportsConfigService {
           : input.catalog_page_size,
     });
 
-    await this.prisma.supplierIntegration.upsert({
+    await (this.prisma as any).supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
       update: {
         display_name: input.display_name.trim(),
@@ -206,7 +206,7 @@ export class ImportsConfigService {
     const healthy = await this.infortisaService.checkServiceHealth();
     const checkedAt = new Date();
 
-    await this.prisma.supplierIntegration.upsert({
+    await (this.prisma as any).supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
       update: { last_healthcheck_at: checkedAt },
       create: {

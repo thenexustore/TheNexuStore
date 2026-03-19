@@ -24,6 +24,7 @@ describe('ImportsController', () => {
     getImportRunById: jest.fn(),
     getImportRunErrors: jest.fn(),
     getProviderStats: jest.fn(),
+    getRuntimeOverview: jest.fn(),
   } as unknown as InfortisaSyncService;
 
   const infortisaService = {

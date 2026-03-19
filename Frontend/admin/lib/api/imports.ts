@@ -83,6 +83,24 @@ export interface ImportRuntimeSettings {
   catalog_page_size?: number | null;
 }
 
+
+export interface ImportRuntimeJobOverview {
+  key: "full" | "incremental" | "stock" | "images";
+  job_name: string;
+  cron: string;
+  enabled_in_settings: boolean;
+  effective_enabled: boolean;
+  registered: boolean;
+  next_run_at?: string | null;
+}
+
+export interface ImportRuntimeOverviewResponse {
+  provider: string;
+  integration_enabled: boolean;
+  settings: ImportRuntimeSettings;
+  jobs: ImportRuntimeJobOverview[];
+}
+
 export interface ImportConfigResponse {
   provider: string;
   display_name: string;
@@ -143,6 +161,10 @@ export async function fetchImportRunErrors(id: string): Promise<ImportRunError[]
 
 export async function fetchProviderStats(): Promise<ProviderStatsResponse> {
   return fetchWithAuth("/admin/imports/provider-stats");
+}
+
+export async function fetchImportRuntimeOverview(): Promise<ImportRuntimeOverviewResponse> {
+  return fetchWithAuth("/admin/imports/runtime-overview");
 }
 
 export async function fetchImportConfig(

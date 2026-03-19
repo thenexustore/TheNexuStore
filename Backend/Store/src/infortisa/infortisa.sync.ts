@@ -38,6 +38,24 @@ type ProductBatchStats = {
   incidents: RunErrorInput[];
 };
 
+
+type RuntimeJobOverview = {
+  key: SyncMode;
+  job_name: string;
+  cron: string;
+  enabled_in_settings: boolean;
+  effective_enabled: boolean;
+  registered: boolean;
+  next_run_at: string | null;
+};
+
+type RuntimeOverview = {
+  provider: string;
+  integration_enabled: boolean;
+  settings: ImportRuntimeSettings;
+  jobs: RuntimeJobOverview[];
+};
+
 type ImportRunSummary = {
   id: string;
   provider: string;
@@ -120,6 +138,108 @@ export class InfortisaSyncService implements OnModuleInit {
       () => void this.syncImages(),
       integrationEnabled && this.runtimeSettings.images_sync_enabled,
     );
+  }
+
+
+  private tryGetCronJob(jobName: string) {
+    try {
+      return this.schedulerRegistry.getCronJob(jobName);
+    } catch {
+      return null;
+    }
+  }
+
+  private serializeCronNextRun(job: CronJob | null) {
+    if (!job) {
+      return null;
+    }
+
+    try {
+      const next = (job as any).nextDate?.() ?? (job as any).nextDates?.(1);
+      const value = Array.isArray(next) ? next[0] : next;
+
+      if (!value) {
+        return null;
+      }
+
+      if (typeof value?.toISO === 'function') {
+        return value.toISO();
+      }
+
+      if (typeof value?.toJSDate === 'function') {
+        return value.toJSDate().toISOString();
+      }
+
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+
+      if (typeof value === 'string') {
+        return value;
+      }
+
+      const date = new Date(String(value));
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    } catch {
+      return null;
+    }
+  }
+
+  async getRuntimeOverview(): Promise<RuntimeOverview> {
+    const record = await this.prisma.supplierIntegration.findUnique({
+      where: { provider: 'INFORTISA' },
+      select: { is_active: true, settings_json: true },
+    });
+
+    const settings = normalizeImportRuntimeSettings(
+      record?.settings_json && typeof record.settings_json === 'object'
+        ? (record.settings_json as Record<string, unknown>)
+        : undefined,
+    );
+    const integrationEnabled = record?.is_active ?? true;
+    const jobs: Array<Pick<RuntimeJobOverview, 'key' | 'job_name' | 'cron' | 'enabled_in_settings'>> = [
+      {
+        key: 'stock',
+        job_name: this.STOCK_SYNC_JOB,
+        cron: settings.stock_sync_cron,
+        enabled_in_settings: settings.stock_sync_enabled,
+      },
+      {
+        key: 'incremental',
+        job_name: this.INCREMENTAL_SYNC_JOB,
+        cron: settings.incremental_sync_cron,
+        enabled_in_settings: settings.incremental_sync_enabled,
+      },
+      {
+        key: 'full',
+        job_name: this.FULL_SYNC_JOB,
+        cron: settings.full_sync_cron,
+        enabled_in_settings: settings.full_sync_enabled,
+      },
+      {
+        key: 'images',
+        job_name: this.IMAGES_SYNC_JOB,
+        cron: settings.images_sync_cron,
+        enabled_in_settings: settings.images_sync_enabled,
+      },
+    ];
+
+    return {
+      provider: this.PROVIDER,
+      integration_enabled: integrationEnabled,
+      settings,
+      jobs: jobs.map((job) => {
+        const effectiveEnabled = integrationEnabled && job.enabled_in_settings;
+        const registeredJob = this.tryGetCronJob(job.job_name);
+
+        return {
+          ...job,
+          effective_enabled: effectiveEnabled,
+          registered: Boolean(registeredJob),
+          next_run_at: this.serializeCronNextRun(registeredJob),
+        };
+      }),
+    };
   }
 
   private configureCronJob(

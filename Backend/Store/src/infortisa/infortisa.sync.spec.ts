@@ -154,6 +154,50 @@ describe('InfortisaSyncService', () => {
     expect(products.upsertFromInfortisa).not.toHaveBeenCalled();
   });
 
+
+  it('reports effective runtime overview', async () => {
+    const runningJob = {
+      nextDate: jest.fn().mockReturnValue({
+        toISO: () => '2026-03-20T02:00:00.000Z',
+      }),
+    };
+    prisma.supplierIntegration.findUnique.mockResolvedValue({
+      is_active: true,
+      settings_json: {
+        stock_sync_enabled: true,
+        incremental_sync_enabled: false,
+        full_sync_enabled: true,
+        images_sync_enabled: true,
+      },
+    });
+    schedulerRegistry.getCronJob = jest.fn((name: string) => {
+      if (name === 'infortisa-stock-sync' || name === 'infortisa-full-sync') {
+        return runningJob;
+      }
+      throw new Error('missing');
+    });
+
+    const overview = await service.getRuntimeOverview();
+
+    expect(overview.integration_enabled).toBe(true);
+    expect(overview.jobs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: 'stock',
+          effective_enabled: true,
+          registered: true,
+          next_run_at: '2026-03-20T02:00:00.000Z',
+        }),
+        expect.objectContaining({
+          key: 'incremental',
+          effective_enabled: false,
+          registered: false,
+          next_run_at: null,
+        }),
+      ]),
+    );
+  });
+
   it('reloads runtime settings including images cron and per-job toggles', async () => {
     prisma.supplierIntegration.findUnique.mockResolvedValue({
       is_active: true,

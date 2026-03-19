@@ -92,8 +92,50 @@ export default function ImportsPage() {
   const [runDetails, setRunDetails] = useState<Record<string, ImportRun>>({});
   const [runErrors, setRunErrors] = useState<Record<string, ImportRunError[]>>({});
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
 
-  const permissions = useMemo(() => {
+  const hasPermission = (permission: string) =>
+    permissions.includes("full_access") || permissions.includes(permission);
+  const canReadConfig = hasPermission("imports:config:read") || permissions.length === 0;
+  const canUpdateConfig = hasPermission("imports:config:update") || permissions.length === 0;
+  const canReadSecret = hasPermission("imports:secret:read") || permissions.includes("full_access");
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") {
+        setPermissions([]);
+        return;
+      }
+
+      const raw = localStorage.getItem("admin_user");
+      if (!raw) {
+        setPermissions([]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as { permissions?: unknown };
+      setPermissions(
+        Array.isArray(parsed.permissions)
+          ? parsed.permissions.map((permission) => String(permission))
+          : [],
+      );
+    } catch {
+      setPermissions([]);
+    }
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const data = await fetchImportHistory(1, 30);
+      setItems(data.items);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load import history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRuns = async () => {
     try {
       if (typeof window === "undefined") {
         return [] as string[];
@@ -120,9 +162,7 @@ export default function ImportsPage() {
       const data = await fetchImportHistory(1, 30);
       setItems(data.items);
     } catch (error: any) {
-      toast.error(error.message || "Failed to load import history");
-    } finally {
-      setLoading(false);
+      toast.error(error.message || "Failed to load import observability");
     }
   };
 

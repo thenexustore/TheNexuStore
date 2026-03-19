@@ -15,12 +15,14 @@
     "orders": "Pedidos",
     "coupons": "Cupones",
     "chat": "Chat",
-    "homeContent": "Página Principal",
-    "homepageSections": "Gestor Página Principal",
+    "homeContent": "Diseño Store",
+    "banners": "Banners",
+    "featuredProducts": "Productos destacados",
     "pricing": "Precios / PVP",
     "logout": "Cerrar sesión",
     "imports": "Importaciones",
     "rmas": "Devoluciones (RMA)",
-    "settings": "Ajustes"
+    "settings": "Ajustes",
+    "homeComposer": "Página Principal"
   }
 }

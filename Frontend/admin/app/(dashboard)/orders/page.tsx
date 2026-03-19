@@ -197,6 +197,7 @@ export default function OrdersPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
@@ -225,6 +226,24 @@ export default function OrdersPage() {
                           {formatDate(order.createdAt)}
                         </td>
                         <td className="px-6 py-4 font-medium">{formatCurrency(Number(order.amount))}</td>
+                        <td className="px-6 py-4 text-xs text-gray-600">
+                          <div className="space-y-1">
+                            <p>
+                              <span className="font-medium text-gray-800">Provider:</span>{" "}
+                              {order.paymentProvider || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-gray-800">Status:</span>{" "}
+                              {order.paymentStatus || "-"}
+                            </p>
+                            {order.redsysResponseCode && (
+                              <p>
+                                <span className="font-medium text-gray-800">Redsys:</span>{" "}
+                                {order.redsysResponseCode}
+                              </p>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4">
                           <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}>
                             <StatusIcon className="w-3 h-3 mr-1" />
@@ -303,6 +322,31 @@ export default function OrdersPage() {
                               <p>Unit: {formatCurrency(Number(item.unit_price_snapshot || 0))}</p>
                             </div>
                           ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <h4 className="text-sm font-semibold mb-2">Payments</h4>
+                        <div className="space-y-3">
+                          {orderDetail.payments?.length ? (
+                            orderDetail.payments.map((payment) => (
+                              <div key={payment.id} className="rounded border bg-gray-50 p-3 text-xs">
+                                <p><span className="font-medium">Provider:</span> {payment.provider}</p>
+                                <p><span className="font-medium">Status:</span> {payment.status}</p>
+                                <p><span className="font-medium">Amount:</span> {formatCurrency(Number(payment.amount || 0))}</p>
+                                <p><span className="font-medium">Currency:</span> {payment.currency}</p>
+                                <p><span className="font-medium">Redsys Response:</span> {payment.redsys_response_code || "-"}</p>
+                                <p><span className="font-medium">Authorization:</span> {payment.redsys_authorization_code || "-"}</p>
+                                <p><span className="font-medium">Method:</span> {payment.redsys_payment_method || payment.provider}</p>
+                                <p className="mt-2 font-medium">Gateway payload</p>
+                                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded border bg-white p-2 text-[11px]">
+                                  {JSON.stringify(payment.raw_response ?? {}, null, 2)}
+                                </pre>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-gray-500">No payment records yet.</p>
+                          )}
                         </div>
                       </div>
                     </>

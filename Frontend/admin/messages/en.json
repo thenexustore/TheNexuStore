@@ -15,12 +15,14 @@
     "orders": "Orders",
     "coupons": "Coupons",
     "chat": "Chat",
-    "homeContent": "Home Content",
-    "homepageSections": "Homepage Manager",
+    "homeContent": "Store Design",
+    "banners": "Banners",
+    "featuredProducts": "Featured products",
     "pricing": "Pricing",
     "logout": "Logout",
     "imports": "Imports",
     "rmas": "Returns (RMA)",
-    "settings": "Settings"
+    "settings": "Settings",
+    "homeComposer": "Homepage"
   }
 }

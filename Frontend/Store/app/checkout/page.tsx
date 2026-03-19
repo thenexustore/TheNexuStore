@@ -5,7 +5,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
-import { createOrder } from "../lib/checkout";
+import { createOrder, createRedsysPayment } from "../lib/checkout";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("es-ES", {
@@ -16,6 +16,13 @@ const formatCurrency = (amount: number) => {
 
 const CHECKOUT_FORM_ID = "checkout-form";
 
+type RedsysRedirectFormData = {
+  Ds_SignatureVersion: string;
+  Ds_MerchantParameters: string;
+  Ds_Signature: string;
+  formUrl: string;
+};
+
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const router = useRouter();
@@ -24,7 +31,11 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"REDSYS" | "BIZUM" | "COD">("REDSYS");
   const checkoutFormRef = useRef<HTMLFormElement>(null);
+  const redsysRedirectFormRef = useRef<HTMLFormElement>(null);
+  const [redsysRedirectForm, setRedsysRedirectForm] =
+    useState<RedsysRedirectFormData | null>(null);
 
   const freeShippingRemaining = useMemo(
     () => Math.max(0, 100 - (cart?.summary.subtotal || 0)),
@@ -119,6 +130,11 @@ export default function CheckoutPage() {
     refreshCartWithDestination,
   ]);
 
+  useEffect(() => {
+    if (!redsysRedirectForm) return;
+    redsysRedirectFormRef.current?.submit();
+  }, [redsysRedirectForm]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -191,10 +207,41 @@ export default function CheckoutPage() {
               ...formData.billing_address,
               vat_id: formData.billing_address.vat_id || undefined,
             },
+        payment_method: paymentMethod,
         notes: formData.notes || undefined,
       };
 
       const response = await createOrder(orderData, getSessionId());
+      if (paymentMethod === "REDSYS" || paymentMethod === "BIZUM") {
+        const redsysIntent = await createRedsysPayment(
+          {
+            order_id: response.order.id,
+            payment_method: paymentMethod,
+            tracking_token: response.order.tracking_token || response.order.id,
+            phone: formData.shipping_address.phone || undefined,
+          },
+          getSessionId(),
+        );
+        const redsysForm: RedsysRedirectFormData = redsysIntent?.formData || {
+          Ds_SignatureVersion: redsysIntent?.Ds_SignatureVersion || "",
+          Ds_MerchantParameters: redsysIntent?.Ds_MerchantParameters || "",
+          Ds_Signature: redsysIntent?.Ds_Signature || "",
+          formUrl: redsysIntent?.formUrl || "",
+        };
+
+        if (
+          redsysForm?.formUrl &&
+          redsysForm.Ds_MerchantParameters &&
+          redsysForm.Ds_Signature &&
+          redsysForm.Ds_SignatureVersion
+        ) {
+          setRedsysRedirectForm(redsysForm);
+          return;
+        }
+
+        throw new Error("Redsys payment form was not generated");
+      }
+
       const trackingToken =
         response.order.tracking_token || response.order.id;
       router.push(`/order/track/${trackingToken}`);
@@ -238,7 +285,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-white py-6 pb-28 text-black sm:py-8 sm:pb-8">
-      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-8">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:mb-8 sm:p-6">
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{t("title")}</h1>
           <p className="mt-2 text-sm text-slate-600">{t("secureNote")}</p>
@@ -446,6 +493,54 @@ export default function CheckoutPage() {
               </div>
 
               <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-4">{t("paymentMethod")}</h2>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="REDSYS"
+                      checked={paymentMethod === "REDSYS"}
+                      onChange={() => setPaymentMethod("REDSYS")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium">{t("payByCard")}</p>
+                      <p className="text-sm text-gray-500">{t("payByCardHint")}</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="BIZUM"
+                      checked={paymentMethod === "BIZUM"}
+                      onChange={() => setPaymentMethod("BIZUM")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium">{t("payByBizum")}</p>
+                      <p className="text-sm text-gray-500">{t("payByBizumHint")}</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="COD"
+                      checked={paymentMethod === "COD"}
+                      onChange={() => setPaymentMethod("COD")}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium">{t("payOnDelivery")}</p>
+                      <p className="text-sm text-gray-500">{t("payOnDeliveryHint")}</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">
                   {t("additionalInfo")}
                 </h2>
@@ -479,7 +574,7 @@ export default function CheckoutPage() {
           </div>
 
           <div>
-            <div className="sticky bottom-0 rounded-xl bg-white p-4 shadow-sm sm:p-6 lg:top-8">
+            <div className="rounded-xl bg-white p-4 shadow-sm sm:p-6 lg:sticky lg:top-8">
               <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
               <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:p-4">
@@ -585,7 +680,7 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 fixed-bottom-bar backdrop-blur lg:hidden">
         <button
           type="submit"
           form={CHECKOUT_FORM_ID}
@@ -595,6 +690,29 @@ export default function CheckoutPage() {
           {loading ? t("processing") : `${t("placeOrder")} · ${formatCurrency(cart.summary.total)}`}
         </button>
       </div>
+
+      <form
+        ref={redsysRedirectFormRef}
+        method="POST"
+        action={redsysRedirectForm?.formUrl || ""}
+        className="hidden"
+      >
+        <input
+          type="hidden"
+          name="Ds_SignatureVersion"
+          value={redsysRedirectForm?.Ds_SignatureVersion || ""}
+        />
+        <input
+          type="hidden"
+          name="Ds_MerchantParameters"
+          value={redsysRedirectForm?.Ds_MerchantParameters || ""}
+        />
+        <input
+          type="hidden"
+          name="Ds_Signature"
+          value={redsysRedirectForm?.Ds_Signature || ""}
+        />
+      </form>
 
     </div>
   );

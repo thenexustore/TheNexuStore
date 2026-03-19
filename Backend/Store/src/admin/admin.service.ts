@@ -6,7 +6,7 @@ import {
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
-import { OrderStatus, StaffRole } from '@prisma/client';
+import { OrderStatus, Prisma, StaffRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
@@ -23,8 +23,9 @@ export class AdminService {
         .toLowerCase(),
       password: process.env.ADMIN_DEFAULT_PASSWORD ?? 'Suraj@123',
       forcePasswordSync:
-        (process.env.ADMIN_DEFAULT_FORCE_PASSWORD_SYNC ?? 'true').toLowerCase() !==
-        'false',
+        (
+          process.env.ADMIN_DEFAULT_FORCE_PASSWORD_SYNC ?? 'true'
+        ).toLowerCase() !== 'false',
     };
   }
 
@@ -77,7 +78,9 @@ export class AdminService {
           where: { id: existingAdmin.id },
           data: updates,
         });
-        this.logger.log(`Default admin account synchronized for ${defaultEmail}`);
+        this.logger.log(
+          `Default admin account synchronized for ${defaultEmail}`,
+        );
       }
 
       return;
@@ -103,7 +106,12 @@ export class AdminService {
     }
 
     if (role === StaffRole.WAREHOUSE) {
-      return ['orders:read', 'orders:update', 'inventory:read', 'inventory:update'];
+      return [
+        'orders:read',
+        'orders:update',
+        'inventory:read',
+        'inventory:update',
+      ];
     }
 
     return [];
@@ -118,7 +126,8 @@ export class AdminService {
 
     const defaultAdmin = this.getDefaultAdminCredentials();
     const shouldSelfHealDefaultAdminLogin =
-      normalizedEmail === defaultAdmin.email && password === defaultAdmin.password;
+      normalizedEmail === defaultAdmin.email &&
+      password === defaultAdmin.password;
 
     if (shouldSelfHealDefaultAdminLogin) {
       await this.ensureDefaultAdminAccount();
@@ -156,7 +165,6 @@ export class AdminService {
     };
   }
 
-
   async updateOwnCredentials(
     staffId: string,
     input: { email?: string; password?: string; currentPassword?: string },
@@ -170,13 +178,18 @@ export class AdminService {
       throw new BadRequestException('Current password is required');
     }
 
-    const staff = await this.prisma.staff.findUnique({ where: { id: staffId } });
+    const staff = await this.prisma.staff.findUnique({
+      where: { id: staffId },
+    });
 
     if (!staff || !staff.is_active) {
       throw new UnauthorizedException('Invalid staff account');
     }
 
-    const passwordMatch = await bcrypt.compare(currentPassword, staff.password_hash);
+    const passwordMatch = await bcrypt.compare(
+      currentPassword,
+      staff.password_hash,
+    );
     if (!passwordMatch) {
       throw new UnauthorizedException('Current password is incorrect');
     }
@@ -202,7 +215,9 @@ export class AdminService {
       });
 
       if (emailInUse && emailInUse.id !== staff.id) {
-        throw new BadRequestException('Email already in use by another account');
+        throw new BadRequestException(
+          'Email already in use by another account',
+        );
       }
     }
 
@@ -260,6 +275,12 @@ export class AdminService {
           skip,
           take: limit,
           orderBy: { created_at: 'desc' },
+          include: {
+            payments: {
+              orderBy: { created_at: 'desc' },
+              take: 1,
+            },
+          },
         }),
         this.prisma.order.count({ where }),
       ]);
@@ -272,11 +293,19 @@ export class AdminService {
         status: string;
         amount: any;
         createdAt: Date;
+        paymentStatus: string | null;
+        paymentProvider: string | null;
+        redsysResponseCode: string | null;
+        redsysAuthorizationCode: string | null;
       }> = [];
 
       for (const order of orders) {
         let customerEmail = order.email || 'Guest';
         let customerName = 'Guest';
+        const latestPayment = order.payments[0] || null;
+        const redsys = this.extractRedsysPayload(
+          latestPayment?.raw_response ?? null,
+        );
 
         if (order.customer_id) {
           const customer = await this.prisma.customer.findUnique({
@@ -298,6 +327,10 @@ export class AdminService {
           status: order.status,
           amount: order.total_amount,
           createdAt: order.created_at,
+          paymentStatus: latestPayment?.status ?? null,
+          paymentProvider: latestPayment?.provider ?? null,
+          redsysResponseCode: redsys?.responseCode ?? null,
+          redsysAuthorizationCode: redsys?.authCode ?? null,
         });
       }
 
@@ -317,6 +350,11 @@ export class AdminService {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
+        include: {
+          payments: {
+            orderBy: { created_at: 'desc' },
+          },
+        },
       });
 
       if (!order) {
@@ -344,6 +382,15 @@ export class AdminService {
         ...order,
         customer,
         items,
+        payments: order.payments.map((payment) => {
+          const redsys = this.extractRedsysPayload(payment.raw_response);
+          return {
+            ...payment,
+            redsys_response_code: redsys?.responseCode ?? null,
+            redsys_authorization_code: redsys?.authCode ?? null,
+            redsys_payment_method: redsys?.payMethod ?? null,
+          };
+        }),
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -386,7 +433,41 @@ export class AdminService {
     };
   }
 
+  private extractRedsysPayload(rawResponse: Prisma.JsonValue | null): {
+    responseCode?: string;
+    authCode?: string;
+    payMethod?: string;
+  } | null {
+    if (
+      !rawResponse ||
+      typeof rawResponse !== 'object' ||
+      Array.isArray(rawResponse)
+    ) {
+      return null;
+    }
 
+    const container = rawResponse as Record<string, unknown>;
+    const redsys = container.redsys;
+    if (!redsys || typeof redsys !== 'object' || Array.isArray(redsys)) {
+      return null;
+    }
+
+    const parsed = redsys as Record<string, unknown>;
+    return {
+      responseCode:
+        typeof parsed.responseCode === 'string'
+          ? parsed.responseCode
+          : undefined,
+      authCode:
+        typeof parsed.authCode === 'string' ? parsed.authCode : undefined,
+      payMethod:
+        typeof parsed.payMethod === 'string'
+          ? parsed.payMethod
+          : typeof parsed.processedPayMethod === 'string'
+            ? parsed.processedPayMethod
+            : undefined,
+    };
+  }
 
   async getOrderTimeline(orderId: string) {
     const logs = await this.prisma.adminAuditLog.findMany({
@@ -410,7 +491,9 @@ export class AdminService {
   }
 
   async addOrderNote(orderId: string, note: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
     if (!order) {
       throw new NotFoundException('Order not found');
     }
@@ -502,6 +585,27 @@ export class AdminService {
 
       if (existingCategory) {
         throw new Error('Category with this name or slug already exists');
+      }
+
+      if (data.parent_id) {
+        const parent = await this.prisma.category.findUnique({
+          where: { id: data.parent_id },
+          select: { id: true, parent_id: true },
+        });
+        if (!parent) {
+          throw new Error('Parent category does not exist');
+        }
+        if (parent.parent_id) {
+          const grandparent = await this.prisma.category.findUnique({
+            where: { id: parent.parent_id },
+            select: { id: true, parent_id: true },
+          });
+          if (grandparent?.parent_id) {
+            throw new Error(
+              'Category depth cannot exceed grandparent/parent/child hierarchy',
+            );
+          }
+        }
       }
 
       const sortOrder =

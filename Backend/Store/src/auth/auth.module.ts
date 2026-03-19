@@ -8,6 +8,7 @@ import { GoogleStrategy } from './google-verfication/google.strategy';
 import { AuthGuard } from './auth.guard';
 import { GoogleAuthGuard } from './google-verfication/google-auth.guard';
 import { JwtAuthModule } from './jwt-auth.module';
+import { OptionalAuthGuard } from './optional-auth.guard';
 
 const googleStrategyProviders =
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -25,9 +26,10 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     AuthService,
     PrismaService,
     AuthGuard,
+    OptionalAuthGuard,
     GoogleAuthGuard,
     ...googleStrategyProviders,
   ],
-  exports: [JwtAuthModule, AuthService, AuthGuard],
+  exports: [JwtAuthModule, AuthService, AuthGuard, OptionalAuthGuard],
 })
 export class AuthModule {}

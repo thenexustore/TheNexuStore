@@ -8,6 +8,7 @@ import { ProductsService } from './products/products.service';
 import { AuditLogController } from './audit-log.controller';
 import { AuditLogService } from './audit-log.service';
 import { ImportsController } from './imports/imports.controller';
+import { ImportsConfigService } from './imports/imports-config.service';
 import { RmaController } from './rma/rma.controller';
 import { RmaService } from './rma/rma.service';
 import { AdminGuard } from './admin.guard';
@@ -21,6 +22,7 @@ import { JwtAuthModule } from '../auth/jwt-auth.module';
 import { PricingAdminModule } from './pricing/pricing.module';
 import { CategoriesModule } from '../user/categories/categories.module';
 import { InfortisaModule } from '../infortisa/infortisa.module';
+import { AdminCategoriesModule } from './categories/admin-categories.module';
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { InfortisaModule } from '../infortisa/infortisa.module';
     PricingAdminModule,
     CategoriesModule,
     InfortisaModule,
+    AdminCategoriesModule,
   ],
   controllers: [
     AdminController,
@@ -49,6 +52,7 @@ import { InfortisaModule } from '../infortisa/infortisa.module';
     AdminGuard,
     PrismaService,
     AuditLogService,
+    ImportsConfigService,
     RmaService,
   ],
   exports: [AdminGuard],

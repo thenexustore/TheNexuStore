@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "export": "next export",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:merge-markers": "node scripts/check-merge-markers.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -17,6 +19,8 @@
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
     "@mui/system": "^7.3.7",
+    "@swc/helpers": "^0.5.19",
+    "@tailwindcss/postcss": "^4.2.1",
     "axios": "^1.13.4",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
@@ -24,17 +28,16 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hot-toast": "^2.6.0",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }

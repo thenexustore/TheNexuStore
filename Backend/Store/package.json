@@ -13,21 +13,26 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
     "check:merge-markers": "node scripts/check-merge-markers.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "smoke:taxonomy-admin": "jest --runInBand src/admin/categories/admin-categories.service.spec.ts src/admin/imports/imports.controller.spec.ts src/infortisa/infortisa-category-mapping.util.spec.ts src/user/products/products.service.spec.ts",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "infortisa:backfill-slugs": "ts-node scripts/backfill-infortisa-slugs.ts",
+    "categories:backfill-level2": "ts-node scripts/backfill-category-level2-parents.ts",
     "prisma:generate": "prisma generate",
-    "prebuild": "npm run prisma:generate",
+    "prebuild": "npm run prisma:generate && npm run check:home-controller-duplicates",
     "prestart": "npm run prisma:generate",
     "prestart:prod": "npm run prisma:generate",
     "config:smoke": "node scripts/config-smoke.cjs",
     "smoke:http": "node scripts/http-smoke.cjs",
     "brands:logo:audit": "ts-node scripts/brand-logo-audit.ts",
-    "brands:logo:normalize": "ts-node scripts/brand-logo-audit.ts --apply"
+    "brands:logo:normalize": "ts-node scripts/brand-logo-audit.ts --apply",
+    "check:home-controller-duplicates": "node scripts/check-home-controller-duplicates.mjs",
+    "seed:categories": "ts-node prisma/seed-parent-categories.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -53,12 +58,14 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@nestjs/cli": "^11.0.0",
+    "typescript": "^5.7.3",
+    "@types/jest": "^30.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
-    "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",
@@ -66,7 +73,6 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/http-errors": "^2.0.5",
-    "@types/jest": "^30.0.0",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.19.3",
     "@types/range-parser": "^1.2.7",
@@ -86,7 +92,6 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
   "jest": {

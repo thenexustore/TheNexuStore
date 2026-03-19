@@ -27,6 +27,15 @@ export class PricingAdminService {
 
 
 
+
+  private normalizeScopeTargets(scope: string, ids: { category_id: string | null; brand_id: string | null; sku_id: string | null }) {
+    if (scope === 'GLOBAL') return { category_id: null, brand_id: null, sku_id: null };
+    if (scope === 'CATEGORY') return { category_id: ids.category_id, brand_id: null, sku_id: null };
+    if (scope === 'BRAND') return { category_id: null, brand_id: ids.brand_id, sku_id: null };
+    if (scope === 'SKU') return { category_id: null, brand_id: null, sku_id: ids.sku_id };
+    return ids;
+  }
+
   private validateDateWindow(startsAt?: string | null, endsAt?: string | null) {
     if (!startsAt || !endsAt) return;
     const s = new Date(startsAt).getTime();
@@ -49,15 +58,27 @@ export class PricingAdminService {
 
   async createRule(dto: RulePayloadDto) {
     const sku_id = await this.resolveSkuId(dto);
-    this.validateScope(dto.scope, dto.category_id ?? null, dto.brand_id ?? null, sku_id);
+    const normalizedTargets = this.normalizeScopeTargets(dto.scope, {
+      category_id: dto.category_id ?? null,
+      brand_id: dto.brand_id ?? null,
+      sku_id,
+    });
+
+    this.validateScope(dto.scope, normalizedTargets.category_id, normalizedTargets.brand_id, normalizedTargets.sku_id);
     this.validateDateWindow(dto.starts_at ?? null, dto.ends_at ?? null);
 
     const created = await this.prisma.pricingRule.create({
       data: {
-        ...dto,
-        sku_id,
+        scope: dto.scope,
+        category_id: normalizedTargets.category_id,
+        brand_id: normalizedTargets.brand_id,
+        sku_id: normalizedTargets.sku_id,
+        margin_pct: dto.margin_pct as any,
         discount_pct: dto.discount_pct ?? 0,
+        min_margin_pct: dto.min_margin_pct ?? null,
+        min_margin_amount: dto.min_margin_amount ?? null,
         rounding_mode: dto.rounding_mode ?? 'NONE',
+        priority: dto.priority,
         starts_at: dto.starts_at ? new Date(dto.starts_at) : null,
         ends_at: dto.ends_at ? new Date(dto.ends_at) : null,
         is_active: dto.is_active ?? true,
@@ -66,9 +87,9 @@ export class PricingAdminService {
 
     void this.enqueueRecalculate({
       scope: dto.scope === 'GLOBAL' ? 'all' : dto.scope.toLowerCase() as any,
-      skuIds: sku_id ? [sku_id] : undefined,
-      brandId: dto.brand_id ?? undefined,
-      categoryId: dto.category_id ?? undefined,
+      skuIds: normalizedTargets.sku_id ? [normalizedTargets.sku_id] : undefined,
+      brandId: normalizedTargets.brand_id ?? undefined,
+      categoryId: normalizedTargets.category_id ?? undefined,
     });
 
     return created;
@@ -80,27 +101,42 @@ export class PricingAdminService {
 
     const sku_id = dto.sku_id || dto.sku_code ? await this.resolveSkuId(dto) : exists.sku_id;
     const scope = dto.scope ?? exists.scope;
-    const category_id = dto.category_id ?? exists.category_id;
-    const brand_id = dto.brand_id ?? exists.brand_id;
+    const normalizedTargets = this.normalizeScopeTargets(scope, {
+      category_id: dto.category_id ?? exists.category_id,
+      brand_id: dto.brand_id ?? exists.brand_id,
+      sku_id,
+    });
 
-    this.validateScope(scope, category_id, brand_id, sku_id);
-    this.validateDateWindow(dto.starts_at ?? null, dto.ends_at ?? null);
+    this.validateScope(scope, normalizedTargets.category_id, normalizedTargets.brand_id, normalizedTargets.sku_id);
+    this.validateDateWindow(dto.starts_at ?? exists.starts_at?.toISOString() ?? null, dto.ends_at ?? exists.ends_at?.toISOString() ?? null);
+
+    const updateData: any = {
+      scope,
+      category_id: normalizedTargets.category_id,
+      brand_id: normalizedTargets.brand_id,
+      sku_id: normalizedTargets.sku_id,
+      starts_at: dto.starts_at ? new Date(dto.starts_at) : dto.starts_at === null ? null : undefined,
+      ends_at: dto.ends_at ? new Date(dto.ends_at) : dto.ends_at === null ? null : undefined,
+    };
+
+    if (dto.margin_pct !== undefined) updateData.margin_pct = dto.margin_pct;
+    if (dto.discount_pct !== undefined) updateData.discount_pct = dto.discount_pct;
+    if (dto.min_margin_pct !== undefined) updateData.min_margin_pct = dto.min_margin_pct;
+    if (dto.min_margin_amount !== undefined) updateData.min_margin_amount = dto.min_margin_amount;
+    if (dto.rounding_mode !== undefined) updateData.rounding_mode = dto.rounding_mode;
+    if (dto.priority !== undefined) updateData.priority = dto.priority;
+    if (dto.is_active !== undefined) updateData.is_active = dto.is_active;
 
     const updated = await this.prisma.pricingRule.update({
       where: { id },
-      data: {
-        ...dto,
-        sku_id,
-        starts_at: dto.starts_at ? new Date(dto.starts_at) : dto.starts_at === null ? null : undefined,
-        ends_at: dto.ends_at ? new Date(dto.ends_at) : dto.ends_at === null ? null : undefined,
-      } as any,
+      data: updateData,
     });
 
     void this.enqueueRecalculate({
       scope: scope === 'GLOBAL' ? 'all' : scope.toLowerCase() as any,
-      skuIds: sku_id ? [sku_id] : undefined,
-      brandId: brand_id ?? undefined,
-      categoryId: category_id ?? undefined,
+      skuIds: normalizedTargets.sku_id ? [normalizedTargets.sku_id] : undefined,
+      brandId: normalizedTargets.brand_id ?? undefined,
+      categoryId: normalizedTargets.category_id ?? undefined,
     });
 
     return updated;

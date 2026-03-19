@@ -3,13 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  MessageEvent,
   Param,
   ParseUUIDPipe,
   Post,
   Put,
   Query,
+  Sse,
   UseGuards,
 } from '@nestjs/common';
+import { Observable, map } from 'rxjs';
 import { HomepageSectionsService } from './homepage-sections.service';
 import {
   CreateHomepageSectionDto,
@@ -18,15 +21,29 @@ import {
   UpdateHomepageSectionDto,
 } from './dto/homepage-sections.dto';
 import { AdminGuard } from '../admin/admin.guard';
+import { HomepagePreviewEventsService } from './homepage-preview-events.service';
 
 @Controller()
 export class HomepageSectionsController {
-  constructor(private readonly homepageSectionsService: HomepageSectionsService) {}
+  constructor(
+    private readonly homepageSectionsService: HomepageSectionsService,
+    private readonly homepagePreviewEventsService: HomepagePreviewEventsService,
+  ) {}
 
   @Get(['homepage/sections', 'homepage-sections'])
   async getHomepageSections() {
     const data = await this.homepageSectionsService.getPublicSections();
     return { success: true, data };
+  }
+
+  @Sse('homepage/sections/stream')
+  streamHomepageSections(): Observable<MessageEvent> {
+    return this.homepagePreviewEventsService.stream().pipe(
+      map((event) => ({
+        type: event.type,
+        data: event,
+      })),
+    );
   }
 
   @UseGuards(AdminGuard)
@@ -66,6 +83,7 @@ export class HomepageSectionsController {
   @Post(['admin/homepage/sections', 'admin/homepage-sections'])
   async create(@Body() body: CreateHomepageSectionDto) {
     const data = await this.homepageSectionsService.create(body);
+    this.homepagePreviewEventsService.notifyHomepageSectionsUpdated();
     return { success: true, data };
   }
 
@@ -73,6 +91,7 @@ export class HomepageSectionsController {
   @Put(['admin/homepage/sections/reorder', 'admin/homepage-sections/reorder'])
   async reorder(@Body() body: ReorderHomepageSectionsDto) {
     const data = await this.homepageSectionsService.reorder(body);
+    this.homepagePreviewEventsService.notifyHomepageSectionsUpdated();
     return { success: true, data };
   }
 
@@ -83,12 +102,15 @@ export class HomepageSectionsController {
     @Body() body: UpdateHomepageSectionDto,
   ) {
     const data = await this.homepageSectionsService.update(id, body);
+    this.homepagePreviewEventsService.notifyHomepageSectionsUpdated();
     return { success: true, data };
   }
 
   @UseGuards(AdminGuard)
   @Delete('admin/homepage/sections/:id')
   async remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.homepageSectionsService.remove(id);
+    const data = await this.homepageSectionsService.remove(id);
+    this.homepagePreviewEventsService.notifyHomepageSectionsUpdated();
+    return data;
   }
 }

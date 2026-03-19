@@ -12,10 +12,17 @@ import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { GoogleAuthGuard } from './google-verfication/google-auth.guard';
+import {
+  buildAuthCookieClearOptions,
+  buildAuthCookieOptions,
+  buildCsrfCookieClearOptions,
+  buildCsrfCookieOptions,
+} from './auth-cookie.util';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import {
   ForgotPasswordDto,
+  ResendOtpDto,
   ResetPasswordDto,
   UpdateProfileDto,
   VerifyOtpDto,
@@ -30,12 +37,7 @@ export class AuthController {
   @Get('csrf-token')
   csrfToken(@Res({ passthrough: true }) res: Response) {
     const token = randomUUID();
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('csrf_token', token, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-    });
+    res.cookie('csrf_token', token, buildCsrfCookieOptions());
     return { csrfToken: token };
   }
 
@@ -46,35 +48,45 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  verifyOtp(@Body() body: VerifyOtpDto) {
-    return this.auth.verifyOtp(body.email, body.otp);
+  @UseGuards(RateLimitGuard)
+  async verifyOtp(
+    @Body() body: VerifyOtpDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const session = await this.auth.verifyOtp(body.email, body.otp);
+    res.cookie('access_token', session.accessToken, buildAuthCookieOptions());
+    return { success: true, user: session.user };
+  }
+
+  @Post('resend-otp')
+  @UseGuards(RateLimitGuard)
+  resendOtp(@Body() body: ResendOtpDto) {
+    return this.auth.resendOtp(body.email);
   }
 
   @Post('login')
   @UseGuards(RateLimitGuard)
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const token = await this.auth.login(body);
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('access_token', token.accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-    });
-    return { success: true };
+    const session = await this.auth.login(body);
+    res.cookie('access_token', session.accessToken, buildAuthCookieOptions());
+    return { success: true, user: session.user };
   }
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access_token');
+    res.clearCookie('access_token', buildAuthCookieClearOptions());
+    res.clearCookie('csrf_token', buildCsrfCookieClearOptions());
     return { success: true };
   }
 
   @Post('forgot-password')
+  @UseGuards(RateLimitGuard)
   forgot(@Body() body: ForgotPasswordDto) {
     return this.auth.forgotPassword(body.email);
   }
 
   @Post('reset-password')
+  @UseGuards(RateLimitGuard)
   reset(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.email, body.otp, body.password);
   }
@@ -101,14 +113,12 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const user = (req as any).user;
-    const token = await this.auth.googleLogin(user);
-    const isProd = process.env.NODE_ENV === 'production';
-
-    res.cookie('access_token', token.accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-    });
-    res.redirect(`${process.env.FRONTEND_URL}/store`);
+    const session = await this.auth.googleLogin(user);
+    res.cookie('access_token', session.accessToken, buildAuthCookieOptions());
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    res.redirect(new URL('/store', `${frontendUrl}/`).toString());
   }
 }

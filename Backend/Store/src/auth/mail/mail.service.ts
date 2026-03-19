@@ -1,21 +1,59 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
-  private transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.MAIL_USER, 
-      pass: process.env.MAIL_PASS,
-    },
-  });
+  private readonly logger = new Logger(MailService.name);
+  private transporter: nodemailer.Transporter | null = null;
+
+  private getTransporter(): nodemailer.Transporter {
+    if (this.transporter) {
+      return this.transporter;
+    }
+
+    const user = process.env.MAIL_USER?.trim();
+    const pass = process.env.MAIL_PASS?.trim();
+
+    if (!user || !pass) {
+      throw new Error('Mail credentials are not configured. Set MAIL_USER and MAIL_PASS.');
+    }
+
+    const host = process.env.MAIL_HOST?.trim() || 'smtp.gmail.com';
+    const parsedPort = Number(process.env.MAIL_PORT ?? 465);
+    const port = Number.isFinite(parsedPort) ? parsedPort : 465;
+    const secureFlag = process.env.MAIL_SECURE?.trim().toLowerCase();
+    const secure =
+      secureFlag === undefined
+        ? port === 465
+        : ['true', '1', 'yes', 'on'].includes(secureFlag);
+
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: {
+        user,
+        pass,
+      },
+    });
+
+    this.logger.log(`Mail transport configured (${host}:${port}, secure=${secure})`);
+    return this.transporter;
+  }
+
+  private getFromAddress(): string {
+    const fromAddress = (process.env.MAIL_FROM || process.env.MAIL_USER || '').trim();
+    if (!fromAddress) {
+      throw new Error('Mail sender is not configured. Set MAIL_FROM or MAIL_USER.');
+    }
+
+    const fromName = (process.env.MAIL_FROM_NAME || 'NEXUS').trim();
+    return `"${fromName}" <${fromAddress}>`;
+  }
 
   async sendOtp(email: string, otp: string) {
-    await this.transporter.sendMail({
-      from: `"NEXUS" <${process.env.MAIL_USER}>`,
+    await this.getTransporter().sendMail({
+      from: this.getFromAddress(),
       to: email,
       subject: 'Your OTP Code',
       html: `
@@ -31,8 +69,8 @@ export class MailService {
     orderNumber: string,
     trackingUrl: string,
   ) {
-    await this.transporter.sendMail({
-      from: `"NEXUS" <${process.env.MAIL_USER}>`,
+    await this.getTransporter().sendMail({
+      from: this.getFromAddress(),
       to: email,
       subject: `Order ${orderNumber} confirmed`,
       html: `

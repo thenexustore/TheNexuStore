@@ -1,8 +1,7 @@
 "use client";
 
-import NextLink from "next/link";
+import { Link as NextLink } from "@/i18n/navigation";
 import React, { useEffect, useState } from "react";
-import { Link } from "@/i18n/navigation";
 import ProductCard from "../components/ProductCard";
 import { productAPI, Product } from "../lib/products";
 
@@ -35,11 +34,11 @@ const StoreExplore: React.FC = () => {
   if (loading) {
     return (
       <section>
-        <div className="mx-4">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
           <div className="mb-8">
             <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
           </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="animate-pulse">
                 <div className="aspect-square rounded-lg bg-gray-200"></div>
@@ -59,7 +58,7 @@ const StoreExplore: React.FC = () => {
   if (error) {
     return (
       <section>
-        <div className="container mx-4">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
           <div className="mb-8">
             <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
           </div>
@@ -75,18 +74,18 @@ const StoreExplore: React.FC = () => {
 
   return (
     <section>
-      <div className="container mx-4">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-3xl font-bold md:text-4xl lg:text-5xl">Explore</h2>
           <NextLink
             href="/products?sort_by=newest"
-            className="rounded-md px-2 py-1 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 hover:underline"
+            className="rounded-md px-2 py-1 text-sm font-medium text-[#0B123A] transition-colors hover:text-[#1a245a] hover:underline"
           >
             View All
           </NextLink>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
           {newArrivals.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}

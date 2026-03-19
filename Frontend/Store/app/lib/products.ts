@@ -91,7 +91,11 @@ export interface CategoryTreeNode {
   id: string;
   name: string;
   slug: string;
+  parent_id?: string | null;
+  sort_order?: number;
   depth: number;
+  path?: string;
+  ancestry?: Array<{ id: string; slug: string; name: string }>;
   children: CategoryTreeNode[];
 }
 
@@ -102,6 +106,11 @@ export interface CategoryTreeResponse {
     locale: string;
     includeEmpty: boolean;
     includeCounts: boolean;
+    normalization?: {
+      normalized_rows: number;
+      root_nodes: number;
+      virtual_parents: number;
+    };
   };
 }
 
@@ -111,6 +120,7 @@ export interface CategorySearchResult {
   slug: string;
   depth: number;
   path: string;
+  pathSlugs?: string[];
   parentIds: string[];
   ancestors: Array<{ id: string; name: string; slug: string }>;
 }

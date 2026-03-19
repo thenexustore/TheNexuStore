@@ -32,6 +32,53 @@ wait_for_url() {
   return 1
 }
 
+validate_infortisa_health() {
+  local url="$1"
+  local payload
+
+  payload="$(curl -fsS "$url")" || return 1
+
+  HEALTH_PAYLOAD="$payload" node <<'NODE'
+const payload = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
+const valid =
+  payload &&
+  typeof payload === 'object' &&
+  payload.provider === 'infortisa' &&
+  typeof payload.base_url === 'string' &&
+  typeof payload.checked_at === 'string' &&
+  typeof payload.auth_configured === 'boolean' &&
+  typeof payload.latency_ms === 'number';
+
+if (!valid) {
+  console.error('Invalid Infortisa health payload shape');
+  process.exit(1);
+}
+
+if (!payload.healthy) {
+  console.error(`Infortisa unhealthy: ${payload.error_summary || 'unknown error'}`);
+  process.exit(1);
+}
+NODE
+}
+
+wait_for_infortisa_health() {
+  local url="$1"
+  local retries="${2:-15}"
+  local delay_s="${3:-2}"
+
+  for ((i = 1; i <= retries; i++)); do
+    if validate_infortisa_health "$url"; then
+      log "Infortisa health check OK: $url"
+      return 0
+    fi
+    log "Waiting for Infortisa health check ($i/$retries): $url"
+    sleep "$delay_s"
+  done
+
+  log "Infortisa health check FAILED: $url"
+  return 1
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "[ERROR] Missing command: $1" >&2
@@ -55,7 +102,7 @@ fix_next_proxy_conflict() {
 }
 
 log "Validating required commands"
-for c in git npm npx pm2 sed curl; do
+for c in git node npm npx pm2 sed curl; do
   require_cmd "$c"
 done
 
@@ -128,7 +175,7 @@ fi
 
 log "Installing/building backend"
 cd "$REPO_DIR/Backend/Store"
-npm ci
+npm ci --include=dev
 DATABASE_URL="$DATABASE_URL" npx prisma generate
 DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
 npm run build
@@ -162,7 +209,7 @@ cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
-npm run build
+NODE_ENV=production npm run build
 pm2 delete nexus-frontend >/dev/null 2>&1 || true
 pm2 delete nexus-store >/dev/null 2>&1 || true
 pm2 start npm --name nexus-store --cwd "$REPO_DIR/Frontend/Store" -- start -- -p 3000
@@ -175,7 +222,7 @@ cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
 ENV
-npm run build
+NODE_ENV=production npm run build
 pm2 delete nexus-admin >/dev/null 2>&1 || true
 pm2 start npm --name nexus-admin --cwd "$REPO_DIR/Frontend/admin" -- start -- -p 3001
 
@@ -185,7 +232,7 @@ pm2 save
 log "Basic checks"
 pm2 status
 wait_for_url "http://127.0.0.1:4000/admin/health" 10 2
-wait_for_url "http://127.0.0.1:4000/admin/infortisa/health" 10 2
+wait_for_infortisa_health "http://127.0.0.1:4000/admin/infortisa/health" 10 2
 wait_for_url "$API_DOMAIN/admin/health" 10 2
 
 log "Deployment complete. Source of truth is now: $REPO_DIR"

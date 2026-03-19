@@ -35,7 +35,14 @@ export async function fetchWithAuth<T = any>(
   const payload = isJsonResponse ? await response.json() : null;
 
   if (!response.ok) {
-    const message = payload?.message || `API request failed (${response.status})`;
+    const rawMessage = payload?.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join(" · ")
+      : typeof rawMessage === "string"
+        ? rawMessage
+        : typeof rawMessage === "object" && rawMessage
+          ? JSON.stringify(rawMessage)
+          : `API request failed (${response.status})`;
     throw new Error(message);
   }
 

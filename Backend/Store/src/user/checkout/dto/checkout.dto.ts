@@ -65,6 +65,6 @@ export class CreateOrderDto {
   notes?: string = '';
 
   @IsOptional()
-  @IsIn(['REDSYS', 'COD', 'STRIPE', 'PAYPAL'])
-  payment_method?: 'REDSYS' | 'COD' | 'STRIPE' | 'PAYPAL' = 'REDSYS';
+  @IsIn(['REDSYS', 'BIZUM', 'COD'])
+  payment_method?: 'REDSYS' | 'BIZUM' | 'COD' = 'REDSYS';
 }

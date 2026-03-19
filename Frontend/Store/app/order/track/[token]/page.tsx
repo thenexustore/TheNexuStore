@@ -1,9 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { getOrderByTrackingToken } from "@/app/lib/checkout";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Link } from "@/i18n/navigation";
+import { getOrderByTrackingToken, type Order, type OrderItem } from "@/app/lib/checkout";
+import {
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  MapPin,
+  Package,
+  RefreshCw,
+  Truck,
+  XCircle,
+} from "lucide-react";
+
+type OrderStatus =
+  | "PENDING_PAYMENT"
+  | "PAID"
+  | "PROCESSING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "FAILED"
+  | "CANCELLED"
+  | "REFUNDED";
+
+type ProgressStep = {
+  key: Exclude<OrderStatus, "FAILED" | "CANCELLED" | "REFUNDED">;
+  label: string;
+  subtitle: string;
+  Icon: typeof Clock3;
+};
+
+const PROGRESS_STEPS: ProgressStep[] = [
+  {
+    key: "PENDING_PAYMENT",
+    label: "Payment Pending",
+    subtitle: "Bank confirmation in progress",
+    Icon: CreditCard,
+  },
+  {
+    key: "PAID",
+    label: "Payment Confirmed",
+    subtitle: "Transaction approved",
+    Icon: CheckCircle2,
+  },
+  {
+    key: "PROCESSING",
+    label: "Preparing Order",
+    subtitle: "Packing started",
+    Icon: Package,
+  },
+  {
+    key: "SHIPPED",
+    label: "Shipped",
+    subtitle: "Handed to carrier",
+    Icon: Truck,
+  },
+  {
+    key: "DELIVERED",
+    label: "Delivered",
+    subtitle: "Order completed",
+    Icon: CheckCircle2,
+  },
+];
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("es-ES", {
@@ -12,48 +72,143 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+const formatStatus = (status: string) => {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+};
+
+const normalizeStatus = (status: string | undefined): OrderStatus => {
+  const normalized = (status || "").toUpperCase();
+  const validStatuses: OrderStatus[] = [
+    "PENDING_PAYMENT",
+    "PAID",
+    "PROCESSING",
+    "SHIPPED",
+    "DELIVERED",
+    "FAILED",
+    "CANCELLED",
+    "REFUNDED",
+  ];
+  return validStatuses.includes(normalized as OrderStatus)
+    ? (normalized as OrderStatus)
+    : "PENDING_PAYMENT";
+};
+
+const statusBadgeClass = (status: OrderStatus) => {
+  switch (status) {
+    case "DELIVERED":
+    case "PAID":
+    case "PROCESSING":
+    case "SHIPPED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "FAILED":
+    case "CANCELLED":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    case "REFUNDED":
+      return "border-slate-300 bg-slate-100 text-slate-700";
+    case "PENDING_PAYMENT":
+    default:
+      return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+};
+
+const itemQuantity = (item: OrderItem): number => item.qty ?? item.quantity ?? 1;
+
 export default function OrderTrackingPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params.token as string;
+  const paymentStatus = searchParams.get("payment");
 
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (!token) return;
+
+    let isMounted = true;
+
     const fetchOrder = async () => {
+      if (!isMounted) return;
+      if (hasLoadedRef.current) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       try {
         const data = await getOrderByTrackingToken(token);
+        if (!isMounted) return;
         setOrder(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch order");
+        setError(null);
+        hasLoadedRef.current = true;
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to fetch order";
+        setError(message);
       } finally {
+        if (!isMounted) return;
         setLoading(false);
+        setRefreshing(false);
       }
     };
 
-    if (token) {
-      fetchOrder();
-    }
-  }, [token]);
+    fetchOrder();
+    return () => {
+      isMounted = false;
+    };
+  }, [token, refreshKey]);
+
+  const normalizedOrderStatus = normalizeStatus(order?.status);
+  const isOrderFailed =
+    normalizedOrderStatus === "FAILED" || normalizedOrderStatus === "CANCELLED";
+  const isOrderPaid =
+    normalizedOrderStatus === "PAID" ||
+    normalizedOrderStatus === "PROCESSING" ||
+    normalizedOrderStatus === "SHIPPED" ||
+    normalizedOrderStatus === "DELIVERED";
+  const isPaymentPending =
+    normalizedOrderStatus === "PENDING_PAYMENT" ||
+    paymentStatus === "pending" ||
+    (paymentStatus === "success" && !isOrderPaid && !isOrderFailed);
+
+  useEffect(() => {
+    if (!token || !order || !isPaymentPending || isOrderFailed) return;
+    const timer = setTimeout(() => {
+      setRefreshKey((value) => value + 1);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [token, order, isPaymentPending, isOrderFailed]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0B123A]"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 shadow-sm">
+          <RefreshCw className="h-5 w-5 animate-spin text-[#0B123A]" />
+          <p className="text-sm font-medium text-slate-600">Loading order status...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4 text-red-600">Error</h2>
-          <p className="text-gray-600 mb-6">{error || "Order not found"}</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-7 text-center shadow-sm">
+          <XCircle className="mx-auto mb-3 h-10 w-10 text-rose-500" />
+          <h2 className="text-2xl font-bold text-slate-900">Order Not Found</h2>
+          <p className="mt-2 text-slate-600">{error || "Unable to load this order."}</p>
           <Link
             href="/"
-            className="bg-[#0B123A] text-white px-6 py-3 rounded-lg hover:bg-[#1a245a]"
+            className="mt-6 inline-flex rounded-xl bg-[#0B123A] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#1a245a]"
           >
             Go to Home
           </Link>
@@ -62,120 +217,220 @@ export default function OrderTrackingPage() {
     );
   }
 
+  const statusIndex = PROGRESS_STEPS.findIndex(
+    (step) => step.key === normalizedOrderStatus,
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">Track Your Order</h1>
-          <p className="text-gray-600">
-            Order <span className="font-semibold">#{order.order_number}</span>
-          </p>
-          <p className="text-sm text-gray-500 mt-1">
-            Current status:{" "}
-            <span className="font-semibold">
-              {order.status.replace("_", " ")}
-            </span>
-          </p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Order Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-semibold mb-2">Shipping Address</h3>
-              <div className="text-gray-600">
-                <p>{order.shipping_address.full_name}</p>
-                <p>{order.shipping_address.address_line1}</p>
-                <p>
-                  {order.shipping_address.city},{" "}
-                  {order.shipping_address.postal_code}
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbe8ff_0%,_#f8fafc_34%,_#f8fafc_100%)] py-8">
+      <div className="mx-auto w-full max-w-5xl px-4">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="bg-gradient-to-r from-[#0B123A] via-[#142a68] to-[#1f3c8c] p-6 text-white sm:p-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-100">
+                  Order Tracking
                 </p>
-                <p>{order.shipping_address.country}</p>
-                {order.shipping_address.phone && (
-                  <p>Phone: {order.shipping_address.phone}</p>
-                )}
+                <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+                  {order.order_number}
+                </h1>
+                <p className="mt-3 text-sm text-blue-100">
+                  Track payment, packing, and shipment updates in real time.
+                </p>
               </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-2">Order Summary</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Date:</span>
-                  <span>{new Date(order.created_at).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(order.subtotal_amount)}</span>
-                </div>
-                {order.discount_amount > 0 && (
-                  <div className="flex justify-between text-green-700">
-                    <span>Discount:</span>
-                    <span>-{formatCurrency(order.discount_amount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span>Shipping:</span>
-                  <span>
-                    {order.shipping_amount === 0
-                      ? "FREE"
-                      : formatCurrency(order.shipping_amount)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span>{formatCurrency(order.tax_amount)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
-                  <span>Total:</span>
-                  <span>{formatCurrency(order.total_amount)}</span>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadgeClass(
+                    normalizedOrderStatus,
+                  )}`}
+                >
+                  {formatStatus(normalizedOrderStatus)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRefreshKey((value) => value + 1)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/25"
+                  disabled={refreshing}
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </button>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Order Items</h2>
-          <div className="space-y-4">
-            {order.items?.map((item: any) => (
+          <div className="space-y-3 p-5 sm:p-6">
+            {isPaymentPending && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                <Clock3 className="mt-0.5 h-4 w-4 flex-none" />
+                <p className="text-sm">
+                  Bank return received. Waiting for secure server confirmation from Redsys.
+                </p>
+              </div>
+            )}
+            {!isPaymentPending && (paymentStatus === "success" || isOrderPaid) && (
+              <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none" />
+                <p className="text-sm">Payment confirmed successfully.</p>
+              </div>
+            )}
+            {(paymentStatus === "failed" || isOrderFailed) && (
+              <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
+                <XCircle className="mt-0.5 h-4 w-4 flex-none" />
+                <p className="text-sm">
+                  Payment was declined or canceled. Please retry from support/admin.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-bold text-slate-900">Order Progress</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-5">
+            {PROGRESS_STEPS.map((step, index) => {
+              const reached = !isOrderFailed && statusIndex >= index;
+              const current = !isOrderFailed && statusIndex === index;
+              return (
+                <div
+                  key={step.key}
+                  className={`rounded-xl border p-3 transition-colors ${
+                    reached
+                      ? "border-[#204198] bg-blue-50"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <step.Icon
+                      className={`h-4 w-4 ${
+                        reached ? "text-[#204198]" : "text-slate-400"
+                      }`}
+                    />
+                    {current && (
+                      <span className="rounded-full bg-[#0B123A] px-2 py-0.5 text-[10px] font-semibold text-white">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className={`mt-2 text-sm font-semibold ${
+                      reached ? "text-slate-900" : "text-slate-500"
+                    }`}
+                  >
+                    {step.label}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{step.subtitle}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900">Shipping Address</h2>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-2 flex items-center gap-2 text-slate-700">
+                <MapPin className="h-4 w-4" />
+                <span className="text-sm font-semibold">
+                  {order.shipping_address.full_name}
+                </span>
+              </div>
+              <p className="text-sm text-slate-600">{order.shipping_address.address_line1}</p>
+              <p className="text-sm text-slate-600">
+                {order.shipping_address.city}, {order.shipping_address.postal_code}
+              </p>
+              <p className="text-sm text-slate-600">{order.shipping_address.country}</p>
+              {order.shipping_address.phone && (
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  Phone: {order.shipping_address.phone}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900">Order Summary</h2>
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Order Date</span>
+                <span>{new Date(order.created_at).toLocaleString("en-GB")}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Subtotal</span>
+                <span>{formatCurrency(order.subtotal_amount)}</span>
+              </div>
+              {order.discount_amount > 0 && (
+                <div className="flex items-center justify-between text-emerald-700">
+                  <span>Discount</span>
+                  <span>-{formatCurrency(order.discount_amount)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Shipping</span>
+                <span>
+                  {order.shipping_amount === 0
+                    ? "Free"
+                    : formatCurrency(order.shipping_amount)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Tax</span>
+                <span>{formatCurrency(order.tax_amount)}</span>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900">
+                <span>Total</span>
+                <span>{formatCurrency(order.total_amount)}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">Order Items</h2>
+          <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+            {order.items?.map((item) => (
               <div
                 key={item.id}
-                className="flex justify-between items-center py-3 border-b border-gray-100 last:border-0"
+                className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex-1">
-                  <p className="font-medium">
-                    {item.title_snapshot || item.title}
+                <div>
+                  <p className="font-semibold text-slate-900">
+                    {item.title_snapshot || item.title || "Item"}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Qty: {item.qty} × {formatCurrency(item.unit_price)}
+                  <p className="text-slate-500">
+                    Qty: {itemQuantity(item)} x {formatCurrency(item.unit_price)}
                   </p>
                 </div>
-                <p className="font-semibold">
+                <p className="font-semibold text-slate-900">
                   {formatCurrency(item.line_total)}
                 </p>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Shipping & Tracking</h2>
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">Shipping & Tracking</h2>
           {order.shipments && order.shipments.length > 0 ? (
-            <div className="space-y-4">
-              {order.shipments.map((shipment: any) => (
+            <div className="mt-4 space-y-3">
+              {order.shipments.map((shipment) => (
                 <div
                   key={shipment.id}
-                  className="border border-gray-200 rounded-lg p-4"
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                 >
-                  <p className="font-semibold mb-1">
-                    Carrier: {shipment.carrier}
-                  </p>
-                  <p className="text-sm text-gray-600 mb-1">
-                    Status: {shipment.status}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-semibold text-slate-900">
+                      Carrier: {shipment.carrier}
+                    </span>
+                    <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
+                      {formatStatus(shipment.status)}
+                    </span>
+                  </div>
                   {shipment.tracking_number && (
-                    <p className="text-sm text-gray-600 mb-1">
+                    <p className="mt-2 text-sm text-slate-600">
                       Tracking Number: {shipment.tracking_number}
                     </p>
                   )}
@@ -184,8 +439,9 @@ export default function OrderTrackingPage() {
                       href={shipment.tracking_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline"
+                      className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#0B123A] hover:text-[#1a245a]"
                     >
+                      <Truck className="h-4 w-4" />
                       View carrier tracking
                     </a>
                   )}
@@ -193,17 +449,23 @@ export default function OrderTrackingPage() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-600">
-              Your order has not been shipped yet. You will receive an email
-              when tracking information is available.
-            </p>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Shipment is not created yet. You will receive email updates as soon as your
+              package is dispatched.
+            </div>
           )}
-        </div>
+        </section>
 
-        <div className="text-center">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href="/products"
+            className="inline-flex items-center justify-center rounded-xl bg-[#0B123A] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#1a245a]"
+          >
+            Continue Shopping
+          </Link>
           <Link
             href="/"
-            className="bg-[#0B123A] text-white px-6 py-3 rounded-lg hover:bg-[#1a245a]"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
             Back to Home
           </Link>
@@ -212,4 +474,3 @@ export default function OrderTrackingPage() {
     </div>
   );
 }
-

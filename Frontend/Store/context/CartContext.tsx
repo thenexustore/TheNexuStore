@@ -8,6 +8,7 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "../app/providers/AuthProvider";
 import {
   getCart,
@@ -18,6 +19,7 @@ import {
   applyCoupon as applyCouponApi,
   removeCoupon as removeCouponApi,
 } from "@/app/lib/cart";
+import { isAuthScreenPath } from "@/app/lib/route-visibility";
 
 interface CartItem {
   id: string;
@@ -153,7 +155,9 @@ const convertBackendToLegacyFormat = (backendCart: Cart): any[] =>
   }));
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const { user, getSessionId } = useAuth();
+  const pathname = usePathname();
+  const skipCartBootstrap = isAuthScreenPath(pathname);
+  const { user, getSessionId, sessionReady } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasSynced, setHasSynced] = useState(false);
@@ -201,9 +205,18 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchBackendCart, loadLegacyCart]);
 
   useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+
+    if (skipCartBootstrap) {
+      setIsLoading(false);
+      return;
+    }
+
     fetchCart();
     setHasSynced(false);
-  }, [user, fetchCart]);
+  }, [fetchCart, sessionReady, skipCartBootstrap, user]);
 
   const addItem = async (skuCode: string, quantity: number) => {
     try {

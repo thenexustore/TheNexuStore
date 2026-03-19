@@ -13,13 +13,4 @@ export class AppController {
   adminHealth() {
     return this.health();
   }
-
-  @Get('admin/infortisa/health')
-  async adminInfortisaHealth() {
-    return {
-      healthy: true,
-      source: 'app-fallback',
-      timestamp: new Date().toISOString(),
-    };
-  }
 }

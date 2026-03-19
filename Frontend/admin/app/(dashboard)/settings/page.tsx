@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Building2,
@@ -22,6 +22,7 @@ import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { updateAdminCredentials } from "@/lib/api";
+import { fetchRemoteBrandingSettings, saveRemoteBrandingSettings, uploadBrandingLogo } from "@/lib/api/branding";
 import AdminBrandLogo from "@/app/components/AdminBrandLogo";
 import {
   defaultAdminSettings,
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
+  const isEn = locale === "en";
 
   const [settings, setSettings] = useState<AdminSettings>(() => loadAdminSettings());
   const [savedSnapshot, setSavedSnapshot] = useState<AdminSettings>(() => loadAdminSettings());
@@ -66,11 +68,11 @@ export default function SettingsPage() {
     normalizedCredentialEmail.length > 0 && normalizedCredentialEmail !== normalizedCurrentAdminEmail;
   const hasCredentialPasswordChange = credentials.newPassword.trim().length > 0;
 
-  const applyLocaleIfNeeded = (nextLanguage: AdminLanguage) => {
+  const applyLocaleIfNeeded = useCallback((nextLanguage: AdminLanguage) => {
     if (locale !== nextLanguage) {
       router.replace(pathname, { locale: nextLanguage });
     }
-  };
+  }, [locale, pathname, router]);
 
   useEffect(() => {
     const adminUserRaw = localStorage.getItem("admin_user");
@@ -87,29 +89,51 @@ export default function SettingsPage() {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const remote = await fetchRemoteBrandingSettings();
+        if (cancelled) return;
+
+        const merged = { ...loadAdminSettings(), ...remote };
+        setSettings(merged);
+        setSavedSnapshot(merged);
+        saveAdminSettings(merged);
+      } catch {
+        // noop: fallback to local settings when API is unavailable
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function onSaveCredentials() {
     if (!credentials.currentPassword) {
-      toast.error("Debes indicar la contraseña actual");
+      toast.error(isEn ? "You must provide current password" : "Debes indicar la contraseña actual");
       return;
     }
 
     if (!hasCredentialEmailChange && !hasCredentialPasswordChange) {
-      toast.error("No hay cambios en usuario o contraseña para guardar");
+      toast.error(isEn ? "No username/password changes to save" : "No hay cambios en usuario o contraseña para guardar");
       return;
     }
 
     if (hasCredentialEmailChange && !isValidEmail(normalizedCredentialEmail)) {
-      toast.error("El usuario admin debe ser un email válido");
+      toast.error(isEn ? "Admin user must be a valid email" : "El usuario admin debe ser un email válido");
       return;
     }
 
     if (hasCredentialPasswordChange && credentials.newPassword.trim().length < 8) {
-      toast.error("La nueva contraseña debe tener al menos 8 caracteres");
+      toast.error(isEn ? "New password must be at least 8 characters" : "La nueva contraseña debe tener al menos 8 caracteres");
       return;
     }
 
     if (hasCredentialPasswordChange && credentials.newPassword !== credentials.confirmNewPassword) {
-      toast.error("La confirmación de contraseña no coincide");
+      toast.error(isEn ? "Password confirmation does not match" : "La confirmación de contraseña no coincide");
       return;
     }
 
@@ -143,24 +167,24 @@ export default function SettingsPage() {
       }));
       setCurrentAdminEmail(updated.email);
 
-      toast.success("Credenciales de admin actualizadas");
+      toast.success(isEn ? "Admin credentials updated" : "Credenciales de admin actualizadas");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudieron actualizar las credenciales";
+      const message = err instanceof Error ? err.message : (isEn ? "Could not update credentials" : "No se pudieron actualizar las credenciales");
       toast.error(message);
     } finally {
       setCredentialsSaving(false);
     }
   }
 
-  function onSave() {
+  const onSave = useCallback(async () => {
     if (settingsSaving) return;
     if (!isSupportEmailValid) {
-      toast.error("El email de soporte no tiene formato válido");
+      toast.error(isEn ? "Support email format is invalid" : "El email de soporte no tiene formato válido");
       return;
     }
 
     if (!hasValidLightLogo) {
-      toast.error("Añade o sube un logo principal personalizado");
+      toast.error(isEn ? "Add or upload a custom primary logo" : "Añade o sube un logo principal personalizado");
       return;
     }
 
@@ -180,16 +204,38 @@ export default function SettingsPage() {
 
     setSettingsSaving(true);
     try {
-      saveAdminSettings(nextSettings);
-      setSettings(nextSettings);
-      setSavedSnapshot(nextSettings);
+      const uploadedLight = nextSettings.brandLogoUrl.startsWith("data:image/")
+        ? await uploadBrandingLogo("light", nextSettings.brandLogoUrl)
+        : nextSettings.brandLogoUrl;
+      const uploadedDark = nextSettings.brandLogoDarkUrl.startsWith("data:image/")
+        ? await uploadBrandingLogo("dark", nextSettings.brandLogoDarkUrl)
+        : nextSettings.brandLogoDarkUrl;
+
+      const remoteReady = {
+        ...nextSettings,
+        brandLogoUrl: uploadedLight,
+        brandLogoDarkUrl: uploadedDark,
+      };
+
+      await saveRemoteBrandingSettings(remoteReady);
+      saveAdminSettings(remoteReady);
+      setSettings(remoteReady);
+      setSavedSnapshot(remoteReady);
       setSavedAt(new Date());
       applyLocaleIfNeeded(nextSettings.adminLanguage);
-      toast.success("Ajustes guardados y aplicados");
+      toast.success(isEn ? "Settings saved and applied" : "Ajustes guardados y aplicados");
     } finally {
       setSettingsSaving(false);
     }
-  }
+  }, [
+    applyLocaleIfNeeded,
+    hasValidLightLogo,
+    isEn,
+    isSupportEmailValid,
+    savedSnapshot,
+    settings,
+    settingsSaving,
+  ]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -210,15 +256,29 @@ export default function SettingsPage() {
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [hasChanges, settings, settingsSaving]);
+  }, [hasChanges, settings, settingsSaving, onSave]);
 
-  function onReset() {
+  async function onReset() {
+    const brandingPayload = {
+      brandLogoUrl: defaultAdminSettings.brandLogoUrl,
+      brandLogoDarkUrl: defaultAdminSettings.brandLogoDarkUrl,
+      brandLogoFit: defaultAdminSettings.brandLogoFit,
+      brandLogoHeight: defaultAdminSettings.brandLogoHeight,
+      brandLogoVersion: defaultAdminSettings.brandLogoVersion,
+      brandLogoBrightness: defaultAdminSettings.brandLogoBrightness,
+      brandLogoSaturation: defaultAdminSettings.brandLogoSaturation,
+    };
     setSettings(defaultAdminSettings);
     saveAdminSettings(defaultAdminSettings);
     setSavedSnapshot(defaultAdminSettings);
     setSavedAt(new Date());
     applyLocaleIfNeeded(defaultAdminSettings.adminLanguage);
-    toast.success("Ajustes restaurados");
+    try {
+      await saveRemoteBrandingSettings(brandingPayload);
+    } catch {
+      toast.error(isEn ? "Settings restored locally, but remote sync failed. Reload to retry." : "Ajustes restaurados localmente, pero falló la sincronización remota. Recarga para reintentar.");
+    }
+    toast.success(isEn ? "Settings restored" : "Ajustes restaurados");
   }
 
   function onDiscard() {
@@ -226,7 +286,7 @@ export default function SettingsPage() {
     setSettings(latest);
     setSavedSnapshot(latest);
     applyLocaleIfNeeded(latest.adminLanguage);
-    toast.info("Cambios descartados");
+    toast.info(isEn ? "Changes discarded" : "Cambios descartados");
   }
 
   function update<K extends keyof AdminSettings>(key: K, value: AdminSettings[K]) {
@@ -245,12 +305,12 @@ export default function SettingsPage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Selecciona un archivo de imagen válido");
+      toast.error(isEn ? "Select a valid image file" : "Selecciona un archivo de imagen válido");
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("La imagen no debe superar 2MB");
+      toast.error(isEn ? "Image must not exceed 2MB" : "La imagen no debe superar 2MB");
       return;
     }
 
@@ -262,9 +322,9 @@ export default function SettingsPage() {
       } else {
         update("brandLogoUrl", dataUrl);
       }
-      toast.success(`Logo ${variant === "dark" ? "oscuro" : "principal"} cargado. Guarda para aplicar.`);
+      toast.success(isEn ? `Logo ${variant === "dark" ? "dark" : "primary"} uploaded. Save to apply.` : `Logo ${variant === "dark" ? "oscuro" : "principal"} cargado. Guarda para aplicar.`);
     } catch {
-      toast.error("No se pudo leer el archivo de logo");
+      toast.error(isEn ? "Could not read logo file" : "No se pudo leer el archivo de logo");
     }
   }
 
@@ -275,48 +335,48 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">Ajustes del panel</h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Configura idioma, branding y preferencias operativas con enfoque eCommerce profesional.
+              {isEn ? "Configure language, branding and operational preferences with a professional eCommerce focus." : "Configura idioma, branding y preferencias operativas con enfoque eCommerce profesional."}
             </p>
-            <p className="mt-2 text-xs text-zinc-500">Tip: usa Ctrl/Cmd + S para guardar rápido.</p>
+            <p className="mt-2 text-xs text-zinc-500">{isEn ? "Tip: use Ctrl/Cmd + S to save quickly." : "Tip: usa Ctrl/Cmd + S para guardar rápido."}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={onDiscard} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Descartar</button>
-            <button type="button" onClick={onReset} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"><Undo2 className="h-4 w-4" />Restaurar por defecto</button>
-            <button type="button" disabled={!hasChanges || settingsSaving} onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"><Save className="h-4 w-4" />{settingsSaving ? "Guardando..." : "Guardar ajustes"}</button>
+            <button type="button" onClick={onDiscard} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">{isEn ? "Discard" : "Descartar"}</button>
+            <button type="button" onClick={onReset} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"><Undo2 className="h-4 w-4" />{isEn ? "Restore defaults" : "Restaurar por defecto"}</button>
+            <button type="button" disabled={!hasChanges || settingsSaving} onClick={onSave} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"><Save className="h-4 w-4" />{settingsSaving ? (isEn ? "Saving..." : "Guardando...") : (isEn ? "Save settings" : "Guardar ajustes")}</button>
           </div>
         </div>
         <div className="mt-3 text-xs text-zinc-500 flex items-center gap-2">
-          {hasChanges ? <span className="text-amber-600 font-medium">Cambios pendientes</span> : <span className="text-emerald-600 font-medium inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />Sincronizado</span>}
+          {hasChanges ? <span className="text-amber-600 font-medium">{isEn ? "Pending changes" : "Cambios pendientes"}</span> : <span className="text-emerald-600 font-medium inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />{isEn ? "Synced" : "Sincronizado"}</span>}
           <span>·</span>
-          <span>{savedAt ? `Último guardado: ${savedAt.toLocaleTimeString()}` : "Aún no guardado en esta sesión"}</span>
+          <span>{savedAt ? `${isEn ? "Last saved" : "Último guardado"}: ${savedAt.toLocaleTimeString()}` : (isEn ? "Not saved yet in this session" : "Aún no guardado en esta sesión")}</span>
         </div>
       </div>
 
       <div className="sticky top-2 z-20 rounded-xl border border-zinc-200/80 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 flex flex-wrap gap-2 shadow-sm">
         <button type="button" onClick={() => scrollToSection("branding-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><CircleDot className="h-3.5 w-3.5" />Branding</button>
-        <button type="button" onClick={() => scrollToSection("security-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Building2 className="h-3.5 w-3.5" />Seguridad</button>
-        <button type="button" onClick={() => scrollToSection("operations-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Gauge className="h-3.5 w-3.5" />Operaciones</button>
-        <button type="button" onClick={() => scrollToSection("experience-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Sparkles className="h-3.5 w-3.5" />Experiencia</button>
-        <button type="button" onClick={() => scrollToSection("integration-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><MousePointerClick className="h-3.5 w-3.5" />Integración</button>
+        <button type="button" onClick={() => scrollToSection("security-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Building2 className="h-3.5 w-3.5" />{isEn ? "Security" : "Seguridad"}</button>
+        <button type="button" onClick={() => scrollToSection("operations-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Gauge className="h-3.5 w-3.5" />{isEn ? "Operations" : "Operaciones"}</button>
+        <button type="button" onClick={() => scrollToSection("experience-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><Sparkles className="h-3.5 w-3.5" />{isEn ? "Experience" : "Experiencia"}</button>
+        <button type="button" onClick={() => scrollToSection("integration-section")} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-200 hover:bg-zinc-50"><MousePointerClick className="h-3.5 w-3.5" />{isEn ? "Integration" : "Integración"}</button>
       </div>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div id="branding-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Branding e identidad</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />{isEn ? "Branding & identity" : "Branding e identidad"}</h2>
 
           <div className="rounded-xl border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-4 space-y-3">
-            <p className="text-sm font-medium text-zinc-900">Sistema de logo enterprise</p>
-            <p className="text-xs text-zinc-500">Configura logo principal y alternativo para fondos oscuros con fallback automático y cache busting.</p>
+            <p className="text-sm font-medium text-zinc-900">{isEn ? "Enterprise logo system" : "Sistema de logo enterprise"}</p>
+            <p className="text-xs text-zinc-500">{isEn ? "Configure primary and dark-background logos with automatic fallback and cache busting." : "Configura logo principal y alternativo para fondos oscuros con fallback automático y cache busting."}</p>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                <p className="text-xs font-medium text-zinc-700 mb-2">Preview claro</p>
+                <p className="text-xs font-medium text-zinc-700 mb-2">{isEn ? "Light preview" : "Preview claro"}</p>
                 <div className="h-12 rounded bg-white border border-zinc-200 flex items-center justify-center">
                   <AdminBrandLogo settings={settings} variant="light" className="w-auto" />
                 </div>
               </div>
               <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-                <p className="text-xs font-medium text-zinc-200 mb-2">Preview oscuro</p>
+                <p className="text-xs font-medium text-zinc-200 mb-2">{isEn ? "Dark preview" : "Preview oscuro"}</p>
                 <div className="h-12 rounded bg-zinc-950 border border-zinc-700 flex items-center justify-center">
                   <AdminBrandLogo settings={settings} variant="dark" className="w-auto" />
                 </div>
@@ -325,10 +385,10 @@ export default function SettingsPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
-                Branding profesional activo: trabajamos con logo personalizado (sin presets prefabricados).
+                {isEn ? "Professional branding active: we work with custom logo only (no preset packs)." : "Branding profesional activo: trabajamos con logo personalizado (sin presets prefabricados)."}
               </div>
               <label className="block text-sm text-zinc-700">
-                Ajuste de imagen
+                {isEn ? "Image fit" : "Ajuste de imagen"}
                 <select value={settings.brandLogoFit} onChange={(e) => update("brandLogoFit", e.target.value as AdminLogoFit)} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
                   <option value="contain">Contain</option>
                   <option value="cover">Cover</option>
@@ -347,12 +407,22 @@ export default function SettingsPage() {
 
             <label className="block text-sm text-zinc-700">
               URL logo principal
-              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+              <div className="mt-1 flex gap-2">
+                <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+                {settings.brandLogoUrl && (
+                  <button type="button" onClick={() => update("brandLogoUrl", "")} title={isEn ? "Clear URL" : "Borrar URL"} className="rounded-lg border border-zinc-200 px-3 py-2 text-zinc-500 hover:bg-zinc-50 hover:text-red-600">✕</button>
+                )}
+              </div>
             </label>
 
             <label className="block text-sm text-zinc-700">
               URL logo para fondo oscuro (login)
-              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+              <div className="mt-1 flex gap-2">
+                <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+                {settings.brandLogoDarkUrl && (
+                  <button type="button" onClick={() => update("brandLogoDarkUrl", "")} title={isEn ? "Clear URL" : "Borrar URL"} className="rounded-lg border border-zinc-200 px-3 py-2 text-zinc-500 hover:bg-zinc-50 hover:text-red-600">✕</button>
+                )}
+              </div>
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -380,14 +450,14 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm text-zinc-700">
-              Idioma del panel
+              {isEn ? "Panel language" : "Idioma del panel"}
               <select value={settings.adminLanguage} onChange={(e) => update("adminLanguage", e.target.value as AdminLanguage)} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
-                <option value="es">Español</option>
+                <option value="es">{isEn ? "Spanish" : "Español"}</option>
                 <option value="en">English</option>
               </select>
             </label>
             <label className="block text-sm text-zinc-700">
-              Divisa por defecto
+              {isEn ? "Default currency" : "Divisa por defecto"}
               <select value={settings.defaultCurrency} onChange={(e) => update("defaultCurrency", e.target.value as AdminSettings["defaultCurrency"])} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
                 <option value="EUR">EUR (€)</option>
                 <option value="USD">USD ($)</option>
@@ -396,74 +466,74 @@ export default function SettingsPage() {
           </div>
 
           <label className="block text-sm text-zinc-700">
-            Formato de fecha
+            {isEn ? "Date format" : "Formato de fecha"}
             <select value={settings.dateFormat} onChange={(e) => update("dateFormat", e.target.value as AdminSettings["dateFormat"])} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
-              <option value="es-ES">España (dd/mm/yyyy)</option>
-              <option value="en-GB">Reino Unido (dd/mm/yyyy)</option>
+              <option value="es-ES">{isEn ? "Spain (dd/mm/yyyy)" : "España (dd/mm/yyyy)"}</option>
+              <option value="en-GB">{isEn ? "United Kingdom (dd/mm/yyyy)" : "Reino Unido (dd/mm/yyyy)"}</option>
               <option value="en-US">USA (mm/dd/yyyy)</option>
             </select>
           </label>
         </div>
 
         <div id="security-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />Cuenta de administrador</h2>
-          <p className="text-sm text-zinc-600">Cambia el usuario (email) y contraseña del admin de forma segura usando tu contraseña actual.</p>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Building2 className="h-5 w-5" />{isEn ? "Administrator account" : "Cuenta de administrador"}</h2>
+          <p className="text-sm text-zinc-600">{isEn ? "Change admin username (email) and password securely using your current password." : "Cambia el usuario (email) y contraseña del admin de forma segura usando tu contraseña actual."}</p>
           <label className="block text-sm text-zinc-700">
-            Usuario admin (email)
-            <input type="email" value={credentials.email} onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" placeholder="admin@tu-dominio.com" />
+            {isEn ? "Admin user (email)" : "Usuario admin (email)"}
+            <input type="email" value={credentials.email} onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" placeholder={isEn ? "admin@your-domain.com" : "admin@tu-dominio.com"} />
           </label>
           <label className="block text-sm text-zinc-700">
-            Contraseña actual
+            {isEn ? "Current password" : "Contraseña actual"}
             <input type="password" value={credentials.currentPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, currentPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
           </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-sm text-zinc-700">
-              Nueva contraseña
-              <input type="password" value={credentials.newPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, newPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" placeholder="Mínimo 8 caracteres" />
+              {isEn ? "New password" : "Nueva contraseña"}
+              <input type="password" value={credentials.newPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, newPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" placeholder={isEn ? "Minimum 8 characters" : "Mínimo 8 caracteres"} />
             </label>
             <label className="block text-sm text-zinc-700">
-              Confirmar nueva contraseña
+              {isEn ? "Confirm new password" : "Confirmar nueva contraseña"}
               <input type="password" value={credentials.confirmNewPassword} onChange={(e) => setCredentials((prev) => ({ ...prev, confirmNewPassword: e.target.value }))} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
             </label>
           </div>
           <button type="button" onClick={onSaveCredentials} disabled={credentialsSaving || (!hasCredentialEmailChange && !hasCredentialPasswordChange)} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60">
-            <Save className="h-4 w-4" />{credentialsSaving ? "Guardando credenciales..." : "Actualizar usuario/contraseña"}
+            <Save className="h-4 w-4" />{credentialsSaving ? (isEn ? "Saving credentials..." : "Guardando credenciales...") : (isEn ? "Update user/password" : "Actualizar usuario/contraseña")}
           </button>
         </div>
 
         <div id="operations-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Gauge className="h-5 w-5" />Rendimiento y listados</h2>
-          <NumberField label="Refresco automático de pedidos (segundos)" value={settings.ordersRefreshSeconds} min={10} max={300} onChange={(value) => update("ordersRefreshSeconds", value)} />
-          <NumberField label="Filas por página en pedidos" value={settings.ordersPageSize} min={5} max={100} onChange={(value) => update("ordersPageSize", value)} />
-          <NumberField label="Filas por página en productos" value={settings.productsPageSize} min={10} max={200} onChange={(value) => update("productsPageSize", value)} />
-          <NumberField label="Umbral de bajo stock" value={settings.lowStockThreshold} min={0} max={500} onChange={(value) => update("lowStockThreshold", value)} />
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Gauge className="h-5 w-5" />{isEn ? "Performance and listings" : "Rendimiento y listados"}</h2>
+          <NumberField label={isEn ? "Orders auto-refresh (seconds)" : "Refresco automático de pedidos (segundos)"} value={settings.ordersRefreshSeconds} min={10} max={300} onChange={(value) => update("ordersRefreshSeconds", value)} />
+          <NumberField label={isEn ? "Rows per page in orders" : "Filas por página en pedidos"} value={settings.ordersPageSize} min={5} max={100} onChange={(value) => update("ordersPageSize", value)} />
+          <NumberField label={isEn ? "Rows per page in products" : "Filas por página en productos"} value={settings.productsPageSize} min={10} max={200} onChange={(value) => update("productsPageSize", value)} />
+          <NumberField label={isEn ? "Low stock threshold" : "Umbral de bajo stock"} value={settings.lowStockThreshold} min={0} max={500} onChange={(value) => update("lowStockThreshold", value)} />
         </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div id="experience-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 space-y-4 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Bell className="h-5 w-5" />Alertas y experiencia</h2>
-          <ToggleRow icon={<Mail className="h-4 w-4" />} label="Notificaciones por email" description="Avisos de incidencias, importaciones y tareas críticas" value={settings.emailNotifications} onChange={(value) => update("emailNotifications", value)} />
-          <ToggleRow icon={<MessageSquare className="h-4 w-4" />} label="Sonido en chat" description="Reproducir aviso al llegar nuevos mensajes" value={settings.chatSoundEnabled} onChange={(value) => update("chatSoundEnabled", value)} />
-          <ToggleRow icon={<Sparkles className="h-4 w-4" />} label="Métricas avanzadas" description="Mostrar KPIs extendidos en el dashboard" value={settings.showAdvancedMetrics} onChange={(value) => update("showAdvancedMetrics", value)} />
-          <ToggleRow icon={<Settings2 className="h-4 w-4" />} label="Sidebar compacta" description="Navegación más ajustada para pantallas pequeñas" value={settings.compactSidebar} onChange={(value) => update("compactSidebar", value)} />
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Bell className="h-5 w-5" />{isEn ? "Alerts and experience" : "Alertas y experiencia"}</h2>
+          <ToggleRow icon={<Mail className="h-4 w-4" />} label={isEn ? "Email notifications" : "Notificaciones por email"} description={isEn ? "Alerts for incidents, imports and critical tasks" : "Avisos de incidencias, importaciones y tareas críticas"} value={settings.emailNotifications} onChange={(value) => update("emailNotifications", value)} />
+          <ToggleRow icon={<MessageSquare className="h-4 w-4" />} label={isEn ? "Chat sound" : "Sonido en chat"} description={isEn ? "Play sound when new messages arrive" : "Reproducir aviso al llegar nuevos mensajes"} value={settings.chatSoundEnabled} onChange={(value) => update("chatSoundEnabled", value)} />
+          <ToggleRow icon={<Sparkles className="h-4 w-4" />} label={isEn ? "Advanced metrics" : "Métricas avanzadas"} description={isEn ? "Show extended KPIs in dashboard" : "Mostrar KPIs extendidos en el dashboard"} value={settings.showAdvancedMetrics} onChange={(value) => update("showAdvancedMetrics", value)} />
+          <ToggleRow icon={<Settings2 className="h-4 w-4" />} label={isEn ? "Compact sidebar" : "Sidebar compacta"} description={isEn ? "Tighter navigation for small screens" : "Navegación más ajustada para pantallas pequeñas"} value={settings.compactSidebar} onChange={(value) => update("compactSidebar", value)} />
         </div>
 
         <div id="integration-section" className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Clock3 className="h-5 w-5" />Integración rápida con módulos</h2>
-          <p className="mt-2 text-sm text-zinc-600">Los ajustes se aplican al instante en módulos conectados y se mantienen por navegador.</p>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Clock3 className="h-5 w-5" />{isEn ? "Quick integration with modules" : "Integración rápida con módulos"}</h2>
+          <p className="mt-2 text-sm text-zinc-600">{isEn ? "Settings apply instantly to connected modules and persist per browser." : "Los ajustes se aplican al instante en módulos conectados y se mantienen por navegador."}</p>
           <div className="mt-4 grid gap-2">
-            <QuickLink href="/dashboard" label="Dashboard" description="Validar métricas avanzadas y vista general" />
-            <QuickLink href="/orders" label="Pedidos" description="Aplicar idioma, divisa, refresco y filas" />
-            <QuickLink href="/products" label="Productos" description="Validar paginación, divisa y umbral de stock" />
-            <QuickLink href="/chat" label="Chat" description="Comprobar notificaciones y sonido" />
+            <QuickLink href="/dashboard" label="Dashboard" description={isEn ? "Validate advanced metrics and overview" : "Validar métricas avanzadas y vista general"} />
+            <QuickLink href="/orders" label={isEn ? "Orders" : "Pedidos"} description={isEn ? "Apply language, currency, refresh and rows" : "Aplicar idioma, divisa, refresco y filas"} />
+            <QuickLink href="/products" label={isEn ? "Products" : "Productos"} description={isEn ? "Validate pagination, currency and stock threshold" : "Validar paginación, divisa y umbral de stock"} />
+            <QuickLink href="/chat" label="Chat" description={isEn ? "Check notifications and sound" : "Comprobar notificaciones y sonido"} />
           </div>
           <div className="mt-5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs text-zinc-600">
-            {hasChanges ? "Tienes cambios sin guardar. Guarda para aplicarlos y persistirlos." : "Sin cambios pendientes. Configuración sincronizada."}
+            {hasChanges ? (isEn ? "You have unsaved changes. Save to apply and persist them." : "Tienes cambios sin guardar. Guarda para aplicarlos y persistirlos.") : (isEn ? "No pending changes. Configuration synced." : "Sin cambios pendientes. Configuración sincronizada.")}
           </div>
           <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600">
-            <p className="flex items-center gap-2 font-medium text-zinc-700"><Globe className="h-4 w-4" />Idioma actual: {locale.toUpperCase()}</p>
-            <p className="mt-1 flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5" />Logo activo: {resolveAdminLogoSrc(settings)}</p>
+            <p className="flex items-center gap-2 font-medium text-zinc-700"><Globe className="h-4 w-4" />{isEn ? "Current language" : "Idioma actual"}: {locale.toUpperCase()}</p>
+            <p className="mt-1 flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5" />{isEn ? "Active logo" : "Logo activo"}: {resolveAdminLogoSrc(settings)}</p>
           </div>
         </div>
       </section>
@@ -471,10 +541,10 @@ export default function SettingsPage() {
       {hasChanges && (
         <div className="fixed bottom-4 right-4 left-4 lg:left-auto lg:w-[520px] rounded-xl border border-zinc-200 bg-white/95 backdrop-blur p-3 shadow-2xl z-40">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-zinc-600">Tienes cambios sin guardar en Ajustes.</p>
+            <p className="text-xs text-zinc-600">{isEn ? "You have unsaved changes in Settings." : "Tienes cambios sin guardar en Ajustes."}</p>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={onDiscard} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">Descartar</button>
-              <button type="button" disabled={settingsSaving} onClick={onSave} className="text-xs rounded-md bg-zinc-900 text-white px-2.5 py-1.5 hover:bg-zinc-800 disabled:opacity-60">{settingsSaving ? "Guardando..." : "Guardar ahora"}</button>
+              <button type="button" onClick={onDiscard} className="text-xs rounded-md border border-zinc-200 px-2.5 py-1.5 hover:bg-zinc-50">{isEn ? "Discard" : "Descartar"}</button>
+              <button type="button" disabled={settingsSaving} onClick={onSave} className="text-xs rounded-md bg-zinc-900 text-white px-2.5 py-1.5 hover:bg-zinc-800 disabled:opacity-60">{settingsSaving ? (isEn ? "Saving..." : "Guardando...") : (isEn ? "Save now" : "Guardar ahora")}</button>
             </div>
           </div>
         </div>
@@ -538,7 +608,7 @@ function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.onerror = () => reject(new Error("Could not read file"));
     reader.readAsDataURL(file);
   });
 }

@@ -43,4 +43,60 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('Invalid environment variable: REDIS_URL');
   });
+
+  it('throws when REDSYS_URL is invalid', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        REDSYS_URL: 'not-url',
+      }),
+    ).toThrow('Invalid environment variable: REDSYS_URL');
+  });
+
+  it('throws when REDSYS_NOTIFY_URL is invalid', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        REDSYS_NOTIFY_URL: 'not-url',
+      }),
+    ).toThrow('Invalid environment variable: REDSYS_NOTIFY_URL');
+  });
+
+  it('throws when REDSYS_ENV is invalid', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        REDSYS_ENV: 'staging',
+      }),
+    ).toThrow('Invalid environment variable: REDSYS_ENV');
+  });
+
+  it('throws when REDSYS production vars are missing in production', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        NODE_ENV: 'production',
+      }),
+    ).toThrow('Missing required environment variable: REDSYS_MERCHANT_CODE');
+  });
+
+  it('throws when only MAIL_USER is provided', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        MAIL_USER: 'alerts@example.com',
+      }),
+    ).toThrow('Mail misconfiguration');
+  });
+
+  it('throws when MAIL_PORT is invalid', () => {
+    expect(() =>
+      validateEnvironment({
+        ...baseEnv,
+        MAIL_USER: 'alerts@example.com',
+        MAIL_PASS: 'secret',
+        MAIL_PORT: 'not-a-port',
+      }),
+    ).toThrow('Invalid environment variable: MAIL_PORT');
+  });
 });

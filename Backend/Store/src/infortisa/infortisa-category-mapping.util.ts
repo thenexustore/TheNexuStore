@@ -1,4 +1,4 @@
-type MenuParentCategory = {
+export type MenuParentCategory = {
   key: string;
   label: string;
   sortOrder: number;
@@ -6,12 +6,12 @@ type MenuParentCategory = {
   subfamilyKeywords: readonly string[];
 };
 
-const DEFAULT_PARENT_CATEGORY: Pick<MenuParentCategory, 'key' | 'label'> = {
+export const DEFAULT_PARENT_CATEGORY: Pick<MenuParentCategory, 'key' | 'label'> = {
   key: 'accesorios-consumibles',
   label: 'Accesorios y consumibles',
 };
 
-const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
+export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
   {
     key: 'ordenadores-portatiles',
     label: 'Ordenadores y portátiles',
@@ -27,6 +27,10 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'mini pc',
       'thin client',
       'cliente ligero',
+      'laptop',
+      'nettop',
+      'barebone',
+      'embedded',
     ],
     subfamilyKeywords: ['ultrabook', 'chromebook', 'torre pc'],
   },
@@ -57,6 +61,12 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'nvme',
       'caja pc',
       'chasis',
+      'tarjeta de red',
+      'controladora',
+      'ventilador',
+      'cooler',
+      'disipador',
+      'adaptador interno',
     ],
   },
   {
@@ -77,13 +87,27 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'hub usb',
       'capturadora',
       'monitor gaming',
+      'pantalla',
+      'display',
+      'lector',
+      'scanner de mano',
+      'trackball',
+      'stylus',
+      'pen tablet',
+      'grabadora',
     ],
   },
   {
     key: 'impresion-escaneado',
     label: 'Impresión y escaneado',
     sortOrder: 40,
-    familyKeywords: ['impresion', 'impresión', 'printing', 'escaneado', 'scanner'],
+    familyKeywords: [
+      'impresion',
+      'impresión',
+      'printing',
+      'escaneado',
+      'scanner',
+    ],
     subfamilyKeywords: [
       'impresora',
       'multifuncion',
@@ -96,6 +120,12 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'scanner',
       'etiquetas',
       'impresora termica',
+      'consumible impresion',
+      'cartucho',
+      'rollo',
+      'cinta termica',
+      'papel',
+      'etiquetadora',
     ],
   },
   {
@@ -117,6 +147,13 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'transceiver',
       'patch panel',
       'kvm',
+      'punto de acceso',
+      'mesh',
+      'powerline',
+      'repetidor',
+      'amplificador wifi',
+      'fibra optica',
+      'modem',
     ],
   },
   {
@@ -133,6 +170,11 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'mifi',
       'pda',
       'radiofrecuencia',
+      'funda',
+      'cargador movil',
+      'accesorio movil',
+      'protector pantalla',
+      'gps',
     ],
   },
   {
@@ -161,13 +203,24 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'streaming',
       'tdt',
       'soporte tv',
+      'proyector',
+      'pantalla proyeccion',
+      'altavoz bluetooth',
+      'auriculares bluetooth',
+      'camara seguridad',
     ],
   },
   {
     key: 'software-seguridad',
     label: 'Software y seguridad',
     sortOrder: 70,
-    familyKeywords: ['software', 'licencia', 'suscripcion', 'seguridad', 'security'],
+    familyKeywords: [
+      'software',
+      'licencia',
+      'suscripcion',
+      'seguridad',
+      'security',
+    ],
     subfamilyKeywords: [
       'antivirus',
       'backup',
@@ -178,6 +231,12 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'office',
       'sistema operativo',
       'endpoint',
+      'vpn',
+      'certificado digital',
+      'firma electronica',
+      'microsoft 365',
+      'windows',
+      'linux',
     ],
   },
   {
@@ -194,6 +253,38 @@ const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'hogar inteligente',
       'sensor',
       'iluminacion inteligente',
+      'silla gaming',
+      'escritorio gaming',
+      'mando',
+      'gamepad',
+      'volante',
+      'control de acceso',
+      'alarma',
+      'cerradura inteligente',
+    ],
+  },
+  {
+    key: 'accesorios-consumibles',
+    label: 'Accesorios y consumibles',
+    sortOrder: 90,
+    familyKeywords: [
+      'accesorio',
+      'consumible',
+      'cable',
+      'adaptador',
+      'bolsa',
+      'mochila',
+      'maletin',
+      'funda portatil',
+    ],
+    subfamilyKeywords: [
+      'pila',
+      'bateria',
+      'cargador',
+      'regleta',
+      'alargador',
+      'soporte',
+      'brazo monitor',
     ],
   },
 ];
@@ -254,13 +345,12 @@ export function recommendParentCategory(
     return DEFAULT_PARENT_CATEGORY;
   }
 
-  const scored = MENU_PARENT_TAXONOMY
-    .map((category) => ({
-      key: category.key,
-      label: category.label,
-      score: scoreCategory(family, subfamily, category),
-      sortOrder: category.sortOrder,
-    }))
+  const scored = MENU_PARENT_TAXONOMY.map((category) => ({
+    key: category.key,
+    label: category.label,
+    score: scoreCategory(family, subfamily, category),
+    sortOrder: category.sortOrder,
+  }))
     .filter((row) => row.score > 0)
     .sort((a, b) => {
       if (b.score === a.score) return a.sortOrder - b.sortOrder;
@@ -277,15 +367,18 @@ export function recommendParentCategory(
   };
 }
 
-
-
-
 const KNOWN_PARENT_CATEGORY_SLUGS = new Set<string>([
-  ...MENU_PARENT_TAXONOMY.map((category) => slugifyCategory(category.label)),
+  ...MENU_PARENT_TAXONOMY.flatMap((category) => [
+    slugifyCategory(category.label),
+    slugifyCategory(category.key),
+  ]),
   slugifyCategory(DEFAULT_PARENT_CATEGORY.label),
+  slugifyCategory(DEFAULT_PARENT_CATEGORY.key),
 ]);
 
-export function isKnownParentCategorySlug(slug: string | null | undefined): boolean {
+export function isKnownParentCategorySlug(
+  slug: string | null | undefined,
+): boolean {
   if (!slug) return false;
   return KNOWN_PARENT_CATEGORY_SLUGS.has(slug);
 }

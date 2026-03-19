@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -142,9 +142,11 @@ export default function HomeProductSection({
         <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{product.brand_name}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-base font-bold text-red-600">{eur.format(product.price)}</span>
+          <span className={`text-base font-bold ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
+            {eur.format(product.price)}
+          </span>
           {hasDeal && product.compare_at_price ? (
-            <span className="text-xs text-black/70 line-through">
+            <span className="text-xs text-slate-500 line-through">
               {eur.format(product.compare_at_price)}
             </span>
           ) : null}
@@ -154,11 +156,12 @@ export default function HomeProductSection({
   };
 
   return (
-    <section className="w-full px-4 sm:px-6">
-      <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3">
+    <section className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+      <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3 lg:px-6">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-amber-500" />
-          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
+          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">{title}</h2>
         </div>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
@@ -173,7 +176,7 @@ export default function HomeProductSection({
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 lg:gap-5">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="animate-pulse rounded-xl border border-slate-200 p-3">
               <div className="mb-3 aspect-square rounded-lg bg-slate-200" />
@@ -192,6 +195,9 @@ export default function HomeProductSection({
           <div
             className="space-y-2"
             onFocusCapture={() => setIsFocusWithin(true)}
+            onKeyDownCapture={(event) => {
+              if (["Tab", "ArrowLeft", "ArrowRight", "Enter", " ", "Spacebar", "Home", "End"].includes(event.key)) setIsInteracting(true);
+            }}
             onBlurCapture={(event) => {
               const nextTarget = event.relatedTarget as Node | null;
               if (!event.currentTarget.contains(nextTarget)) setIsFocusWithin(false);
@@ -199,7 +205,7 @@ export default function HomeProductSection({
           >
           <div
             ref={scrollRef}
-            className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2"
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 sm:gap-4 lg:gap-5"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
             onTouchStart={() => setIsInteracting(true)}
@@ -229,10 +235,11 @@ export default function HomeProductSection({
           </div>
         </>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 lg:gap-5">
           {products.map((product) => card(product))}
         </div>
       )}
+      </div>
     </section>
   );
 }

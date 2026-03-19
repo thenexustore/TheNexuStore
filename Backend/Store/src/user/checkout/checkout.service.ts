@@ -13,6 +13,8 @@ import { PaymentProvider, Prisma } from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { MailService } from '../../auth/mail/mail.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
+import { RedsysService } from '../payment/redsys.service';
+import { randomBytes, randomInt } from 'crypto';
 
 @Injectable()
 export class CheckoutService {
@@ -22,15 +24,23 @@ export class CheckoutService {
     private couponService: CouponService,
     private mailService: MailService,
     private shippingTaxService: ShippingTaxService,
+    private redsysService: RedsysService,
     private readonly logger: AppLogger,
   ) {}
 
   private readonly FRONTEND_URL =
     process.env.FRONTEND_URL || 'http://localhost:3000';
+  private readonly BASE_URL = process.env.BASE_URL || 'http://localhost:4000';
+  private readonly REDSYS_NOTIFY_URL =
+    process.env.REDSYS_NOTIFY_URL || `${this.BASE_URL}/payments/redsys/notify`;
+  private readonly REDSYS_OK_URL =
+    process.env.REDSYS_OK_URL || `${this.BASE_URL}/payments/redsys/ok`;
+  private readonly REDSYS_KO_URL =
+    process.env.REDSYS_KO_URL || `${this.BASE_URL}/payments/redsys/ko`;
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
+    const random = randomInt(0, 1000);
     return `ORD-${timestamp}-${random.toString().padStart(3, '0')}`;
   }
 
@@ -202,7 +212,18 @@ export class CheckoutService {
       const paymentIntent = await this.createPaymentIntent(
         order.id,
         total,
-        paymentMethod as PaymentProvider,
+        paymentMethod,
+        trackingToken,
+        {
+          subtotal,
+          shipping: shippingAmount,
+          tax,
+          discount: discountAmount,
+          total,
+          currency: order.currency,
+          itemCount: cartItemsForStock.length,
+        },
+        dto.shipping_address.phone,
         tx,
       );
 
@@ -210,7 +231,19 @@ export class CheckoutService {
     });
 
     const trackingUrl = `${this.FRONTEND_URL}/order/track/${result.order.tracking_token}`;
-    await this.mailService.sendOrderConfirmation(dto.email, result.order.order_number, trackingUrl);
+    try {
+      await this.mailService.sendOrderConfirmation(
+        dto.email,
+        result.order.order_number,
+        trackingUrl,
+      );
+    } catch (error) {
+      this.logger.warn('Failed to send order confirmation email', 'CheckoutService', {
+        orderId: result.order.id,
+        email: dto.email,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     this.logger.log('Checkout transaction completed', 'CheckoutService', {
       orderId: result.order.id,
@@ -222,6 +255,7 @@ export class CheckoutService {
       order: {
         id: result.order.id,
         order_number: result.order.order_number,
+        tracking_token: result.order.tracking_token,
         status: result.order.status,
         total_amount: Number(result.order.total_amount),
         currency: result.order.currency,
@@ -234,40 +268,44 @@ export class CheckoutService {
   private async createPaymentIntent(
     orderId: string,
     amount: number,
-    provider: PaymentProvider = 'REDSYS',
+    provider: PaymentProvider | 'BIZUM' = 'REDSYS',
+    trackingToken?: string,
+    snapshot?: {
+      subtotal: number;
+      shipping: number;
+      tax: number;
+      discount: number;
+      total: number;
+      currency: string;
+      itemCount: number;
+    },
+    customerPhone?: string,
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<PaymentIntentDto> {
-    let status = 'requires_payment_method';
-    let paymentStatus: 'INITIATED' | 'AUTHORIZED' = 'INITIATED';
-
     if (provider === 'COD') {
-      status = 'cod_pending';
-      paymentStatus = 'AUTHORIZED';
-    }
-
-    const paymentIntent = {
-      id: `pi_${provider.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      client_secret: provider === 'COD' 
-        ? '' 
-        : `secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`,
-      amount,
-      currency: 'EUR',
-      status,
-      provider,
-    };
-
-    await tx.payment.create({
-      data: {
-        order_id: orderId,
-        provider,
-        status: paymentStatus,
+      const paymentIntent = {
+        id: `pi_cod_${Date.now()}_${randomBytes(6).toString('hex')}`,
+        client_secret: '',
         amount,
         currency: 'EUR',
-        provider_payment_id: paymentIntent.id,
-      },
-    });
+        status: 'cod_pending',
+        provider,
+      };
 
-    if (provider === 'COD') {
+      await tx.payment.create({
+        data: {
+          order_id: orderId,
+          provider,
+          status: 'AUTHORIZED',
+          amount,
+          currency: 'EUR',
+          provider_payment_id: paymentIntent.id,
+          raw_response: {
+            snapshot,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
       await tx.order.update({
         where: { id: orderId },
         data: { status: 'PROCESSING' },
@@ -283,14 +321,97 @@ export class CheckoutService {
           await tx.coupon.update({ where: { id: discount.coupon_id }, data: { usage_count: { increment: 1 } } });
         }
       }
+
+      return paymentIntent;
     }
 
-    return paymentIntent;
+    if (provider === 'REDSYS' || provider === 'BIZUM') {
+      const payment = await tx.payment.create({
+        data: {
+          order_id: orderId,
+          provider: 'REDSYS',
+          status: 'INITIATED',
+          amount,
+          currency: 'EUR',
+          provider_payment_id: null,
+          raw_response: {
+            snapshot,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      const merchantOrderReference =
+        this.redsysService.createMerchantOrderReference(payment.id);
+      const urlOk = this.appendQueryParam(
+        this.REDSYS_OK_URL,
+        'orderRef',
+        merchantOrderReference,
+      );
+      const urlKo = this.appendQueryParam(
+        this.REDSYS_KO_URL,
+        'orderRef',
+        merchantOrderReference,
+      );
+
+      const formData = this.redsysService.createPaymentForm({
+        merchantOrderReference,
+        amount,
+        merchantUrl: this.REDSYS_NOTIFY_URL,
+        urlOk,
+        urlKo,
+        merchantData: payment.id,
+        productDescription: `Order ${orderId}`,
+        merchantName: 'The Nexus Store',
+        paymentMethod: provider === 'BIZUM' ? 'BIZUM' : 'CARD',
+        bizumMobileNumber: provider === 'BIZUM' ? customerPhone : undefined,
+      });
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          provider_payment_id: merchantOrderReference,
+          raw_response: {
+            snapshot,
+            redsysMerchantOrder: merchantOrderReference,
+            redsysRequest: {
+              paymentMethod: provider === 'BIZUM' ? 'BIZUM' : 'REDSYS',
+              merchantUrl: this.REDSYS_NOTIFY_URL,
+              urlOk,
+              urlKo,
+              trackingToken: trackingToken ?? null,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return {
+        id: payment.id,
+        client_secret: '',
+        provider: provider === 'BIZUM' ? 'BIZUM' : 'REDSYS',
+        amount,
+        currency: 'EUR',
+        status: 'requires_action',
+        redirect_url: formData.formUrl,
+        form_data: formData,
+      } as PaymentIntentDto;
+    }
+
+    throw new BadRequestException(`Payment provider ${provider} not supported`);
   }
 
   private async generateTrackingToken(): Promise<string> {
-    // Simple random token; uniqueness enforced at DB level
-    return `trk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    return `trk_${randomBytes(12).toString('hex')}`;
+  }
+
+  private appendQueryParam(baseUrl: string, key: string, value: string): string {
+    try {
+      const parsed = new URL(baseUrl);
+      parsed.searchParams.set(key, value);
+      return parsed.toString();
+    } catch {
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      return `${baseUrl}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+    }
   }
 
   private serializeOrder(order: any) {

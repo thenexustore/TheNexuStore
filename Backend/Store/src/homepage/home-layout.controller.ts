@@ -6,6 +6,7 @@ import {
   CreateSectionDto,
   MoveSectionDto,
   ReorderItemsDto,
+  ReorderSectionsDto,
   UpdateItemDto,
   UpdateLayoutDto,
   UpdateSectionDto,
@@ -42,6 +43,26 @@ export class HomeLayoutController {
   ) {
     const data = await this.service.searchOptions(target, q, Number(limit || 12));
     return { success: true, data };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('/admin/home/diagnostics/active')
+  async activeDiagnostics(@Query('locale') locale?: string) {
+    return {
+      success: true,
+      data: await this.service.getActiveLayoutDiagnostics(locale),
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('/admin/home/integrated-summary')
+  async integratedSummary(@Query('limit') limit?: string) {
+    return {
+      success: true,
+      data: await this.service.getIntegratedModulesSummary(
+        Number(limit || 8),
+      ),
+    };
   }
 
   @UseGuards(AdminGuard)
@@ -104,6 +125,13 @@ export class HomeLayoutController {
     return { success: true, data: await this.service.moveSection(sectionId, body) };
   }
 
+  // Single canonical endpoint for section reorder (must not be duplicated).
+  @UseGuards(AdminGuard)
+  @Post('/admin/home/sections/reorder')
+  async reorderSections(@Body() body: ReorderSectionsDto) {
+    return { success: true, data: await this.service.reorderSections(body) };
+  }
+
   @UseGuards(AdminGuard)
   @Get('/admin/home/sections/:sectionId/items')
   async listItems(@Param('sectionId') sectionId: string) {
@@ -132,5 +160,11 @@ export class HomeLayoutController {
   @Post('/admin/home/items/reorder')
   async reorderItems(@Body() body: ReorderItemsDto) {
     return { success: true, data: await this.service.reorderItems(body) };
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('/admin/home/items/upload-image')
+  async uploadItemImage(@Body() body: { dataUrl?: string }) {
+    return { success: true, data: await this.service.uploadItemImage(String(body?.dataUrl || '')) };
   }
 }

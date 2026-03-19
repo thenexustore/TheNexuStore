@@ -2,6 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
+import { randomBytes } from 'crypto';
+import {
+  recommendParentCategory,
+  slugifyCategory,
+  getParentCategorySortOrder,
+  isKnownParentCategorySlug,
+} from '../../infortisa/infortisa-category-mapping.util';
+import { shouldReparentImportedCategory } from '../../infortisa/infortisa-category-parent-policy.util';
+import { buildCategoryLevel2Descriptor } from '../../user/categories/category-taxonomy.util';
 
 @Injectable()
 export class ProductsService {
@@ -9,7 +18,7 @@ export class ProductsService {
 
   private generateSKU(prefix: string = 'PROD'): string {
     const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substr(2, 6).toUpperCase();
+    const random = randomBytes(3).toString('hex').toUpperCase();
     return `${prefix}-${timestamp}-${random}`;
   }
 
@@ -1188,19 +1197,102 @@ export class ProductsService {
         }
 
         if (Category) {
-          let category = await this.prisma.category.findFirst({
-            where: { name: { equals: Category, mode: 'insensitive' } },
+          const recommendedParent = recommendParentCategory(
+            null,
+            Category as string,
+          );
+          const parentCategorySlug = slugifyCategory(recommendedParent.key);
+          const parentCategorySortOrder = getParentCategorySortOrder(
+            recommendedParent.label,
+          );
+
+          const parentCategory = await this.prisma.category.upsert({
+            where: { slug: parentCategorySlug },
+            update: {
+              name: recommendedParent.label,
+              is_active: true,
+              sort_order: parentCategorySortOrder,
+            },
+            create: {
+              name: recommendedParent.label,
+              slug: parentCategorySlug,
+              is_active: true,
+              sort_order: parentCategorySortOrder,
+            },
           });
 
-          if (!category) {
-            category = await this.prisma.category.create({
-              data: {
-                name: Category,
-                slug: Category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                sort_order: 0,
+          const childSlugPart =
+            slugifyCategory(Category as string) || 'general';
+          const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
+          const level2Descriptor = buildCategoryLevel2Descriptor(
+            parentCategorySlug,
+            {
+              name: Category as string,
+              slug: categorySlug,
+              subfamilyName: Category as string,
+            },
+          );
+          const level2Category = await this.prisma.category.upsert({
+            where: { slug: level2Descriptor.slug },
+            update: {
+              name: level2Descriptor.name,
+              parent_id: parentCategory.id,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+            create: {
+              parent_id: parentCategory.id,
+              name: level2Descriptor.name,
+              slug: level2Descriptor.slug,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+          });
+
+          const existingCategory = await this.prisma.category.findUnique({
+            where: { slug: categorySlug },
+            select: {
+              id: true,
+              parent_id: true,
+              parent_locked: true,
+              parent: {
+                select: { slug: true },
               },
-            });
-          }
+            },
+          });
+
+          const shouldReparent = shouldReparentImportedCategory({
+            isNewCategory: !existingCategory,
+            isParentLocked: Boolean(existingCategory?.parent_locked),
+            hasKnownCurrentParent: isKnownParentCategorySlug(
+              existingCategory?.parent?.slug,
+            ),
+            currentParentSlug: existingCategory?.parent?.slug,
+            recommendedParentSlug: parentCategory.slug,
+          });
+
+          const category = existingCategory
+            ? await this.prisma.category.update({
+                where: { slug: categorySlug },
+                data: {
+                  parent_id: shouldReparent
+                    ? level2Category.id
+                    : existingCategory.parent_id,
+                  name: Category as string,
+                  is_active: true,
+                },
+              })
+            : await this.prisma.category.create({
+                data: {
+                  parent_id: level2Category.id,
+                  name: Category as string,
+                  slug: categorySlug,
+                  is_active: true,
+                  sort_order: 0,
+                },
+              });
 
           await this.prisma.product.update({
             where: { id: product.id },
@@ -1513,19 +1605,102 @@ export class ProductsService {
 
         let mainCategoryId: string | null = null;
         if (Category) {
-          let category = await this.prisma.category.findFirst({
-            where: { name: { equals: Category, mode: 'insensitive' } },
+          const recommendedParent = recommendParentCategory(
+            null,
+            Category as string,
+          );
+          const parentCategorySlug = slugifyCategory(recommendedParent.key);
+          const parentCategorySortOrder = getParentCategorySortOrder(
+            recommendedParent.label,
+          );
+
+          const parentCategory = await this.prisma.category.upsert({
+            where: { slug: parentCategorySlug },
+            update: {
+              name: recommendedParent.label,
+              is_active: true,
+              sort_order: parentCategorySortOrder,
+            },
+            create: {
+              name: recommendedParent.label,
+              slug: parentCategorySlug,
+              is_active: true,
+              sort_order: parentCategorySortOrder,
+            },
           });
 
-          if (!category) {
-            category = await this.prisma.category.create({
-              data: {
-                name: Category,
-                slug: Category.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                sort_order: 0,
+          const childSlugPart =
+            slugifyCategory(Category as string) || 'general';
+          const categorySlug = `${parentCategorySlug}-${childSlugPart}`;
+          const level2Descriptor = buildCategoryLevel2Descriptor(
+            parentCategorySlug,
+            {
+              name: Category as string,
+              slug: categorySlug,
+              subfamilyName: Category as string,
+            },
+          );
+          const level2Category = await this.prisma.category.upsert({
+            where: { slug: level2Descriptor.slug },
+            update: {
+              name: level2Descriptor.name,
+              parent_id: parentCategory.id,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+            create: {
+              parent_id: parentCategory.id,
+              name: level2Descriptor.name,
+              slug: level2Descriptor.slug,
+              is_active: true,
+              sort_order:
+                parentCategorySortOrder * 100 + level2Descriptor.sort_order,
+            },
+          });
+
+          const existingCategory = await this.prisma.category.findUnique({
+            where: { slug: categorySlug },
+            select: {
+              id: true,
+              parent_id: true,
+              parent_locked: true,
+              parent: {
+                select: { slug: true },
               },
-            });
-          }
+            },
+          });
+
+          const shouldReparent = shouldReparentImportedCategory({
+            isNewCategory: !existingCategory,
+            isParentLocked: Boolean(existingCategory?.parent_locked),
+            hasKnownCurrentParent: isKnownParentCategorySlug(
+              existingCategory?.parent?.slug,
+            ),
+            currentParentSlug: existingCategory?.parent?.slug,
+            recommendedParentSlug: parentCategory.slug,
+          });
+
+          const category = existingCategory
+            ? await this.prisma.category.update({
+                where: { slug: categorySlug },
+                data: {
+                  parent_id: shouldReparent
+                    ? level2Category.id
+                    : existingCategory.parent_id,
+                  name: Category as string,
+                  is_active: true,
+                },
+              })
+            : await this.prisma.category.create({
+                data: {
+                  parent_id: level2Category.id,
+                  name: Category as string,
+                  slug: categorySlug,
+                  is_active: true,
+                  sort_order: 0,
+                },
+              });
           mainCategoryId = category.id;
         }
 

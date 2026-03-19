@@ -1,21 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-
-type CategoryRow = {
-  id: string;
-  name: string;
-  slug: string;
-  parent_id: string | null;
-  sort_order: number;
-};
-
-type CategoryTreeNode = {
-  id: string;
-  name: string;
-  slug: string;
-  depth: number;
-  children: CategoryTreeNode[];
-};
+import {
+  buildCategoryTaxonomyTree,
+  normalizeCategoryTaxonomyRows,
+  type CategoryTaxonomyNode,
+  type CategoryTaxonomyRow,
+  sortCategoryRows,
+} from './category-taxonomy.util';
 
 type TreeQuery = {
   locale?: string;
@@ -30,7 +21,7 @@ export class CategoriesService {
   private readonly cacheTtlMs = 5 * 60 * 1000;
   private readonly treeCache = new Map<
     string,
-    { expiresAt: number; value: { items: CategoryTreeNode[]; meta: any } }
+    { expiresAt: number; value: { items: CategoryTaxonomyNode[]; meta: any } }
   >();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -39,7 +30,12 @@ export class CategoriesService {
     this.treeCache.clear();
   }
 
-  private getCacheKey({ locale, maxDepth, includeEmpty, includeCounts }: Required<TreeQuery>) {
+  private getCacheKey({
+    locale,
+    maxDepth,
+    includeEmpty,
+    includeCounts,
+  }: Required<TreeQuery>) {
     return `categories:tree:${locale}:d${maxDepth}:empty${includeEmpty}:counts${includeCounts}`;
   }
 
@@ -54,8 +50,8 @@ export class CategoriesService {
     return raw === 'true' || raw === '1';
   }
 
-  private async getVisibleCategories() {
-    return this.prisma.category.findMany({
+  private async getVisibleCategories(): Promise<CategoryTaxonomyRow[]> {
+    const rows = await this.prisma.category.findMany({
       where: { is_active: true },
       select: {
         id: true,
@@ -66,63 +62,8 @@ export class CategoriesService {
       },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
     });
-  }
 
-  private sortRows(rows: CategoryRow[]) {
-    return [...rows].sort(
-      (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
-    );
-  }
-
-  private buildTree(rows: CategoryRow[], maxDepth: number) {
-    const byId = new Map(rows.map((row) => [row.id, row]));
-    const childrenByParent = new Map<string, CategoryRow[]>();
-
-    for (const row of rows) {
-      if (!row.parent_id || !byId.has(row.parent_id)) continue;
-      if (!childrenByParent.has(row.parent_id)) childrenByParent.set(row.parent_id, []);
-      childrenByParent.get(row.parent_id)!.push(row);
-    }
-
-    for (const [parentId, children] of childrenByParent) {
-      childrenByParent.set(parentId, this.sortRows(children));
-    }
-
-    const roots = this.sortRows(
-      rows.filter((row) => !row.parent_id || !byId.has(row.parent_id)),
-    );
-
-    const buildNode = (
-      row: CategoryRow,
-      depth: number,
-      path: Set<string>,
-    ): CategoryTreeNode | null => {
-      if (path.has(row.id)) {
-        this.logger.warn(`Cycle detected in categories tree at node ${row.id}`);
-        return null;
-      }
-
-      const nextPath = new Set(path);
-      nextPath.add(row.id);
-
-      const children = depth >= maxDepth
-        ? []
-        : (childrenByParent.get(row.id) ?? [])
-            .map((child) => buildNode(child, depth + 1, nextPath))
-            .filter((item): item is CategoryTreeNode => item !== null);
-
-      return {
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        depth,
-        children,
-      };
-    };
-
-    return roots
-      .map((root) => buildNode(root, 1, new Set<string>()))
-      .filter((item): item is CategoryTreeNode => item !== null);
+    return normalizeCategoryTaxonomyRows(rows);
   }
 
   async getCategoryTree(query: TreeQuery) {
@@ -140,7 +81,16 @@ export class CategoriesService {
 
     const maxDepth = Number.parseInt(normalized.maxDepth, 10);
     const rows = await this.getVisibleCategories();
-    const items = this.buildTree(rows, maxDepth);
+    const items = buildCategoryTaxonomyTree(rows, maxDepth);
+    const virtualParentCount = rows.filter((row) =>
+      row.id.startsWith('virtual:'),
+    ).length;
+
+    if (items.length === 0 && rows.length > 0) {
+      this.logger.warn(
+        'Active categories exist but taxonomy tree is empty; check for invalid cyclic parent relationships.',
+      );
+    }
 
     const value = {
       items,
@@ -149,30 +99,47 @@ export class CategoriesService {
         locale: normalized.locale,
         includeEmpty: normalized.includeEmpty === 'true',
         includeCounts: normalized.includeCounts === 'true',
+        normalization: {
+          normalized_rows: rows.length,
+          root_nodes: items.length,
+          virtual_parents: virtualParentCount,
+        },
       },
     };
 
-    this.treeCache.set(cacheKey, { value, expiresAt: Date.now() + this.cacheTtlMs });
+    this.treeCache.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + this.cacheTtlMs,
+    });
     return value;
   }
 
-  async searchCategories({ query, locale, maxDepth }: { query?: string; locale?: string; maxDepth?: string }) {
+  async searchCategories({
+    query,
+    maxDepth,
+  }: {
+    query?: string;
+    locale?: string;
+    maxDepth?: string;
+  }) {
     const q = (query ?? '').trim().toLowerCase();
     if (!q) return [];
 
     const depthLimit = this.normalizeMaxDepth(maxDepth);
-    const rows = await this.getVisibleCategories();
+    const rows = sortCategoryRows(await this.getVisibleCategories());
     const byId = new Map(rows.map((row) => [row.id, row]));
 
-    const buildAncestors = (row: CategoryRow) => {
-      const chain: CategoryRow[] = [row];
+    const buildAncestors = (row: CategoryTaxonomyRow) => {
+      const chain: CategoryTaxonomyRow[] = [row];
       const visited = new Set<string>([row.id]);
       let cursor = row;
 
       while (cursor.parent_id && byId.has(cursor.parent_id)) {
         const parent = byId.get(cursor.parent_id)!;
         if (visited.has(parent.id)) {
-          this.logger.warn(`Cycle detected while resolving category search path for ${row.id}`);
+          this.logger.warn(
+            `Cycle detected while resolving category search path for ${row.id}`,
+          );
           break;
         }
         chain.unshift(parent);
@@ -184,7 +151,11 @@ export class CategoriesService {
     };
 
     return rows
-      .filter((row) => row.name.toLowerCase().includes(q) || row.slug.toLowerCase().includes(q))
+      .filter(
+        (row) =>
+          row.name.toLowerCase().includes(q) ||
+          row.slug.toLowerCase().includes(q),
+      )
       .map((row) => {
         const chain = buildAncestors(row);
         const clipped = chain.slice(0, depthLimit);
@@ -194,6 +165,7 @@ export class CategoriesService {
           slug: row.slug,
           depth: chain.length,
           path: chain.map((item) => item.name).join(' > '),
+          pathSlugs: chain.map((item) => item.slug),
           parentIds: chain.slice(0, -1).map((item) => item.id),
           ancestors: clipped.slice(0, -1).map((item) => ({
             id: item.id,
@@ -202,7 +174,9 @@ export class CategoriesService {
           })),
         };
       })
-      .sort((a, b) => a.path.localeCompare(b.path));
+      .sort((a, b) =>
+        a.path.localeCompare(b.path, 'es', { sensitivity: 'base' }),
+      );
   }
 
   async getLegacyMenuTree() {
@@ -211,7 +185,7 @@ export class CategoriesService {
       parent_id: parent.id,
       parent_name: parent.name,
       parent_slug: parent.slug,
-      sort_order: 0,
+      sort_order: parent.sort_order,
       children: parent.children.map((child) => ({
         parent_id: parent.id,
         parent_name: parent.name,
@@ -219,7 +193,7 @@ export class CategoriesService {
         child_id: child.id,
         child_name: child.name,
         child_slug: child.slug,
-        sort_order: 0,
+        sort_order: child.sort_order,
       })),
     }));
 

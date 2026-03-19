@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import ProductCard from "../components/ProductCard";
@@ -11,12 +12,10 @@ import { Pagination } from "../components/Pagination";
 import { SidebarFilters } from "../components/SidebarFilters";
 import { MobileFilters } from "../components/MobileFilters";
 
-export default function ProductsPage() {
-  const searchParams = useSearchParams();
-  const { updateURL } = useURLSync();
-  const t = useTranslations("products");
-
-  const initialFilters: ProductFilters = {
+function buildFiltersFromSearchParams(
+  searchParams: ReturnType<typeof useSearchParams>,
+): ProductFilters {
+  const filters: ProductFilters = {
     page: parseInt(searchParams.get("page") || "1"),
     limit: 20,
     search: searchParams.get("search") || undefined,
@@ -36,8 +35,21 @@ export default function ProductsPage() {
 
   const categoriesParam = searchParams.get("categories");
   if (categoriesParam) {
-    initialFilters.categories = categoriesParam.split(",");
+    filters.categories = categoriesParam.split(",");
   }
+
+  return filters;
+}
+
+export default function ProductsPage() {
+  const searchParams = useSearchParams();
+  const { updateURL } = useURLSync();
+  const t = useTranslations("products");
+
+  const initialFilters = useMemo(
+    () => buildFiltersFromSearchParams(searchParams),
+    [searchParams],
+  );
 
   const {
     productsResponse,
@@ -47,6 +59,10 @@ export default function ProductsPage() {
     setFilters,
     filterOptions,
   } = useProductData(initialFilters);
+
+  useEffect(() => {
+    setFilters(initialFilters);
+  }, [initialFilters, setFilters]);
 
   const handlePageChange = (page: number) => {
     const newFilters = { ...filters, page };
@@ -66,22 +82,24 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6 lg:px-8">
       <div className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-800 p-5 text-white shadow-sm sm:p-8">
-        <h1 className="break-words text-2xl font-bold sm:text-3xl">{t("all")}</h1>
+        <h1 className="break-words text-2xl font-bold sm:text-3xl lg:text-4xl">{t("all")}</h1>
         <p className="mt-2 text-sm text-indigo-100 sm:text-base">
           {t("found", {count: productsResponse?.total || 0})}
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
         {filterOptions && (
-          <div className="hidden lg:block w-64 flex-shrink-0">
+          <div className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
+            <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <SidebarFilters
               filterOptions={filterOptions}
               filters={filters}
               onFilterChange={handleFilterChange}
             />
+            </div>
           </div>
         )}
 
@@ -118,15 +136,20 @@ export default function ProductsPage() {
           ) : loading ? (
             <ProductGridSkeleton />
           ) : productsResponse?.products.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white py-12 text-center">
-              <h3 className="text-xl font-semibold">{t("noProducts")}</h3>
-              <p className="mt-2 text-gray-600">
+            <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                <svg className="h-8 w-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800">{t("noProducts")}</h3>
+              <p className="mt-2 text-sm text-slate-500 max-w-xs mx-auto">
                 {t("adjustFilters")}
               </p>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5">
                 {productsResponse?.products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

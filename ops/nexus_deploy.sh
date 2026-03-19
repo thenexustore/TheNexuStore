@@ -24,6 +24,13 @@ ADMIN_DOMAIN="${ADMIN_DOMAIN:-}"
 SKIP_EXTERNAL_HEALTHCHECKS="${SKIP_EXTERNAL_HEALTHCHECKS:-1}"
 SYNC_FRONTEND_ENV="${SYNC_FRONTEND_ENV:-1}"
 
+for c in git node npm npx sed curl; do
+  command -v "$c" >/dev/null 2>&1 || {
+    echo "[ERROR] Missing command: $c" >&2
+    exit 1
+  }
+done
+
 log() { echo "[$(date +'%F %T')] $*"; }
 run() {
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -76,6 +83,53 @@ require_cmd() {
     echo "[ERROR] Missing command: $1" >&2
     exit 1
   }
+}
+
+validate_infortisa_health() {
+  local url="$1"
+  local payload
+
+  payload="$(curl -fsS "$url")" || return 1
+
+  HEALTH_PAYLOAD="$payload" node <<'NODE'
+const payload = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
+const valid =
+  payload &&
+  typeof payload === 'object' &&
+  payload.provider === 'infortisa' &&
+  typeof payload.base_url === 'string' &&
+  typeof payload.checked_at === 'string' &&
+  typeof payload.auth_configured === 'boolean' &&
+  typeof payload.latency_ms === 'number';
+
+if (!valid) {
+  console.error('Invalid Infortisa health payload shape');
+  process.exit(1);
+}
+
+if (!payload.healthy) {
+  console.error(`Infortisa unhealthy: ${payload.error_summary || 'unknown error'}`);
+  process.exit(1);
+}
+NODE
+}
+
+wait_for_infortisa_health() {
+  local url="$1"
+  local retries="${2:-15}"
+  local delay_s="${3:-2}"
+
+  for ((i = 1; i <= retries; i++)); do
+    if validate_infortisa_health "$url"; then
+      log "Infortisa health check OK: $url"
+      return 0
+    fi
+    log "Waiting for Infortisa health check ($i/$retries): $url"
+    sleep "$delay_s"
+  done
+
+  log "Infortisa health check FAILED: $url"
+  return 1
 }
 
 ensure_repo() {
@@ -133,11 +187,20 @@ ensure_pm2() {
 
 install_deps() {
   local app_dir="$1"
+  local include_dev="${2:-0}"
+  local install_cmd=""
+
   if [[ -f "$app_dir/package-lock.json" ]]; then
-    run "cd '$app_dir' && npm ci"
+    install_cmd="npm ci"
   else
-    run "cd '$app_dir' && npm install"
+    install_cmd="npm install"
   fi
+
+  if [[ "$include_dev" == "1" ]]; then
+    install_cmd="$install_cmd --include=dev"
+  fi
+
+  run "cd '$app_dir' && $install_cmd"
 }
 
 fix_next_proxy_conflict() {
@@ -206,7 +269,22 @@ run "cd '$REPO_DIR' && git fetch --all --prune"
 if git -C "$REPO_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
   run "cd '$REPO_DIR' && git checkout '$BRANCH'"
   run "cd '$REPO_DIR' && git reset --hard 'origin/$BRANCH'"
+  # Preserve persistent runtime storage (branding assets, settings) before cleaning.
+  # The storage/ dir is listed in Backend/Store/.gitignore so git clean ignores it,
+  # but we also back it up explicitly in case the gitignore is ever modified.
+  BACKEND_STORAGE_DIR="$BACKEND_DIR/storage"
+  if [[ -d "$BACKEND_STORAGE_DIR" ]]; then
+    if ! cp -a "$BACKEND_STORAGE_DIR" "$BACKUP_DIR/storage_snapshot"; then
+      echo "[ERROR] Could not backup backend storage to $BACKUP_DIR/storage_snapshot. Aborting to prevent data loss." >&2
+      exit 1
+    fi
+  fi
   run "cd '$REPO_DIR' && git clean -fd"
+  # Restore storage dir if git clean somehow removed it (e.g., if gitignore was absent)
+  if [[ ! -d "$BACKEND_STORAGE_DIR" && -d "$BACKUP_DIR/storage_snapshot" ]]; then
+    run "cp -a '$BACKUP_DIR/storage_snapshot' '$BACKEND_STORAGE_DIR'"
+    log "Restored backend storage from backup snapshot"
+  fi
 else
   log "WARN: origin/$BRANCH not found. Using local branch state without hard reset."
   run "cd '$REPO_DIR' && git checkout '$BRANCH'"
@@ -249,7 +327,7 @@ NEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL
 ENV"
   run "cat > '$ADMIN_ENV_FILE' <<ENV
 NEXT_PUBLIC_API_URL=$DEPLOY_API_URL
-NEXT_PUBLIC_SITE_URL=$DEPLOY_ADMIN_URL
+NEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL
 ENV"
   run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
 else
@@ -257,7 +335,7 @@ else
 fi
 
 log "Building backend"
-install_deps "$BACKEND_DIR"
+install_deps "$BACKEND_DIR" 1
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma generate"
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate deploy"
 run "cd '$BACKEND_DIR' && npm run build"
@@ -270,12 +348,12 @@ run "sed -i 's/\\r$//' '$BACKEND_START_SCRIPT'"
 log "Building store"
 fix_next_proxy_conflict "$STORE_DIR"
 install_deps "$STORE_DIR"
-run "cd '$STORE_DIR' && npm run build"
+run "cd '$STORE_DIR' && NODE_ENV=production npm run build"
 
 log "Building admin"
 fix_next_proxy_conflict "$ADMIN_DIR"
 install_deps "$ADMIN_DIR"
-run "cd '$ADMIN_DIR' && npm run build"
+run "cd '$ADMIN_DIR' && NODE_ENV=production npm run build"
 
 log "Restarting PM2"
 run "pm2 delete nexus-frontend >/dev/null 2>&1 || true"
@@ -286,7 +364,7 @@ run "pm2 save"
 
 if [[ "$DRY_RUN" == "0" ]]; then
   wait_for_url "http://127.0.0.1:4000/admin/health"
-  wait_for_url "http://127.0.0.1:4000/admin/infortisa/health"
+  wait_for_infortisa_health "http://127.0.0.1:4000/admin/infortisa/health"
   wait_for_url "http://127.0.0.1:3000"
   wait_for_url "http://127.0.0.1:3001"
 

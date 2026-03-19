@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { API_URL } from "../lib/env";
 import Image from "next/image";
 import {
@@ -14,15 +14,28 @@ import {
   ShieldCheck,
   Hash,
 } from "lucide-react";
-import { registerUser, verifyOtp } from "../lib/auth";
+import { registerUser, resendOtp, verifyOtp } from "../lib/auth";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "../components/StoreBrandLogo";
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+  return fallback;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState("register");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState(null as any);
   const [otp, setOtp] = useState("");
@@ -34,7 +47,10 @@ export default function RegisterPage() {
     password: "",
   });
 
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
+  useEffect(
+    () => subscribeStoreBranding(setStoreBranding, { refreshRemote: false }),
+    [],
+  );
 
   useEffect(() => {
     if (!image) return;
@@ -42,6 +58,14 @@ export default function RegisterPage() {
     setPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [image]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendCooldown((previous) => Math.max(0, previous - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const toBase64 = (file: any) =>
     new Promise((res, rej) => {
@@ -54,13 +78,14 @@ export default function RegisterPage() {
   const onRegister = async (e: any) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       const profile_image = image ? String(await toBase64(image)) : null;
       await registerUser({ ...form, profile_image });
       setStep("verify");
-    } catch (err: any) {
-      setError(err?.message || "Registration failed");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -69,14 +94,33 @@ export default function RegisterPage() {
   const onVerify = async (e: any) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       await verifyOtp({ email: form.email, otp });
-      router.replace("/login");
-    } catch (err: any) {
-      setError(err?.message || "Invalid verification code");
+      router.replace("/account");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Invalid verification code"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onResendOtp = async () => {
+    if (resendCooldown > 0 || resendLoading || loading) return;
+
+    setError("");
+    setNotice("");
+    setResendLoading(true);
+
+    try {
+      await resendOtp({ email: form.email });
+      setNotice("A new OTP has been sent to your email.");
+      setResendCooldown(30);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Unable to resend OTP"));
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -98,9 +142,9 @@ export default function RegisterPage() {
           />
         </div>
 
-        <div className="bg-white border-[3px] border-black p-8 md:p-12 shadow-[16px_16px_0px_0px_rgba(0,0,0,1)]">
+        <div className="bg-white border-[3px] border-black p-6 sm:p-8 md:p-12 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] sm:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)]">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 text-red-600 text-[10px] font-black uppercase tracking-widest">
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 text-red-600 text-[10px] font-black uppercase tracking-widest whitespace-pre-wrap break-words">
               {error}
             </div>
           )}
@@ -145,7 +189,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <input
                     placeholder="FIRST_NAME"
                     required
@@ -273,6 +317,22 @@ flex items-center justify-center gap-2
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                 />
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                <button
+                  type="button"
+                  onClick={onResendOtp}
+                  disabled={resendLoading || resendCooldown > 0 || loading}
+                  className="text-slate-500 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resendLoading
+                    ? "Resending..."
+                    : resendCooldown > 0
+                      ? `Resend in ${resendCooldown}s`
+                      : "Resend OTP"}
+                </button>
+                {notice && <span className="text-green-600">{notice}</span>}
               </div>
 
               <button

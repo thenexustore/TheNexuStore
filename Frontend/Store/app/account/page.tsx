@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getMe, logoutUser, updateProfile } from "../lib/auth";
+import { useRouter } from "@/i18n/navigation";
+import { getMe, updateProfile } from "../lib/auth";
+import { useAuth } from "../providers/AuthProvider";
 
 export default function AccountPage() {
   const router = useRouter();
+  const { logout, refreshUser } = useAuth();
   const [user, setUser] = useState(null as any);
   const [edit, setEdit] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const [profile, setProfile] = useState({
     first_name: "",
@@ -69,26 +72,89 @@ export default function AccountPage() {
   }, [router]);
 
   const handleSave = async () => {
+    if (loading) return;
+
+    const normalizedProfile = {
+      first_name: profile.first_name.trim(),
+      last_name: profile.last_name.trim(),
+      ...(profile.profile_image.trim()
+        ? { profile_image: profile.profile_image.trim() }
+        : {}),
+    };
+
+    if (!normalizedProfile.first_name || !normalizedProfile.last_name) {
+      setError("First and last name are required");
+      return;
+    }
+
+    const normalizedAddress = {
+      company: address.company.trim(),
+      address_line1: address.address_line1.trim(),
+      address_line2: address.address_line2.trim(),
+      city: address.city.trim(),
+      postal_code: address.postal_code.trim(),
+      region: address.region.trim(),
+      country: address.country.trim(),
+      phone: address.phone.trim(),
+      is_default: Boolean(address.is_default),
+    };
+
+    const hasAnyAddressField = [
+      normalizedAddress.company,
+      normalizedAddress.address_line1,
+      normalizedAddress.address_line2,
+      normalizedAddress.city,
+      normalizedAddress.postal_code,
+      normalizedAddress.region,
+      normalizedAddress.country,
+      normalizedAddress.phone,
+    ].some((value) => value.length > 0);
+
+    if (hasAnyAddressField) {
+      const requiredAddressFields = [
+        normalizedAddress.address_line1,
+        normalizedAddress.city,
+        normalizedAddress.postal_code,
+        normalizedAddress.region,
+        normalizedAddress.country,
+      ];
+
+      if (requiredAddressFields.some((value) => value.length === 0)) {
+        setError("Complete address line 1, city, postal code, region, and country");
+        return;
+      }
+    }
+
     setLoading(true);
-    await updateProfile({ profile, address });
-    const fresh = await getMe();
-    setUser(fresh);
-    setEdit(false);
-    setLoading(false);
+    setError("");
+    try {
+      const updatedUser = await updateProfile({
+        profile: normalizedProfile,
+        ...(hasAnyAddressField ? { address: normalizedAddress } : {}),
+      });
+      const fresh = updatedUser ?? (await getMe());
+      setUser(fresh);
+      await refreshUser();
+      setEdit(false);
+    } catch (err: any) {
+      setError(err?.message || "Failed to update profile");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-[#f9fafb] text-slate-900 pb-20">
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b pb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
             <p className="text-slate-500 text-sm mt-1">Manage your profile and shipping information.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {!edit ? (
               <button
                 onClick={() => setEdit(true)}
@@ -114,7 +180,7 @@ export default function AccountPage() {
               </>
             )}
             <button
-              onClick={() => logoutUser().then(() => router.push("/login"))}
+              onClick={() => logout().then(() => router.push("/login"))}
               className="btn btn-danger"
             >
               Logout
@@ -122,10 +188,16 @@ export default function AccountPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Avatar & Basic Info */}
           <div className="lg:col-span-1">
-            <div className="rounded-xl border bg-white p-6 text-center">
+            <div className="rounded-xl border bg-white p-6 text-center lg:sticky lg:top-24">
               <div className="relative mx-auto w-32 h-32 mb-4">
                 <img
                   src={profile.profile_image || "https://ui-avatars.com/api/?name=" + profile.first_name}

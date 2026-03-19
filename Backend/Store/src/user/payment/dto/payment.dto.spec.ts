@@ -6,7 +6,7 @@ describe('InitiatePaymentDto', () => {
   it('accepts supported providers', async () => {
     const dto = plainToInstance(InitiatePaymentDto, {
       order_id: '550e8400-e29b-41d4-a716-446655440000',
-      provider: 'REDSYS',
+      provider: 'BIZUM',
     });
 
     const errors = await validate(dto);

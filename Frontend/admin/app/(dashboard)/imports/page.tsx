@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchImportConfig,
   fetchImportHistory,
@@ -9,7 +9,6 @@ import {
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
-  testImportConnection,
   triggerImport,
   updateImportConfig,
   type ImportHistoryItem,
@@ -253,10 +252,7 @@ export default function ImportsPage() {
 
   async function loadRuns() {
     try {
-      const [runsData, providerStatsData] = await Promise.all([
-        fetchImportRuns(),
-        fetchProviderStats(),
-      ]);
+      const [runsData, providerStatsData] = await Promise.all([fetchImportRuns(), fetchProviderStats()]);
       setRuns(runsData);
       setProviderStats(providerStatsData);
     } catch (error) {

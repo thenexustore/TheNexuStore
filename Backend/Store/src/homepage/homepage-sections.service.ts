@@ -1109,6 +1109,7 @@ export class HomepageSectionsService {
       const result = await this.productsService.getProducts({
         page: 1,
         limit: Math.max(limit * 2, 24),
+        search: q || undefined,
         categories: category?.slug ? [category.slug] : undefined,
         brand: brand?.slug || undefined,
         min_price: query.priceMin,
@@ -1123,6 +1124,7 @@ export class HomepageSectionsService {
         const relaxed = await this.productsService.getProducts({
           page: 1,
           limit: Math.max(limit * 2, 24),
+          search: q || undefined,
           categories: category?.slug ? [category.slug] : undefined,
           brand: brand?.slug || undefined,
           min_price: query.priceMin,

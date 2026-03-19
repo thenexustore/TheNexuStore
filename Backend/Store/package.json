@@ -32,7 +32,9 @@
     "brands:logo:audit": "ts-node scripts/brand-logo-audit.ts",
     "brands:logo:normalize": "ts-node scripts/brand-logo-audit.ts --apply",
     "check:home-controller-duplicates": "node scripts/check-home-controller-duplicates.mjs",
-    "seed:categories": "ts-node prisma/seed-parent-categories.ts"
+    "seed:categories": "ts-node prisma/seed-parent-categories.ts",
+    "pretypecheck": "npm run prisma:generate",
+    "pretest": "npm run prisma:generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

@@ -90,11 +90,15 @@ export {
   testImportConnection,
   triggerImport,
   updateImportConfig,
+  type ImportConfigResponse,
+  type ImportConnectionTestResponse,
+  type ImportRuntimeSettings,
   type ImportHistoryItem,
   type ImportHistoryResponse,
   type ImportRun,
   type ImportRunError,
   type ProviderStatsResponse,
+  type UpdateImportConfigInput,
 } from "./imports";
 
 export {

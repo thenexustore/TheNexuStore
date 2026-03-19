@@ -1,8 +1,19 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
+
+const emptyStringToUndefined = ({ value }: { value: unknown }) =>
+  value === '' ? undefined : value;
 
 export class UpdateImportIntegrationConfigDto {
   @IsString()
@@ -30,4 +41,43 @@ export class UpdateImportIntegrationConfigDto {
   @MaxLength(2000)
   @Transform(trimString)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(trimString)
+  stock_sync_cron?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(trimString)
+  incremental_sync_cron?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(trimString)
+  full_sync_cron?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsInt()
+  @Min(1)
+  @Max(5000)
+  stock_batch_size?: number;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  full_sync_batch_size?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? null : value))
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  catalog_page_size?: number | null;
 }

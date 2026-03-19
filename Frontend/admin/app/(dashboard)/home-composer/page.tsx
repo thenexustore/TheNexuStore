@@ -1074,6 +1074,11 @@ export default function HomeComposerPage() {
   };
 
   const commitRenameLayout = async () => {
+    // Guard: don't commit if cancel was just clicked (race condition protection)
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
     if (!activeLayout) return;
     const trimmed = renameValue.trim();
     if (!trimmed || trimmed === activeLayout.name) {
@@ -1230,7 +1235,10 @@ export default function HomeComposerPage() {
                   onChange={(e) => setRenameValue(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void commitRenameLayout();
-                    if (e.key === "Escape") setRenamingLayout(false);
+                    if (e.key === "Escape") {
+                      renameCancelledRef.current = true;
+                      setRenamingLayout(false);
+                    }
                   }}
                   onBlur={() => void commitRenameLayout()}
                   className="flex-1 rounded-lg border border-indigo-400 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -1243,7 +1251,10 @@ export default function HomeComposerPage() {
                   ✓
                 </button>
                 <button
-                  onClick={() => setRenamingLayout(false)}
+                  onClick={() => {
+                    renameCancelledRef.current = true;
+                    setRenamingLayout(false);
+                  }}
                   className="rounded-lg border border-zinc-300 px-2 py-2 text-xs hover:bg-zinc-50"
                 >
                   ✕

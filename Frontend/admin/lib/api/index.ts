@@ -77,14 +77,18 @@ export {
   type ShippingZone,
   type ShippingRule,
   type TaxZone,
-} from './shipping-tax';
+} from "./shipping-tax";
 
 export {
+  fetchImportConfig,
   fetchImportHistory,
   retryImport,
+  testImportConnection,
   triggerImport,
+  updateImportConfig,
   type ImportHistoryItem,
   type ImportHistoryResponse,
+  type ImportIntegrationConfig,
 } from "./imports";
 
 export {

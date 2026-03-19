@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  fetchImportConfig,
   fetchImportHistory,
   retryImport,
+  testImportConnection,
   triggerImport,
+  updateImportConfig,
   type ImportHistoryItem,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -70,11 +73,39 @@ function getSuspiciousImportAlert(items: ImportHistoryItem[]) {
 
 export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState<null | "full" | "stock" | "images">(
-    null,
-  );
+  const [running, setRunning] = useState<null | ImportMode>(null);
   const [items, setItems] = useState<ImportHistoryItem[]>([]);
   const [retryReason, setRetryReason] = useState("");
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [showingSecret, setShowingSecret] = useState(false);
+  const [storedMaskedKey, setStoredMaskedKey] = useState<string | null>(null);
+  const [lastHealthcheckAt, setLastHealthcheckAt] = useState<string | null>(
+    null,
+  );
+  const [configSource, setConfigSource] = useState<string>("default_fallback");
+  const [form, setForm] = useState<ConfigFormState>(EMPTY_FORM);
+
+  const permissions = useMemo(() => {
+    try {
+      const rawUser = localStorage.getItem("admin_user");
+      if (!rawUser) return [] as string[];
+      const parsed = JSON.parse(rawUser) as { permissions?: unknown };
+      return Array.isArray(parsed.permissions)
+        ? parsed.permissions.map((permission) => String(permission))
+        : [];
+    } catch {
+      return [] as string[];
+    }
+  }, []);
+
+  const hasPermission = (required: string) =>
+    permissions.includes("full_access") || permissions.includes(required);
+
+  const canReadConfig = hasPermission("imports:config:read");
+  const canUpdateConfig = hasPermission("imports:config:update");
+  const canReadSecret = hasPermission("imports:secret:read");
 
   const loadHistory = async () => {
     try {
@@ -87,8 +118,36 @@ export default function ImportsPage() {
     }
   };
 
+  const loadConfig = async (includeSecret = false) => {
+    if (!canReadConfig) {
+      setConfigLoading(false);
+      return;
+    }
+
+    try {
+      const data = await fetchImportConfig(includeSecret);
+      setForm({
+        display_name: data.display_name,
+        base_url: data.base_url,
+        api_key: includeSecret ? data.api_key || "" : "",
+        is_active: data.is_active,
+        notes: data.notes || "",
+      });
+      setStoredMaskedKey(data.api_key_masked || null);
+      setLastHealthcheckAt(data.last_healthcheck_at);
+      setConfigSource(data.source);
+      setShowingSecret(includeSecret && Boolean(data.api_key));
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load API configuration");
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadHistory();
+    loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const suspiciousAlert = useMemo(() => getSuspiciousImportAlert(items), [items]);
@@ -106,7 +165,7 @@ export default function ImportsPage() {
     }
   };
 
-  const runRetry = async (mode: "full" | "stock" | "images") => {
+  const runRetry = async (mode: ImportMode) => {
     const reason = retryReason.trim();
     if (!reason) {
       toast.error("Retry reason is required");
@@ -125,12 +184,76 @@ export default function ImportsPage() {
     }
   };
 
+  const saveConfig = async () => {
+    setConfigSaving(true);
+    try {
+      const data = await updateImportConfig({
+        display_name: form.display_name,
+        base_url: form.base_url,
+        api_key: form.api_key.trim() || undefined,
+        is_active: form.is_active,
+        notes: form.notes,
+      });
+      setStoredMaskedKey(data.api_key_masked || null);
+      setLastHealthcheckAt(data.last_healthcheck_at);
+      setConfigSource(data.source);
+      if (!showingSecret) {
+        setForm((current) => ({ ...current, api_key: "" }));
+      }
+      toast.success("API configuration updated");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update API configuration");
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const revealSecret = async () => {
+    if (!canReadSecret) {
+      toast.error("You do not have permission to reveal the API key");
+      return;
+    }
+
+    try {
+      const data = await fetchImportConfig(true);
+      setForm((current) => ({ ...current, api_key: data.api_key || "" }));
+      setStoredMaskedKey(data.api_key_masked || null);
+      setShowingSecret(true);
+      toast.success("API key revealed for this session");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reveal API key");
+    }
+  };
+
+  const hideSecret = () => {
+    setShowingSecret(false);
+    setForm((current) => ({ ...current, api_key: "" }));
+  };
+
+  const testConnection = async () => {
+    setTestingConnection(true);
+    try {
+      const data = await testImportConnection();
+      setLastHealthcheckAt(data.checked_at);
+      toast.success(
+        data.ok
+          ? "Provider connection succeeded"
+          : "Provider connection failed",
+      );
+    } catch (error: any) {
+      toast.error(error.message || "Failed to test provider connection");
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Imports</h1>
         <p className="text-slate-500 mt-2">
-          Run supplier synchronization jobs and review latest history.
+          Run supplier synchronization jobs, manage provider credentials and
+          review latest history.
         </p>
       </div>
 
@@ -159,7 +282,9 @@ export default function ImportsPage() {
           className="bg-white border border-slate-200 rounded-2xl p-4 text-left hover:border-slate-300 disabled:opacity-60"
         >
           <Database className="w-5 h-5 text-slate-700 mb-3" />
-          <p className="font-semibold text-slate-900">Run full catalog import</p>
+          <p className="font-semibold text-slate-900">
+            Run full catalog import
+          </p>
           <p className="text-sm text-slate-500 mt-1">
             Sync complete catalog, stock and product changes.
           </p>

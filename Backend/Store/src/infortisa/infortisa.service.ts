@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../common/prisma.service';
 import { generateDeterministicProductSlug } from './product-slug.util';
 
 export interface InfortisaCatalogFetchMeta {
@@ -23,15 +24,62 @@ export interface InfortisaCatalogFetchResult {
 @Injectable()
 export class InfortisaService implements OnModuleInit {
   private readonly logger = new Logger(InfortisaService.name);
-  private readonly baseURL = 'https://apiv2.infortisa.com';
   private client!: AxiosInstance;
-  private token!: string;
+  private token = '';
+  private baseURL = DEFAULT_BASE_URL;
 
-  constructor(private config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  onModuleInit() {
-    this.token = this.config.get('INFORTISA_API_TOKEN') || '';
+  async onModuleInit() {
+    await this.reloadConfiguration();
+  }
+
+  async reloadConfiguration() {
+    const integration = await this.prisma.supplierIntegration.findUnique({
+      where: { provider: PROVIDER },
+    });
+    const fallbackToken = this.config.get<string>('INFORTISA_API_TOKEN') || '';
+    this.token = integration?.api_key_encrypted
+      ? this.tryDecrypt(integration.api_key_encrypted) || fallbackToken
+      : fallbackToken;
+    this.baseURL = integration?.base_url || DEFAULT_BASE_URL;
     this.initializeClient();
+  }
+
+  private getEncryptionSecret() {
+    return (
+      this.config.get<string>('INTEGRATION_SECRET_KEY') ||
+      this.config.get<string>('JWT_SECRET') ||
+      'dev_secret'
+    );
+  }
+
+  private tryDecrypt(payload: string) {
+    try {
+      const raw = Buffer.from(payload, 'base64');
+      const iv = raw.subarray(0, 12);
+      const authTag = raw.subarray(12, 28);
+      const encrypted = raw.subarray(28);
+      const crypto = require('crypto') as typeof import('crypto');
+      const key = crypto
+        .createHash('sha256')
+        .update(this.getEncryptionSecret())
+        .digest();
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(authTag);
+      return Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final(),
+      ]).toString('utf8');
+    } catch (error: any) {
+      this.logger.warn(
+        `Falling back to env token due to decrypt failure: ${error?.message || error}`,
+      );
+      return null;
+    }
   }
 
   private initializeClient() {
@@ -56,6 +104,14 @@ export class InfortisaService implements OnModuleInit {
         return Promise.reject(error);
       },
     );
+  }
+
+  private async getClient() {
+    if (!this.client) {
+      await this.reloadConfiguration();
+    }
+
+    return this.client;
   }
 
   private formatToInfortisaDate(date: string): string {
@@ -478,7 +534,8 @@ export class InfortisaService implements OnModuleInit {
     const formatted = this.formatToInfortisaDate(date);
 
     try {
-      const response = await this.client.get(
+      const client = await this.getClient();
+      const response = await client.get(
         '/api/Product/GetModifiedProductsByDateTime',
         {
           params: {
@@ -505,7 +562,8 @@ export class InfortisaService implements OnModuleInit {
     const formatted = this.formatToInfortisaDate(date);
 
     try {
-      const response = await this.client.get(
+      const client = await this.getClient();
+      const response = await client.get(
         '/api/Stock/GetModifiedStocksByDateTime',
         {
           params: {
@@ -530,7 +588,8 @@ export class InfortisaService implements OnModuleInit {
 
   async getProductBySku(sku: string): Promise<any> {
     try {
-      const response = await this.client.get('/api/Product/GetProductBySku', {
+      const client = await this.getClient();
+      const response = await client.get('/api/Product/GetProductBySku', {
         params: { sku },
       });
 
@@ -544,7 +603,8 @@ export class InfortisaService implements OnModuleInit {
 
   async getStockAndPrice(): Promise<any[]> {
     try {
-      const response = await this.client.get('/api/Product/GetStockPrice');
+      const client = await this.getClient();
+      const response = await client.get('/api/Product/GetStockPrice');
       const data = response.data.items || response.data || [];
 
       if (!Array.isArray(data)) {
@@ -561,12 +621,13 @@ export class InfortisaService implements OnModuleInit {
 
   async checkServiceHealth(): Promise<boolean> {
     try {
-      const response = await this.client.get('/api/Ficha/Get', {
+      const client = await this.getClient();
+      const response = await client.get('/api/Ficha/Get', {
         params: { user: this.token },
       });
-      return response.data === 'Su servicio está funcionando correctamente.';
+      return response.status === 200;
     } catch (error: any) {
-      this.logger.error('Service health check failed', error.message);
+      this.logger.error('Health check failed', error.message);
       return false;
     }
   }
@@ -580,11 +641,12 @@ export class InfortisaService implements OnModuleInit {
         : '/api/Tarifa/GetFileV5';
 
     try {
-      const response = await this.client.get(endpoint, {
+      const client = await this.getClient();
+      const response = await client.get(endpoint, {
         params: { user: this.token },
         responseType: 'text',
       });
-      return response.data;
+      return response.data as string;
     } catch (error: any) {
       this.logger.error('Get tariff file failed', error.message);
       throw error;
@@ -593,7 +655,8 @@ export class InfortisaService implements OnModuleInit {
 
   async createOrder(orderData: any): Promise<any> {
     try {
-      const response = await this.client.post('/api/order/create', orderData);
+      const client = await this.getClient();
+      const response = await client.post('/api/order/create', orderData);
       return response.data;
     } catch (error: any) {
       this.logger.error('Create order failed', error.message);
@@ -603,7 +666,8 @@ export class InfortisaService implements OnModuleInit {
 
   async getOrderStatus(customerReference: string): Promise<any> {
     try {
-      const response = await this.client.get('/api/order/status', {
+      const client = await this.getClient();
+      const response = await client.get('/api/order/status', {
         params: { CustomerReference: customerReference },
       });
       return response.data;
@@ -615,7 +679,8 @@ export class InfortisaService implements OnModuleInit {
 
   async getInvoicesByDate(date: string): Promise<any> {
     try {
-      const response = await this.client.get('/api/invoice/GetByDate', {
+      const client = await this.getClient();
+      const response = await client.get('/api/invoice/GetByDate', {
         params: { Date: date },
       });
       return response.data;

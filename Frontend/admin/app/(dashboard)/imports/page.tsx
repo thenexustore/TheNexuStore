@@ -9,6 +9,7 @@ import {
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
+  testImportConnection,
   triggerImport,
   updateImportConfig,
   type ImportHistoryItem,

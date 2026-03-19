@@ -258,12 +258,26 @@ export default function SettingsPage() {
     };
   }, [hasChanges, settings, settingsSaving, onSave]);
 
-  function onReset() {
+  async function onReset() {
+    const brandingPayload = {
+      brandLogoUrl: defaultAdminSettings.brandLogoUrl,
+      brandLogoDarkUrl: defaultAdminSettings.brandLogoDarkUrl,
+      brandLogoFit: defaultAdminSettings.brandLogoFit,
+      brandLogoHeight: defaultAdminSettings.brandLogoHeight,
+      brandLogoVersion: defaultAdminSettings.brandLogoVersion,
+      brandLogoBrightness: defaultAdminSettings.brandLogoBrightness,
+      brandLogoSaturation: defaultAdminSettings.brandLogoSaturation,
+    };
     setSettings(defaultAdminSettings);
     saveAdminSettings(defaultAdminSettings);
     setSavedSnapshot(defaultAdminSettings);
     setSavedAt(new Date());
     applyLocaleIfNeeded(defaultAdminSettings.adminLanguage);
+    try {
+      await saveRemoteBrandingSettings(brandingPayload);
+    } catch {
+      toast.error(isEn ? "Settings restored locally, but remote sync failed. Reload to retry." : "Ajustes restaurados localmente, pero falló la sincronización remota. Recarga para reintentar.");
+    }
     toast.success(isEn ? "Settings restored" : "Ajustes restaurados");
   }
 
@@ -393,12 +407,22 @@ export default function SettingsPage() {
 
             <label className="block text-sm text-zinc-700">
               URL logo principal
-              <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+              <div className="mt-1 flex gap-2">
+                <input value={settings.brandLogoUrl} onChange={(e) => update("brandLogoUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-light.svg" className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+                {settings.brandLogoUrl && (
+                  <button type="button" onClick={() => update("brandLogoUrl", "")} title={isEn ? "Clear URL" : "Borrar URL"} className="rounded-lg border border-zinc-200 px-3 py-2 text-zinc-500 hover:bg-zinc-50 hover:text-red-600">✕</button>
+                )}
+              </div>
             </label>
 
             <label className="block text-sm text-zinc-700">
               URL logo para fondo oscuro (login)
-              <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+              <div className="mt-1 flex gap-2">
+                <input value={settings.brandLogoDarkUrl} onChange={(e) => update("brandLogoDarkUrl", e.target.value)} placeholder="https://cdn.tu-dominio.com/brand/logo-dark.svg" className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />
+                {settings.brandLogoDarkUrl && (
+                  <button type="button" onClick={() => update("brandLogoDarkUrl", "")} title={isEn ? "Clear URL" : "Borrar URL"} className="rounded-lg border border-zinc-200 px-3 py-2 text-zinc-500 hover:bg-zinc-50 hover:text-red-600">✕</button>
+                )}
+              </div>
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">

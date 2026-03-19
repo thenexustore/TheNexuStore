@@ -106,6 +106,11 @@ export interface CategoryTreeResponse {
     locale: string;
     includeEmpty: boolean;
     includeCounts: boolean;
+    normalization?: {
+      normalized_rows: number;
+      root_nodes: number;
+      virtual_parents: number;
+    };
   };
 }
 

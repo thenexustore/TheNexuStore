@@ -47,7 +47,7 @@ export class ImportsController {
       images: () => this.infortisaSync.syncImages(),
     };
 
-    await modeHandlers[body.mode]();
+    const result = await modeHandlers[body.mode]();
 
     const durationMs = Date.now() - startedAt;
     const detailsParts = [
@@ -58,6 +58,35 @@ export class ImportsController {
 
     if (body.reason) {
       detailsParts.push(`reason=${body.reason}`);
+    }
+
+    if (result && typeof result === 'object') {
+      const summary = result as Record<string, unknown>;
+      if (typeof summary.sourceItemsReceived === 'number') {
+        detailsParts.push(
+          `source_items_received=${summary.sourceItemsReceived}`,
+        );
+      }
+      if (typeof summary.sourceTotalExpected === 'number') {
+        detailsParts.push(
+          `source_total_expected=${summary.sourceTotalExpected}`,
+        );
+      }
+      if (typeof summary.sourcePageSize === 'number') {
+        detailsParts.push(`source_page_size=${summary.sourcePageSize}`);
+      }
+      if (typeof summary.sourcePages === 'number') {
+        detailsParts.push(`source_pages=${summary.sourcePages}`);
+      }
+      if (typeof summary.created === 'number') {
+        detailsParts.push(`created=${summary.created}`);
+      }
+      if (typeof summary.updated === 'number') {
+        detailsParts.push(`updated=${summary.updated}`);
+      }
+      if (typeof summary.skipped === 'number') {
+        detailsParts.push(`skipped=${summary.skipped}`);
+      }
     }
 
     await this.prisma.syncLog.upsert({
@@ -93,6 +122,9 @@ export class ImportsController {
       mode: body.mode,
       durationMs,
       ...(body.reason ? { reason: body.reason } : {}),
+      ...(result && typeof result === 'object'
+        ? (result as Record<string, unknown>)
+        : {}),
     };
   }
 

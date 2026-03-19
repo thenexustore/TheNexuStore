@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma.service';
-import { InfortisaService } from './infortisa.service';
+import {
+  InfortisaCatalogFetchResult,
+  InfortisaService,
+} from './infortisa.service';
 import { ProductsService } from '../user/products/products.service';
 import {
   extractInfortisaStock,
@@ -25,8 +28,11 @@ export class InfortisaSyncService {
   async fullSync() {
     try {
       this.logger.log('Starting full synchronization');
-      await this.syncFullCatalog();
-      this.logger.log('Full synchronization completed successfully');
+      const summary = await this.syncFullCatalog();
+      this.logger.log(
+        `Full synchronization completed successfully: received=${summary.sourceItemsReceived}, total=${summary.sourceTotalExpected ?? 'unknown'}, pages=${summary.sourcePages}`,
+      );
+      return summary;
     } catch (error: any) {
       this.logger.error('Full synchronization failed', error.stack);
       throw error;
@@ -94,7 +100,10 @@ export class InfortisaSyncService {
     this.logger.log('Starting full catalog sync');
 
     try {
-      const allProducts = await this.infortisa.getAllProducts();
+      const catalog = await this.infortisa.getAllProductsPaged();
+      this.assertCatalogNotProbablyTruncated(catalog);
+
+      const allProducts = catalog.items;
       const batchSize = 500;
       const totals = { ...this.emptyBatchStats };
 
@@ -112,11 +121,24 @@ export class InfortisaSyncService {
 
       await this.handleDiscontinuedProducts(allProducts);
 
+      const summary = {
+        created: totals.created,
+        updated: totals.updated,
+        skipped: totals.skipped,
+        sourceItemsReceived: catalog.meta.totalReceived,
+        sourceTotalExpected: catalog.meta.totalExpected,
+        sourcePageSize: catalog.meta.pageSize,
+        sourcePages: catalog.meta.totalPages ?? 1,
+      };
+
       this.logger.log(
-        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped})`,
+        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped}, source_pages=${summary.sourcePages}, source_page_size=${summary.sourcePageSize}, source_total=${summary.sourceTotalExpected ?? 'unknown'})`,
       );
+
+      return summary;
     } catch (error: any) {
       this.logger.error('Full catalog sync failed', error.stack);
+      throw error;
     }
   }
 
@@ -162,6 +184,31 @@ export class InfortisaSyncService {
       }
     } catch (error: any) {
       this.logger.error('Image sync failed', error.stack);
+    }
+  }
+
+  private assertCatalogNotProbablyTruncated(
+    catalog: InfortisaCatalogFetchResult,
+  ) {
+    const technicalLimits = new Set([100, 250, 500, 1000, 2000, 5000, 10000]);
+    const { totalReceived, totalExpected, totalPages, pageSize, limit } =
+      catalog.meta;
+
+    const probableLimit = [pageSize, limit].find(
+      (value): value is number =>
+        typeof value === 'number' && technicalLimits.has(value),
+    );
+
+    const probablyTruncated =
+      (totalExpected !== null && totalExpected > totalReceived) ||
+      ((totalPages === null || totalPages === 1) &&
+        probableLimit !== undefined &&
+        totalReceived === probableLimit);
+
+    if (probablyTruncated) {
+      throw new Error(
+        `Probable Infortisa catalog truncation detected (received=${totalReceived}, total=${totalExpected ?? 'unknown'}, pages=${totalPages ?? 1}, pageSize=${pageSize})`,
+      );
     }
   }
 

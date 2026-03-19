@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchImportHistory,
   retryImport,
@@ -8,7 +8,65 @@ import {
   type ImportHistoryItem,
 } from "@/lib/api";
 import { toast } from "sonner";
-import { RefreshCw, Database, Box, Image as ImageIcon } from "lucide-react";
+import {
+  RefreshCw,
+  Database,
+  Box,
+  Image as ImageIcon,
+  AlertTriangle,
+} from "lucide-react";
+
+const KNOWN_TECHNICAL_LIMITS = [100, 250, 500, 1000, 2000, 5000, 10000];
+
+function parseDetails(details?: string | null) {
+  if (!details) return {} as Record<string, string>;
+
+  return details.split(";").reduce<Record<string, string>>((acc, chunk) => {
+    const [rawKey, ...rest] = chunk.split("=");
+    const key = rawKey?.trim();
+    if (!key || rest.length === 0) return acc;
+    acc[key] = rest.join("=").trim();
+    return acc;
+  }, {});
+}
+
+function getSuspiciousImportAlert(items: ImportHistoryItem[]) {
+  for (const item of items) {
+    const parsed = parseDetails(item.details);
+    const received = Number(parsed.source_items_received ?? "");
+    const pageSize = Number(parsed.source_page_size ?? "");
+    const total = Number(parsed.source_total_expected ?? "");
+
+    if (!Number.isFinite(received) || received <= 0) continue;
+
+    const receivedIsRound = received % 100 === 0;
+    const matchesTechnicalLimit = KNOWN_TECHNICAL_LIMITS.includes(received);
+    const pageSizeLimitReached =
+      Number.isFinite(pageSize) && KNOWN_TECHNICAL_LIMITS.includes(pageSize) && received === pageSize;
+    const totalMismatch = Number.isFinite(total) && total > received;
+
+    if (
+      receivedIsRound ||
+      matchesTechnicalLimit ||
+      pageSizeLimitReached ||
+      totalMismatch
+    ) {
+      return {
+        item,
+        received,
+        pageSize: Number.isFinite(pageSize) ? pageSize : null,
+        total: Number.isFinite(total) ? total : null,
+        reason: totalMismatch
+          ? "Supplier metadata indicates more catalog items than were received."
+          : matchesTechnicalLimit || pageSizeLimitReached
+            ? "The supplier response matched a known technical limit exactly."
+            : "The supplier returned an unusually round item count.",
+      };
+    }
+  }
+
+  return null;
+}
 
 export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
@@ -32,6 +90,8 @@ export default function ImportsPage() {
   useEffect(() => {
     loadHistory();
   }, []);
+
+  const suspiciousAlert = useMemo(() => getSuspiciousImportAlert(items), [items]);
 
   const runImport = async (mode: "full" | "stock" | "images") => {
     setRunning(mode);
@@ -73,6 +133,24 @@ export default function ImportsPage() {
           Run supplier synchronization jobs and review latest history.
         </p>
       </div>
+
+      {suspiciousAlert && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Potential supplier truncation detected</p>
+              <p className="mt-1 text-sm">
+                {suspiciousAlert.reason} Latest run: <strong>{suspiciousAlert.item.type}</strong>
+                {" · "}
+                received={suspiciousAlert.received}
+                {suspiciousAlert.pageSize ? ` · pageSize=${suspiciousAlert.pageSize}` : ""}
+                {suspiciousAlert.total ? ` · total=${suspiciousAlert.total}` : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button

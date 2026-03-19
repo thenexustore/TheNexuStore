@@ -62,6 +62,32 @@ export interface ProviderStatsResponse {
   note: string;
 }
 
+export interface ImportConnectionTestResponse {
+  ok: boolean;
+  checked_at: string;
+}
+
+export interface ImportConfigResponse {
+  provider: string;
+  display_name: string;
+  base_url: string;
+  is_active: boolean;
+  notes?: string | null;
+  last_healthcheck_at?: string | null;
+  api_key_last4?: string | null;
+  api_key_masked?: string | null;
+  api_key?: string;
+  source?: string;
+}
+
+export interface UpdateImportConfigInput {
+  display_name: string;
+  base_url: string;
+  api_key?: string;
+  is_active?: boolean;
+  notes?: string;
+}
+
 export async function fetchImportHistory(
   page = 1,
   limit = 20,
@@ -87,6 +113,29 @@ export async function fetchImportRunErrors(id: string): Promise<ImportRunError[]
 
 export async function fetchProviderStats(): Promise<ProviderStatsResponse> {
   return fetchWithAuth("/admin/imports/provider-stats");
+}
+
+export async function fetchImportConfig(
+  includeSecret = false,
+): Promise<ImportConfigResponse> {
+  return fetchWithAuth(
+    `/admin/imports/config?includeSecret=${includeSecret ? "true" : "false"}`,
+  );
+}
+
+export async function updateImportConfig(
+  input: UpdateImportConfigInput,
+): Promise<ImportConfigResponse> {
+  return fetchWithAuth("/admin/imports/config", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function testImportConnection(): Promise<ImportConnectionTestResponse> {
+  return fetchWithAuth("/admin/imports/config/test-connection", {
+    method: "POST",
+  });
 }
 
 export async function triggerImport(mode: "full" | "stock" | "images") {

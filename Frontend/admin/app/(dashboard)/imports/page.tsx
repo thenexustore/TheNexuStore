@@ -42,6 +42,12 @@ type ImportConfigForm = {
   api_key: string;
   is_active: boolean;
   notes: string;
+  stock_sync_cron: string;
+  incremental_sync_cron: string;
+  full_sync_cron: string;
+  stock_batch_size: string;
+  full_sync_batch_size: string;
+  catalog_page_size: string;
 };
 
 type MetricCardTone = "slate" | "sky" | "emerald" | "amber" | "rose";
@@ -224,6 +230,12 @@ export default function ImportsPage() {
     api_key: "",
     is_active: true,
     notes: "",
+    stock_sync_cron: "",
+    incremental_sync_cron: "",
+    full_sync_cron: "",
+    stock_batch_size: "",
+    full_sync_batch_size: "",
+    catalog_page_size: "",
   });
 
   const hasPermission = (permission: string) =>
@@ -253,7 +265,10 @@ export default function ImportsPage() {
 
   async function loadRuns() {
     try {
-      const [runsData, providerStatsData] = await Promise.all([fetchImportRuns(), fetchProviderStats()]);
+      const [runsData, providerStatsData] = await Promise.all([
+        fetchImportRuns(),
+        fetchProviderStats(),
+      ]);
       setRuns(runsData);
       setProviderStats(providerStatsData);
     } catch (error) {
@@ -279,6 +294,14 @@ export default function ImportsPage() {
         api_key: includeSecret ? data.api_key || "" : "",
         is_active: data.is_active,
         notes: data.notes || "",
+        stock_sync_cron: data.settings.stock_sync_cron,
+        incremental_sync_cron: data.settings.incremental_sync_cron,
+        full_sync_cron: data.settings.full_sync_cron,
+        stock_batch_size: String(data.settings.stock_batch_size),
+        full_sync_batch_size: String(data.settings.full_sync_batch_size),
+        catalog_page_size: data.settings.catalog_page_size
+          ? String(data.settings.catalog_page_size)
+          : "",
       });
       setStoredMaskedKey(data.api_key_masked || null);
       setLastHealthcheckAt(data.last_healthcheck_at || null);
@@ -327,6 +350,14 @@ export default function ImportsPage() {
         api_key: form.api_key.trim() || undefined,
         is_active: form.is_active,
         notes: form.notes,
+        stock_sync_cron: form.stock_sync_cron,
+        incremental_sync_cron: form.incremental_sync_cron,
+        full_sync_cron: form.full_sync_cron,
+        stock_batch_size: Number(form.stock_batch_size),
+        full_sync_batch_size: Number(form.full_sync_batch_size),
+        catalog_page_size: form.catalog_page_size.trim()
+          ? Number(form.catalog_page_size)
+          : null,
       });
       toast.success("API configuration updated");
       await loadConfig(showingSecret && canReadSecret);
@@ -647,6 +678,136 @@ export default function ImportsPage() {
                     rows={4}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Runtime scheduling and fetch tuning
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Control the cron cadence and how many supplier records are
+                  processed per batch or requested per catalog page.
+                </p>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Stock sync cron
+                    </label>
+                    <input
+                      value={form.stock_sync_cron}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          stock_sync_cron: event.target.value,
+                        }))
+                      }
+                      disabled={!canUpdateConfig}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Incremental products cron
+                    </label>
+                    <input
+                      value={form.incremental_sync_cron}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          incremental_sync_cron: event.target.value,
+                        }))
+                      }
+                      disabled={!canUpdateConfig}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Full catalog cron
+                    </label>
+                    <input
+                      value={form.full_sync_cron}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          full_sync_cron: event.target.value,
+                        }))
+                      }
+                      disabled={!canUpdateConfig}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Stock batch size
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.stock_batch_size}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          stock_batch_size: event.target.value,
+                        }))
+                      }
+                      disabled={!canUpdateConfig}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Full sync batch size
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.full_sync_batch_size}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          full_sync_batch_size: event.target.value,
+                        }))
+                      }
+                      disabled={!canUpdateConfig}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Catalog page size override
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.catalog_page_size}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          catalog_page_size: event.target.value,
+                        }))
+                      }
+                      disabled={!canUpdateConfig}
+                      placeholder="Blank = provider default"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      Leave blank to use the provider-reported/default page size.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

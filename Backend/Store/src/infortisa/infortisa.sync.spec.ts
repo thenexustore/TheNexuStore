@@ -6,6 +6,7 @@ describe('InfortisaSyncService', () => {
   let prisma: any;
   let infortisa: any;
   let products: any;
+  let schedulerRegistry: any;
 
   beforeEach(() => {
     prisma = {
@@ -79,8 +80,13 @@ describe('InfortisaSyncService', () => {
     products = {
       upsertFromInfortisa: jest.fn().mockResolvedValue('created'),
     };
+    schedulerRegistry = {
+      getCronJob: jest.fn(() => { throw new Error('missing'); }),
+      addCronJob: jest.fn(),
+      deleteCronJob: jest.fn(),
+    };
 
-    service = new InfortisaSyncService(prisma, infortisa, products);
+    service = new InfortisaSyncService(prisma, infortisa, products, schedulerRegistry);
     jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
   });
 

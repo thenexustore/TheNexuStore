@@ -3,6 +3,11 @@ import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { generateDeterministicProductSlug } from './product-slug.util';
+import {
+  INFORTISA_DEFAULT_BASE_URL,
+  INFORTISA_PROVIDER,
+  normalizeImportRuntimeSettings,
+} from './import-runtime-settings';
 
 const PROVIDER = 'INFORTISA';
 const DEFAULT_BASE_URL = 'https://apiv2.infortisa.com';
@@ -39,7 +44,8 @@ export class InfortisaService implements OnModuleInit {
   private readonly logger = new Logger(InfortisaService.name);
   private client!: AxiosInstance;
   private token = '';
-  private baseURL = DEFAULT_BASE_URL;
+  private baseURL = INFORTISA_DEFAULT_BASE_URL;
+  private catalogPageSizeOverride: number | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -51,14 +57,20 @@ export class InfortisaService implements OnModuleInit {
   }
 
   async reloadConfiguration() {
-    const integration = await (this.prisma as any).supplierIntegration.findUnique({
-      where: { provider: PROVIDER },
+    const integration = await this.prisma.supplierIntegration.findUnique({
+      where: { provider: INFORTISA_PROVIDER },
     });
     const fallbackToken = this.config.get<string>('INFORTISA_API_TOKEN') || '';
+    const runtimeSettings = normalizeImportRuntimeSettings(
+      integration?.settings_json && typeof integration.settings_json === 'object'
+        ? (integration.settings_json as Record<string, unknown>)
+        : undefined,
+    );
     this.token = integration?.api_key_encrypted
       ? this.tryDecrypt(integration.api_key_encrypted) || fallbackToken
       : fallbackToken;
-    this.baseURL = integration?.base_url || DEFAULT_BASE_URL;
+    this.baseURL = integration?.base_url || INFORTISA_DEFAULT_BASE_URL;
+    this.catalogPageSizeOverride = runtimeSettings.catalog_page_size;
     this.initializeClient();
   }
 
@@ -468,7 +480,11 @@ export class InfortisaService implements OnModuleInit {
   async getAllProductsPaged(): Promise<InfortisaCatalogFetchResult> {
     try {
       const client = await this.getClient();
-      const firstResponse = await client.get('/api/Product/Get');
+      const firstResponse = this.catalogPageSizeOverride
+        ? await client.get('/api/Product/Get', {
+            params: { page: 1, pageSize: this.catalogPageSizeOverride },
+          })
+        : await client.get('/api/Product/Get');
       const firstPage = this.extractCatalogPage(firstResponse.data, 1);
       const pages = [firstPage];
 
@@ -494,7 +510,7 @@ export class InfortisaService implements OnModuleInit {
       }
 
       const totalPages = firstPage.meta.totalPages ?? 1;
-      const pageSize = firstPage.meta.pageSize;
+      const pageSize = this.catalogPageSizeOverride ?? firstPage.meta.pageSize;
 
       for (let page = 2; page <= totalPages; page += 1) {
         const response = await client.get('/api/Product/Get', {

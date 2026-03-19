@@ -67,6 +67,15 @@ export interface ImportConnectionTestResponse {
   checked_at: string;
 }
 
+export interface ImportRuntimeSettings {
+  stock_sync_cron: string;
+  incremental_sync_cron: string;
+  full_sync_cron: string;
+  stock_batch_size: number;
+  full_sync_batch_size: number;
+  catalog_page_size?: number | null;
+}
+
 export interface ImportConfigResponse {
   provider: string;
   display_name: string;
@@ -78,6 +87,7 @@ export interface ImportConfigResponse {
   api_key_masked?: string | null;
   api_key?: string;
   source?: string;
+  settings: ImportRuntimeSettings;
 }
 
 export interface UpdateImportConfigInput {
@@ -86,6 +96,12 @@ export interface UpdateImportConfigInput {
   api_key?: string;
   is_active?: boolean;
   notes?: string;
+  stock_sync_cron?: string;
+  incremental_sync_cron?: string;
+  full_sync_cron?: string;
+  stock_batch_size?: number;
+  full_sync_batch_size?: number;
+  catalog_page_size?: number | null;
 }
 
 export async function fetchImportHistory(

@@ -92,6 +92,7 @@ export {
   updateImportConfig,
   type ImportConfigResponse,
   type ImportConnectionTestResponse,
+  type ImportRuntimeSettings,
   type ImportHistoryItem,
   type ImportHistoryResponse,
   type ImportRun,

@@ -22,6 +22,8 @@ import {
   RetryImportDto,
   TriggerImportDto,
 } from './dto/imports.dto';
+import { UpdateImportIntegrationConfigDto } from './dto/imports-config.dto';
+import { ImportsConfigService } from './imports-config.service';
 
 @Controller('admin/imports')
 @UseGuards(AdminGuard)
@@ -31,6 +33,7 @@ export class ImportsController {
     private readonly prisma: PrismaService,
     private readonly infortisaSync: InfortisaSyncService,
     private readonly auditLogService: AuditLogService,
+    private readonly importsConfigService: ImportsConfigService,
   ) {}
 
   private async executeImport(
@@ -97,6 +100,46 @@ export class ImportsController {
       durationMs,
       run: runResult,
       ...(body.reason ? { reason: body.reason } : {}),
+    };
+  }
+
+  @Get('config')
+  @Permissions('imports:config:read')
+  async config(
+    @Req() req: Request,
+    @Query('includeSecret') includeSecret?: string,
+  ) {
+    const permissions = Array.isArray((req.user as any)?.permissions)
+      ? ((req.user as any).permissions as string[])
+      : [];
+    const canReadSecret =
+      permissions.includes('full_access') ||
+      permissions.includes('imports:secret:read');
+
+    return {
+      success: true,
+      data: await this.importsConfigService.getConfig({
+        includeSecret: includeSecret === 'true' && canReadSecret,
+        enforceSecretRead: includeSecret === 'true',
+      }),
+    };
+  }
+
+  @Patch('config')
+  @Permissions('imports:config:update')
+  async updateConfig(@Body() body: UpdateImportIntegrationConfigDto) {
+    return {
+      success: true,
+      data: await this.importsConfigService.updateConfig(body),
+    };
+  }
+
+  @Post('config/test-connection')
+  @Permissions('imports:config:read')
+  async testConnection() {
+    return {
+      success: true,
+      data: await this.importsConfigService.testConnection(),
     };
   }
 

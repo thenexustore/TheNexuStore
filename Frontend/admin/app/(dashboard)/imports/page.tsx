@@ -7,6 +7,7 @@ import {
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
+  testImportConnection,
   triggerImport,
   type ImportRun,
   type ImportRunError,
@@ -87,6 +88,32 @@ export default function ImportsPage() {
     }
   };
 
+  const loadConfig = async (includeSecret = false) => {
+    if (!canReadConfig) {
+      setConfigLoading(false);
+      return;
+    }
+
+    try {
+      const data = await fetchImportConfig(includeSecret);
+      setForm({
+        display_name: data.display_name,
+        base_url: data.base_url,
+        api_key: includeSecret ? data.api_key || "" : "",
+        is_active: data.is_active,
+        notes: data.notes || "",
+      });
+      setStoredMaskedKey(data.api_key_masked || null);
+      setLastHealthcheckAt(data.last_healthcheck_at);
+      setConfigSource(data.source);
+      setShowingSecret(includeSecret && Boolean(data.api_key));
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load API configuration");
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadDashboard();
   }, []);
@@ -130,7 +157,7 @@ export default function ImportsPage() {
     }
   };
 
-  const runRetry = async (mode: "full" | "stock" | "images") => {
+  const runRetry = async (mode: ImportMode) => {
     const reason = retryReason.trim();
     if (!reason) {
       toast.error("Retry reason is required");

@@ -2,6 +2,7 @@ import { ImportsController } from './imports.controller';
 import { PrismaService } from '../../common/prisma.service';
 import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
 import { AuditLogService } from '../audit-log.service';
+import { ImportsConfigService } from './imports-config.service';
 
 describe('ImportsController', () => {
   const prisma = {
@@ -26,18 +27,33 @@ describe('ImportsController', () => {
     logAction: jest.fn(),
   } as unknown as AuditLogService;
 
+  const importsConfigService = {
+    getConfig: jest.fn(),
+    updateConfig: jest.fn(),
+    testConnection: jest.fn(),
+  } as unknown as ImportsConfigService;
+
   let controller: ImportsController;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new ImportsController(prisma, infortisaSync, auditLogService);
+    controller = new ImportsController(
+      prisma,
+      infortisaSync,
+      auditLogService,
+      importsConfigService,
+    );
   });
 
   it('returns import history with pagination metadata', async () => {
     (prisma.syncLog.findMany as jest.Mock).mockResolvedValue([{ id: 1 }]);
     (prisma.syncLog.count as jest.Mock).mockResolvedValue(1);
 
-    const result = await controller.history({ page: 2, limit: 10, type: 'manual_full' });
+    const result = await controller.history({
+      page: 2,
+      limit: 10,
+      type: 'manual_full',
+    });
 
     expect(prisma.syncLog.findMany).toHaveBeenCalledWith({
       where: { type: 'manual_full' },
@@ -90,7 +106,9 @@ describe('ImportsController', () => {
     expect(infortisaSync.syncStockRealTime).toHaveBeenCalledTimes(1);
     expect(prisma.syncLog.upsert).toHaveBeenCalledWith({
       where: { type: 'manual_stock' },
-      update: expect.objectContaining({ details: expect.stringContaining('mode=stock') }),
+      update: expect.objectContaining({
+        details: expect.stringContaining('mode=stock'),
+      }),
       create: expect.objectContaining({ type: 'manual_stock' }),
     });
     expect(auditLogService.logAction).toHaveBeenCalledWith(

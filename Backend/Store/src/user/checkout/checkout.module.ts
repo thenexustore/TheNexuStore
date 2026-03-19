@@ -11,7 +11,14 @@ import { RedsysService } from '../payment/redsys.service';
 import { ShippingTaxModule } from '../../shipping-tax/shipping-tax.module';
 
 @Module({
-  imports: [CommonModule, CartModule, AuthModule, CouponModule, MailModule, ShippingTaxModule],
+  imports: [
+    CommonModule,
+    CartModule,
+    AuthModule,
+    CouponModule,
+    MailModule,
+    ShippingTaxModule,
+  ],
   controllers: [CheckoutController],
   providers: [CheckoutService, RedsysService],
   exports: [CheckoutService],

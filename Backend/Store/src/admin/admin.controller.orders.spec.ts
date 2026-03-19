@@ -22,9 +22,17 @@ describe('AdminController orders flows', () => {
   });
 
   it('delegates orders list with validated query values', async () => {
-    (adminService.getOrders as jest.Mock).mockResolvedValue({ orders: [], total: 0 });
+    (adminService.getOrders as jest.Mock).mockResolvedValue({
+      orders: [],
+      total: 0,
+    });
 
-    await controller.getOrders({ page: 2, limit: 15, status: 'PAID', search: 'john' });
+    await controller.getOrders({
+      page: 2,
+      limit: 15,
+      status: 'PAID',
+      search: 'john',
+    });
 
     expect(adminService.getOrders).toHaveBeenCalledWith(2, 15, 'PAID', 'john');
   });
@@ -38,9 +46,9 @@ describe('AdminController orders flows', () => {
       user: { id: 's1', email: 'admin@test.com' },
     } as any;
 
-    await expect(controller.addOrderNote('o1', { note: '   ' }, req)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      controller.addOrderNote('o1', { note: '   ' }, req),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(adminService.addOrderNote).not.toHaveBeenCalled();
   });
 

@@ -68,7 +68,8 @@ export class InfortisaSyncService implements OnModuleInit {
   private readonly INCREMENTAL_SYNC_JOB = 'infortisa-incremental-sync';
   private readonly FULL_SYNC_JOB = 'infortisa-full-sync';
   private readonly IMAGES_SYNC_JOB = 'infortisa-images-sync';
-  private runtimeSettings: ImportRuntimeSettings = DEFAULT_IMPORT_RUNTIME_SETTINGS;
+  private runtimeSettings: ImportRuntimeSettings =
+    DEFAULT_IMPORT_RUNTIME_SETTINGS;
 
   constructor(
     private prisma: PrismaService,
@@ -218,7 +219,8 @@ export class InfortisaSyncService implements OnModuleInit {
       await this.setLastSync('stock_realtime');
       const finishedAt = new Date();
       const duration = finishedAt.getTime() - startedAt.getTime();
-      const status: ImportRunSummary['status'] = errors > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
+      const status: ImportRunSummary['status'] =
+        errors > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
 
       await this.finalizeImportRun(run.id, {
         finishedAt,
@@ -282,12 +284,18 @@ export class InfortisaSyncService implements OnModuleInit {
         },
       });
 
-      const stats = await this.processProductsBatch(activeItems, 'incremental_upsert');
+      const stats = await this.processProductsBatch(
+        activeItems,
+        'incremental_upsert',
+      );
       await this.setLastSync('product_incremental');
 
       const finishedAt = new Date();
       const duration = finishedAt.getTime() - startedAt.getTime();
-      const status = this.resolveRunStatus(stats.errors, stats.validationSkipped);
+      const status = this.resolveRunStatus(
+        stats.errors,
+        stats.validationSkipped,
+      );
 
       await this.finalizeImportRun(run.id, {
         finishedAt,
@@ -356,7 +364,10 @@ export class InfortisaSyncService implements OnModuleInit {
 
       const archivedCount = await this.handleDiscontinuedProducts(allProducts);
       const finishedAt = new Date();
-      const status = this.resolveRunStatus(totals.errors, totals.validationSkipped);
+      const status = this.resolveRunStatus(
+        totals.errors,
+        totals.validationSkipped,
+      );
 
       await this.finalizeImportRun(run.id, {
         finishedAt,
@@ -840,7 +851,10 @@ export class InfortisaSyncService implements OnModuleInit {
     };
   }
 
-  private mergeProductBatchStats(target: ProductBatchStats, next: ProductBatchStats) {
+  private mergeProductBatchStats(
+    target: ProductBatchStats,
+    next: ProductBatchStats,
+  ) {
     target.processed += next.processed;
     target.persisted += next.persisted;
     target.created += next.created;
@@ -848,7 +862,9 @@ export class InfortisaSyncService implements OnModuleInit {
     target.skipped += next.skipped;
     target.validationSkipped += next.validationSkipped;
     target.errors += next.errors;
-    next.incidents.forEach((incident) => this.pushIncident(target.incidents, incident));
+    next.incidents.forEach((incident) =>
+      this.pushIncident(target.incidents, incident),
+    );
   }
 
   private pushIncident(collection: RunErrorInput[], incident: RunErrorInput) {

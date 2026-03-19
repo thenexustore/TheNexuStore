@@ -37,7 +37,8 @@ const scopeScore: Record<PricingScope, number> = {
   GLOBAL: 1,
 };
 
-const round2 = (value: number): number => Math.round(Math.max(0, value) * 100) / 100;
+const round2 = (value: number): number =>
+  Math.round(Math.max(0, value) * 100) / 100;
 
 export function applyRounding(value: number, mode: RoundingMode): number {
   const v = Math.max(0, value);
@@ -63,7 +64,10 @@ export function applyRounding(value: number, mode: RoundingMode): number {
   }
 }
 
-export function pickWinningRule(rules: RuleCandidate[], now = new Date()): RuleCandidate | null {
+export function pickWinningRule(
+  rules: RuleCandidate[],
+  now = new Date(),
+): RuleCandidate | null {
   const active = rules.filter((rule) => {
     if (rule.starts_at && now < rule.starts_at) return false;
     if (rule.ends_at && now > rule.ends_at) return false;
@@ -113,15 +117,22 @@ export function computePricing(input: ComputeInput): ComputeResult {
   }
 
   const marginPct = input.rule.margin_pct || 0;
-  const discountPctInput = Math.min(Math.max(input.rule.discount_pct || 0, 0), 90);
+  const discountPctInput = Math.min(
+    Math.max(input.rule.discount_pct || 0, 0),
+    90,
+  );
   const baseRaw = cost * (1 + marginPct / 100);
   const compareAtPrice = applyRounding(baseRaw, input.rule.rounding_mode);
 
   const saleRaw = compareAtPrice * (1 - discountPctInput / 100);
   let salePrice = applyRounding(saleRaw, input.rule.rounding_mode);
 
-  const floorPct = input.rule.min_margin_pct ? cost * (1 + input.rule.min_margin_pct / 100) : 0;
-  const floorAmount = input.rule.min_margin_amount ? cost + input.rule.min_margin_amount : 0;
+  const floorPct = input.rule.min_margin_pct
+    ? cost * (1 + input.rule.min_margin_pct / 100)
+    : 0;
+  const floorAmount = input.rule.min_margin_amount
+    ? cost + input.rule.min_margin_amount
+    : 0;
   const floor = round2(Math.max(cost, floorPct, floorAmount));
 
   let needsReview = false;
@@ -131,9 +142,10 @@ export function computePricing(input: ComputeInput): ComputeResult {
     needsReview = true;
   }
 
-  const discountPct = compareAtPrice > salePrice
-    ? Math.round((1 - salePrice / compareAtPrice) * 100)
-    : null;
+  const discountPct =
+    compareAtPrice > salePrice
+      ? Math.round((1 - salePrice / compareAtPrice) * 100)
+      : null;
 
   return {
     cost,

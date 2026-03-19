@@ -29,14 +29,19 @@ export class PricingRulesService {
   }
 
   async getById(id: string) {
-    const rule = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
+    const rule = await (this.prisma.pricingRule as any).findUnique({
+      where: { id },
+    });
     if (!rule) {
       throw new NotFoundException('rule not found');
     }
     return rule;
   }
 
-  private async resolveSkuId(input: { sku_id?: string | null; sku_code?: string | null }) {
+  private async resolveSkuId(input: {
+    sku_id?: string | null;
+    sku_code?: string | null;
+  }) {
     if (input.sku_id) return input.sku_id;
     const code = (input.sku_code ?? '').trim();
     if (!code) return null;
@@ -55,10 +60,18 @@ export class PricingRulesService {
     return sku.id;
   }
 
-  private validateFinal(scope: string, category_id: string | null, brand_id: string | null, sku_id: string | null) {
-    if (scope === 'CATEGORY' && !category_id) throw new BadRequestException('CATEGORY scope requires category_id');
-    if (scope === 'BRAND' && !brand_id) throw new BadRequestException('BRAND scope requires brand_id');
-    if (scope === 'SKU' && !sku_id) throw new BadRequestException('SKU scope requires sku_id or sku_code');
+  private validateFinal(
+    scope: string,
+    category_id: string | null,
+    brand_id: string | null,
+    sku_id: string | null,
+  ) {
+    if (scope === 'CATEGORY' && !category_id)
+      throw new BadRequestException('CATEGORY scope requires category_id');
+    if (scope === 'BRAND' && !brand_id)
+      throw new BadRequestException('BRAND scope requires brand_id');
+    if (scope === 'SKU' && !sku_id)
+      throw new BadRequestException('SKU scope requires sku_id or sku_code');
   }
 
   async create(dto: CreatePricingRuleDto, actorId?: string) {
@@ -89,21 +102,34 @@ export class PricingRulesService {
   }
 
   async update(id: string, dto: UpdatePricingRuleDto) {
-    const exists = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
+    const exists = await (this.prisma.pricingRule as any).findUnique({
+      where: { id },
+    });
     if (!exists) throw new NotFoundException('rule not found');
 
     if (exists.approval_status === PricingApprovalStatus.PUBLISHED) {
-      throw new BadRequestException('Published rules cannot be edited directly');
+      throw new BadRequestException(
+        'Published rules cannot be edited directly',
+      );
     }
 
     const resolvedSkuId =
-      dto.sku_id || dto.sku_code ? await this.resolveSkuId(dto) : (exists as any).sku_id ?? null;
+      dto.sku_id || dto.sku_code
+        ? await this.resolveSkuId(dto)
+        : (exists.sku_id ?? null);
 
-    const finalScope = (dto.scope ?? (exists as any).scope) as string;
-    const finalCategoryId = (dto.category_id ?? (exists as any).category_id) as string | null;
-    const finalBrandId = (dto.brand_id ?? (exists as any).brand_id) as string | null;
+    const finalScope = (dto.scope ?? exists.scope) as string;
+    const finalCategoryId = (dto.category_id ?? exists.category_id) as
+      | string
+      | null;
+    const finalBrandId = (dto.brand_id ?? exists.brand_id) as string | null;
 
-    this.validateFinal(finalScope, finalCategoryId, finalBrandId, resolvedSkuId);
+    this.validateFinal(
+      finalScope,
+      finalCategoryId,
+      finalBrandId,
+      resolvedSkuId,
+    );
 
     return (this.prisma.pricingRule as any).update({
       where: { id },
@@ -111,7 +137,7 @@ export class PricingRulesService {
         scope: dto.scope as any,
         category_id: dto.category_id,
         brand_id: dto.brand_id,
-        sku_id: (dto.sku_id || dto.sku_code) ? resolvedSkuId : undefined,
+        sku_id: dto.sku_id || dto.sku_code ? resolvedSkuId : undefined,
         margin_pct: dto.margin_pct as any,
         min_margin_amount: dto.min_margin_amount as any,
         rounding_mode: dto.rounding_mode as any,
@@ -126,7 +152,9 @@ export class PricingRulesService {
     status: PricingApprovalStatus,
     actorId?: string,
   ) {
-    const exists = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
+    const exists = await (this.prisma.pricingRule as any).findUnique({
+      where: { id },
+    });
     if (!exists) throw new NotFoundException('rule not found');
 
     const current = exists.approval_status as unknown as PricingApprovalStatus;
@@ -151,7 +179,11 @@ export class PricingRulesService {
         throw new BadRequestException('Only PENDING rules can be approved');
       }
 
-      if (exists.created_by_actor_id && actorId && exists.created_by_actor_id === actorId) {
+      if (
+        exists.created_by_actor_id &&
+        actorId &&
+        exists.created_by_actor_id === actorId
+      ) {
         throw new BadRequestException('4-eyes rule: creator cannot approve');
       }
 
@@ -200,9 +232,14 @@ export class PricingRulesService {
   }
 
   async toggle(id: string, is_active: boolean) {
-    const exists = await (this.prisma.pricingRule as any).findUnique({ where: { id } });
+    const exists = await (this.prisma.pricingRule as any).findUnique({
+      where: { id },
+    });
     if (!exists) throw new NotFoundException('rule not found');
-    return (this.prisma.pricingRule as any).update({ where: { id }, data: { is_active } });
+    return (this.prisma.pricingRule as any).update({
+      where: { id },
+      data: { is_active },
+    });
   }
 
   async preview(sku_code: string) {
@@ -229,12 +266,19 @@ export class PricingRulesService {
     if (supplierProduct?.price?.cost_price != null) {
       cost = Number(supplierProduct.price.cost_price);
     } else {
-      const skuPrice = await this.prisma.skuPrice.findUnique({ where: { sku_id: sku.id } });
+      const skuPrice = await this.prisma.skuPrice.findUnique({
+        where: { sku_id: sku.id },
+      });
       cost = Number(skuPrice?.sale_price ?? 0);
     }
 
-    const computed = await this.pricing.computeForSkuId({ skuId: sku.id, costPrice: cost });
-    const current = await this.prisma.skuPrice.findUnique({ where: { sku_id: sku.id } });
+    const computed = await this.pricing.computeForSkuId({
+      skuId: sku.id,
+      costPrice: cost,
+    });
+    const current = await this.prisma.skuPrice.findUnique({
+      where: { sku_id: sku.id },
+    });
 
     return {
       sku_code: sku.sku_code,

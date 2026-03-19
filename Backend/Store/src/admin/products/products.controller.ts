@@ -56,7 +56,6 @@ export class ProductsController {
     };
   }
 
-
   @Put('bulk/status')
   async bulkUpdateStatus(
     @Body() body: BulkUpdateProductStatusDto,
@@ -91,10 +90,7 @@ export class ProductsController {
   }
 
   @Delete('bulk')
-  async bulkDelete(
-    @Body() body: BulkDeleteProductsDto,
-    @Req() req: Request,
-  ) {
+  async bulkDelete(@Body() body: BulkDeleteProductsDto, @Req() req: Request) {
     const data = await this.productsService.bulkDeleteProducts(body.ids);
 
     await this.auditLogService.logAction({

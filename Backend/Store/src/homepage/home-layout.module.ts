@@ -7,6 +7,11 @@ import { PricingService } from '../pricing/pricing.service';
 
 @Module({
   controllers: [HomeLayoutController],
-  providers: [HomeLayoutService, PrismaService, ProductsService, PricingService],
+  providers: [
+    HomeLayoutService,
+    PrismaService,
+    ProductsService,
+    PricingService,
+  ],
 })
 export class HomeLayoutModule {}

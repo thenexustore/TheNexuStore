@@ -6,7 +6,10 @@ export type MenuParentCategory = {
   subfamilyKeywords: readonly string[];
 };
 
-export const DEFAULT_PARENT_CATEGORY: Pick<MenuParentCategory, 'key' | 'label'> = {
+export const DEFAULT_PARENT_CATEGORY: Pick<
+  MenuParentCategory,
+  'key' | 'label'
+> = {
   key: 'accesorios-consumibles',
   label: 'Accesorios y consumibles',
 };

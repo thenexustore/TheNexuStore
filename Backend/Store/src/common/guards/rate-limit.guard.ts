@@ -28,7 +28,8 @@ export class RateLimitGuard implements CanActivate {
     const isSensitiveRoute =
       sensitiveAuthRoutes.some((segment) => route.includes(segment)) &&
       req.method === 'POST';
-    const isCheckoutCreate = route.includes('create-order') && req.method === 'POST';
+    const isCheckoutCreate =
+      route.includes('create-order') && req.method === 'POST';
 
     const limit = isSensitiveRoute ? 5 : isCheckoutCreate ? 10 : 30;
     const windowMs = 60_000;

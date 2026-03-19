@@ -10,7 +10,12 @@ interface EndpointMetric {
 export class RequestMetricsService {
   private readonly metrics = new Map<string, EndpointMetric>();
 
-  record(method: string, path: string, statusCode: number, durationMs: number): EndpointMetric {
+  record(
+    method: string,
+    path: string,
+    statusCode: number,
+    durationMs: number,
+  ): EndpointMetric {
     const key = `${method} ${path}`;
     const previous = this.metrics.get(key) ?? {
       count: 0,

@@ -90,6 +90,7 @@ export {
   testImportConnection,
   triggerImport,
   updateImportConfig,
+  fetchCatalogProbe,
   type ImportConfigResponse,
   type ImportConnectionTestResponse,
   type ImportRuntimeSettings,
@@ -99,6 +100,7 @@ export {
   type ImportRunError,
   type ProviderStatsResponse,
   type UpdateImportConfigInput,
+  type CatalogProbeResponse,
 } from "./imports";
 
 export {

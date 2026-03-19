@@ -37,7 +37,12 @@ export class BrandingController {
   @UseGuards(AdminGuard)
   @Post('admin/branding/upload-logo')
   async uploadBrandingLogo(
-    @Body() body: { variant?: 'light' | 'dark'; dataUrl?: string; apiBaseUrl?: string },
+    @Body()
+    body: {
+      variant?: 'light' | 'dark';
+      dataUrl?: string;
+      apiBaseUrl?: string;
+    },
   ) {
     const variant = body?.variant === 'dark' ? 'dark' : 'light';
     const dataUrl = String(body?.dataUrl || '');
@@ -52,7 +57,11 @@ export class BrandingController {
     }
 
     try {
-      const url = await this.brandingService.saveLogoDataUrl(variant, dataUrl, apiBaseUrl);
+      const url = await this.brandingService.saveLogoDataUrl(
+        variant,
+        dataUrl,
+        apiBaseUrl,
+      );
       return {
         success: true,
         data: { url },

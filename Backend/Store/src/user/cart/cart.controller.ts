@@ -11,7 +11,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
-import { AddToCartDto, UpdateCartItemDto, CartQueryDto, ApplyCouponDto, CartTotalsQueryDto } from './dto/cart.dto';
+import {
+  AddToCartDto,
+  UpdateCartItemDto,
+  CartQueryDto,
+  ApplyCouponDto,
+  CartTotalsQueryDto,
+} from './dto/cart.dto';
 import { AuthGuard } from '../../auth/auth.guard';
 import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
 import { PrismaService } from 'src/common/prisma.service';
@@ -41,7 +47,6 @@ export class CartController {
       postal_code: query.postal_code,
     });
   }
-
 
   @Get('totals')
   async getTotals(@Request() req, @Query() query: CartTotalsQueryDto) {
@@ -133,7 +138,11 @@ export class CartController {
   ) {
     const customerId = req.user?.id;
     const sessionId = query.session_id || req.headers['x-session-id'];
-    return this.cartService.validateCoupon(dto.coupon_code, customerId, sessionId);
+    return this.cartService.validateCoupon(
+      dto.coupon_code,
+      customerId,
+      sessionId,
+    );
   }
 
   @Post('coupon/apply')

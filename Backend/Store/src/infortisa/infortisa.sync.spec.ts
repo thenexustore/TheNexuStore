@@ -72,7 +72,9 @@ describe('InfortisaSyncService', () => {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue([]),
       },
-      $transaction: jest.fn().mockImplementation(async (callback) => callback(prisma)),
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (callback) => callback(prisma)),
     };
     infortisa = {
       getAllProductsPaged: jest.fn(),
@@ -84,12 +86,19 @@ describe('InfortisaSyncService', () => {
       upsertFromInfortisa: jest.fn().mockResolvedValue('created'),
     };
     schedulerRegistry = {
-      getCronJob: jest.fn(() => { throw new Error('missing'); }),
+      getCronJob: jest.fn(() => {
+        throw new Error('missing');
+      }),
       addCronJob: jest.fn(),
       deleteCronJob: jest.fn(),
     };
 
-    service = new InfortisaSyncService(prisma, infortisa, products, schedulerRegistry);
+    service = new InfortisaSyncService(
+      prisma,
+      infortisa,
+      products,
+      schedulerRegistry,
+    );
     jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
   });
 

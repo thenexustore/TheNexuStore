@@ -20,7 +20,10 @@ export type ImportRuntimeSettings = {
   catalog_page_size: number | null;
 };
 
-export type PartialImportRuntimeSettings = Partial<ImportRuntimeSettings> | null | undefined;
+export type PartialImportRuntimeSettings =
+  | Partial<ImportRuntimeSettings>
+  | null
+  | undefined;
 
 export const DEFAULT_IMPORT_RUNTIME_SETTINGS: ImportRuntimeSettings = {
   stock_sync_enabled: true,
@@ -37,7 +40,6 @@ export const DEFAULT_IMPORT_RUNTIME_SETTINGS: ImportRuntimeSettings = {
   image_sync_take: 50,
   catalog_page_size: null,
 };
-
 
 function parseBoolean(value: unknown, field: string) {
   if (value === undefined) {
@@ -70,9 +72,8 @@ function parsePositiveInteger(
     return null;
   }
 
-  const parsed = typeof value === 'string' && value.trim() !== ''
-    ? Number(value)
-    : value;
+  const parsed =
+    typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
 
   if (!Number.isInteger(parsed)) {
     throw new BadRequestException(`${field} must be an integer`);
@@ -119,8 +120,10 @@ export function normalizeImportRuntimeSettings(
       parseBoolean(source.stock_sync_enabled, 'stock_sync_enabled') ??
       DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_sync_enabled,
     incremental_sync_enabled:
-      parseBoolean(source.incremental_sync_enabled, 'incremental_sync_enabled') ??
-      DEFAULT_IMPORT_RUNTIME_SETTINGS.incremental_sync_enabled,
+      parseBoolean(
+        source.incremental_sync_enabled,
+        'incremental_sync_enabled',
+      ) ?? DEFAULT_IMPORT_RUNTIME_SETTINGS.incremental_sync_enabled,
     full_sync_enabled:
       parseBoolean(source.full_sync_enabled, 'full_sync_enabled') ??
       DEFAULT_IMPORT_RUNTIME_SETTINGS.full_sync_enabled,
@@ -131,8 +134,10 @@ export function normalizeImportRuntimeSettings(
       parseCronExpression(source.stock_sync_cron, 'stock_sync_cron') ??
       DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_sync_cron,
     incremental_sync_cron:
-      parseCronExpression(source.incremental_sync_cron, 'incremental_sync_cron') ??
-      DEFAULT_IMPORT_RUNTIME_SETTINGS.incremental_sync_cron,
+      parseCronExpression(
+        source.incremental_sync_cron,
+        'incremental_sync_cron',
+      ) ?? DEFAULT_IMPORT_RUNTIME_SETTINGS.incremental_sync_cron,
     full_sync_cron:
       parseCronExpression(source.full_sync_cron, 'full_sync_cron') ??
       DEFAULT_IMPORT_RUNTIME_SETTINGS.full_sync_cron,
@@ -145,10 +150,14 @@ export function normalizeImportRuntimeSettings(
         max: 5000,
       }) ?? DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_batch_size,
     full_sync_batch_size:
-      parsePositiveInteger(source.full_sync_batch_size, 'full_sync_batch_size', {
-        min: 1,
-        max: 10000,
-      }) ?? DEFAULT_IMPORT_RUNTIME_SETTINGS.full_sync_batch_size,
+      parsePositiveInteger(
+        source.full_sync_batch_size,
+        'full_sync_batch_size',
+        {
+          min: 1,
+          max: 10000,
+        },
+      ) ?? DEFAULT_IMPORT_RUNTIME_SETTINGS.full_sync_batch_size,
     full_sync_batch_delay_ms:
       parsePositiveInteger(
         source.full_sync_batch_delay_ms,

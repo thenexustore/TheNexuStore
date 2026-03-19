@@ -26,7 +26,9 @@ describe('AppService health', () => {
   });
 
   it('returns degraded when a required dependency fails', async () => {
-    const prisma = { $queryRaw: jest.fn().mockRejectedValue(new Error('db down')) } as any;
+    const prisma = {
+      $queryRaw: jest.fn().mockRejectedValue(new Error('db down')),
+    } as any;
     const service = new AppService(prisma);
 
     const health = await service.getHealth();

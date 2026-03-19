@@ -25,7 +25,12 @@ export class AdminGuard implements CanActivate {
     }
 
     if (role === StaffRole.WAREHOUSE) {
-      return ['orders:read', 'orders:update', 'inventory:read', 'inventory:update'];
+      return [
+        'orders:read',
+        'orders:update',
+        'inventory:read',
+        'inventory:update',
+      ];
     }
 
     return [];
@@ -77,8 +82,8 @@ export class AdminGuard implements CanActivate {
 
       if (requiredPermissions?.length && !isLegacyAdmin) {
         const hasFullAccess = effectivePermissions.includes('full_access');
-        const hasAllRequiredPermissions = requiredPermissions.every((permission) =>
-          effectivePermissions.includes(permission),
+        const hasAllRequiredPermissions = requiredPermissions.every(
+          (permission) => effectivePermissions.includes(permission),
         );
 
         if (!hasFullAccess && !hasAllRequiredPermissions) {

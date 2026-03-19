@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { ImportsController } from './imports.controller';
 import { PrismaService } from '../../common/prisma.service';
 import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
+import { InfortisaService } from '../../infortisa/infortisa.service';
 import { AuditLogService } from '../audit-log.service';
 import { ImportsConfigService } from './imports-config.service';
 
@@ -25,6 +26,10 @@ describe('ImportsController', () => {
     getProviderStats: jest.fn(),
   } as unknown as InfortisaSyncService;
 
+  const infortisaService = {
+    catalogProbe: jest.fn(),
+  } as unknown as InfortisaService;
+
   const auditLogService = {
     logAction: jest.fn(),
   } as unknown as AuditLogService;
@@ -42,6 +47,7 @@ describe('ImportsController', () => {
     controller = new ImportsController(
       prisma,
       infortisaSync,
+      infortisaService,
       auditLogService,
       importsConfigService,
     );
@@ -75,7 +81,9 @@ describe('ImportsController', () => {
   });
 
   it('returns structured import runs', async () => {
-    (infortisaSync.listImportRuns as jest.Mock).mockResolvedValue([{ id: 'run-1' }]);
+    (infortisaSync.listImportRuns as jest.Mock).mockResolvedValue([
+      { id: 'run-1' },
+    ]);
 
     await expect(controller.runs()).resolves.toEqual({
       success: true,
@@ -84,7 +92,9 @@ describe('ImportsController', () => {
   });
 
   it('returns provider stats', async () => {
-    (infortisaSync.getProviderStats as jest.Mock).mockResolvedValue({ provider: 'infortisa' });
+    (infortisaSync.getProviderStats as jest.Mock).mockResolvedValue({
+      provider: 'infortisa',
+    });
 
     await expect(controller.providerStats()).resolves.toEqual({
       success: true,
@@ -93,7 +103,9 @@ describe('ImportsController', () => {
   });
 
   it('forwards includeSecret when the staff user has secret-read permission', async () => {
-    (importsConfigService.getConfig as jest.Mock).mockResolvedValue({ provider: 'INFORTISA' });
+    (importsConfigService.getConfig as jest.Mock).mockResolvedValue({
+      provider: 'INFORTISA',
+    });
 
     const result = await controller.config(
       {
@@ -136,9 +148,10 @@ describe('ImportsController', () => {
     });
   });
 
-
   it('triggers incremental sync and logs execution', async () => {
-    (infortisaSync.syncProductsIncremental as jest.Mock).mockResolvedValue({ id: 'run-3' });
+    (infortisaSync.syncProductsIncremental as jest.Mock).mockResolvedValue({
+      id: 'run-3',
+    });
 
     const req = {
       user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },
@@ -159,7 +172,9 @@ describe('ImportsController', () => {
   });
 
   it('triggers stock sync and logs execution', async () => {
-    (infortisaSync.syncStockRealTime as jest.Mock).mockResolvedValue({ id: 'run-2' });
+    (infortisaSync.syncStockRealTime as jest.Mock).mockResolvedValue({
+      id: 'run-2',
+    });
 
     const req = {
       user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },
@@ -183,7 +198,10 @@ describe('ImportsController', () => {
       expect.objectContaining({
         action: 'IMPORT_TRIGGERED',
         resource: 'IMPORT_JOB',
-        metadata: expect.objectContaining({ mode: 'stock', run: { id: 'run-2' } }),
+        metadata: expect.objectContaining({
+          mode: 'stock',
+          run: { id: 'run-2' },
+        }),
       }),
     );
     expect(result.success).toBe(true);
@@ -223,5 +241,37 @@ describe('ImportsController', () => {
       }),
     );
     expect(result.success).toBe(true);
+  });
+
+  it('returns catalog probe results', async () => {
+    const probeResult = {
+      api: {
+        firstPageReceived: 1424,
+        totalExpected: null,
+        totalPages: null,
+        pageSize: 1424,
+        hasMore: null,
+        configuredPageSize: null,
+      },
+      db: { totalProducts: 1424, activeProducts: 1400 },
+      assessment: 'API returned 1424 products without pagination metadata.',
+      probeModeAvailable: false,
+    };
+    (infortisaService.catalogProbe as jest.Mock).mockResolvedValue(probeResult);
+
+    const result = await controller.catalogProbe();
+
+    expect(infortisaService.catalogProbe).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ success: true, data: probeResult });
+  });
+
+  it('returns success false when catalog probe throws', async () => {
+    (infortisaService.catalogProbe as jest.Mock).mockRejectedValue(
+      new Error('Network error'),
+    );
+
+    const result = await controller.catalogProbe();
+
+    expect(result).toEqual({ success: false, error: 'Network error' });
   });
 });

@@ -56,7 +56,9 @@ export class ShippingTaxAdminService {
 
     await this.prisma.$transaction(async (tx) => {
       if (zoneCodes.length > 0) {
-        await tx.shippingRule.deleteMany({ where: { zone_code: { in: zoneCodes } } });
+        await tx.shippingRule.deleteMany({
+          where: { zone_code: { in: zoneCodes } },
+        });
       }
 
       if (rules.length > 0) {

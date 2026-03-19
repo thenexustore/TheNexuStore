@@ -6,10 +6,7 @@ export class StaffAuthController {
   constructor(private readonly staffAuthService: StaffAuthService) {}
 
   @Post('login')
-  login(
-    @Body('email') email: string,
-    @Body('password') password: string,
-  ) {
+  login(@Body('email') email: string, @Body('password') password: string) {
     return this.staffAuthService.login(email, password);
   }
 }

@@ -125,13 +125,11 @@ describe('ProductsService category filtering', () => {
   });
 
   it('expands selected category slugs to include descendants and direct main category matches', async () => {
-    mockResolvedCategoryBranch(
-      [
-        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
-        { id: 'child-1', parent_id: 'parent-1' },
-        { id: 'grandchild-1', parent_id: 'child-1' },
-      ],
-    );
+    mockResolvedCategoryBranch([
+      { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
+      { id: 'child-1', parent_id: 'parent-1' },
+      { id: 'grandchild-1', parent_id: 'child-1' },
+    ]);
 
     await requestProducts({
       categories: ['ordenadores-portatiles'],
@@ -141,13 +139,11 @@ describe('ProductsService category filtering', () => {
   });
 
   it('supports the legacy single category filter and expands its descendants', async () => {
-    mockResolvedCategoryBranch(
-      [
-        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
-        { id: 'child-1', parent_id: 'parent-1' },
-        { id: 'grandchild-1', parent_id: 'child-1' },
-      ],
-    );
+    mockResolvedCategoryBranch([
+      { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
+      { id: 'child-1', parent_id: 'parent-1' },
+      { id: 'grandchild-1', parent_id: 'child-1' },
+    ]);
 
     await requestProducts({
       category: 'ordenadores-portatiles',
@@ -157,12 +153,10 @@ describe('ProductsService category filtering', () => {
   });
 
   it('accepts category ids as filter values and expands their descendants', async () => {
-    mockResolvedCategoryBranch(
-      [
-        { id: 'parent-1', parent_id: null },
-        { id: 'child-1', parent_id: 'parent-1' },
-      ],
-    );
+    mockResolvedCategoryBranch([
+      { id: 'parent-1', parent_id: null },
+      { id: 'child-1', parent_id: 'parent-1' },
+    ]);
 
     await requestProducts({
       category: 'parent-1',
@@ -172,12 +166,10 @@ describe('ProductsService category filtering', () => {
   });
 
   it('combines legacy category and categories inputs without duplicating descendants', async () => {
-    mockResolvedCategoryBranch(
-      [
-        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
-        { id: 'child-1', parent_id: 'parent-1' },
-      ],
-    );
+    mockResolvedCategoryBranch([
+      { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
+      { id: 'child-1', parent_id: 'parent-1' },
+    ]);
 
     await requestProducts({
       category: 'ordenadores-portatiles',
@@ -188,12 +180,10 @@ describe('ProductsService category filtering', () => {
   });
 
   it('keeps valid descendants when the filter mixes valid and invalid category slugs', async () => {
-    mockResolvedCategoryBranch(
-      [
-        { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
-        { id: 'child-1', parent_id: 'parent-1' },
-      ],
-    );
+    mockResolvedCategoryBranch([
+      { id: 'parent-1', parent_id: null, slug: 'ordenadores-portatiles' },
+      { id: 'child-1', parent_id: 'parent-1' },
+    ]);
 
     await requestProducts({
       categories: ['ordenadores-portatiles', 'slug-inexistente'],

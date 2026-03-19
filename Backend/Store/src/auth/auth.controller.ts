@@ -66,7 +66,10 @@ export class AuthController {
 
   @Post('login')
   @UseGuards(RateLimitGuard)
-  async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const session = await this.auth.login(body);
     res.cookie('access_token', session.accessToken, buildAuthCookieOptions());
     return { success: true, user: session.user };
@@ -115,10 +118,9 @@ export class AuthController {
     const user = (req as any).user;
     const session = await this.auth.googleLogin(user);
     res.cookie('access_token', session.accessToken, buildAuthCookieOptions());
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(
-      /\/$/,
-      '',
-    );
+    const frontendUrl = (
+      process.env.FRONTEND_URL || 'http://localhost:3000'
+    ).replace(/\/$/, '');
     res.redirect(new URL('/store', `${frontendUrl}/`).toString());
   }
 }

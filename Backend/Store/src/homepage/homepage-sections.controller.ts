@@ -54,7 +54,10 @@ export class HomepageSectionsController {
   }
 
   @UseGuards(AdminGuard)
-  @Get(['admin/homepage/sections/diagnostics', 'admin/homepage-sections/diagnostics'])
+  @Get([
+    'admin/homepage/sections/diagnostics',
+    'admin/homepage-sections/diagnostics',
+  ])
   async getAdminDiagnostics() {
     const data = await this.homepageSectionsService.getAdminDiagnostics();
     return { success: true, data };
@@ -70,10 +73,7 @@ export class HomepageSectionsController {
   }
 
   @UseGuards(AdminGuard)
-  @Get([
-    'admin/homepage/sections/options',
-    'admin/homepage-sections/options',
-  ])
+  @Get(['admin/homepage/sections/options', 'admin/homepage-sections/options'])
   async getOptions(@Query() query: HomepageSectionOptionsQueryDto) {
     const data = await this.homepageSectionsService.getOptions(query);
     return { success: true, data };

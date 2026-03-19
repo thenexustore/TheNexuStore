@@ -148,7 +148,7 @@ export class ProductsService {
 
         const uniqueAttributes: Record<string, string[]> = {};
         for (const [key, valueSet] of Object.entries(attributes)) {
-          uniqueAttributes[key] = Array.from(valueSet as Set<string>);
+          uniqueAttributes[key] = Array.from(valueSet);
         }
 
         const variants = product.skus.map((sku) => {
@@ -1016,7 +1016,6 @@ export class ProductsService {
       throw new Error('Failed to update product status: ' + error.message);
     }
   }
-
 
   async bulkUpdateProductStatus(ids: string[], status: string) {
     const validStatuses = ['DRAFT', 'ACTIVE', 'ARCHIVED'];

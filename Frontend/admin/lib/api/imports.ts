@@ -184,3 +184,25 @@ export async function retryImport(
     body: JSON.stringify({ mode, reason }),
   });
 }
+
+export interface CatalogProbeResponse {
+  api: {
+    firstPageReceived: number;
+    totalExpected: number | null;
+    totalPages: number | null;
+    pageSize: number;
+    hasMore: boolean | null;
+    configuredPageSize: number | null;
+  };
+  db: {
+    totalProducts: number;
+    activeProducts: number;
+  };
+  assessment: string;
+  probeModeAvailable: boolean;
+}
+
+export async function fetchCatalogProbe(): Promise<CatalogProbeResponse> {
+  const response = await fetchWithAuth("/admin/imports/catalog-probe");
+  return response.data ?? response;
+}

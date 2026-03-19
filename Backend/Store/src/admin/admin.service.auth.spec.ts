@@ -7,10 +7,7 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const mockedBcrypt = jest.requireMock('bcrypt') as {
-  compare: jest.Mock;
-  hash: jest.Mock;
-};
+const mockedBcrypt = jest.requireMock('bcrypt');
 
 describe('AdminService auth', () => {
   const prisma = {
@@ -81,9 +78,9 @@ describe('AdminService auth', () => {
   it('throws unauthorized when credentials are invalid', async () => {
     (prisma.staff.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.login('missing@test.com', 'secret')).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(
+      service.login('missing@test.com', 'secret'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('creates default admin if missing on module init', async () => {

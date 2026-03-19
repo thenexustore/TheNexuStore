@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { HomeLayoutService } from './home-layout.service';
 import {
   CreateItemDto,
@@ -28,11 +38,13 @@ export class HomeLayoutController {
 
   @UseGuards(AdminGuard)
   @Get('/admin/home/preview')
-  async preview(@Query('layoutId') layoutId: string, @Query('locale') locale?: string) {
+  async preview(
+    @Query('layoutId') layoutId: string,
+    @Query('locale') locale?: string,
+  ) {
     const data = await this.service.resolveHome(locale, layoutId);
     return { success: true, data };
   }
-
 
   @UseGuards(AdminGuard)
   @Get('/admin/home/options')
@@ -41,7 +53,11 @@ export class HomeLayoutController {
     @Query('q') q?: string,
     @Query('limit') limit?: string,
   ) {
-    const data = await this.service.searchOptions(target, q, Number(limit || 12));
+    const data = await this.service.searchOptions(
+      target,
+      q,
+      Number(limit || 12),
+    );
     return { success: true, data };
   }
 
@@ -59,9 +75,7 @@ export class HomeLayoutController {
   async integratedSummary(@Query('limit') limit?: string) {
     return {
       success: true,
-      data: await this.service.getIntegratedModulesSummary(
-        Number(limit || 8),
-      ),
+      data: await this.service.getIntegratedModulesSummary(Number(limit || 8)),
     };
   }
 
@@ -109,8 +123,14 @@ export class HomeLayoutController {
 
   @UseGuards(AdminGuard)
   @Put('/admin/home/sections/:sectionId')
-  async updateSection(@Param('sectionId') sectionId: string, @Body() body: UpdateSectionDto) {
-    return { success: true, data: await this.service.updateSection(sectionId, body) };
+  async updateSection(
+    @Param('sectionId') sectionId: string,
+    @Body() body: UpdateSectionDto,
+  ) {
+    return {
+      success: true,
+      data: await this.service.updateSection(sectionId, body),
+    };
   }
 
   @UseGuards(AdminGuard)
@@ -121,8 +141,14 @@ export class HomeLayoutController {
 
   @UseGuards(AdminGuard)
   @Post('/admin/home/sections/:sectionId/move')
-  async moveSection(@Param('sectionId') sectionId: string, @Body() body: MoveSectionDto) {
-    return { success: true, data: await this.service.moveSection(sectionId, body) };
+  async moveSection(
+    @Param('sectionId') sectionId: string,
+    @Body() body: MoveSectionDto,
+  ) {
+    return {
+      success: true,
+      data: await this.service.moveSection(sectionId, body),
+    };
   }
 
   // Single canonical endpoint for section reorder (must not be duplicated).
@@ -140,13 +166,22 @@ export class HomeLayoutController {
 
   @UseGuards(AdminGuard)
   @Post('/admin/home/sections/:sectionId/items')
-  async createItem(@Param('sectionId') sectionId: string, @Body() body: CreateItemDto) {
-    return { success: true, data: await this.service.createItem(sectionId, body) };
+  async createItem(
+    @Param('sectionId') sectionId: string,
+    @Body() body: CreateItemDto,
+  ) {
+    return {
+      success: true,
+      data: await this.service.createItem(sectionId, body),
+    };
   }
 
   @UseGuards(AdminGuard)
   @Put('/admin/home/items/:itemId')
-  async updateItem(@Param('itemId') itemId: string, @Body() body: UpdateItemDto) {
+  async updateItem(
+    @Param('itemId') itemId: string,
+    @Body() body: UpdateItemDto,
+  ) {
     return { success: true, data: await this.service.updateItem(itemId, body) };
   }
 
@@ -165,6 +200,9 @@ export class HomeLayoutController {
   @UseGuards(AdminGuard)
   @Post('/admin/home/items/upload-image')
   async uploadItemImage(@Body() body: { dataUrl?: string }) {
-    return { success: true, data: await this.service.uploadItemImage(String(body?.dataUrl || '')) };
+    return {
+      success: true,
+      data: await this.service.uploadItemImage(String(body?.dataUrl || '')),
+    };
   }
 }

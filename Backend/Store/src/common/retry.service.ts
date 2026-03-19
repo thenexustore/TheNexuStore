@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class RetryService {
-  async execute<T>(operation: () => Promise<T>, retries = 3, baseDelayMs = 200): Promise<T> {
+  async execute<T>(
+    operation: () => Promise<T>,
+    retries = 3,
+    baseDelayMs = 200,
+  ): Promise<T> {
     let attempt = 0;
     let lastError: unknown;
 

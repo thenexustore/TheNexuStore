@@ -30,7 +30,9 @@ export function validateEnvironment(env = process.env) {
   if (env.REDIS_URL) {
     assertValidUrl('REDIS_URL', env.REDIS_URL);
   } else {
-    logger.warn('REDIS_URL is not configured. Redis-backed features are disabled.');
+    logger.warn(
+      'REDIS_URL is not configured. Redis-backed features are disabled.',
+    );
   }
 
   if (env.RABBITMQ_URL) {
@@ -86,7 +88,11 @@ export function validateEnvironment(env = process.env) {
     }
   }
 
-  if (!env.REDSYS_MERCHANT_CODE || !env.REDSYS_TERMINAL || !env.REDSYS_SECRET_KEY) {
+  if (
+    !env.REDSYS_MERCHANT_CODE ||
+    !env.REDSYS_TERMINAL ||
+    !env.REDSYS_SECRET_KEY
+  ) {
     logger.warn(
       'REDSYS merchant configuration is incomplete. Set REDSYS_MERCHANT_CODE, REDSYS_TERMINAL and REDSYS_SECRET_KEY.',
     );

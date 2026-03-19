@@ -59,7 +59,8 @@ export class InfortisaService implements OnModuleInit {
     });
     const fallbackToken = this.config.get<string>('INFORTISA_API_TOKEN') || '';
     const runtimeSettings = normalizeImportRuntimeSettings(
-      integration?.settings_json && typeof integration.settings_json === 'object'
+      integration?.settings_json &&
+        typeof integration.settings_json === 'object'
         ? (integration.settings_json as Record<string, unknown>)
         : undefined,
     );
@@ -474,6 +475,64 @@ export class InfortisaService implements OnModuleInit {
     };
   }
 
+  /**
+   * Probe remaining pages when the supplier API provides no pagination signals
+   * but a catalog_page_size override is configured. Fetches successive pages
+   * until an empty page or a partial page (fewer items than pageSize) is returned.
+   */
+  private async probeRemainingPages(
+    client: AxiosInstance,
+    firstPage: InfortisaCatalogFetchResult,
+    pageSize: number,
+    maxPages = 200,
+  ): Promise<InfortisaCatalogFetchResult> {
+    const pages: InfortisaCatalogFetchResult[] = [firstPage];
+    let currentPage = 2;
+
+    while (currentPage <= maxPages) {
+      const response = await client.get('/api/Product/Get', {
+        params: { page: currentPage, pageSize },
+      });
+      const nextPage = this.extractCatalogPage(response.data, currentPage);
+
+      if (nextPage.items.length === 0) {
+        break;
+      }
+
+      pages.push(nextPage);
+
+      if (nextPage.items.length < pageSize) {
+        break;
+      }
+
+      currentPage += 1;
+    }
+
+    const items = pages.flatMap((p) => p.items);
+
+    this.logger.log(
+      `Infortisa /api/Product/Get probe mode: pages=${pages.length} pageSize=${pageSize} received=${items.length}`,
+    );
+
+    return {
+      items,
+      meta: {
+        ...firstPage.meta,
+        page: 1,
+        pageSize,
+        totalReceived: items.length,
+        totalExpected: null,
+        totalPages: pages.length,
+        hasMore: false,
+        raw: {
+          ...firstPage.meta.raw,
+          resolvedPages: pages.length,
+          probeMode: true,
+        },
+      },
+    };
+  }
+
   async getAllProductsPaged(): Promise<InfortisaCatalogFetchResult> {
     try {
       const client = await this.getClient();
@@ -500,6 +559,24 @@ export class InfortisaService implements OnModuleInit {
         ) {
           throw new Error(
             `Infortisa product catalog count mismatch without pagination (received=${firstPage.meta.totalReceived}, total=${firstPage.meta.totalExpected})`,
+          );
+        }
+
+        // Probe mode: when catalog_page_size is configured and the first page
+        // is at capacity with no pagination signals, probe for additional pages.
+        if (
+          this.catalogPageSizeOverride !== null &&
+          firstPage.meta.totalExpected === null &&
+          firstPage.meta.totalReceived > 0 &&
+          firstPage.meta.totalReceived >= this.catalogPageSizeOverride
+        ) {
+          this.logger.log(
+            `Infortisa /api/Product/Get: first page at capacity (received=${firstPage.meta.totalReceived}, pageSize=${this.catalogPageSizeOverride}) with no pagination signals — activating probe mode`,
+          );
+          return await this.probeRemainingPages(
+            client,
+            firstPage,
+            this.catalogPageSizeOverride,
           );
         }
 
@@ -772,5 +849,82 @@ export class InfortisaService implements OnModuleInit {
       this.logger.error('Get invoices by date failed', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Lightweight catalog diagnostic: fetches the first page from the supplier API
+   * and compares it against the local database counts so administrators can detect
+   * whether the sync is missing products.
+   */
+  async catalogProbe(): Promise<{
+    api: {
+      firstPageReceived: number;
+      totalExpected: number | null;
+      totalPages: number | null;
+      pageSize: number;
+      hasMore: boolean | null;
+      configuredPageSize: number | null;
+    };
+    db: {
+      totalProducts: number;
+      activeProducts: number;
+    };
+    assessment: string;
+    probeModeAvailable: boolean;
+  }> {
+    const client = await this.getClient();
+
+    const firstResponse = this.catalogPageSizeOverride
+      ? await client.get('/api/Product/Get', {
+          params: { page: 1, pageSize: this.catalogPageSizeOverride },
+        })
+      : await client.get('/api/Product/Get');
+
+    const rawItems = this.getArrayPayload(firstResponse.data);
+    const items: any[] = rawItems ?? [];
+    const meta = this.buildCatalogMeta(firstResponse.data, items, 1);
+
+    const [totalProducts, activeProducts] = await Promise.all([
+      this.prisma.product.count(),
+      this.prisma.product.count({ where: { status: 'ACTIVE' } }),
+    ]);
+
+    const probeModeAvailable =
+      this.catalogPageSizeOverride !== null &&
+      meta.totalExpected === null &&
+      items.length > 0 &&
+      items.length >= this.catalogPageSizeOverride;
+
+    let assessment: string;
+    if (meta.totalExpected !== null) {
+      const gap = meta.totalExpected - activeProducts;
+      assessment =
+        gap > 0
+          ? `API reports ${meta.totalExpected} total products but the catalog only has ${activeProducts} active — ${gap} products may be missing. Run a full sync to reconcile.`
+          : `Catalog appears in sync: API total=${meta.totalExpected}, DB active=${activeProducts}.`;
+    } else if (probeModeAvailable) {
+      assessment = `API returned ${items.length} products and may have more (first page is full). Enable probe mode by configuring catalog_page_size and running a full sync.`;
+    } else if (this.catalogPageSizeOverride === null && items.length > 0) {
+      assessment = `API returned ${items.length} products without pagination metadata. To verify completeness, set catalog_page_size in import settings and run a full sync.`;
+    } else {
+      assessment = `API returned ${items.length} products. DB has ${activeProducts} active products. No truncation signals detected.`;
+    }
+
+    return {
+      api: {
+        firstPageReceived: items.length,
+        totalExpected: meta.totalExpected,
+        totalPages: meta.totalPages,
+        pageSize: meta.pageSize,
+        hasMore: meta.hasMore,
+        configuredPageSize: this.catalogPageSizeOverride,
+      },
+      db: {
+        totalProducts,
+        activeProducts,
+      },
+      assessment,
+      probeModeAvailable,
+    };
   }
 }

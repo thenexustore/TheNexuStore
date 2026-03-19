@@ -43,7 +43,12 @@ export class HomeLayoutService {
     return Math.max(1, Math.min(24, Math.floor(n)));
   }
 
-  private clampRange(value: unknown, min: number, max: number, fallback: number) {
+  private clampRange(
+    value: unknown,
+    min: number,
+    max: number,
+    fallback: number,
+  ) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return fallback;
     return Math.max(min, Math.min(max, Math.floor(numeric)));
@@ -60,7 +65,10 @@ export class HomeLayoutService {
     const text = `${name || ''} ${slug || ''}`.toLowerCase();
     const buckets: Array<{ terms: string[]; score: number }> = [
       { terms: ['portatil', 'portátil', 'laptop', 'notebook'], score: 70 },
-      { terms: ['impresora', 'printer', 'multifuncion', 'multifunción'], score: 55 },
+      {
+        terms: ['impresora', 'printer', 'multifuncion', 'multifunción'],
+        score: 55,
+      },
       { terms: ['monitor', 'pantalla'], score: 50 },
       { terms: ['tablet', 'ipad'], score: 45 },
       { terms: ['teclado', 'keyboard'], score: 35 },
@@ -100,7 +108,10 @@ export class HomeLayoutService {
   ) {
     if (!products.length) return null;
 
-    const categoryTokens = this.tokenizeCategoryText(category.name, category.slug);
+    const categoryTokens = this.tokenizeCategoryText(
+      category.name,
+      category.slug,
+    );
     const categoryTokenSet = new Set(categoryTokens);
 
     const ranked = products
@@ -108,7 +119,10 @@ export class HomeLayoutService {
         const firstMedia = product.media?.[0]?.url || null;
         if (!firstMedia) return null;
 
-        const productTokens = this.tokenizeCategoryText(product.title, product.slug);
+        const productTokens = this.tokenizeCategoryText(
+          product.title,
+          product.slug,
+        );
         const overlapCount = productTokens.reduce(
           (acc, token) => acc + (categoryTokenSet.has(token) ? 1 : 0),
           0,
@@ -119,7 +133,9 @@ export class HomeLayoutService {
           overlapCount,
         };
       })
-      .filter((entry): entry is { url: string; overlapCount: number } => Boolean(entry));
+      .filter((entry): entry is { url: string; overlapCount: number } =>
+        Boolean(entry),
+      );
 
     if (!ranked.length) return null;
 
@@ -143,7 +159,14 @@ export class HomeLayoutService {
     }
 
     if (type === HomeSectionType.PRODUCT_CAROUSEL) {
-      next.source = ['NEW_ARRIVALS', 'BEST_DEALS', 'FEATURED', 'CATEGORY', 'BRAND', 'BEST_SELLERS'].includes(String(next.source))
+      next.source = [
+        'NEW_ARRIVALS',
+        'BEST_DEALS',
+        'FEATURED',
+        'CATEGORY',
+        'BRAND',
+        'BEST_SELLERS',
+      ].includes(String(next.source))
         ? String(next.source)
         : 'NEW_ARRIVALS';
       next.limit = this.clampLimit(next.limit, 12);
@@ -151,17 +174,31 @@ export class HomeLayoutService {
       next.mode = next.mode || 'rule';
       next.discount_only = this.asBoolean(next.discount_only, false);
       next.featured_only = this.asBoolean(next.featured_only, false);
-      next.category_scope = ['parent_only', 'children_only', 'parent_and_descendants'].includes(String(next.category_scope))
+      next.category_scope = [
+        'parent_only',
+        'children_only',
+        'parent_and_descendants',
+      ].includes(String(next.category_scope))
         ? String(next.category_scope)
         : 'parent_and_descendants';
-      next.categoryId = String(next.categoryId || next.query?.categoryId || '').trim() || null;
+      next.categoryId =
+        String(next.categoryId || next.query?.categoryId || '').trim() || null;
       next.categoryIds = Array.isArray(next.categoryIds)
-        ? next.categoryIds.map((x: any) => String(x || '').trim()).filter(Boolean)
-        : String(next.categoryIds || '').split(',').map((x: string) => x.trim()).filter(Boolean);
-      next.brandId = String(next.brandId || next.query?.brandId || '').trim() || null;
+        ? next.categoryIds
+            .map((x: any) => String(x || '').trim())
+            .filter(Boolean)
+        : String(next.categoryIds || '')
+            .split(',')
+            .map((x: string) => x.trim())
+            .filter(Boolean);
+      next.brandId =
+        String(next.brandId || next.query?.brandId || '').trim() || null;
       next.brandIds = Array.isArray(next.brandIds)
         ? next.brandIds.map((x: any) => String(x || '').trim()).filter(Boolean)
-        : String(next.brandIds || '').split(',').map((x: string) => x.trim()).filter(Boolean);
+        : String(next.brandIds || '')
+            .split(',')
+            .map((x: string) => x.trim())
+            .filter(Boolean);
       next.sortBy = String(next.sortBy || next.query?.sortBy || 'newest');
       next.autoplay = this.asBoolean(next.autoplay, true);
       next.show_arrows = this.asBoolean(next.show_arrows, true);
@@ -182,7 +219,9 @@ export class HomeLayoutService {
       next.show_top_badges = this.asBoolean(next.show_top_badges, false);
       next.image_fit = next.image_fit === 'cover' ? 'cover' : 'contain';
       next.card_style = next.card_style === 'elevated' ? 'elevated' : 'minimal';
-      next.auto_strategy = ['demand', 'alphabetical', 'manual_sort'].includes(String(next.auto_strategy))
+      next.auto_strategy = ['demand', 'alphabetical', 'manual_sort'].includes(
+        String(next.auto_strategy),
+      )
         ? String(next.auto_strategy)
         : 'demand';
       next.cta_text = String(next.cta_text || 'Explorar').trim() || 'Explorar';
@@ -206,8 +245,6 @@ export class HomeLayoutService {
 
     return next;
   }
-
-
 
   private toProductCard(p: any) {
     const sku = p.skus?.[0];
@@ -361,7 +398,6 @@ export class HomeLayoutService {
     return { success: true };
   }
 
-
   private async reindexLayoutSections(layoutId: string) {
     const sections = await this.prisma.homePageSection.findMany({
       where: { layout_id: layoutId },
@@ -454,7 +490,9 @@ export class HomeLayoutService {
     return this.listSections(section.layout_id);
   }
 
-  async reorderSections(dto: { items: Array<{ id: string; position: number }> }) {
+  async reorderSections(dto: {
+    items: Array<{ id: string; position: number }>;
+  }) {
     const items = Array.isArray(dto?.items)
       ? dto.items.map((item) => ({
           id: String(item?.id || '').trim(),
@@ -471,12 +509,16 @@ export class HomeLayoutService {
       throw new BadRequestException('positions must be positive integers');
     }
 
-    const uniqueIds = Array.from(new Set(items.map((item) => item.id).filter(Boolean)));
+    const uniqueIds = Array.from(
+      new Set(items.map((item) => item.id).filter(Boolean)),
+    );
     if (uniqueIds.length !== items.length) {
       throw new BadRequestException('Section ids must be unique');
     }
 
-    const uniquePositions = new Set(items.map((item) => Math.floor(item.position)));
+    const uniquePositions = new Set(
+      items.map((item) => Math.floor(item.position)),
+    );
     if (uniquePositions.size !== items.length) {
       throw new BadRequestException('Section positions must be unique');
     }
@@ -492,7 +534,9 @@ export class HomeLayoutService {
 
     const layoutIds = new Set(sections.map((section) => section.layout_id));
     if (layoutIds.size !== 1) {
-      throw new BadRequestException('All sections must belong to the same layout');
+      throw new BadRequestException(
+        'All sections must belong to the same layout',
+      );
     }
 
     const normalizedItems = [...items]
@@ -515,7 +559,9 @@ export class HomeLayoutService {
   }
 
   async removeSection(id: string) {
-    const section = await this.prisma.homePageSection.findUnique({ where: { id } });
+    const section = await this.prisma.homePageSection.findUnique({
+      where: { id },
+    });
     if (!section) throw new NotFoundException('Section not found');
 
     await this.prisma.homePageSection.delete({ where: { id } });
@@ -566,7 +612,6 @@ export class HomeLayoutService {
     this.invalidateCache();
     return { success: true };
   }
-
 
   async uploadItemImage(dataUrl: string) {
     if (!dataUrl?.startsWith('data:image/')) {
@@ -648,19 +693,26 @@ export class HomeLayoutService {
     const source = config.source || 'NEW_ARRIVALS';
     const limit = this.clampLimit(config.limit, 12);
     const inStockOnly = config.inStockOnly ?? true;
-    const sortBy = (config.sortBy || config.query?.sortBy || 'newest') as any;
+    const sortBy = config.sortBy || config.query?.sortBy || 'newest';
     const featuredOnly = Boolean(config.featured_only);
     const discountOnly = Boolean(config.discount_only);
 
-    const singleCategoryId = String(config.categoryId || config.query?.categoryId || '').trim();
-    const singleBrandId = String(config.brandId || config.query?.brandId || '').trim();
+    const singleCategoryId = String(
+      config.categoryId || config.query?.categoryId || '',
+    ).trim();
+    const singleBrandId = String(
+      config.brandId || config.query?.brandId || '',
+    ).trim();
     const categoryIds = [
       ...new Set(
         [
           singleCategoryId,
-          ...((Array.isArray(config.categoryIds) ? config.categoryIds : String(config.categoryIds || '').split(','))
+          ...(Array.isArray(config.categoryIds)
+            ? config.categoryIds
+            : String(config.categoryIds || '').split(',')
+          )
             .map((x: any) => String(x || '').trim())
-            .filter(Boolean)),
+            .filter(Boolean),
         ].filter(Boolean),
       ),
     ];
@@ -668,9 +720,12 @@ export class HomeLayoutService {
       ...new Set(
         [
           singleBrandId,
-          ...((Array.isArray(config.brandIds) ? config.brandIds : String(config.brandIds || '').split(','))
+          ...(Array.isArray(config.brandIds)
+            ? config.brandIds
+            : String(config.brandIds || '').split(',')
+          )
             .map((x: any) => String(x || '').trim())
-            .filter(Boolean)),
+            .filter(Boolean),
         ].filter(Boolean),
       ),
     ];
@@ -678,11 +733,17 @@ export class HomeLayoutService {
     const applyPostFilters = (products: any[]) => {
       const filtered = products
         .filter((p) => p?.status === 'ACTIVE')
-        .filter((p) => (inStockOnly ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0 : true))
+        .filter((p) =>
+          inStockOnly
+            ? (p.skus?.[0]?.inventory?.[0]?.qty_on_hand || 0) > 0
+            : true,
+        )
         .map((product) => this.toProductCard(product));
 
       return filtered
-        .filter((card) => (discountOnly ? Number(card.discount_percentage || 0) > 0 : true))
+        .filter((card) =>
+          discountOnly ? Number(card.discount_percentage || 0) > 0 : true,
+        )
         .slice(0, limit);
     };
 
@@ -730,7 +791,9 @@ export class HomeLayoutService {
       });
       const order = new Map(ids.map((id, idx) => [id, idx]));
       return applyPostFilters(
-        products.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)),
+        products.sort(
+          (a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999),
+        ),
       );
     }
 
@@ -754,18 +817,24 @@ export class HomeLayoutService {
         take: Math.max(limit * 2, 24),
       });
 
-      const featuredCards = applyPostFilters(featured.map((entry) => entry.product));
+      const featuredCards = applyPostFilters(
+        featured.map((entry) => entry.product),
+      );
       if (featuredCards.length && source === 'FEATURED') return featuredCards;
       if (featuredOnly) return featuredCards;
     }
 
     if (source === 'CATEGORY' && categoryIds.length) {
-      const categoryScope = String(config.category_scope || 'parent_and_descendants');
+      const categoryScope = String(
+        config.category_scope || 'parent_and_descendants',
+      );
 
       if (
         categoryIds.length === 1 &&
         categoryScope === 'parent_and_descendants' &&
-        (!config.categoryIds || (Array.isArray(config.categoryIds) && config.categoryIds.length === 0))
+        (!config.categoryIds ||
+          (Array.isArray(config.categoryIds) &&
+            config.categoryIds.length === 0))
       ) {
         const result = await this.productsService.getProducts({
           page: 1,
@@ -775,7 +844,9 @@ export class HomeLayoutService {
           sort_by: sortBy,
         });
         const cards = (result.products || []).filter((p: any) =>
-          discountOnly ? Number(p.discount_percentage || p.discount_pct || 0) > 0 : true,
+          discountOnly
+            ? Number(p.discount_percentage || p.discount_pct || 0) > 0
+            : true,
         );
         if (cards.length) return cards.slice(0, limit);
       }
@@ -825,8 +896,15 @@ export class HomeLayoutService {
     }
 
     if (source === 'BEST_DEALS') {
-      const deals = await this.productsService.getDealsProducts(limit, inStockOnly);
-      const dealCards = deals.filter((p: any) => (discountOnly ? Number(p.discount_percentage || p.discount_pct || 0) > 0 : true));
+      const deals = await this.productsService.getDealsProducts(
+        limit,
+        inStockOnly,
+      );
+      const dealCards = deals.filter((p: any) =>
+        discountOnly
+          ? Number(p.discount_percentage || p.discount_pct || 0) > 0
+          : true,
+      );
       if (dealCards.length) return dealCards;
 
       const featured = await this.prisma.featuredProduct.findMany({
@@ -847,7 +925,9 @@ export class HomeLayoutService {
         orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
         take: Math.max(limit * 2, 24),
       });
-      const featuredCards = applyPostFilters(featured.map((entry) => entry.product));
+      const featuredCards = applyPostFilters(
+        featured.map((entry) => entry.product),
+      );
       if (featuredCards.length) return featuredCards;
     }
 
@@ -866,7 +946,11 @@ export class HomeLayoutService {
     });
 
     return (result.products || [])
-      .filter((p: any) => (discountOnly ? Number(p.discount_percentage || p.discount_pct || 0) > 0 : true))
+      .filter((p: any) =>
+        discountOnly
+          ? Number(p.discount_percentage || p.discount_pct || 0) > 0
+          : true,
+      )
       .slice(0, limit);
   }
 
@@ -890,7 +974,9 @@ export class HomeLayoutService {
         return [];
       }
 
-      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const activeBannerById = new Map(
+        activeBanners.map((banner) => [banner.id, banner]),
+      );
       const seen = new Set<string>();
       const curatedOrderedBanners = items
         .map((item) => {
@@ -927,7 +1013,6 @@ export class HomeLayoutService {
         }));
     }
 
-
     if (section.type === HomeSectionType.CATEGORY_STRIP) {
       if (config.mode === 'curated') {
         const items = await this.prisma.homePageSectionItem.findMany({
@@ -940,7 +1025,10 @@ export class HomeLayoutService {
             if (!x.category) return null;
             return {
               ...x.category,
-              image_url: x.image_url || (x.category as any).image_url || (x.category as any).image,
+              image_url:
+                x.image_url ||
+                (x.category as any).image_url ||
+                (x.category as any).image,
               href: x.href || null,
               item_label: x.label || null,
             };
@@ -981,7 +1069,8 @@ export class HomeLayoutService {
           return {
             category,
             score:
-              this.categoryDemandKeywordScore(category.name, category.slug) * 5 +
+              this.categoryDemandKeywordScore(category.name, category.slug) *
+                5 +
               activeProducts * 4 -
               category.sort_order,
           };
@@ -992,7 +1081,9 @@ export class HomeLayoutService {
       const ranked = [...scoredCategories];
 
       if (autoStrategy === 'alphabetical') {
-        ranked.sort((a, b) => a.category.name.localeCompare(b.category.name, 'es'));
+        ranked.sort((a, b) =>
+          a.category.name.localeCompare(b.category.name, 'es'),
+        );
       } else if (autoStrategy === 'manual_sort') {
         ranked.sort((a, b) => a.category.sort_order - b.category.sort_order);
       } else {
@@ -1005,8 +1096,9 @@ export class HomeLayoutService {
 
       if (categories.length < requestedLimit) {
         const existingSemanticKeys = new Set(
-          categories.map((category) =>
-            `${String(category.slug || '').toLowerCase()}|${String(category.name || '').toLowerCase()}`,
+          categories.map(
+            (category) =>
+              `${String(category.slug || '').toLowerCase()}|${String(category.name || '').toLowerCase()}`,
           ),
         );
         const existingIds = new Set(categories.map((category) => category.id));
@@ -1036,7 +1128,7 @@ export class HomeLayoutService {
 
       const parentIds = categories.map((category) => category.id);
       const childRows = parentIds.length
-        ? ((await this.prisma.category.findMany({
+        ? (await this.prisma.category.findMany({
             where: {
               is_active: true,
               parent_id: { in: parentIds },
@@ -1045,7 +1137,7 @@ export class HomeLayoutService {
               id: true,
               parent_id: true,
             },
-          })) || [])
+          })) || []
         : [];
 
       const childIdsByParent = new Map<string, string[]>();
@@ -1074,7 +1166,11 @@ export class HomeLayoutService {
               status: 'ACTIVE',
               OR: [
                 { main_category_id: { in: relatedCategoryIds } },
-                { categories: { some: { category_id: { in: relatedCategoryIds } } } },
+                {
+                  categories: {
+                    some: { category_id: { in: relatedCategoryIds } },
+                  },
+                },
               ],
               media: { some: {} },
             },
@@ -1092,7 +1188,10 @@ export class HomeLayoutService {
             take: 12,
           });
 
-          const derivedImage = this.pickBestCategoryMedia(category, candidateProducts);
+          const derivedImage = this.pickBestCategoryMedia(
+            category,
+            candidateProducts,
+          );
           if (!derivedImage) {
             this.logger.warn(
               `CATEGORY_STRIP category ${category.id} (${category.slug}) has no image_url and no product media fallback.`,
@@ -1121,7 +1220,10 @@ export class HomeLayoutService {
             if (!x.brand) return null;
             return {
               ...x.brand,
-              image_url: x.image_url || (x.brand as any).logo_url || (x.brand as any).image,
+              image_url:
+                x.image_url ||
+                (x.brand as any).logo_url ||
+                (x.brand as any).image,
               href: x.href || null,
               item_label: x.label || null,
             };
@@ -1261,8 +1363,8 @@ export class HomeLayoutService {
             String(normalizedConfig.categoryId || '').trim(),
             ...(Array.isArray(normalizedConfig.categoryIds)
               ? normalizedConfig.categoryIds
-              : String(normalizedConfig.categoryIds || '')
-                  .split(','))
+              : String(normalizedConfig.categoryIds || '').split(',')
+            )
               .map((x: any) => String(x || '').trim())
               .filter(Boolean),
           ].filter(Boolean);
@@ -1271,8 +1373,8 @@ export class HomeLayoutService {
             String(normalizedConfig.brandId || '').trim(),
             ...(Array.isArray(normalizedConfig.brandIds)
               ? normalizedConfig.brandIds
-              : String(normalizedConfig.brandIds || '')
-                  .split(','))
+              : String(normalizedConfig.brandIds || '').split(',')
+            )
               .map((x: any) => String(x || '').trim())
               .filter(Boolean),
           ].filter(Boolean);

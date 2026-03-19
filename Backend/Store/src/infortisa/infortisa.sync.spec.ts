@@ -6,9 +6,13 @@ describe('InfortisaSyncService', () => {
   let prisma: any;
   let infortisa: any;
   let products: any;
+  let schedulerRegistry: any;
 
   beforeEach(() => {
     prisma = {
+      supplierIntegration: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       product: {
         updateMany: jest.fn().mockResolvedValue(undefined),
         findMany: jest.fn(),
@@ -18,6 +22,57 @@ describe('InfortisaSyncService', () => {
       inventoryLevel: { upsert: jest.fn() },
       productMedia: { create: jest.fn() },
       syncLog: { findUnique: jest.fn(), upsert: jest.fn() },
+      importRun: {
+        create: jest.fn().mockImplementation(async ({ data }) => ({
+          id: 'run-1',
+          provider: data.provider,
+          mode: data.mode,
+          started_at: data.started_at,
+          finished_at: null,
+          status: 'RUNNING',
+          source_items_received: 0,
+          processed_count: 0,
+          persisted_count: 0,
+          validation_skipped_count: 0,
+          created_count: 0,
+          updated_count: 0,
+          skipped_count: 0,
+          error_count: 0,
+          archived_count: 0,
+          request_meta_json: data.request_meta_json ?? null,
+          result_meta_json: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })),
+        update: jest.fn().mockResolvedValue(undefined),
+        findUniqueOrThrow: jest.fn().mockImplementation(async ({ where }) => ({
+          id: where.id,
+          provider: 'infortisa',
+          mode: 'full',
+          started_at: new Date(),
+          finished_at: new Date(),
+          status: 'SUCCESS',
+          source_items_received: 3,
+          processed_count: 3,
+          persisted_count: 3,
+          validation_skipped_count: 0,
+          created_count: 3,
+          updated_count: 0,
+          skipped_count: 0,
+          error_count: 0,
+          archived_count: 0,
+          request_meta_json: null,
+          result_meta_json: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })),
+      },
+      importRunError: {
+        create: jest.fn().mockResolvedValue(undefined),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $transaction: jest.fn().mockImplementation(async (callback) => callback(prisma)),
     };
     infortisa = {
       getAllProductsPaged: jest.fn(),
@@ -28,8 +83,13 @@ describe('InfortisaSyncService', () => {
     products = {
       upsertFromInfortisa: jest.fn().mockResolvedValue('created'),
     };
+    schedulerRegistry = {
+      getCronJob: jest.fn(() => { throw new Error('missing'); }),
+      addCronJob: jest.fn(),
+      deleteCronJob: jest.fn(),
+    };
 
-    service = new InfortisaSyncService(prisma, infortisa, products);
+    service = new InfortisaSyncService(prisma, infortisa, products, schedulerRegistry);
     jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
   });
 
@@ -83,5 +143,53 @@ describe('InfortisaSyncService', () => {
 
     await expect(service.syncFullCatalog()).rejects.toThrow(/truncation/i);
     expect(products.upsertFromInfortisa).not.toHaveBeenCalled();
+  });
+
+  it('reloads runtime settings including images cron and per-job toggles', async () => {
+    prisma.supplierIntegration.findUnique.mockResolvedValue({
+      is_active: true,
+      settings_json: {
+        stock_sync_enabled: true,
+        incremental_sync_enabled: false,
+        full_sync_enabled: true,
+        images_sync_enabled: true,
+        images_sync_cron: '15 * * * *',
+        full_sync_batch_delay_ms: 250,
+        image_sync_take: 25,
+      },
+    });
+
+    await service.reloadRuntimeSettings();
+
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(3);
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-stock-sync',
+      expect.anything(),
+    );
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-full-sync',
+      expect.anything(),
+    );
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-images-sync',
+      expect.anything(),
+    );
+  });
+
+  it('uses runtime image take limit when syncing images', async () => {
+    prisma.product.findMany.mockResolvedValue([]);
+    prisma.supplierIntegration.findUnique.mockResolvedValue({
+      is_active: true,
+      settings_json: {
+        image_sync_take: 12,
+      },
+    });
+
+    await service.reloadRuntimeSettings();
+    await service.syncImages();
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 12 }),
+    );
   });
 });

@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
-import { InfortisaService } from './infortisa.service';
+import {
+  InfortisaCatalogFetchResult,
+  InfortisaService,
+} from './infortisa.service';
 import { ProductsService } from '../user/products/products.service';
 import {
   extractInfortisaStock,
@@ -70,7 +73,7 @@ export class InfortisaSyncService {
       this.logger.log('Starting full synchronization');
       const summary = await this.syncFullCatalog();
       this.logger.log(
-        `Full synchronization completed successfully (run=${summary.id})`,
+        `Full synchronization completed successfully: received=${summary.sourceItemsReceived}, total=${summary.sourceTotalExpected ?? 'unknown'}, pages=${summary.sourcePages}`,
       );
       return summary;
     } catch (error: any) {
@@ -252,15 +255,12 @@ export class InfortisaSyncService {
     });
 
     try {
-      const allProducts = await this.infortisa.getAllProducts();
-      const totals = this.emptyProductBatchStats();
+      const catalog = await this.infortisa.getAllProductsPaged();
+      this.assertCatalogNotProbablyTruncated(catalog);
 
-      await this.updateImportRunProgress(run.id, {
-        source_items_received: allProducts.length,
-        result_meta_json: {
-          batch_size: this.FULL_SYNC_BATCH_SIZE,
-        },
-      });
+      const allProducts = catalog.items;
+      const batchSize = 500;
+      const totals = { ...this.emptyBatchStats };
 
       for (let i = 0; i < allProducts.length; i += this.FULL_SYNC_BATCH_SIZE) {
         const batch = allProducts.slice(i, i + this.FULL_SYNC_BATCH_SIZE);
@@ -301,11 +301,21 @@ export class InfortisaSyncService {
         incidents: totals.incidents,
       });
 
+      const summary = {
+        created: totals.created,
+        updated: totals.updated,
+        skipped: totals.skipped,
+        sourceItemsReceived: catalog.meta.totalReceived,
+        sourceTotalExpected: catalog.meta.totalExpected,
+        sourcePageSize: catalog.meta.pageSize,
+        sourcePages: catalog.meta.totalPages ?? 1,
+      };
+
       this.logger.log(
-        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped}, validationSkipped=${totals.validationSkipped}, errors=${totals.errors}, archived=${archivedCount})`,
+        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped}, source_pages=${summary.sourcePages}, source_page_size=${summary.sourcePageSize}, source_total=${summary.sourceTotalExpected ?? 'unknown'})`,
       );
 
-      return this.getImportRunSummary(run.id);
+      return summary;
     } catch (error: any) {
       await this.failImportRun(run.id, error, { job: 'full_catalog' });
       this.logger.error('Full catalog sync failed', error.stack);
@@ -359,120 +369,29 @@ export class InfortisaSyncService {
     }
   }
 
-  async listImportRuns(limit = 30) {
-    return (this.prisma as any).importRun.findMany({
-      orderBy: { started_at: 'desc' },
-      take: limit,
-      include: {
-        errors: {
-          orderBy: { created_at: 'desc' },
-          take: 5,
-        },
-      },
-    });
-  }
+  private assertCatalogNotProbablyTruncated(
+    catalog: InfortisaCatalogFetchResult,
+  ) {
+    const technicalLimits = new Set([100, 250, 500, 1000, 2000, 5000, 10000]);
+    const { totalReceived, totalExpected, totalPages, pageSize, limit } =
+      catalog.meta;
 
-  async getImportRunById(id: string) {
-    return (this.prisma as any).importRun.findUnique({
-      where: { id },
-      include: {
-        errors: {
-          orderBy: { created_at: 'desc' },
-          take: 20,
-        },
-      },
-    });
-  }
-
-  async getImportRunErrors(id: string, limit = 50) {
-    return (this.prisma as any).importRunError.findMany({
-      where: { import_run_id: id },
-      orderBy: { created_at: 'desc' },
-      take: limit,
-    });
-  }
-
-  async getProviderStats(provider = this.PROVIDER) {
-    const [latestRun, countsByStatus, lastRuns] = await Promise.all([
-      (this.prisma as any).importRun.findFirst({
-        where: { provider },
-        orderBy: { started_at: 'desc' },
-        include: {
-          errors: {
-            orderBy: { created_at: 'desc' },
-            take: 5,
-          },
-        },
-      }),
-      (this.prisma as any).importRun.groupBy({
-        by: ['status'],
-        where: { provider },
-        _count: { _all: true },
-      }),
-      (this.prisma as any).importRun.findMany({
-        where: { provider },
-        orderBy: { started_at: 'desc' },
-        take: 10,
-        select: {
-          id: true,
-          mode: true,
-          status: true,
-          source_items_received: true,
-          processed_count: true,
-          persisted_count: true,
-          validation_skipped_count: true,
-          created_count: true,
-          updated_count: true,
-          skipped_count: true,
-          error_count: true,
-          archived_count: true,
-          started_at: true,
-          finished_at: true,
-        },
-      }),
-    ]);
-
-    const totals = lastRuns.reduce(
-      (acc, run) => {
-        acc.source_items_received += run.source_items_received;
-        acc.processed_count += run.processed_count;
-        acc.persisted_count += run.persisted_count;
-        acc.validation_skipped_count += run.validation_skipped_count;
-        acc.created_count += run.created_count;
-        acc.updated_count += run.updated_count;
-        acc.skipped_count += run.skipped_count;
-        acc.error_count += run.error_count;
-        acc.archived_count += run.archived_count;
-        return acc;
-      },
-      {
-        source_items_received: 0,
-        processed_count: 0,
-        persisted_count: 0,
-        validation_skipped_count: 0,
-        created_count: 0,
-        updated_count: 0,
-        skipped_count: 0,
-        error_count: 0,
-        archived_count: 0,
-      },
+    const probableLimit = [pageSize, limit].find(
+      (value): value is number =>
+        typeof value === 'number' && technicalLimits.has(value),
     );
 
-    return {
-      provider,
-      latestRun,
-      statusCounts: (countsByStatus as Array<{ status: string; _count: { _all: number } }>).reduce((acc, item) => {
-        acc[item.status] = item._count._all;
-        return acc;
-      }, {} as Record<string, number>),
-      aggregates: totals,
-      difference_received_vs_persisted:
-        totals.source_items_received - totals.persisted_count,
-      note:
-        totals.source_items_received === totals.persisted_count
-          ? `La API devolvió ${totals.source_items_received} y se guardaron ${totals.persisted_count}`
-          : `La API devolvió más elementos que los persistidos: ${totals.source_items_received} recibidos frente a ${totals.persisted_count} guardados`,
-    };
+    const probablyTruncated =
+      (totalExpected !== null && totalExpected > totalReceived) ||
+      ((totalPages === null || totalPages === 1) &&
+        probableLimit !== undefined &&
+        totalReceived === probableLimit);
+
+    if (probablyTruncated) {
+      throw new Error(
+        `Probable Infortisa catalog truncation detected (received=${totalReceived}, total=${totalExpected ?? 'unknown'}, pages=${totalPages ?? 1}, pageSize=${pageSize})`,
+      );
+    }
   }
 
   private async processStockUpdate(product: any) {

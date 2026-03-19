@@ -19,30 +19,60 @@ import {
   Database,
   Box,
   Image as ImageIcon,
-  ChevronDown,
-  ChevronUp,
   AlertTriangle,
 } from "lucide-react";
 
-const statusStyles: Record<string, string> = {
-  SUCCESS: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  PARTIAL_SUCCESS: "bg-amber-50 text-amber-700 border-amber-200",
-  FAILED: "bg-rose-50 text-rose-700 border-rose-200",
-  RUNNING: "bg-sky-50 text-sky-700 border-sky-200",
-};
+const KNOWN_TECHNICAL_LIMITS = [100, 250, 500, 1000, 2000, 5000, 10000];
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleString() : "—";
+function parseDetails(details?: string | null) {
+  if (!details) return {} as Record<string, string>;
 
-const formatDelta = (received: number, persisted: number) => {
-  if (received === persisted) {
-    return `La API devolvió ${received} y se guardaron ${persisted}`;
+  return details.split(";").reduce<Record<string, string>>((acc, chunk) => {
+    const [rawKey, ...rest] = chunk.split("=");
+    const key = rawKey?.trim();
+    if (!key || rest.length === 0) return acc;
+    acc[key] = rest.join("=").trim();
+    return acc;
+  }, {});
+}
+
+function getSuspiciousImportAlert(items: ImportHistoryItem[]) {
+  for (const item of items) {
+    const parsed = parseDetails(item.details);
+    const received = Number(parsed.source_items_received ?? "");
+    const pageSize = Number(parsed.source_page_size ?? "");
+    const total = Number(parsed.source_total_expected ?? "");
+
+    if (!Number.isFinite(received) || received <= 0) continue;
+
+    const receivedIsRound = received % 100 === 0;
+    const matchesTechnicalLimit = KNOWN_TECHNICAL_LIMITS.includes(received);
+    const pageSizeLimitReached =
+      Number.isFinite(pageSize) && KNOWN_TECHNICAL_LIMITS.includes(pageSize) && received === pageSize;
+    const totalMismatch = Number.isFinite(total) && total > received;
+
+    if (
+      receivedIsRound ||
+      matchesTechnicalLimit ||
+      pageSizeLimitReached ||
+      totalMismatch
+    ) {
+      return {
+        item,
+        received,
+        pageSize: Number.isFinite(pageSize) ? pageSize : null,
+        total: Number.isFinite(total) ? total : null,
+        reason: totalMismatch
+          ? "Supplier metadata indicates more catalog items than were received."
+          : matchesTechnicalLimit || pageSizeLimitReached
+            ? "The supplier response matched a known technical limit exactly."
+            : "The supplier returned an unusually round item count.",
+      };
+    }
   }
-  if (received > persisted) {
-    return `La API devolvió ${received} pero solo se guardaron ${persisted}`;
-  }
-  return `Se guardaron ${persisted} aunque el feed marcó ${received} recibidos`;
-};
+
+  return null;
+}
 
 function MetricCard({ label, value, tone = "slate" }: { label: string; value: string | number; tone?: "slate" | "blue" | "amber" | "emerald" | "rose" }) {
   const tones = {
@@ -118,31 +148,7 @@ export default function ImportsPage() {
     loadDashboard();
   }, []);
 
-  const ensureRunExpanded = async (id: string) => {
-    if (expandedRunId === id) {
-      setExpandedRunId(null);
-      return;
-    }
-
-    setExpandedRunId(id);
-    if (runDetails[id] && runErrors[id]) {
-      return;
-    }
-
-    setDetailLoadingId(id);
-    try {
-      const [detail, errors] = await Promise.all([
-        fetchImportRun(id),
-        fetchImportRunErrors(id),
-      ]);
-      setRunDetails((prev) => ({ ...prev, [id]: detail }));
-      setRunErrors((prev) => ({ ...prev, [id]: errors }));
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load import run detail");
-    } finally {
-      setDetailLoadingId(null);
-    }
-  };
+  const suspiciousAlert = useMemo(() => getSuspiciousImportAlert(items), [items]);
 
   const runImport = async (mode: "full" | "stock" | "images") => {
     setRunning(mode);
@@ -191,11 +197,37 @@ export default function ImportsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <button onClick={() => runImport("full")} disabled={running !== null} className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60">
-          <Database className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run full catalog import</p>
-          <p className="mt-1 text-sm text-slate-500">Sync complete catalog, stock and product changes.</p>
+      {suspiciousAlert && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Potential supplier truncation detected</p>
+              <p className="mt-1 text-sm">
+                {suspiciousAlert.reason} Latest run: <strong>{suspiciousAlert.item.type}</strong>
+                {" · "}
+                received={suspiciousAlert.received}
+                {suspiciousAlert.pageSize ? ` · pageSize=${suspiciousAlert.pageSize}` : ""}
+                {suspiciousAlert.total ? ` · total=${suspiciousAlert.total}` : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button
+          onClick={() => runImport("full")}
+          disabled={running !== null}
+          className="bg-white border border-slate-200 rounded-2xl p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <Database className="w-5 h-5 text-slate-700 mb-3" />
+          <p className="font-semibold text-slate-900">
+            Run full catalog import
+          </p>
+          <p className="text-sm text-slate-500 mt-1">
+            Sync complete catalog, stock and product changes.
+          </p>
         </button>
 
         <button onClick={() => runRetry("full")} disabled={running !== null} className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60">

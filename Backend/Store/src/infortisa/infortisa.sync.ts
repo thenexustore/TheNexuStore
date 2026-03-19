@@ -259,8 +259,7 @@ export class InfortisaSyncService {
       this.assertCatalogNotProbablyTruncated(catalog);
 
       const allProducts = catalog.items;
-      const batchSize = 500;
-      const totals = { ...this.emptyBatchStats };
+      const totals = this.emptyProductBatchStats();
 
       for (let i = 0; i < allProducts.length; i += this.FULL_SYNC_BATCH_SIZE) {
         const batch = allProducts.slice(i, i + this.FULL_SYNC_BATCH_SIZE);
@@ -635,6 +634,52 @@ export class InfortisaSyncService {
 
   private async getImportRunSummary(id: string): Promise<ImportRunSummary> {
     return (this.prisma as any).importRun.findUniqueOrThrow({ where: { id } });
+  }
+
+  async listImportRuns(limit = 20) {
+    return (this.prisma as any).importRun.findMany({
+      orderBy: { started_at: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getImportRunById(id: string) {
+    return (this.prisma as any).importRun.findUnique({
+      where: { id },
+    });
+  }
+
+  async getImportRunErrors(id: string, limit = 100) {
+    return (this.prisma as any).importRunError.findMany({
+      where: { import_run_id: id },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getProviderStats() {
+    const [latestRun, totalRuns, failedRuns] = await Promise.all([
+      (this.prisma as any).importRun.findFirst({
+        where: { provider: this.PROVIDER.toLowerCase() },
+        orderBy: { started_at: 'desc' },
+      }),
+      (this.prisma as any).importRun.count({
+        where: { provider: this.PROVIDER.toLowerCase() },
+      }),
+      (this.prisma as any).importRun.count({
+        where: {
+          provider: this.PROVIDER.toLowerCase(),
+          status: 'FAILED',
+        },
+      }),
+    ]);
+
+    return {
+      provider: this.PROVIDER.toLowerCase(),
+      total_runs: totalRuns,
+      failed_runs: failedRuns,
+      latest_run: latestRun,
+    };
   }
 
   private resolveRunStatus(errors: number, validationSkipped: number) {

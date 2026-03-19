@@ -7,8 +7,15 @@ import {
 import { PrismaService } from '../../common/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { CouponService } from '../coupon/coupon.service';
-import { BillingAddressDto, CreateOrderDto, ShippingAddressDto } from './dto/checkout.dto';
-import { OrderResponseDto, PaymentIntentDto } from './dto/checkout-response.dto';
+import {
+  BillingAddressDto,
+  CreateOrderDto,
+  ShippingAddressDto,
+} from './dto/checkout.dto';
+import {
+  OrderResponseDto,
+  PaymentIntentDto,
+} from './dto/checkout-response.dto';
 import { PaymentProvider, Prisma } from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { MailService } from '../../auth/mail/mail.service';
@@ -44,7 +51,10 @@ export class CheckoutService {
     return `ORD-${timestamp}-${random.toString().padStart(3, '0')}`;
   }
 
-  private async validateCartStock(cartItems: any[], tx: Prisma.TransactionClient = this.prisma): Promise<boolean> {
+  private async validateCartStock(
+    cartItems: any[],
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<boolean> {
     for (const item of cartItems) {
       const inventory = await tx.inventoryLevel.aggregate({
         where: { sku_id: item.sku_id },
@@ -66,7 +76,11 @@ export class CheckoutService {
     return true;
   }
 
-  private async reserveStock(orderId: string, cartItems: any[], tx: Prisma.TransactionClient = this.prisma) {
+  private async reserveStock(
+    orderId: string,
+    cartItems: any[],
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
     for (const item of cartItems) {
       const warehouses = await tx.inventoryLevel.findMany({
         where: { sku_id: item.sku_id, qty_on_hand: { gt: 0 } },
@@ -141,7 +155,9 @@ export class CheckoutService {
     const total = totals.total;
 
     const billingAddressJson = JSON.parse(JSON.stringify(dto.billing_address));
-    const shippingAddressJson = JSON.parse(JSON.stringify(dto.shipping_address));
+    const shippingAddressJson = JSON.parse(
+      JSON.stringify(dto.shipping_address),
+    );
     const paymentMethod = dto.payment_method || 'REDSYS';
     const trackingToken = await this.generateTrackingToken();
 
@@ -172,7 +188,9 @@ export class CheckoutService {
       });
 
       if (cart.applied_coupon && discountAmount > 0) {
-        const coupon = await this.couponService.getCouponByCode(cart.applied_coupon.code);
+        const coupon = await this.couponService.getCouponByCode(
+          cart.applied_coupon.code,
+        );
         if (coupon) {
           await tx.orderDiscount.create({
             data: {
@@ -195,8 +213,10 @@ export class CheckoutService {
             unit_price: Number(price.sale_price),
             qty: cartItem.qty,
             line_subtotal: Number(price.sale_price) * cartItem.qty,
-            tax_amount: Number(price.sale_price) * cartItem.qty * totals.tax_rate,
-            line_total: Number(price.sale_price) * cartItem.qty * (1 + totals.tax_rate),
+            tax_amount:
+              Number(price.sale_price) * cartItem.qty * totals.tax_rate,
+            line_total:
+              Number(price.sale_price) * cartItem.qty * (1 + totals.tax_rate),
             fulfillment_type: 'INTERNAL',
           },
         });
@@ -238,11 +258,15 @@ export class CheckoutService {
         trackingUrl,
       );
     } catch (error) {
-      this.logger.warn('Failed to send order confirmation email', 'CheckoutService', {
-        orderId: result.order.id,
-        email: dto.email,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.logger.warn(
+        'Failed to send order confirmation email',
+        'CheckoutService',
+        {
+          orderId: result.order.id,
+          email: dto.email,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
 
     this.logger.log('Checkout transaction completed', 'CheckoutService', {
@@ -318,7 +342,10 @@ export class CheckoutService {
 
       if (order && order.discounts.length > 0) {
         for (const discount of order.discounts) {
-          await tx.coupon.update({ where: { id: discount.coupon_id }, data: { usage_count: { increment: 1 } } });
+          await tx.coupon.update({
+            where: { id: discount.coupon_id },
+            data: { usage_count: { increment: 1 } },
+          });
         }
       }
 
@@ -403,7 +430,11 @@ export class CheckoutService {
     return `trk_${randomBytes(12).toString('hex')}`;
   }
 
-  private appendQueryParam(baseUrl: string, key: string, value: string): string {
+  private appendQueryParam(
+    baseUrl: string,
+    key: string,
+    value: string,
+  ): string {
     try {
       const parsed = new URL(baseUrl);
       parsed.searchParams.set(key, value);

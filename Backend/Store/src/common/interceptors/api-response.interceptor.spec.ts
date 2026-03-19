@@ -13,7 +13,7 @@ describe('ApiResponseInterceptor', () => {
         success: true,
         data: { id: 'p1' },
       });
-      expect(typeof (value as any).timestamp).toBe('string');
+      expect(typeof value.timestamp).toBe('string');
       done();
     });
   });

@@ -19,16 +19,18 @@ describe('RmaService', () => {
   });
 
   it('throws on invalid status filter', async () => {
-    await expect(service.list('INVALID')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.list('INVALID')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(prisma.rma.findMany).not.toHaveBeenCalled();
   });
 
   it('throws when updating unknown rma', async () => {
     (prisma.rma.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.updateStatus('missing-id', 'APPROVED')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.updateStatus('missing-id', 'APPROVED'),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.rma.update).not.toHaveBeenCalled();
   });
 });

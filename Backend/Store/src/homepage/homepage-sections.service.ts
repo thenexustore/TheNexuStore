@@ -191,8 +191,8 @@ export class HomepageSectionsService {
     return raw
       .map((item) => {
         if (!item || typeof item !== 'object') return null;
-        const icon = String((item as any).icon || 'shield').trim();
-        const text = String((item as any).text || '').trim();
+        const icon = String(item.icon || 'shield').trim();
+        const text = String(item.text || '').trim();
         if (!text) return null;
         return { icon: icon || 'shield', text };
       })
@@ -235,9 +235,7 @@ export class HomepageSectionsService {
       }
       const invalidItem = items.find(
         (item) =>
-          !item ||
-          typeof item !== 'object' ||
-          !String((item as any).text || '').trim(),
+          !item || typeof item !== 'object' || !String(item.text || '').trim(),
       );
       if (invalidItem) {
         issues.push('Todos los items de TRUST_BAR deben tener texto.');
@@ -357,7 +355,10 @@ export class HomepageSectionsService {
       ),
     };
 
-    if (type === HomepageSectionType.FEATURED_PICKS && (next.source || 'query') === 'query') {
+    if (
+      type === HomepageSectionType.FEATURED_PICKS &&
+      (next.source || 'query') === 'query'
+    ) {
       next.query = {
         ...(next.query || {}),
         featuredOnly: next.query?.featuredOnly ?? next.featured_only ?? true,
@@ -728,7 +729,7 @@ export class HomepageSectionsService {
 
     const brandsMap = new Map<string, number>();
     for (const p of products) {
-      const key = String((p as any).brand_name || '').trim();
+      const key = String(p.brand_name || '').trim();
       if (!key) continue;
       brandsMap.set(key, (brandsMap.get(key) || 0) + 1);
     }

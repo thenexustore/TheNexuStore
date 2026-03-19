@@ -19,11 +19,13 @@ export class ChatUserController {
   constructor(private chatService: ChatService) {}
 
   @Post('guest/init')
-  async initGuest(@Request() req: any, @Res({ passthrough: true }) res: Response) {
+  async initGuest(
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const sessionRef = req.cookies?.guest_session || null;
-    const { accessToken, sessionRef: newSessionRef } = await this.chatService.initGuest(
-      sessionRef,
-    );
+    const { accessToken, sessionRef: newSessionRef } =
+      await this.chatService.initGuest(sessionRef);
 
     const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access_token', accessToken, {
@@ -44,7 +46,10 @@ export class ChatUserController {
 
   @UseGuards(AuthGuard)
   @Post('conversations')
-  async createConversation(@Body() dto: CreateConversationDto, @Request() req: any) {
+  async createConversation(
+    @Body() dto: CreateConversationDto,
+    @Request() req: any,
+  ) {
     const customer = req.user;
     const conv = await this.chatService.createConversation(customer.id, dto);
     return { success: true, data: conv };

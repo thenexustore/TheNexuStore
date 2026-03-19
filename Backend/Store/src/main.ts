@@ -30,8 +30,14 @@ async function bootstrap() {
   app.use(cookieParser());
 
   const envBrandingStoragePath = process.env.BRANDING_STORAGE_DIR?.trim();
-  if (envBrandingStoragePath && !envBrandingStoragePath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(envBrandingStoragePath)) {
-    throw new Error(`BRANDING_STORAGE_DIR must be an absolute path, got: ${envBrandingStoragePath}`);
+  if (
+    envBrandingStoragePath &&
+    !envBrandingStoragePath.startsWith('/') &&
+    !/^[A-Za-z]:[\\/]/.test(envBrandingStoragePath)
+  ) {
+    throw new Error(
+      `BRANDING_STORAGE_DIR must be an absolute path, got: ${envBrandingStoragePath}`,
+    );
   }
   const brandingAssetsDir = envBrandingStoragePath
     ? join(envBrandingStoragePath, 'assets')
@@ -62,7 +68,12 @@ async function bootstrap() {
         const elapsedNanoseconds = process.hrtime.bigint() - startedAt;
         const durationMs = Number(elapsedNanoseconds / BigInt(1_000_000));
         const path = req.route?.path || req.originalUrl || req.url;
-        const metric = requestMetrics.record(req.method, path, res.statusCode, durationMs);
+        const metric = requestMetrics.record(
+          req.method,
+          path,
+          res.statusCode,
+          durationMs,
+        );
 
         logger.log('HTTP request completed', 'HTTP', {
           method: req.method,
@@ -74,7 +85,9 @@ async function bootstrap() {
           metrics: {
             count: metric.count,
             errors: metric.errors,
-            avgDurationMs: Number((metric.totalDurationMs / metric.count).toFixed(2)),
+            avgDurationMs: Number(
+              (metric.totalDurationMs / metric.count).toFixed(2),
+            ),
           },
         });
       });

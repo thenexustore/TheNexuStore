@@ -28,7 +28,9 @@ describe('DashboardService alerts', () => {
     (prisma.order.count as jest.Mock)
       .mockResolvedValueOnce(3) // todayOrders
       .mockResolvedValueOnce(2); // pendingOrdersCount
-    (prisma.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { total_amount: 100 } });
+    (prisma.order.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { total_amount: 100 },
+    });
     (prisma.product.count as jest.Mock)
       .mockResolvedValueOnce(120) // total products
       .mockResolvedValueOnce(100); // active products
@@ -50,11 +52,17 @@ describe('DashboardService alerts', () => {
   it('adds error alert when import details indicate failure', async () => {
     const recent = new Date();
     (prisma.syncLog.findMany as jest.Mock).mockResolvedValue([
-      { type: 'manual_full', last_sync: recent, details: 'FAILED at supplier endpoint' },
+      {
+        type: 'manual_full',
+        last_sync: recent,
+        details: 'FAILED at supplier endpoint',
+      },
     ]);
 
     const result = await service.getDashboardStats();
 
-    expect(result.alerts.some((a: any) => a.id === 'imports-failed')).toBe(true);
+    expect(result.alerts.some((a: any) => a.id === 'imports-failed')).toBe(
+      true,
+    );
   });
 });

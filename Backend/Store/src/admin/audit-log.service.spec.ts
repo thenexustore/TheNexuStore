@@ -34,7 +34,9 @@ describe('AuditLogService', () => {
   });
 
   it('lists logs with pagination', async () => {
-    (prisma.adminAuditLog.findMany as jest.Mock).mockResolvedValue([{ id: '1' }]);
+    (prisma.adminAuditLog.findMany as jest.Mock).mockResolvedValue([
+      { id: '1' },
+    ]);
     (prisma.adminAuditLog.count as jest.Mock).mockResolvedValue(1);
 
     const result = await service.list({ page: 1, limit: 20 });
@@ -43,7 +45,6 @@ describe('AuditLogService', () => {
     expect(result.total).toBe(1);
     expect(result.items).toEqual([{ id: '1' }]);
   });
-
 
   it('filters logs by requestId when provided', async () => {
     (prisma.adminAuditLog.findMany as jest.Mock).mockResolvedValue([]);

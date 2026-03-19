@@ -13,11 +13,13 @@ import {
   testImportConnection,
   triggerImport,
   updateImportConfig,
+  fetchCatalogProbe,
   type ImportHistoryItem,
   type ImportRun,
   type ImportRunError,
   type ImportRuntimeOverviewResponse,
   type ProviderStatsResponse,
+  type CatalogProbeResponse,
 } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -34,6 +36,7 @@ import {
   PlugZap,
   RefreshCw,
   Save,
+  Search,
 } from "lucide-react";
 
 type ImportMode = "full" | "incremental" | "stock" | "images";
@@ -235,6 +238,8 @@ export default function ImportsPage() {
     null,
   );
   const [configSource, setConfigSource] = useState<string | null>(null);
+  const [catalogProbe, setCatalogProbe] = useState<CatalogProbeResponse | null>(null);
+  const [catalogProbeLoading, setCatalogProbeLoading] = useState(false);
   const [form, setForm] = useState<ImportConfigForm>({
     display_name: "",
     base_url: "",
@@ -465,6 +470,18 @@ export default function ImportsPage() {
       toast.error(getErrorMessage(error, `Failed to retry ${mode} import`));
     } finally {
       setRunning(null);
+    }
+  }
+
+  async function runCatalogProbe() {
+    setCatalogProbeLoading(true);
+    try {
+      const result = await fetchCatalogProbe();
+      setCatalogProbe(result);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to run catalog probe"));
+    } finally {
+      setCatalogProbeLoading(false);
     }
   }
 
@@ -1297,6 +1314,124 @@ export default function ImportsPage() {
             </div>
           </div>
         ) : null}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Diagnóstico de catálogo
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Comprueba cuántos productos hay en la API del proveedor y compáralos
+              con los que están en la base de datos. Si el número no coincide, es
+              posible que falten productos por importar.
+            </p>
+          </div>
+          <button
+            onClick={() => void runCatalogProbe()}
+            disabled={catalogProbeLoading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            <Search className="h-4 w-4" />
+            {catalogProbeLoading ? "Analizando..." : "Analizar catálogo"}
+          </button>
+        </div>
+
+        {catalogProbe ? (
+          <div className="mt-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">
+                  API · primera página
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {catalogProbe.api.firstPageReceived}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">
+                  API · total esperado
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {catalogProbe.api.totalExpected ?? "—"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">
+                  BD · productos activos
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {catalogProbe.db.activeProducts}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">
+                  BD · total productos
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {catalogProbe.db.totalProducts}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`rounded-2xl border p-4 ${
+                catalogProbe.api.totalExpected !== null &&
+                catalogProbe.api.totalExpected > catalogProbe.db.activeProducts
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : catalogProbe.probeModeAvailable
+                    ? "border-sky-300 bg-sky-50 text-sky-900"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-900"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                {catalogProbe.api.totalExpected !== null &&
+                catalogProbe.api.totalExpected > catalogProbe.db.activeProducts ? (
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                ) : (
+                  <Database className="mt-0.5 h-5 w-5 shrink-0" />
+                )}
+                <div className="space-y-1">
+                  <p className="font-semibold">{catalogProbe.assessment}</p>
+                  <div className="text-sm opacity-80">
+                    <span>
+                      pageSize={catalogProbe.api.pageSize}
+                      {catalogProbe.api.configuredPageSize
+                        ? ` (configurado: ${catalogProbe.api.configuredPageSize})`
+                        : " (sin override)"}
+                      {catalogProbe.api.totalPages !== null
+                        ? ` · páginas=${catalogProbe.api.totalPages}`
+                        : ""}
+                      {catalogProbe.api.hasMore !== null
+                        ? ` · hasMore=${String(catalogProbe.api.hasMore)}`
+                        : ""}
+                    </span>
+                  </div>
+                  {catalogProbe.probeModeAvailable && (
+                    <p className="mt-2 text-sm font-medium">
+                      ✓ El modo sonda (probe) está disponible. La siguiente importación completa
+                      con <code className="rounded bg-black/10 px-1 py-0.5 text-xs">catalog_page_size</code>{" "}
+                      configurado obtendrá automáticamente todas las páginas disponibles.
+                    </p>
+                  )}
+                  {!catalogProbe.api.configuredPageSize && (
+                    <p className="mt-2 text-sm">
+                      💡 Para habilitar la paginación por sonda, configura{" "}
+                      <strong>catalog_page_size</strong> en los ajustes de la API
+                      (p. ej. 500) y ejecuta una importación completa.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-slate-500">
+            Pulsa «Analizar catálogo» para comparar los productos de la API con
+            los de la base de datos y detectar posibles importaciones incompletas.
+          </p>
+        )}
       </section>
     </div>
   );

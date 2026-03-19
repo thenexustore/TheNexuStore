@@ -7,7 +7,9 @@ export class RateLimitService {
   consume(key: string, limit: number, windowMs: number): boolean {
     const now = Date.now();
     const windowStart = now - windowMs;
-    const values = (this.buckets.get(key) ?? []).filter((v) => v >= windowStart);
+    const values = (this.buckets.get(key) ?? []).filter(
+      (v) => v >= windowStart,
+    );
 
     if (values.length >= limit) {
       this.buckets.set(key, values);

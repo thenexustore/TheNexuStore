@@ -68,11 +68,17 @@ export class RedsysService {
   private readonly DEFAULT_TEST_URL =
     'https://sis-t.redsys.es:25443/sis/realizarPago';
   private readonly DEFAULT_PROD_URL = 'https://sis.redsys.es/sis/realizarPago';
-  private readonly REDSYS_ENV = (process.env.REDSYS_ENV ?? 'test').toLowerCase();
+  private readonly REDSYS_ENV = (
+    process.env.REDSYS_ENV ?? 'test'
+  ).toLowerCase();
   private readonly REDSYS_URL =
     process.env.REDSYS_URL ||
-    (this.REDSYS_ENV === 'prod' ? this.DEFAULT_PROD_URL : this.DEFAULT_TEST_URL);
-  private readonly MERCHANT_CODE = (process.env.REDSYS_MERCHANT_CODE ?? '').trim();
+    (this.REDSYS_ENV === 'prod'
+      ? this.DEFAULT_PROD_URL
+      : this.DEFAULT_TEST_URL);
+  private readonly MERCHANT_CODE = (
+    process.env.REDSYS_MERCHANT_CODE ?? ''
+  ).trim();
   private readonly TERMINAL = (process.env.REDSYS_TERMINAL ?? '').trim();
   private readonly SECRET_KEY = (process.env.REDSYS_SECRET_KEY ?? '').trim();
   private readonly CURRENCY = '978'; // EUR
@@ -128,7 +134,9 @@ export class RedsysService {
       }
     }
 
-    const merchantParamsBase64 = this.encodeBase64(JSON.stringify(merchantParams));
+    const merchantParamsBase64 = this.encodeBase64(
+      JSON.stringify(merchantParams),
+    );
     const signature = this.generateSignature(
       merchantParamsBase64,
       input.merchantOrderReference,
@@ -166,8 +174,14 @@ export class RedsysService {
     }
 
     const params = this.decodeMerchantParams(merchantParameters);
-    const responseCodeRaw = this.getParam(params, ['Ds_Response', 'DS_RESPONSE']);
-    const merchantOrderReference = this.getParam(params, ['Ds_Order', 'DS_ORDER']);
+    const responseCodeRaw = this.getParam(params, [
+      'Ds_Response',
+      'DS_RESPONSE',
+    ]);
+    const merchantOrderReference = this.getParam(params, [
+      'Ds_Order',
+      'DS_ORDER',
+    ]);
     const authCode = this.getOptionalParam(params, [
       'Ds_AuthorisationCode',
       'DS_AUTHORISATIONCODE',
@@ -233,7 +247,9 @@ export class RedsysService {
       terminal: string;
     },
   ): void {
-    if (notification.merchantOrderReference !== expected.merchantOrderReference) {
+    if (
+      notification.merchantOrderReference !== expected.merchantOrderReference
+    ) {
       throw new BadRequestException('REDSYS order reference mismatch');
     }
     if (notification.amountInCents !== expected.amountInCents) {
@@ -264,7 +280,9 @@ export class RedsysService {
     if (currencyIso.toUpperCase() === 'EUR') {
       return this.CURRENCY;
     }
-    throw new BadRequestException(`Unsupported currency for REDSYS: ${currencyIso}`);
+    throw new BadRequestException(
+      `Unsupported currency for REDSYS: ${currencyIso}`,
+    );
   }
 
   private assertSigningConfig(): void {
@@ -298,7 +316,9 @@ export class RedsysService {
       if (typeof value !== 'string' || value.length === 0) {
         continue;
       }
-      if (keys.some((candidate) => candidate.toLowerCase() === key.toLowerCase())) {
+      if (
+        keys.some((candidate) => candidate.toLowerCase() === key.toLowerCase())
+      ) {
         return value;
       }
     }
@@ -313,7 +333,10 @@ export class RedsysService {
     return Buffer.from(this.normalizeBase64(data), 'base64').toString('utf8');
   }
 
-  private generateSignature(merchantParamsBase64: string, orderNumber: string): string {
+  private generateSignature(
+    merchantParamsBase64: string,
+    orderNumber: string,
+  ): string {
     const key = Buffer.from(this.normalizeBase64(this.SECRET_KEY), 'base64');
     const orderKey = this.encrypt3DES(orderNumber, key);
     const hmac = crypto.createHmac('sha256', orderKey);
@@ -327,7 +350,10 @@ export class RedsysService {
   ): boolean {
     const params = this.decodeMerchantParams(merchantParamsBase64);
     const dsOrder = this.getParam(params, ['Ds_Order', 'DS_ORDER']);
-    const expectedSignature = this.generateSignature(merchantParamsBase64, dsOrder);
+    const expectedSignature = this.generateSignature(
+      merchantParamsBase64,
+      dsOrder,
+    );
 
     const receivedBuffer = Buffer.from(
       this.normalizeBase64(receivedSignature),
@@ -347,7 +373,9 @@ export class RedsysService {
     const blockSize = 8;
     const remainder = data.length % blockSize;
     const paddedData =
-      remainder === 0 ? data : data.padEnd(data.length + (blockSize - remainder), '\0');
+      remainder === 0
+        ? data
+        : data.padEnd(data.length + (blockSize - remainder), '\0');
     const cipher = crypto.createCipheriv(
       'des-ede3-cbc',
       key.slice(0, 24),
@@ -357,7 +385,9 @@ export class RedsysService {
     return Buffer.concat([cipher.update(paddedData, 'utf8'), cipher.final()]);
   }
 
-  private decodeMerchantParams(merchantParamsBase64: string): RedsysDecodedParams {
+  private decodeMerchantParams(
+    merchantParamsBase64: string,
+  ): RedsysDecodedParams {
     const decoded = this.decodeBase64(merchantParamsBase64);
     let parsed: unknown;
     try {
@@ -367,13 +397,18 @@ export class RedsysService {
     }
 
     if (!parsed || typeof parsed !== 'object') {
-      throw new BadRequestException('Invalid REDSYS merchant parameters payload');
+      throw new BadRequestException(
+        'Invalid REDSYS merchant parameters payload',
+      );
     }
     return parsed as RedsysDecodedParams;
   }
 
   private normalizeBase64(value: string): string {
-    const normalized = value.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    const normalized = value
+      .replace(/\s/g, '')
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
     const missingPadding = normalized.length % 4;
     if (missingPadding === 0) {
       return normalized;

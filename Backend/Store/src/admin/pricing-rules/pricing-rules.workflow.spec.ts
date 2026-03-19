@@ -21,10 +21,20 @@ describe('PricingRulesService workflow', () => {
   });
 
   it('moves DRAFT to PENDING', async () => {
-    (prisma.pricingRule.findUnique as jest.Mock).mockResolvedValue({ id: 'r1', approval_status: 'DRAFT' });
-    (prisma.pricingRule.update as jest.Mock).mockResolvedValue({ id: 'r1', approval_status: 'PENDING' });
+    (prisma.pricingRule.findUnique as jest.Mock).mockResolvedValue({
+      id: 'r1',
+      approval_status: 'DRAFT',
+    });
+    (prisma.pricingRule.update as jest.Mock).mockResolvedValue({
+      id: 'r1',
+      approval_status: 'PENDING',
+    });
 
-    const result: any = await service.transitionStatus('r1', 'PENDING' as any, 'u1');
+    const result: any = await service.transitionStatus(
+      'r1',
+      'PENDING' as any,
+      'u1',
+    );
 
     expect(result.approval_status).toBe('PENDING');
     expect(prisma.pricingRule.update).toHaveBeenCalled();
@@ -37,7 +47,9 @@ describe('PricingRulesService workflow', () => {
       created_by_actor_id: 'u1',
     });
 
-    await expect(service.transitionStatus('r1', 'APPROVED' as any, 'u1')).rejects.toThrow(BadRequestException);
+    await expect(
+      service.transitionStatus('r1', 'APPROVED' as any, 'u1'),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('does not allow reverting PUBLISHED rule to DRAFT', async () => {
@@ -46,9 +58,9 @@ describe('PricingRulesService workflow', () => {
       approval_status: 'PUBLISHED',
     });
 
-    await expect(service.transitionStatus('r1', 'DRAFT' as any, 'u2')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.transitionStatus('r1', 'DRAFT' as any, 'u2'),
+    ).rejects.toThrow(BadRequestException);
     expect(prisma.pricingRule.update).not.toHaveBeenCalled();
   });
 });

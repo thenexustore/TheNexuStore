@@ -8,7 +8,13 @@ const STATIC_ALLOWED_ORIGINS = [
   'https://nexus-store-eight.vercel.app',
 ] as const;
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+const LOOPBACK_HOSTS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  '::1',
+  '[::1]',
+]);
 
 function parseOrigin(origin: string): URL | null {
   try {

@@ -6,14 +6,8 @@ import { AuthModule } from '../../auth/auth.module';
 import { AdminGuard } from '../admin.guard';
 
 @Module({
-  imports: [
-    AuthModule,
-  ],
+  imports: [AuthModule],
   controllers: [FeaturedProductsController],
-  providers: [
-    FeaturedProductsService,
-    PrismaService,
-    AdminGuard,
-  ],
+  providers: [FeaturedProductsService, PrismaService, AdminGuard],
 })
 export class FeaturedProductsModule {}

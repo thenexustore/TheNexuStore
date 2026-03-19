@@ -13,11 +13,10 @@ export class UserFeaturedProductsController {
     @Query('search') search?: string,
   ) {
     try {
-     
       const response = await this.featuredProductsService.findAll({
         take: limit ? parseInt(limit) : 20,
         is_active: true,
-        search, 
+        search,
       });
 
       return {

@@ -133,14 +133,70 @@ export class ShippingTaxService {
     if (rulesCount === 0) {
       await this.prisma.shippingRule.createMany({
         data: [
-          { zone_code: 'ES_PENINSULA_BALEARES', min_base_excl_tax: 0, max_base_excl_tax: 50, shipping_base_excl_tax: 5, currency: 'EUR', priority: 1 },
-          { zone_code: 'ES_PENINSULA_BALEARES', min_base_excl_tax: 50, max_base_excl_tax: 199, shipping_base_excl_tax: 3, currency: 'EUR', priority: 2 },
-          { zone_code: 'ES_PENINSULA_BALEARES', min_base_excl_tax: 199, max_base_excl_tax: null, shipping_base_excl_tax: 0, currency: 'EUR', priority: 3 },
-          { zone_code: 'PT', min_base_excl_tax: 0, max_base_excl_tax: 199, shipping_base_excl_tax: 6, currency: 'EUR', priority: 1 },
-          { zone_code: 'PT', min_base_excl_tax: 199, max_base_excl_tax: null, shipping_base_excl_tax: 0, currency: 'EUR', priority: 2 },
-          { zone_code: 'AD', min_base_excl_tax: 0, max_base_excl_tax: 800, shipping_base_excl_tax: 50, currency: 'EUR', priority: 1 },
-          { zone_code: 'AD', min_base_excl_tax: 800, max_base_excl_tax: 1500, shipping_base_excl_tax: 30, currency: 'EUR', priority: 2 },
-          { zone_code: 'AD', min_base_excl_tax: 1500, max_base_excl_tax: null, shipping_base_excl_tax: 0, currency: 'EUR', priority: 3 },
+          {
+            zone_code: 'ES_PENINSULA_BALEARES',
+            min_base_excl_tax: 0,
+            max_base_excl_tax: 50,
+            shipping_base_excl_tax: 5,
+            currency: 'EUR',
+            priority: 1,
+          },
+          {
+            zone_code: 'ES_PENINSULA_BALEARES',
+            min_base_excl_tax: 50,
+            max_base_excl_tax: 199,
+            shipping_base_excl_tax: 3,
+            currency: 'EUR',
+            priority: 2,
+          },
+          {
+            zone_code: 'ES_PENINSULA_BALEARES',
+            min_base_excl_tax: 199,
+            max_base_excl_tax: null,
+            shipping_base_excl_tax: 0,
+            currency: 'EUR',
+            priority: 3,
+          },
+          {
+            zone_code: 'PT',
+            min_base_excl_tax: 0,
+            max_base_excl_tax: 199,
+            shipping_base_excl_tax: 6,
+            currency: 'EUR',
+            priority: 1,
+          },
+          {
+            zone_code: 'PT',
+            min_base_excl_tax: 199,
+            max_base_excl_tax: null,
+            shipping_base_excl_tax: 0,
+            currency: 'EUR',
+            priority: 2,
+          },
+          {
+            zone_code: 'AD',
+            min_base_excl_tax: 0,
+            max_base_excl_tax: 800,
+            shipping_base_excl_tax: 50,
+            currency: 'EUR',
+            priority: 1,
+          },
+          {
+            zone_code: 'AD',
+            min_base_excl_tax: 800,
+            max_base_excl_tax: 1500,
+            shipping_base_excl_tax: 30,
+            currency: 'EUR',
+            priority: 2,
+          },
+          {
+            zone_code: 'AD',
+            min_base_excl_tax: 1500,
+            max_base_excl_tax: null,
+            shipping_base_excl_tax: 0,
+            currency: 'EUR',
+            priority: 3,
+          },
         ],
       });
     }
@@ -162,7 +218,9 @@ export class ShippingTaxService {
             mode: ossEnabled ? TaxMode.VAT : TaxMode.OUTSIDE_VAT,
             standard_rate: ossEnabled ? 0.23 : 0,
             customs_duty_rate: 0,
-            notes: ossEnabled ? 'Portugal VAT 23%' : 'OSS disabled. treated as outside VAT',
+            notes: ossEnabled
+              ? 'Portugal VAT 23%'
+              : 'OSS disabled. treated as outside VAT',
           },
           {
             code: 'CANARY_ISLANDS',
@@ -246,7 +304,9 @@ export class ShippingTaxService {
     const subtotal = this.round2(input.subtotalExclTax);
     const discount = this.round2(Math.min(input.discountExclTax, subtotal));
 
-    const zone = await this.prisma.shippingZone.findUnique({ where: { code: zoneCode } });
+    const zone = await this.prisma.shippingZone.findUnique({
+      where: { code: zoneCode },
+    });
     if (!zone || !zone.enabled || zoneCode === 'OTHER') {
       return {
         status: 'UNAVAILABLE',
@@ -261,7 +321,8 @@ export class ShippingTaxService {
         total: this.round2(subtotal - discount),
         tax_mode: TaxMode.OUTSIDE_VAT,
         tax_label: 'Taxes',
-        message: 'Shipping not available for this destination. Contact support.',
+        message:
+          'Shipping not available for this destination. Contact support.',
       };
     }
 
@@ -269,14 +330,21 @@ export class ShippingTaxService {
       where: {
         zone_code: zoneCode,
         min_base_excl_tax: { lte: subtotal },
-        OR: [{ max_base_excl_tax: null }, { max_base_excl_tax: { gt: subtotal } }],
+        OR: [
+          { max_base_excl_tax: null },
+          { max_base_excl_tax: { gt: subtotal } },
+        ],
       },
       orderBy: { priority: 'asc' },
     });
 
-    const shipping = this.round2(Number(shippingRule?.shipping_base_excl_tax ?? 0));
+    const shipping = this.round2(
+      Number(shippingRule?.shipping_base_excl_tax ?? 0),
+    );
 
-    const taxZone = await this.prisma.taxZone.findUnique({ where: { code: zoneCode } });
+    const taxZone = await this.prisma.taxZone.findUnique({
+      where: { code: zoneCode },
+    });
     const taxRate =
       taxZone && taxZone.enabled && taxZone.mode === TaxMode.VAT
         ? Number(taxZone.standard_rate)

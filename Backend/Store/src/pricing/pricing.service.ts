@@ -10,7 +10,9 @@ import {
 export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async resolveCostForSku(skuId: string): Promise<{ cost: number; source: string }> {
+  private async resolveCostForSku(
+    skuId: string,
+  ): Promise<{ cost: number; source: string }> {
     const directSupplier = await this.prisma.supplierProduct.findFirst({
       where: { sku_id: skuId, price: { isNot: null } },
       include: { price: true, supplier: true },
@@ -18,15 +20,23 @@ export class PricingService {
     });
 
     if (directSupplier?.price?.cost_price != null) {
-      return { cost: Number(directSupplier.price.cost_price), source: 'SUPPLIER_PRICE' };
+      return {
+        cost: Number(directSupplier.price.cost_price),
+        source: 'SUPPLIER_PRICE',
+      };
     }
 
-    const existing = await this.prisma.skuPrice.findUnique({ where: { sku_id: skuId } });
+    const existing = await this.prisma.skuPrice.findUnique({
+      where: { sku_id: skuId },
+    });
     if (existing?.cost_price != null) {
       return { cost: Number(existing.cost_price), source: 'SKU_CACHE_COST' };
     }
 
-    return { cost: Number(existing?.sale_price ?? 0), source: 'SKU_SALE_FALLBACK' };
+    return {
+      cost: Number(existing?.sale_price ?? 0),
+      source: 'SKU_SALE_FALLBACK',
+    };
   }
 
   async findCandidateRules(ctx: {
@@ -36,15 +46,15 @@ export class PricingService {
   }): Promise<RuleCandidate[]> {
     const where: any = {
       is_active: true,
-      OR: [
-        { scope: 'GLOBAL' },
-        { scope: 'SKU', sku_id: ctx.skuId },
-      ],
+      OR: [{ scope: 'GLOBAL' }, { scope: 'SKU', sku_id: ctx.skuId }],
     };
 
     if (ctx.brandId) where.OR.push({ scope: 'BRAND', brand_id: ctx.brandId });
     if (ctx.categoryIds.length) {
-      where.OR.push({ scope: 'CATEGORY', category_id: { in: ctx.categoryIds } });
+      where.OR.push({
+        scope: 'CATEGORY',
+        category_id: { in: ctx.categoryIds },
+      });
     }
 
     const rules = await this.prisma.pricingRule.findMany({ where });
@@ -54,8 +64,10 @@ export class PricingService {
       priority: rule.priority,
       margin_pct: Number(rule.margin_pct ?? 0),
       discount_pct: Number(rule.discount_pct ?? 0),
-      min_margin_pct: rule.min_margin_pct != null ? Number(rule.min_margin_pct) : null,
-      min_margin_amount: rule.min_margin_amount != null ? Number(rule.min_margin_amount) : null,
+      min_margin_pct:
+        rule.min_margin_pct != null ? Number(rule.min_margin_pct) : null,
+      min_margin_amount:
+        rule.min_margin_amount != null ? Number(rule.min_margin_amount) : null,
       rounding_mode: rule.rounding_mode,
       starts_at: rule.starts_at,
       ends_at: rule.ends_at,
@@ -94,9 +106,10 @@ export class PricingService {
       ...sku.product.categories.map((c) => c.category_id),
     ];
 
-    const costResolved = params.costPrice != null
-      ? { cost: params.costPrice, source: 'OVERRIDE' }
-      : await this.resolveCostForSku(sku.id);
+    const costResolved =
+      params.costPrice != null
+        ? { cost: params.costPrice, source: 'OVERRIDE' }
+        : await this.resolveCostForSku(sku.id);
 
     const rules = await this.findCandidateRules({
       skuId: sku.id,
@@ -120,8 +133,15 @@ export class PricingService {
     };
   }
 
-  async applyAndUpsertSkuPriceBySkuId(params: { skuId: string; costPrice?: number; fallbackSource?: string }) {
-    const computed = await this.computeForSkuId({ skuId: params.skuId, costPrice: params.costPrice });
+  async applyAndUpsertSkuPriceBySkuId(params: {
+    skuId: string;
+    costPrice?: number;
+    fallbackSource?: string;
+  }) {
+    const computed = await this.computeForSkuId({
+      skuId: params.skuId,
+      costPrice: params.costPrice,
+    });
 
     await this.prisma.skuPrice.upsert({
       where: { sku_id: params.skuId },
@@ -134,7 +154,9 @@ export class PricingService {
         rule_id: computed.rule_id,
         needs_review: computed.needs_review,
         currency: 'EUR',
-        price_source: computed.rule_id ? computed.price_source : (params.fallbackSource ?? computed.price_source),
+        price_source: computed.rule_id
+          ? computed.price_source
+          : (params.fallbackSource ?? computed.price_source),
         updated_at: new Date(),
       },
       update: {
@@ -144,7 +166,9 @@ export class PricingService {
         discount_pct: computed.discount_pct,
         rule_id: computed.rule_id,
         needs_review: computed.needs_review,
-        price_source: computed.rule_id ? computed.price_source : (params.fallbackSource ?? computed.price_source),
+        price_source: computed.rule_id
+          ? computed.price_source
+          : (params.fallbackSource ?? computed.price_source),
         updated_at: new Date(),
       },
     });

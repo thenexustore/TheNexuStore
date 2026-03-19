@@ -13,10 +13,7 @@ export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
-  async getAuditLogs(
-    @Req() req: Request,
-    @Query() query: AuditLogsQueryDto,
-  ) {
+  async getAuditLogs(@Req() req: Request, @Query() query: AuditLogsQueryDto) {
     const pageNum = query.page;
     const limitNum = query.limit;
 

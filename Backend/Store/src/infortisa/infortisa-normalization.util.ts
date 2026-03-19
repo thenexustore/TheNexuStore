@@ -12,9 +12,7 @@ export function extractInfortisaStock(product: any): {
   const stockCentral = toFiniteNumber(
     product?.StockCentral ?? product?.STOCKCENTRAL ?? product?.Stock,
   );
-  const stockPalma = toFiniteNumber(
-    product?.StockPalma ?? product?.STOCKPALMA,
-  );
+  const stockPalma = toFiniteNumber(product?.StockPalma ?? product?.STOCKPALMA);
   const stockExterno = toFiniteNumber(
     product?.StockExterno ?? product?.STOCKEXTERNO,
   );

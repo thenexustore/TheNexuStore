@@ -7,6 +7,11 @@ import { AuditLogService } from '../audit-log.service';
 
 @Module({
   controllers: [PricingRulesController],
-  providers: [PricingRulesService, PrismaService, PricingService, AuditLogService],
+  providers: [
+    PricingRulesService,
+    PrismaService,
+    PricingService,
+    AuditLogService,
+  ],
 })
 export class PricingRulesModule {}

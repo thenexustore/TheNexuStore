@@ -47,7 +47,6 @@ export class ProductsController {
     return this.productsService.getFeaturedProducts(limit);
   }
 
-
   @Get('deals')
   async getDealsProducts(
     @Query('limit', new DefaultValuePipe(48), ParseIntPipe) limit: number,
@@ -86,7 +85,6 @@ export class ProductsController {
     const customerId = req.user.userId;
     return this.productsService.createReview(productId, customerId, dto);
   }
-
 
   @Get('categories/:slug/products')
   async getProductsByCategory(

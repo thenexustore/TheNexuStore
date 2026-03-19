@@ -80,7 +80,10 @@ export class PricingRulesController {
 
   @Patch(':id/toggle-status')
   async toggle(@Param('id') id: string, @Body() dto: TogglePricingRuleDto) {
-    return { success: true, data: await this.service.toggle(id, dto.is_active) };
+    return {
+      success: true,
+      data: await this.service.toggle(id, dto.is_active),
+    };
   }
 
   @Patch(':id/workflow')

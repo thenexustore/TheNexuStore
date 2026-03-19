@@ -32,7 +32,9 @@ export class BrandingService {
     const envPath = process.env.BRANDING_STORAGE_DIR?.trim();
     if (envPath) {
       if (!envPath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(envPath)) {
-        throw new Error(`BRANDING_STORAGE_DIR must be an absolute path, got: ${envPath}`);
+        throw new Error(
+          `BRANDING_STORAGE_DIR must be an absolute path, got: ${envPath}`,
+        );
       }
       this.storageDir = envPath;
     } else {
@@ -42,16 +44,33 @@ export class BrandingService {
     this.assetsDir = join(this.storageDir, 'assets');
   }
 
-  private normalize(input: BrandingSettingsPayload): Required<BrandingSettingsPayload> {
+  private normalize(
+    input: BrandingSettingsPayload,
+  ): Required<BrandingSettingsPayload> {
     return {
-      brandLogoUrl: typeof input.brandLogoUrl === 'string' ? input.brandLogoUrl.trim() : '',
+      brandLogoUrl:
+        typeof input.brandLogoUrl === 'string' ? input.brandLogoUrl.trim() : '',
       brandLogoDarkUrl:
-        typeof input.brandLogoDarkUrl === 'string' ? input.brandLogoDarkUrl.trim() : '',
+        typeof input.brandLogoDarkUrl === 'string'
+          ? input.brandLogoDarkUrl.trim()
+          : '',
       brandLogoFit: input.brandLogoFit === 'cover' ? 'cover' : 'contain',
-      brandLogoHeight: Math.max(20, Math.min(64, Number(input.brandLogoHeight) || 32)),
-      brandLogoVersion: Math.max(1, Math.min(999999, Number(input.brandLogoVersion) || 1)),
-      brandLogoBrightness: Math.max(60, Math.min(140, Number(input.brandLogoBrightness) || 100)),
-      brandLogoSaturation: Math.max(60, Math.min(140, Number(input.brandLogoSaturation) || 100)),
+      brandLogoHeight: Math.max(
+        20,
+        Math.min(64, Number(input.brandLogoHeight) || 32),
+      ),
+      brandLogoVersion: Math.max(
+        1,
+        Math.min(999999, Number(input.brandLogoVersion) || 1),
+      ),
+      brandLogoBrightness: Math.max(
+        60,
+        Math.min(140, Number(input.brandLogoBrightness) || 100),
+      ),
+      brandLogoSaturation: Math.max(
+        60,
+        Math.min(140, Number(input.brandLogoSaturation) || 100),
+      ),
     };
   }
 
@@ -60,7 +79,9 @@ export class BrandingService {
       const raw = await fs.readFile(this.settingsPath, 'utf8');
       const parsed = JSON.parse(raw) as BrandingSettingsPayload;
       const normalized = this.normalize({ ...DEFAULT_BRANDING, ...parsed });
-      normalized.brandLogoUrl = await this.validateBrandingAssetUrl(normalized.brandLogoUrl);
+      normalized.brandLogoUrl = await this.validateBrandingAssetUrl(
+        normalized.brandLogoUrl,
+      );
       normalized.brandLogoDarkUrl = await this.validateBrandingAssetUrl(
         normalized.brandLogoDarkUrl,
       );
@@ -70,10 +91,16 @@ export class BrandingService {
     }
   }
 
-  async saveSettings(input: BrandingSettingsPayload): Promise<Required<BrandingSettingsPayload>> {
+  async saveSettings(
+    input: BrandingSettingsPayload,
+  ): Promise<Required<BrandingSettingsPayload>> {
     await fs.mkdir(this.storageDir, { recursive: true });
     const next = this.normalize(input);
-    await fs.writeFile(this.settingsPath, JSON.stringify(next, null, 2), 'utf8');
+    await fs.writeFile(
+      this.settingsPath,
+      JSON.stringify(next, null, 2),
+      'utf8',
+    );
     return next;
   }
 
@@ -117,7 +144,9 @@ export class BrandingService {
   private async validateBrandingAssetUrl(url: string): Promise<string> {
     if (!url) return '';
     // Matches branding-assets uploaded via saveLogoDataUrl (e.g. /branding-assets/logo-light.png)
-    const match = url.match(/\/branding-assets\/(logo-(?:light|dark)\.[a-zA-Z0-9]+)(?:\?.*)?$/);
+    const match = url.match(
+      /\/branding-assets\/(logo-(?:light|dark)\.[a-zA-Z0-9]+)(?:\?.*)?$/,
+    );
     if (!match) return url;
     const filePath = join(this.assetsDir, match[1]);
     try {

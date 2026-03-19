@@ -41,7 +41,9 @@ export class RulePayloadDto {
   @IsNumber() @Min(0) @Max(500) margin_pct!: number;
   @IsOptional() @IsNumber() @Min(0) @Max(90) discount_pct?: number;
   @IsOptional() @IsNumber() @Min(0) @Max(500) min_margin_pct?: number | null;
-  @IsOptional() @IsNumber() @Min(0) @Max(1000000) min_margin_amount?: number | null;
+  @IsOptional() @IsNumber() @Min(0) @Max(1000000) min_margin_amount?:
+    | number
+    | null;
 
   @IsOptional() @IsEnum(RoundingMode) rounding_mode?: RoundingMode;
 
@@ -81,7 +83,11 @@ export class PreviewDto {
 }
 
 export class RecalculateDto {
-  @IsOptional() @IsIn(['all', 'sku', 'brand', 'category']) scope?: 'all' | 'sku' | 'brand' | 'category';
+  @IsOptional() @IsIn(['all', 'sku', 'brand', 'category']) scope?:
+    | 'all'
+    | 'sku'
+    | 'brand'
+    | 'category';
   @IsOptional() @IsArray() @IsString({ each: true }) skuIds?: string[];
   @IsOptional() @IsString() brandId?: string;
   @IsOptional() @IsString() categoryId?: string;

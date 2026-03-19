@@ -82,8 +82,6 @@ describe('CarouselsController', () => {
     expect(result.sections[1].data).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
-
-
   it('keeps object payload for newsletter in carousels config', async () => {
     (homepageSectionsService.getPublicSections as jest.Mock).mockResolvedValue([
       {
@@ -212,7 +210,6 @@ describe('CarouselsController', () => {
     ]);
   });
 
-
   it('returns active categories and supports optional parent slug', async () => {
     (prisma.category.findMany as jest.Mock).mockResolvedValue([
       { id: 'cat-1', name: 'Electrónica', slug: 'electronica' },
@@ -233,5 +230,4 @@ describe('CarouselsController', () => {
       { id: 'cat-1', name: 'Electrónica', slug: 'electronica' },
     ]);
   });
-
 });

@@ -94,7 +94,10 @@ export class AdminController {
     @Body() body: BulkUpdateOrderStatusDto,
     @Req() req: Request,
   ) {
-    const data = await this.adminService.bulkUpdateOrderStatus(body.ids, body.status);
+    const data = await this.adminService.bulkUpdateOrderStatus(
+      body.ids,
+      body.status,
+    );
 
     await this.auditLogService.logAction({
       actor: req.user as any,

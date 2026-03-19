@@ -34,7 +34,10 @@ describe('GlobalExceptionFilter', () => {
   };
 
   it('formats HttpException responses with request metadata', () => {
-    const filter = new GlobalExceptionFilter({ error: jest.fn(), warn: jest.fn() } as unknown as AppLogger);
+    const filter = new GlobalExceptionFilter({
+      error: jest.fn(),
+      warn: jest.fn(),
+    } as unknown as AppLogger);
     const { host, status, json } = createHost({ requestId: 'req-123' });
 
     filter.catch(
@@ -57,7 +60,10 @@ describe('GlobalExceptionFilter', () => {
   });
 
   it('maps unknown errors to HTTP 500', () => {
-    const filter = new GlobalExceptionFilter({ error: jest.fn(), warn: jest.fn() } as unknown as AppLogger);
+    const filter = new GlobalExceptionFilter({
+      error: jest.fn(),
+      warn: jest.fn(),
+    } as unknown as AppLogger);
     const { host, status, json } = createHost();
 
     filter.catch(new Error('Boom'), host);

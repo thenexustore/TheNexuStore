@@ -8,7 +8,11 @@ describe('InfortisaService catalog contract handling', () => {
   beforeEach(() => {
     service = new InfortisaService({
       get: jest.fn(),
-    } as unknown as ConfigService);
+    } as unknown as ConfigService, {
+      supplierIntegration: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    } as any);
     getMock = jest.fn();
     (service as any).client = { get: getMock };
   });

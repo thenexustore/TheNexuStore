@@ -623,24 +623,48 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const [items, activeBanners] = await Promise.all([
-        this.prisma.homePageSectionItem.findMany({
-          where: { section_id: section.id },
-          orderBy: { position: 'asc' },
-          include: { banner: true },
-        }),
+      const items = await this.prisma.homePageSectionItem.findMany({
+        where: { section_id: section.id },
+        orderBy: { position: 'asc' },
+        include: { banner: true },
+      });
+
+      const curatedBannerIds = Array.from(
+        new Set(
+          items
+            .map((item) => item.banner_id || item.banner?.id || null)
+            .filter((bannerId): bannerId is string => Boolean(bannerId)),
+        ),
+      );
+
+      const [activeBanners, curatedActiveBanners] = await Promise.all([
         this.prisma.banner.findMany({
           where: { is_active: true },
           orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
           take: 6,
         }),
+        curatedBannerIds.length
+          ? this.prisma.banner.findMany({
+              where: { is_active: true, id: { in: curatedBannerIds } },
+            })
+          : Promise.resolve([]),
       ]);
 
-      if (!activeBanners.length) {
+      const curatedActiveBannerIds = new Set(
+        curatedActiveBanners.map((banner) => banner.id),
+      );
+      const resolvedActiveBanners = [
+        ...curatedActiveBanners,
+        ...activeBanners.filter((banner) => !curatedActiveBannerIds.has(banner.id)),
+      ];
+
+      if (!resolvedActiveBanners.length) {
         return [];
       }
 
-      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const activeBannerById = new Map(
+        resolvedActiveBanners.map((banner) => [banner.id, banner]),
+      );
       const seen = new Set<string>();
       const curatedOrderedBanners = items
         .map((item) => {
@@ -648,7 +672,7 @@ export class HomeLayoutService {
           if (!bannerId) return null;
           return activeBannerById.get(bannerId) || null;
         })
-        .filter((banner): banner is (typeof activeBanners)[number] => {
+        .filter((banner): banner is (typeof resolvedActiveBanners)[number] => {
           if (!banner) return false;
           if (seen.has(banner.id)) return false;
           seen.add(banner.id);
@@ -665,7 +689,7 @@ export class HomeLayoutService {
         );
       }
 
-      const remainingActiveBanners = activeBanners.filter(
+      const remainingActiveBanners = resolvedActiveBanners.filter(
         (banner) => !seen.has(banner.id),
       );
 

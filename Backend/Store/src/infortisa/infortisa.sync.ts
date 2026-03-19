@@ -640,12 +640,24 @@ export class InfortisaSyncService {
     return (this.prisma as any).importRun.findMany({
       orderBy: { started_at: 'desc' },
       take: limit,
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 5,
+        },
+      },
     });
   }
 
   async getImportRunById(id: string) {
     return (this.prisma as any).importRun.findUnique({
       where: { id },
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 50,
+        },
+      },
     });
   }
 
@@ -658,27 +670,67 @@ export class InfortisaSyncService {
   }
 
   async getProviderStats() {
-    const [latestRun, totalRuns, failedRuns] = await Promise.all([
-      (this.prisma as any).importRun.findFirst({
-        where: { provider: this.PROVIDER.toLowerCase() },
-        orderBy: { started_at: 'desc' },
-      }),
-      (this.prisma as any).importRun.count({
-        where: { provider: this.PROVIDER.toLowerCase() },
-      }),
-      (this.prisma as any).importRun.count({
-        where: {
-          provider: this.PROVIDER.toLowerCase(),
-          status: 'FAILED',
+    const provider = this.PROVIDER.toLowerCase();
+    const runs = await (this.prisma as any).importRun.findMany({
+      where: { provider },
+      orderBy: { started_at: 'desc' },
+      take: 50,
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 5,
         },
-      }),
-    ]);
+      },
+    });
+
+    const latestRun = runs[0] ?? null;
+    const statusCounts: Record<string, number> = runs.reduce((acc: Record<string, number>, run: any) => {
+      acc[run.status] = (acc[run.status] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const aggregates = runs.reduce(
+      (acc, run) => {
+        acc.source_items_received += run.source_items_received ?? 0;
+        acc.processed_count += run.processed_count ?? 0;
+        acc.persisted_count += run.persisted_count ?? 0;
+        acc.validation_skipped_count += run.validation_skipped_count ?? 0;
+        acc.created_count += run.created_count ?? 0;
+        acc.updated_count += run.updated_count ?? 0;
+        acc.skipped_count += run.skipped_count ?? 0;
+        acc.error_count += run.error_count ?? 0;
+        acc.archived_count += run.archived_count ?? 0;
+        return acc;
+      },
+      {
+        source_items_received: 0,
+        processed_count: 0,
+        persisted_count: 0,
+        validation_skipped_count: 0,
+        created_count: 0,
+        updated_count: 0,
+        skipped_count: 0,
+        error_count: 0,
+        archived_count: 0,
+      },
+    );
+
+    const differenceReceivedVsPersisted =
+      aggregates.source_items_received - aggregates.persisted_count;
+    const note =
+      runs.length === 0
+        ? 'No import runs recorded yet.'
+        : differenceReceivedVsPersisted === 0
+          ? `La API devolvió ${aggregates.source_items_received} elementos y el catálogo persistió ${aggregates.persisted_count}.`
+          : `La API devolvió ${aggregates.source_items_received} elementos pero el catálogo persistió ${aggregates.persisted_count}.`;
 
     return {
-      provider: this.PROVIDER.toLowerCase(),
-      total_runs: totalRuns,
-      failed_runs: failedRuns,
-      latest_run: latestRun,
+      provider,
+      latestRun,
+      statusCounts,
+      aggregates,
+      difference_received_vs_persisted: differenceReceivedVsPersisted,
+      note,
     };
   }
 

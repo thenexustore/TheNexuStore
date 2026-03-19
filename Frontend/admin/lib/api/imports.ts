@@ -62,6 +62,11 @@ export interface ProviderStatsResponse {
   note: string;
 }
 
+export interface ImportConnectionTestResponse {
+  ok: boolean;
+  checked_at: string;
+}
+
 export interface ImportConfigResponse {
   provider: string;
   display_name: string;
@@ -127,7 +132,7 @@ export async function updateImportConfig(
   });
 }
 
-export async function testImportConnection() {
+export async function testImportConnection(): Promise<ImportConnectionTestResponse> {
   return fetchWithAuth("/admin/imports/config/test-connection", {
     method: "POST",
   });

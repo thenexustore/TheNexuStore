@@ -51,7 +51,7 @@ export class InfortisaService implements OnModuleInit {
   }
 
   async reloadConfiguration() {
-    const integration = await this.prisma.supplierIntegration.findUnique({
+    const integration = await (this.prisma as any).supplierIntegration.findUnique({
       where: { provider: PROVIDER },
     });
     const fallbackToken = this.config.get<string>('INFORTISA_API_TOKEN') || '';

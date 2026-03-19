@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { API_URL } from "../lib/env";
 import { Mail, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
 import { loginUser } from "../lib/auth";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "../components/StoreBrandLogo";
+import { useAuth } from "../providers/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +29,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginUser({ email, password });
-      router.push("/store");
+      await refreshUser();
+      router.replace("/store");
     } catch (err: any) {
       setError(err?.message || "Invalid email or password");
     } finally {

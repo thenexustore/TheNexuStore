@@ -9,6 +9,7 @@ type UserMe = {
   first_name?: string;
   last_name?: string;
   role: string;
+  phone?: string;
   profile_image?: string;
   createdAt: string;
   address?: {
@@ -58,6 +59,7 @@ export async function verifyOtp(data: { email: string; otp: string }) {
   const res = await fetch(`${API_URL}/auth/verify-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(data),
   });
 
@@ -122,6 +124,7 @@ export async function getMe(): Promise<UserMe | null> {
       ...user,
       first_name: user.first_name ?? user.firstName,
       last_name: user.last_name ?? user.lastName,
+      phone: user.phone ?? undefined,
       profile_image: user.profile_image ?? undefined,
       ...(user.address
         ? {
@@ -145,10 +148,14 @@ export async function getMe(): Promise<UserMe | null> {
 }
 
 export async function logoutUser() {
-  await fetch(`${API_URL}/auth/logout`, {
+  const res = await fetch(`${API_URL}/auth/logout`, {
     method: "POST",
     credentials: "include",
   });
+
+  if (!res.ok) {
+    throw new Error(await getApiErrorMessage(res, "Logout failed"));
+  }
 }
 
 export async function forgotPassword(data: { email: string }) {

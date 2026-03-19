@@ -14,17 +14,52 @@ export interface ImportHistoryResponse {
   totalPages: number;
 }
 
-export interface ImportIntegrationConfig {
+export interface ImportRunError {
+  id: string;
+  sku?: string | null;
+  stage?: string | null;
+  message: string;
+  created_at: string;
+}
+
+export interface ImportRun {
+  id: string;
   provider: string;
-  display_name: string;
-  base_url: string;
-  is_active: boolean;
-  notes: string | null;
-  last_healthcheck_at: string | null;
-  api_key_last4: string | null;
-  api_key_masked: string | null;
-  api_key?: string;
-  source: "database" | "env_fallback" | "default_fallback";
+  mode: string;
+  started_at: string;
+  finished_at?: string | null;
+  status: "RUNNING" | "SUCCESS" | "PARTIAL_SUCCESS" | "FAILED";
+  source_items_received: number;
+  processed_count: number;
+  persisted_count: number;
+  validation_skipped_count: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  error_count: number;
+  archived_count: number;
+  request_meta_json?: Record<string, unknown> | null;
+  result_meta_json?: Record<string, unknown> | null;
+  errors?: ImportRunError[];
+}
+
+export interface ProviderStatsResponse {
+  provider: string;
+  latestRun?: ImportRun | null;
+  statusCounts: Record<string, number>;
+  aggregates: {
+    source_items_received: number;
+    processed_count: number;
+    persisted_count: number;
+    validation_skipped_count: number;
+    created_count: number;
+    updated_count: number;
+    skipped_count: number;
+    error_count: number;
+    archived_count: number;
+  };
+  difference_received_vs_persisted: number;
+  note: string;
 }
 
 export async function fetchImportHistory(
@@ -38,37 +73,20 @@ export async function fetchImportHistory(
   return fetchWithAuth(`/admin/imports/history?${params.toString()}`);
 }
 
-export async function fetchImportConfig(includeSecret = false) {
-  const params = new URLSearchParams();
-  if (includeSecret) {
-    params.set("includeSecret", "true");
-  }
-
-  return fetchWithAuth<ImportIntegrationConfig>(
-    `/admin/imports/config${params.toString() ? `?${params.toString()}` : ""}`,
-  );
+export async function fetchImportRuns(): Promise<ImportRun[]> {
+  return fetchWithAuth("/admin/imports/runs");
 }
 
-export async function updateImportConfig(input: {
-  display_name: string;
-  base_url: string;
-  api_key?: string;
-  is_active: boolean;
-  notes?: string;
-}) {
-  return fetchWithAuth<ImportIntegrationConfig>("/admin/imports/config", {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
+export async function fetchImportRun(id: string): Promise<ImportRun> {
+  return fetchWithAuth(`/admin/imports/runs/${id}`);
 }
 
-export async function testImportConnection() {
-  return fetchWithAuth<{ ok: boolean; checked_at: string }>(
-    "/admin/imports/config/test-connection",
-    {
-      method: "POST",
-    },
-  );
+export async function fetchImportRunErrors(id: string): Promise<ImportRunError[]> {
+  return fetchWithAuth(`/admin/imports/runs/${id}/errors`);
+}
+
+export async function fetchProviderStats(): Promise<ProviderStatsResponse> {
+  return fetchWithAuth("/admin/imports/provider-stats");
 }
 
 export async function triggerImport(mode: "full" | "stock" | "images") {

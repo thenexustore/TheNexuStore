@@ -82,13 +82,19 @@ export {
 export {
   fetchImportConfig,
   fetchImportHistory,
+  fetchImportRun,
+  fetchImportRunErrors,
+  fetchImportRuns,
+  fetchProviderStats,
   retryImport,
   testImportConnection,
   triggerImport,
   updateImportConfig,
   type ImportHistoryItem,
   type ImportHistoryResponse,
-  type ImportIntegrationConfig,
+  type ImportRun,
+  type ImportRunError,
+  type ProviderStatsResponse,
 } from "./imports";
 
 export {

@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { ImportsController } from './imports.controller';
 import { PrismaService } from '../../common/prisma.service';
 import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
@@ -87,6 +88,50 @@ describe('ImportsController', () => {
     await expect(controller.providerStats()).resolves.toEqual({
       success: true,
       data: { provider: 'infortisa' },
+    });
+  });
+
+  it('forwards includeSecret when the staff user has secret-read permission', async () => {
+    (importsConfigService.getConfig as jest.Mock).mockResolvedValue({ provider: 'INFORTISA' });
+
+    const result = await controller.config(
+      {
+        user: {
+          permissions: ['imports:config:read', 'imports:secret:read'],
+        },
+      } as any,
+      'true',
+    );
+
+    expect(importsConfigService.getConfig).toHaveBeenCalledWith({
+      includeSecret: true,
+      enforceSecretRead: true,
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { provider: 'INFORTISA' },
+    });
+  });
+
+  it('keeps includeSecret false when the staff user lacks secret-read permission', async () => {
+    (importsConfigService.getConfig as jest.Mock).mockRejectedValue(
+      new ForbiddenException('Explicit secret read permission is required'),
+    );
+
+    await expect(
+      controller.config(
+        {
+          user: {
+            permissions: ['imports:config:read'],
+          },
+        } as any,
+        'true',
+      ),
+    ).rejects.toThrow('Explicit secret read permission is required');
+
+    expect(importsConfigService.getConfig).toHaveBeenCalledWith({
+      includeSecret: false,
+      enforceSecretRead: true,
     });
   });
 

@@ -12,6 +12,11 @@ import {
 } from 'crypto';
 import { PrismaService } from '../../common/prisma.service';
 import { InfortisaService } from '../../infortisa/infortisa.service';
+import {
+  normalizeImportRuntimeSettings,
+  type PartialImportRuntimeSettings,
+} from '../../infortisa/import-runtime-settings';
+import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
 import { UpdateImportIntegrationConfigDto } from './dto/imports-config.dto';
 
 const INTEGRATION_PROVIDER = 'INFORTISA';
@@ -24,6 +29,7 @@ export class ImportsConfigService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly infortisaService: InfortisaService,
+    private readonly infortisaSyncService: InfortisaSyncService,
   ) {}
 
   private getEncryptionSecret() {
@@ -90,6 +96,14 @@ export class ImportsConfigService {
     }
   }
 
+  private readRuntimeSettings(raw: unknown) {
+    return normalizeImportRuntimeSettings(
+      raw && typeof raw === 'object'
+        ? (raw as PartialImportRuntimeSettings)
+        : undefined,
+    );
+  }
+
   async getIntegrationRecord() {
     return this.prisma.supplierIntegration.findUnique({
       where: { provider: INTEGRATION_PROVIDER },
@@ -130,19 +144,34 @@ export class ImportsConfigService {
         : decryptedToken
           ? 'env_fallback'
           : 'default_fallback',
+      settings: this.readRuntimeSettings(record?.settings_json),
     };
   }
 
   async updateConfig(input: UpdateImportIntegrationConfigDto) {
+    const record = await this.getIntegrationRecord();
     const apiKey = input.api_key?.trim();
     const encryptedApiKey = apiKey ? this.encryptApiKey(apiKey) : undefined;
     const apiKeyLast4 = apiKey ? apiKey.slice(-4) : undefined;
+    const settings = normalizeImportRuntimeSettings({
+      ...this.readRuntimeSettings(record?.settings_json),
+      stock_sync_cron: input.stock_sync_cron,
+      incremental_sync_cron: input.incremental_sync_cron,
+      full_sync_cron: input.full_sync_cron,
+      stock_batch_size: input.stock_batch_size,
+      full_sync_batch_size: input.full_sync_batch_size,
+      catalog_page_size:
+        input.catalog_page_size === undefined
+          ? undefined
+          : input.catalog_page_size,
+    });
 
     await this.prisma.supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
       update: {
         display_name: input.display_name.trim(),
         base_url: this.normalizeBaseUrl(input.base_url),
+        settings_json: settings,
         ...(typeof input.is_active === 'boolean'
           ? { is_active: input.is_active }
           : {}),
@@ -161,32 +190,36 @@ export class ImportsConfigService {
         notes: input.notes?.trim() || null,
         api_key_encrypted: encryptedApiKey || null,
         api_key_last4: apiKeyLast4 || null,
+        settings_json: settings,
       },
     });
 
     await this.infortisaService.reloadConfiguration();
+    await this.infortisaSyncService.reloadRuntimeSettings();
 
     return this.getConfig();
   }
 
   async testConnection() {
     const healthy = await this.infortisaService.checkServiceHealth();
+    const checkedAt = new Date();
 
     await this.prisma.supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
-      update: { last_healthcheck_at: new Date() },
+      update: { last_healthcheck_at: checkedAt },
       create: {
         provider: INTEGRATION_PROVIDER,
         display_name: INTEGRATION_FALLBACK_NAME,
         base_url: INTEGRATION_FALLBACK_BASE_URL,
         is_active: true,
-        last_healthcheck_at: new Date(),
+        settings_json: normalizeImportRuntimeSettings(),
+        last_healthcheck_at: checkedAt,
       },
     });
 
     return {
       ok: healthy,
-      checked_at: new Date().toISOString(),
+      checked_at: checkedAt.toISOString(),
     };
   }
 }

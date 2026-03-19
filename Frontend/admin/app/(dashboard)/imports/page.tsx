@@ -9,6 +9,7 @@ import {
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
+  testImportConnection,
   triggerImport,
   updateImportConfig,
   type ImportHistoryItem,
@@ -256,47 +257,6 @@ export default function ImportsPage() {
     void Promise.all([loadHistory(), loadRuns(), loadConfig(false)]);
   }, [canReadConfig]);
 
-  const saveConfig = async () => {
-    setConfigSaving(true);
-    try {
-      await updateImportConfig({
-        display_name: form.display_name,
-        base_url: form.base_url,
-        api_key: form.api_key.trim() || undefined,
-        is_active: form.is_active,
-        notes: form.notes,
-      });
-      toast.success("API configuration updated");
-      await loadConfig(showingSecret && canReadSecret);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update API configuration");
-    } finally {
-      setConfigSaving(false);
-    }
-  };
-
-  const handleTestConnection = async () => {
-    setConnectionTesting(true);
-    try {
-      const result = await testImportConnection();
-      setLastHealthcheckAt(result.checked_at || new Date().toISOString());
-      toast.success(result.ok ? "Connection to supplier API is healthy" : "Supplier API responded as unhealthy");
-      await loadConfig(showingSecret && canReadSecret);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to test API connection");
-    } finally {
-      setConnectionTesting(false);
-    }
-  };
-
-  const handleToggleSecret = async () => {
-    if (!canReadSecret) {
-      toast.error("You do not have permission to read the API key");
-      return;
-    }
-    await loadConfig(!showingSecret);
-  };
-
   const latestRun = providerStats?.latestRun ?? runs[0] ?? null;
   const latestIncidents = latestRun ? runErrors[latestRun.id] ?? latestRun.errors ?? [] : [];
 
@@ -327,12 +287,12 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center gap-2 text-sm text-slate-500"><PlugZap className="h-4 w-4" /> Last healthcheck</div><p className="mt-2 text-lg font-semibold text-slate-900">{formatDate(lastHealthcheckAt)}</p></div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center gap-2 text-sm text-slate-500"><KeyRound className="h-4 w-4" /> Stored key</div><p className="mt-2 break-all text-lg font-semibold text-slate-900">{showingSecret ? form.api_key || "—" : storedMaskedKey || "No key stored"}</p></div>
             </div>
+            {providerStats ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
               <p className="text-xs uppercase tracking-wide text-rose-700">Difference</p>
               <p className="mt-2 text-2xl font-semibold text-rose-900">{providerStats.difference_received_vs_persisted}</p>
             </div>
-          </div>
-        )}
+            ) : null}
 
             <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="space-y-4">

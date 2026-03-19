@@ -691,7 +691,6 @@ export default function Navbar() {
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={closeMobilePanels}
           aria-label={t("closeMenu")}
-          aria-label="Close menu"
         />
       )}
 
@@ -727,7 +726,6 @@ export default function Navbar() {
                 onClick={() => setCategorySearch("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 aria-label={t("clearSearch")}
-                aria-label="Limpiar búsqueda de categorías"
               >
                 <X className="h-4 w-4" />
               </button>

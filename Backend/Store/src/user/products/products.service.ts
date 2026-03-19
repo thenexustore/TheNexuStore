@@ -1390,8 +1390,6 @@ export class ProductsService {
       name: categoryName,
       slug: categorySlug,
       subfamilyName: infortisaSubfamily,
-      name: categoryName,
-      slug: categorySlug,
     });
     const level2Category = await this.prisma.category.upsert({
       where: { slug: level2Descriptor.slug },

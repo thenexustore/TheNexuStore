@@ -6,6 +6,7 @@ import {
   fetchImportHistory,
   fetchImportRun,
   fetchImportRunErrors,
+  fetchImportRuntimeOverview,
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
@@ -15,6 +16,7 @@ import {
   type ImportHistoryItem,
   type ImportRun,
   type ImportRunError,
+  type ImportRuntimeOverviewResponse,
   type ProviderStatsResponse,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -218,6 +220,8 @@ export default function ImportsPage() {
   const [runs, setRuns] = useState<ImportRun[]>([]);
   const [providerStats, setProviderStats] =
     useState<ProviderStatsResponse | null>(null);
+  const [runtimeOverview, setRuntimeOverview] =
+    useState<ImportRuntimeOverviewResponse | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
   const [runDetails, setRunDetails] = useState<Record<string, ImportRun>>({});
@@ -279,12 +283,14 @@ export default function ImportsPage() {
 
   async function loadRuns() {
     try {
-      const [runsData, providerStatsData] = await Promise.all([
+      const [runsData, providerStatsData, runtimeOverviewData] = await Promise.all([
         fetchImportRuns(),
         fetchProviderStats(),
+        fetchImportRuntimeOverview(),
       ]);
       setRuns(runsData);
       setProviderStats(providerStatsData);
+      setRuntimeOverview(runtimeOverviewData);
     } catch (error) {
       toast.error(
         getErrorMessage(error, "Failed to load import observability"),
@@ -831,6 +837,60 @@ export default function ImportsPage() {
           </>
         )}
       </section>
+
+      {runtimeOverview ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Estado efectivo del scheduler
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Muestra qué jobs están realmente activos ahora mismo, con su cron
+                aplicado y la próxima ejecución calculada.
+              </p>
+            </div>
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${runtimeOverview.integration_enabled ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+              {runtimeOverview.integration_enabled ? "Integración global activa" : "Integración global desactivada"}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4 md:grid-cols-2">
+            {runtimeOverview.jobs.map((job: ImportRuntimeOverviewResponse["jobs"][number]) => (
+              <div key={job.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold capitalize text-slate-900">{job.key}</p>
+                    <p className="mt-1 text-xs text-slate-500">{job.job_name}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${job.effective_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
+                    {job.effective_enabled ? "Activo" : "Inactivo"}
+                  </span>
+                </div>
+
+                <dl className="mt-4 space-y-2 text-sm text-slate-600">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Habilitado en ajustes</dt>
+                    <dd>{job.enabled_in_settings ? "Sí" : "No"}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt>Registrado en scheduler</dt>
+                    <dd>{job.registered ? "Sí" : "No"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Cron</dt>
+                    <dd className="mt-1 break-all rounded-lg bg-white px-2 py-1 font-mono text-xs text-slate-700">{job.cron}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Próxima ejecución</dt>
+                    <dd className="mt-1 text-slate-700">{formatDate(job.next_run_at ?? null)}</dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <button

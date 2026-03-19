@@ -23,6 +23,7 @@ describe('ImportsController', () => {
     getImportRunById: jest.fn(),
     getImportRunErrors: jest.fn(),
     getProviderStats: jest.fn(),
+    getRuntimeOverview: jest.fn(),
   } as unknown as InfortisaSyncService;
 
   const auditLogService = {
@@ -136,6 +137,24 @@ describe('ImportsController', () => {
     });
   });
 
+
+
+  it('returns runtime overview', async () => {
+    (infortisaSync.getRuntimeOverview as jest.Mock).mockResolvedValue({
+      provider: 'infortisa',
+      integration_enabled: true,
+      jobs: [],
+    });
+
+    await expect(controller.runtimeOverview()).resolves.toEqual({
+      success: true,
+      data: {
+        provider: 'infortisa',
+        integration_enabled: true,
+        jobs: [],
+      },
+    });
+  });
 
   it('triggers incremental sync and logs execution', async () => {
     (infortisaSync.syncProductsIncremental as jest.Mock).mockResolvedValue({ id: 'run-3' });

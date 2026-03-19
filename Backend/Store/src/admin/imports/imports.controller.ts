@@ -246,6 +246,13 @@ export class ImportsController {
     return { success: true, data: stats };
   }
 
+  @Get('runtime-overview')
+  @Permissions('imports:config:read')
+  async runtimeOverview() {
+    const data = await this.infortisaSync.getRuntimeOverview();
+    return { success: true, data };
+  }
+
   @Post('run')
   @Permissions('imports:run')
   async run(@Body() body: TriggerImportDto, @Req() req: AdminRequest) {

@@ -493,7 +493,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               <ActionLink
                 key={asText(cat.id, `cat-${idx}`)}
                 href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-                className={`group relative flex min-h-[224px] w-[var(--card-mobile)] flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:w-[var(--card-desktop)] ${cardToneClass}`}
+                className={`group relative flex min-h-[224px] w-[var(--card-mobile)] shrink-0 flex-none flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:w-[var(--card-desktop)] ${cardToneClass}`}
                 style={{
                   ['--card-mobile' as string]: `${mobileCardPx}px`,
                   ['--card-desktop' as string]: `${desktopCardPx}px`,
@@ -685,7 +685,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       <ActionLink
         key={asText(product.id, `prod-${idx}`)}
         href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-        className="group relative flex min-h-[26rem] snap-start flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg min-w-[var(--card-mobile)] max-w-[var(--card-mobile)] md:min-h-[27rem] md:min-w-[var(--card-desktop)] md:max-w-[var(--card-desktop)]"
+        className="group relative flex min-h-[26rem] w-[var(--card-mobile)] shrink-0 flex-none snap-start flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg md:min-h-[27rem] md:w-[var(--card-desktop)]"
         style={{
           ['--card-mobile' as string]: `${mobileCardPx}px`,
           ['--card-desktop' as string]: `${desktopCardPx}px`,
@@ -908,7 +908,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
           <ActionLink
             key={asText(brand.id, `brand-${idx}`)}
             href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-            className="snap-start rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]"
+            className="snap-start shrink-0 flex-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]"
             style={{
               ['--brand-mobile' as string]: `${mobileItemPx}px`,
               ['--brand-desktop' as string]: `${itemPx}px`,

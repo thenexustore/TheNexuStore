@@ -173,7 +173,7 @@ export default async function StorePage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-8 pt-4 sm:pb-12 sm:pt-6 lg:pb-16 lg:pt-8">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-8 pt-8 sm:pb-12 sm:pt-10 lg:pb-16 lg:pt-12">
       <div className="mx-auto w-full max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8 sm:space-y-12 lg:space-y-16">
         {shouldRenderDynamic ? (
           <Suspense>

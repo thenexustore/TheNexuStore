@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { HomeBuilderApiError, homeBuilderApi } from "@/lib/api/home-builder";
 import { API_URL, SITE_URL } from "@/lib/constants";
 import { useLocale } from "next-intl";
-import { Eye, LayoutTemplate, Sparkles, Wand2 } from "lucide-react";
+import { Eye, LayoutTemplate, Pencil, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { getBanners, toggleBannerStatus } from "@/lib/api/banners";
 import {
   fetchFeaturedProducts,
@@ -221,6 +221,14 @@ export default function HomeComposerPage() {
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
+
+  // New state for improvements
+  const [renamingLayout, setRenamingLayout] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameCancelledRef = useRef(false);
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [jsonExpanded, setJsonExpanded] = useState(false);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -569,6 +577,7 @@ export default function HomeComposerPage() {
       variant: selectedSection.variant || "",
       configText: JSON.stringify(selectedSection.config || {}, null, 2),
     });
+    setJsonExpanded(false); // collapse JSON editor when switching sections
   }, [selectedSection]);
 
   useEffect(() => {
@@ -613,11 +622,29 @@ export default function HomeComposerPage() {
     return () => clearTimeout(handle);
   }, [selectedSection, curatedEnabled, currentTarget, searchQuery]);
 
+  // Ctrl+S keyboard shortcut to save section
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+        event.preventDefault();
+        if (isDraftDirty && parsedDraftConfig && !saving) {
+          void saveInspector();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // saveInspector is defined below but used here - this is fine for keyboard shortcut
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDraftDirty, parsedDraftConfig, saving]);
+
   const createLayout = async () => {
+    const defaultName = `Home ${new Date().toLocaleDateString(locale)}`;
+    const name = window.prompt("Nombre del nuevo diseño:", defaultName);
+    if (name === null) return; // user cancelled
     try {
       setSaving(true);
-      const name = `Home ${new Date().toLocaleDateString()}`;
-      const layout = (await homeBuilderApi.createLayout({ name, locale })) as HomeLayout;
+      const layout = (await homeBuilderApi.createLayout({ name: name.trim() || defaultName, locale })) as HomeLayout;
       await loadLayouts();
       setActiveLayoutId(layout.id);
       toast.success("Diseño creado");
@@ -965,12 +992,177 @@ export default function HomeComposerPage() {
     });
   };
 
+  const formatJsonConfig = () => {
+    if (!draft) return;
+    try {
+      const parsed = safeJsonParse(draft.configText);
+      setDraft({ ...draft, configText: JSON.stringify(parsed, null, 2) });
+      setJsonExpanded(true);
+      toast.success("JSON formateado");
+    } catch {
+      setJsonExpanded(true);
+      toast.error("JSON inválido: no se puede formatear");
+    }
+  };
+
+  const resetConfigToDefaults = () => {
+    if (!selectedSection || !draft) return;
+    if (!window.confirm("¿Restablecer la configuración de este bloque a los valores predeterminados?")) return;
+    const defaultConfig = DEFAULT_CONFIG[selectedSection.type] || {};
+    setDraft({ ...draft, configText: JSON.stringify(defaultConfig, null, 2) });
+    toast.success("Configuración restablecida a valores predeterminados");
+  };
+
+  const duplicateSection = async (section: HomeSection) => {
+    if (!activeLayoutId) return;
+    try {
+      setSaving(true);
+      const newTitle = `${section.title || SECTION_TYPE_LABELS[section.type]} (copia)`;
+      await homeBuilderApi.createSection(activeLayoutId, {
+        type: section.type,
+        position: sections.length + 1,
+        is_enabled: false,
+        title: newTitle,
+        config: { ...section.config },
+      });
+      await loadSections(activeLayoutId);
+      toast.success("Sección duplicada (desactivada por defecto)");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo duplicar la sección");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const enableAllSections = async () => {
+    if (!sections.length) return;
+    const disabled = sections.filter((s) => !s.is_enabled);
+    if (!disabled.length) { toast.success("Todas las secciones ya están visibles"); return; }
+    try {
+      setSaving(true);
+      await Promise.all(
+        disabled.map((s) => homeBuilderApi.updateSection(s.id, { is_enabled: true }))
+      );
+      await loadSections(activeLayoutId);
+      toast.success(`${disabled.length} sección${disabled.length !== 1 ? "es" : ""} activada${disabled.length !== 1 ? "s" : ""}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo activar todas las secciones");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disableAllSections = async () => {
+    if (!sections.length) return;
+    const enabled = sections.filter((s) => s.is_enabled);
+    if (!enabled.length) { toast.success("Todas las secciones ya están ocultas"); return; }
+    if (!window.confirm(`¿Ocultar todas las ${enabled.length} secciones visibles?`)) return;
+    try {
+      setSaving(true);
+      await Promise.all(
+        enabled.map((s) => homeBuilderApi.updateSection(s.id, { is_enabled: false }))
+      );
+      await loadSections(activeLayoutId);
+      toast.success(`${enabled.length} sección${enabled.length !== 1 ? "es" : ""} desactivada${enabled.length !== 1 ? "s" : ""}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo desactivar todas las secciones");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startRenameLayout = () => {
+    if (!activeLayout) return;
+    setRenameValue(activeLayout.name);
+    setRenamingLayout(true);
+    setTimeout(() => renameInputRef.current?.focus(), 50);
+  };
+
+  const commitRenameLayout = async () => {
+    // Guard: don't commit if cancel was just clicked (race condition protection)
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
+    if (!activeLayout) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === activeLayout.name) {
+      setRenamingLayout(false);
+      return;
+    }
+    try {
+      setSaving(true);
+      await homeBuilderApi.updateLayout(activeLayout.id, { name: trimmed });
+      await loadLayouts();
+      toast.success("Diseño renombrado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo renombrar el diseño");
+    } finally {
+      setSaving(false);
+      setRenamingLayout(false);
+    }
+  };
+
+  const deleteLayout = async () => {
+    if (!activeLayout) return;
+    if (activeLayout.is_active) {
+      toast.error("No se puede eliminar un diseño publicado. Publica otro diseño primero.");
+      return;
+    }
+    if (!window.confirm(`¿Eliminar el diseño "${activeLayout.name}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      setSaving(true);
+      await homeBuilderApi.deleteLayout(activeLayout.id);
+      await loadLayouts();
+      toast.success("Diseño eliminado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el diseño");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cloneLayout = async () => {
+    if (!activeLayout) return;
+    const newName = window.prompt("Nombre para el diseño clonado:", `${activeLayout.name} (copia)`);
+    if (newName === null) return;
+    try {
+      setSaving(true);
+      const cloned = (await homeBuilderApi.cloneLayout(activeLayout.id)) as HomeLayout;
+      // Rename if user provided a different name
+      const trimmedName = newName.trim();
+      if (trimmedName && trimmedName !== cloned.name) {
+        await homeBuilderApi.updateLayout(cloned.id, { name: trimmedName });
+      }
+      await loadLayouts();
+      setActiveLayoutId(cloned.id);
+      toast.success("Diseño clonado. Ahora estás editando la copia (inactiva).");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo clonar el diseño");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectSectionWithGuard = (id: string) => {
+    if (id === selectedSectionId) return;
+    if (isDraftDirty) {
+      if (!window.confirm("Tienes cambios sin guardar en el bloque actual. ¿Descartar y cambiar de sección?")) return;
+    }
+    setSelectedSectionId(id);
+  };
+
   const previewLink = activeLayoutId
     ? `${SITE_URL}/${locale}/store?previewLayoutId=${activeLayoutId}`
     : `${SITE_URL}/${locale}/store`;
 
   if (loading) {
-    return <div className="p-6 text-sm text-zinc-600">Cargando Página Principal…</div>;
+    return (
+      <div className="flex items-center gap-3 p-6 text-sm text-zinc-600">
+        <RefreshCw className="h-4 w-4 animate-spin" />
+        Cargando Página Principal…
+      </div>
+    );
   }
 
   const config = parsedDraftConfig || {};
@@ -980,16 +1172,51 @@ export default function HomeComposerPage() {
     selectedSection?.type === "PRODUCT_CAROUSEL" &&
     String(config.source || "NEW_ARRIVALS") === "FEATURED";
 
+  const enabledSectionsCount = sections.filter((s) => s.is_enabled).length;
+
+  const normalizedSectionFilter = sectionFilter.trim().toLowerCase();
+  const filteredSections = normalizedSectionFilter
+    ? sections.filter(
+        (s) =>
+          (s.title || "").toLowerCase().includes(normalizedSectionFilter) ||
+          s.type.toLowerCase().includes(normalizedSectionFilter),
+      )
+    : sections;
+
   return (
     <div className="space-y-6 p-6">
+      {/* Floating save bar */}
+      {isDraftDirty && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg text-sm text-amber-900">
+          <span className="font-medium">⚠️ Cambios sin guardar</span>
+          <button
+            onClick={saveInspector}
+            disabled={saving || !parsedDraftConfig}
+            className="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+          >
+            Guardar bloque
+          </button>
+          <button
+            onClick={resetDraft}
+            disabled={saving}
+            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs hover:bg-amber-50 disabled:opacity-60"
+          >
+            Descartar
+          </button>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Página Principal</span>
           <a href="#composer-banners-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
-            Ir a Banners integrados
+            ↓ Banners integrados
           </a>
           <a href="#composer-featured-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
-            Ir a Productos destacados integrados
+            ↓ Productos destacados
+          </a>
+          <a href={previewLink} target="_blank" rel="noreferrer" className="ml-auto rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50 flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" /> Vista previa
           </a>
         </div>
       </div>
@@ -1011,63 +1238,137 @@ export default function HomeComposerPage() {
               + Nuevo diseño
             </button>
             <button
-              onClick={publishLayout}
+              onClick={() => void cloneLayout()}
               disabled={saving || !activeLayout}
-              className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
+              title="Clonar el diseño activo (copia con sus secciones)"
             >
-              Publicar diseño
+              Clonar diseño
             </button>
-            <a
-              href={previewLink}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50"
+            <button
+              onClick={publishLayout}
+              disabled={saving || !activeLayout || !!activeLayout?.is_active}
+              className={`rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60 ${
+                activeLayout?.is_active
+                  ? "border border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : "bg-black text-white hover:bg-zinc-800"
+              }`}
             >
-              Abrir vista previa
-            </a>
+              {activeLayout?.is_active ? "✓ Ya publicado" : "Publicar diseño"}
+            </button>
             <a
               href={`${API_URL}/admin/home/preview?layoutId=${activeLayoutId}`}
               target="_blank"
               rel="noreferrer"
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50"
+              title="Ver JSON del layout en API"
             >
-              Ver JSON de vista previa
+              Ver JSON
             </a>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <label className="text-sm">
-            <span className="mb-1 block text-zinc-500">Diseño</span>
-            <select
-              value={activeLayoutId}
-              onChange={(event) => setActiveLayoutId(event.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2"
-            >
-              {layouts.map((layout) => (
-                <option key={layout.id} value={layout.id}>
-                  {layout.name}
-                  {layout.is_active ? " (Activo)" : ""}
-                  {layout.locale ? ` · ${layout.locale}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
+          <div>
+            <span className="mb-1 block text-xs text-zinc-500">Diseño activo</span>
+            {renamingLayout ? (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void commitRenameLayout();
+                    if (e.key === "Escape") {
+                      renameCancelledRef.current = true;
+                      setRenamingLayout(false);
+                    }
+                  }}
+                  onBlur={() => void commitRenameLayout()}
+                  className="flex-1 rounded-lg border border-indigo-400 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <button
+                  onClick={() => void commitRenameLayout()}
+                  disabled={saving}
+                  className="rounded-lg bg-black px-2 py-2 text-xs text-white hover:bg-zinc-800 disabled:opacity-60"
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={() => {
+                    renameCancelledRef.current = true;
+                    setRenamingLayout(false);
+                  }}
+                  className="rounded-lg border border-zinc-300 px-2 py-2 text-xs hover:bg-zinc-50"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <select
+                  value={activeLayoutId}
+                  onChange={(event) => setActiveLayoutId(event.target.value)}
+                  className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                >
+                  {layouts.map((layout) => (
+                    <option key={layout.id} value={layout.id}>
+                      {layout.name}
+                      {layout.is_active ? " ✓ Activo" : ""}
+                      {layout.locale ? ` · ${layout.locale}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={startRenameLayout}
+                  disabled={!activeLayout || saving}
+                  className="rounded-lg border border-zinc-300 bg-white p-2 text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
+                  title="Renombrar diseño"
+                  aria-label="Renombrar diseño"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
           <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm">
-            <div className="text-zinc-500">Estado</div>
-            <div className="font-medium text-zinc-900">
-              {activeLayout?.is_active ? "Publicado" : "Borrador"}
+            <div className="text-zinc-500 text-xs">Estado</div>
+            <div className={`font-medium ${activeLayout?.is_active ? "text-emerald-700" : "text-zinc-600"}`}>
+              {activeLayout?.is_active ? "✓ Publicado" : "Borrador"}
             </div>
           </div>
           <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm">
-            <div className="text-zinc-500">Secciones</div>
-            <div className="font-medium text-zinc-900">{sections.length}</div>
+            <div className="text-zinc-500 text-xs">Secciones</div>
+            <div className="font-medium text-zinc-900">
+              {enabledSectionsCount}<span className="text-zinc-400 font-normal">/{sections.length}</span>
+              <span className="ml-1 text-[11px] text-zinc-400">visibles</span>
+            </div>
           </div>
+          {activeLayout && !activeLayout.is_active ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm shadow-sm flex items-center">
+              <button
+                onClick={() => void deleteLayout()}
+                disabled={saving}
+                className="text-xs text-rose-700 hover:text-rose-900 disabled:opacity-40"
+                title="Eliminar diseño (solo borradores)"
+              >
+                🗑 Eliminar
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {activeDiagnostics?.activeLayout ? (
           <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
-            <div className="font-semibold">Diagnóstico layout activo (runtime)</div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold">Diagnóstico layout activo (runtime)</span>
+              <button
+                onClick={() => void loadActiveDiagnostics()}
+                className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] hover:bg-indigo-50"
+              >
+                <RefreshCw className="inline h-3 w-3 mr-0.5" /> Actualizar
+              </button>
+            </div>
             <div className="mt-1">
               Layout activo en API: <span className="font-mono">{activeDiagnostics.activeLayout.id}</span>
               {activeDiagnostics.activeLayout.locale ? ` · ${activeDiagnostics.activeLayout.locale}` : " · global"}
@@ -1088,12 +1389,17 @@ export default function HomeComposerPage() {
               ))}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+            Sin datos de diagnóstico. Publica un diseño para ver el estado en tiempo real.
+          </div>
+        )}
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><LayoutTemplate className="h-3.5 w-3.5" /> Diseña por bloques</span>
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Eye className="h-3.5 w-3.5" /> Previsualiza antes de publicar</span>
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Wand2 className="h-3.5 w-3.5" /> Ajustes rápidos en inspector</span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 ml-auto">⌨️ Ctrl+S = guardar bloque</span>
       </div>
 
       </div>
@@ -1118,7 +1424,8 @@ export default function HomeComposerPage() {
           <input
             value={newSectionTitle}
             onChange={(event) => setNewSectionTitle(event.target.value)}
-            placeholder="Título de la sección"
+            onKeyDown={(e) => { if (e.key === "Enter" && !saving && activeLayoutId) void addSection(); }}
+            placeholder="Título de la sección (opcional)"
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm"
           />
           <button
@@ -1133,18 +1440,67 @@ export default function HomeComposerPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Lienzo de secciones</h2>
-          <p className="mt-1 text-xs text-zinc-500">Reordena, oculta o elimina bloques con un clic.</p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold">Lienzo de secciones</h2>
+              <p className="mt-1 text-xs text-zinc-500">Selecciona, reordena, oculta o elimina bloques. Duplica para crear variantes.</p>
+            </div>
+            {sections.length > 0 && (
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => void enableAllSections()}
+                  disabled={saving || sections.every((s) => s.is_enabled)}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+                  title="Activar todas las secciones"
+                >
+                  Activar todas
+                </button>
+                <button
+                  onClick={() => void disableAllSections()}
+                  disabled={saving || sections.every((s) => !s.is_enabled)}
+                  className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
+                  title="Ocultar todas las secciones"
+                >
+                  Ocultar todas
+                </button>
+              </div>
+            )}
+          </div>
+
+          {sections.length > 4 && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                placeholder="Filtrar secciones por nombre o tipo…"
+                className="flex-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
+              />
+              {sectionFilter && (
+                <button
+                  onClick={() => setSectionFilter("")}
+                  className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
+                >
+                  ✕ Limpiar
+                </button>
+              )}
+              {normalizedSectionFilter && (
+                <span className="text-xs text-zinc-500">
+                  {filteredSections.length}/{sections.length}
+                </span>
+              )}
+            </div>
+          )}
 
           <CanvasSections
-            sections={sections}
+            sections={filteredSections}
             selectedSectionId={selectedSectionId}
             saving={saving}
             sectionTypeLabels={SECTION_TYPE_LABELS}
-            onSelect={setSelectedSectionId}
+            onSelect={selectSectionWithGuard}
             onMove={(section, direction) => void moveSection(section, direction)}
             onToggle={(section) => void toggleSection(section)}
             onDelete={(id) => void deleteSection(id)}
+            onDuplicate={(section) => void duplicateSection(section)}
           />
         </div>
 
@@ -1153,18 +1509,23 @@ export default function HomeComposerPage() {
           <p className="mt-1 text-xs text-zinc-500">Edita contenido, comportamiento y configuración avanzada.</p>
 
           {!selectedSection || !draft ? (
-            <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-500">
-              Selecciona un bloque en el lienzo para empezar a editarlo.
+            <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center text-sm text-zinc-500">
+              <div className="text-3xl mb-2">👆</div>
+              <div>Selecciona un bloque en el lienzo para editarlo.</div>
+              <div className="mt-1 text-xs text-zinc-400">Haz clic en cualquier sección de la lista.</div>
             </div>
           ) : (
             <div className="mt-4 space-y-4">
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-                Editando: <span className="font-semibold text-zinc-800">{SECTION_TYPE_LABELS[selectedSection.type]}</span>
-                {isDraftDirty ? (
-                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Cambios sin guardar</span>
-                ) : (
-                  <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">Sin cambios</span>
-                )}
+              <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                <div>
+                  Editando: <span className="font-semibold text-zinc-800">{SECTION_TYPE_LABELS[selectedSection.type]}</span>
+                  {isDraftDirty ? (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠️ Sin guardar</span>
+                  ) : (
+                    <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">✓ Guardado</span>
+                  )}
+                </div>
+                <span className="text-[11px] text-zinc-400">Ctrl+S para guardar</span>
               </div>
 
               {selectedSection.type === "HERO_CAROUSEL" ? (
@@ -2202,19 +2563,51 @@ export default function HomeComposerPage() {
                 </div>
               ) : null}
 
-              <label className="block text-sm">
-                <span className="mb-1 block text-zinc-500">Config JSON (avanzado)</span>
-                <textarea
-                  value={draft.configText}
-                  onChange={(event) => setDraft({ ...draft, configText: event.target.value })}
-                  rows={14}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
-                />
-              </label>
+              <div className="block text-sm">
+                <button
+                  type="button"
+                  onClick={() => setJsonExpanded((v) => !v)}
+                  className="mb-1 flex w-full items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-left hover:bg-zinc-100"
+                >
+                  <span className="text-xs font-medium text-zinc-600">
+                    {jsonExpanded ? "▼" : "▶"} Config JSON (avanzado)
+                    {!parsedDraftConfig && (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠️ Inválido</span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={formatJsonConfig}
+                      className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50"
+                      title="Formatear JSON"
+                    >
+                      {} Formatear
+                    </button>
+                    <button
+                      onClick={resetConfigToDefaults}
+                      className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50"
+                      title="Restablecer a valores por defecto"
+                    >
+                      ↺ Defecto
+                    </button>
+                  </div>
+                </button>
+                {jsonExpanded && (
+                  <textarea
+                    value={draft.configText}
+                    onChange={(event) => setDraft({ ...draft, configText: event.target.value })}
+                    rows={14}
+                    spellCheck={false}
+                    className={`w-full rounded-lg border px-3 py-2 font-mono text-xs ${
+                      parsedDraftConfig ? "border-zinc-300" : "border-amber-400 bg-amber-50"
+                    }`}
+                  />
+                )}
+              </div>
 
               {!parsedDraftConfig ? (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  JSON inválido: corrige la configuración antes de guardar.
+                  ⚠️ JSON inválido: corrige la configuración antes de guardar.
                 </div>
               ) : null}
 
@@ -2222,17 +2615,18 @@ export default function HomeComposerPage() {
                 <button
                   onClick={saveInspector}
                   disabled={saving || !parsedDraftConfig || !isDraftDirty}
-                  className="rounded-lg bg-black px-4 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-60"
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
                 >
-                  Guardar bloque
+                  {saving ? "Guardando…" : "Guardar bloque"}
                 </button>
                 <button
                   onClick={resetDraft}
                   disabled={saving || !isDraftDirty}
                   className="rounded-lg border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
                 >
-                  Descartar cambios
+                  Descartar
                 </button>
+                <span className="ml-auto text-xs text-zinc-400">⌨️ Ctrl+S</span>
               </div>
             </div>
           )}
@@ -2243,15 +2637,22 @@ export default function HomeComposerPage() {
         <section id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Banners</h3>
-              <p className="text-xs text-zinc-500">Panel integrado dentro de Página Principal.</p>
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                🖼️ Banners del carrusel
+              </h3>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                {integratedBanners.length > 0
+                  ? `${integratedBanners.filter((b) => b.is_active).length} activo${integratedBanners.filter((b) => b.is_active).length !== 1 ? "s" : ""} de ${integratedBanners.length} total`
+                  : "Panel integrado en Página Principal"}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={loadIntegratedModules}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                onClick={() => void loadIntegratedModules()}
+                disabled={integratedLoading}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
               >
-                Refrescar
+                <RefreshCw className={`inline h-3 w-3 mr-0.5 ${integratedLoading ? "animate-spin" : ""}`} /> Refrescar
               </button>
               <a
                 href={`/${locale}/banners`}
@@ -2259,27 +2660,36 @@ export default function HomeComposerPage() {
                 rel="noreferrer"
                 className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
               >
-                Abrir completo ↗
+                Gestionar ↗
               </a>
             </div>
           </div>
-          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+          <div className="space-y-1.5 rounded-xl border border-zinc-200 p-2">
             {integratedLoading ? (
-              <div className="p-3 text-xs text-zinc-500">Cargando banners…</div>
+              <div className="py-4 text-center text-xs text-zinc-500">
+                <RefreshCw className="inline h-3 w-3 animate-spin mr-1" /> Cargando banners…
+              </div>
             ) : integratedBanners.length === 0 ? (
-              <div className="p-3 text-xs text-zinc-500">No hay banners configurados.</div>
+              <div className="py-4 text-center text-xs text-zinc-500">
+                No hay banners configurados. <a href={`/${locale}/banners`} className="text-indigo-600 hover:underline">Crea uno ↗</a>
+              </div>
             ) : (
               integratedBanners.slice(0, 8).map((banner) => (
-                <div key={banner.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                <div key={banner.id} className={`flex items-center justify-between rounded-lg border px-2 py-2 transition ${banner.is_active ? "border-emerald-200 bg-emerald-50/40" : "border-zinc-200"}`}>
                   <div className="min-w-0">
                     <div className="truncate text-xs font-medium text-zinc-900">{banner.title_text || "Sin título"}</div>
-                    <div className="text-[11px] text-zinc-500">Orden #{banner.sort_order}</div>
+                    <div className="text-[11px] text-zinc-400">Orden #{banner.sort_order}</div>
                   </div>
                   <button
-                    onClick={() => toggleIntegratedBanner(banner.id)}
-                    className={`rounded px-2 py-1 text-[11px] ${banner.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                    onClick={() => void toggleIntegratedBanner(banner.id)}
+                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                      banner.is_active
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                    }`}
+                    title={banner.is_active ? "Desactivar banner" : "Activar banner"}
                   >
-                    {banner.is_active ? "Activo" : "Inactivo"}
+                    {banner.is_active ? "✓ Activo" : "Inactivo"}
                   </button>
                 </div>
               ))
@@ -2290,15 +2700,22 @@ export default function HomeComposerPage() {
         <section id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-semibold text-zinc-900">Gestión de Productos destacados</h3>
-              <p className="text-xs text-zinc-500">Panel integrado dentro de Página Principal.</p>
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                ⭐ Productos destacados
+              </h3>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                {integratedFeatured.length > 0
+                  ? `${integratedFeatured.filter((f) => f.is_active).length} activo${integratedFeatured.filter((f) => f.is_active).length !== 1 ? "s" : ""} de ${integratedFeatured.length} total`
+                  : "Panel integrado en Página Principal"}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={loadIntegratedModules}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                onClick={() => void loadIntegratedModules()}
+                disabled={integratedLoading}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
               >
-                Refrescar
+                <RefreshCw className={`inline h-3 w-3 mr-0.5 ${integratedLoading ? "animate-spin" : ""}`} /> Refrescar
               </button>
               <a
                 href={`/${locale}/featured-products`}
@@ -2306,27 +2723,36 @@ export default function HomeComposerPage() {
                 rel="noreferrer"
                 className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
               >
-                Abrir completo ↗
+                Gestionar ↗
               </a>
             </div>
           </div>
-          <div className="space-y-2 rounded-xl border border-zinc-200 p-2">
+          <div className="space-y-1.5 rounded-xl border border-zinc-200 p-2">
             {integratedLoading ? (
-              <div className="p-3 text-xs text-zinc-500">Cargando destacados…</div>
+              <div className="py-4 text-center text-xs text-zinc-500">
+                <RefreshCw className="inline h-3 w-3 animate-spin mr-1" /> Cargando destacados…
+              </div>
             ) : integratedFeatured.length === 0 ? (
-              <div className="p-3 text-xs text-zinc-500">No hay productos destacados configurados.</div>
+              <div className="py-4 text-center text-xs text-zinc-500">
+                No hay productos destacados. <a href={`/${locale}/featured-products`} className="text-indigo-600 hover:underline">Añade uno ↗</a>
+              </div>
             ) : (
               integratedFeatured.slice(0, 8).map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-2 py-1.5">
+                <div key={item.id} className={`flex items-center justify-between rounded-lg border px-2 py-2 transition ${item.is_active ? "border-emerald-200 bg-emerald-50/40" : "border-zinc-200"}`}>
                   <div className="min-w-0">
                     <div className="truncate text-xs font-medium text-zinc-900">{item.title || item.product?.title || "Sin título"}</div>
-                    <div className="text-[11px] text-zinc-500">Orden #{item.sort_order}</div>
+                    <div className="text-[11px] text-zinc-400">Orden #{item.sort_order}</div>
                   </div>
                   <button
-                    onClick={() => toggleIntegratedFeatured(item.id)}
-                    className={`rounded px-2 py-1 text-[11px] ${item.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}
+                    onClick={() => void toggleIntegratedFeatured(item.id)}
+                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                      item.is_active
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                    }`}
+                    title={item.is_active ? "Desactivar destacado" : "Activar destacado"}
                   >
-                    {item.is_active ? "Activo" : "Inactivo"}
+                    {item.is_active ? "✓ Activo" : "Inactivo"}
                   </button>
                 </div>
               ))

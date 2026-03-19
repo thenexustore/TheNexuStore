@@ -8,6 +8,9 @@ import { normalizeImportRuntimeSettings } from './import-runtime-settings';
 const PROVIDER = 'INFORTISA';
 const DEFAULT_BASE_URL = 'https://apiv2.infortisa.com';
 
+const PROVIDER = 'INFORTISA';
+const DEFAULT_BASE_URL = 'https://apiv2.infortisa.com';
+
 export type InfortisaHealthStatus = {
   healthy: boolean;
   provider: 'infortisa';
@@ -53,7 +56,7 @@ export class InfortisaService implements OnModuleInit {
   }
 
   async reloadConfiguration() {
-    const integration = await this.prisma.supplierIntegration.findUnique({
+    const integration = await (this.prisma as any).supplierIntegration.findUnique({
       where: { provider: PROVIDER },
     });
     const fallbackToken = this.config.get<string>('INFORTISA_API_TOKEN') || '';

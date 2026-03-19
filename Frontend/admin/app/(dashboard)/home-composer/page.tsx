@@ -227,6 +227,8 @@ export default function HomeComposerPage() {
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
   const renameCancelledRef = useRef(false);
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [jsonExpanded, setJsonExpanded] = useState(false);
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -575,6 +577,7 @@ export default function HomeComposerPage() {
       variant: selectedSection.variant || "",
       configText: JSON.stringify(selectedSection.config || {}, null, 2),
     });
+    setJsonExpanded(false); // collapse JSON editor when switching sections
   }, [selectedSection]);
 
   useEffect(() => {
@@ -994,8 +997,10 @@ export default function HomeComposerPage() {
     try {
       const parsed = safeJsonParse(draft.configText);
       setDraft({ ...draft, configText: JSON.stringify(parsed, null, 2) });
+      setJsonExpanded(true);
       toast.success("JSON formateado");
     } catch {
+      setJsonExpanded(true);
       toast.error("JSON inválido: no se puede formatear");
     }
   };
@@ -1117,6 +1122,28 @@ export default function HomeComposerPage() {
     }
   };
 
+  const cloneLayout = async () => {
+    if (!activeLayout) return;
+    const newName = window.prompt("Nombre para el diseño clonado:", `${activeLayout.name} (copia)`);
+    if (newName === null) return;
+    try {
+      setSaving(true);
+      const cloned = (await homeBuilderApi.cloneLayout(activeLayout.id)) as HomeLayout;
+      // Rename if user provided a different name
+      const trimmedName = newName.trim();
+      if (trimmedName && trimmedName !== cloned.name) {
+        await homeBuilderApi.updateLayout(cloned.id, { name: trimmedName });
+      }
+      await loadLayouts();
+      setActiveLayoutId(cloned.id);
+      toast.success("Diseño clonado. Ahora estás editando la copia (inactiva).");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo clonar el diseño");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const selectSectionWithGuard = (id: string) => {
     if (id === selectedSectionId) return;
     if (isDraftDirty) {
@@ -1146,6 +1173,15 @@ export default function HomeComposerPage() {
     String(config.source || "NEW_ARRIVALS") === "FEATURED";
 
   const enabledSectionsCount = sections.filter((s) => s.is_enabled).length;
+
+  const normalizedSectionFilter = sectionFilter.trim().toLowerCase();
+  const filteredSections = normalizedSectionFilter
+    ? sections.filter(
+        (s) =>
+          (s.title || "").toLowerCase().includes(normalizedSectionFilter) ||
+          s.type.toLowerCase().includes(normalizedSectionFilter),
+      )
+    : sections;
 
   return (
     <div className="space-y-6 p-6">
@@ -1200,6 +1236,14 @@ export default function HomeComposerPage() {
               className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
             >
               + Nuevo diseño
+            </button>
+            <button
+              onClick={() => void cloneLayout()}
+              disabled={saving || !activeLayout}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
+              title="Clonar el diseño activo (copia con sus secciones)"
+            >
+              Clonar diseño
             </button>
             <button
               onClick={publishLayout}
@@ -1423,8 +1467,32 @@ export default function HomeComposerPage() {
             )}
           </div>
 
+          {sections.length > 4 && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                placeholder="Filtrar secciones por nombre o tipo…"
+                className="flex-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
+              />
+              {sectionFilter && (
+                <button
+                  onClick={() => setSectionFilter("")}
+                  className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
+                >
+                  ✕ Limpiar
+                </button>
+              )}
+              {normalizedSectionFilter && (
+                <span className="text-xs text-zinc-500">
+                  {filteredSections.length}/{sections.length}
+                </span>
+              )}
+            </div>
+          )}
+
           <CanvasSections
-            sections={sections}
+            sections={filteredSections}
             selectedSectionId={selectedSectionId}
             saving={saving}
             sectionTypeLabels={SECTION_TYPE_LABELS}
@@ -2496,9 +2564,18 @@ export default function HomeComposerPage() {
               ) : null}
 
               <div className="block text-sm">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="text-zinc-500">Config JSON (avanzado)</span>
-                  <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setJsonExpanded((v) => !v)}
+                  className="mb-1 flex w-full items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-left hover:bg-zinc-100"
+                >
+                  <span className="text-xs font-medium text-zinc-600">
+                    {jsonExpanded ? "▼" : "▶"} Config JSON (avanzado)
+                    {!parsedDraftConfig && (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠️ Inválido</span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={formatJsonConfig}
                       className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50"
@@ -2514,16 +2591,18 @@ export default function HomeComposerPage() {
                       ↺ Defecto
                     </button>
                   </div>
-                </div>
-                <textarea
-                  value={draft.configText}
-                  onChange={(event) => setDraft({ ...draft, configText: event.target.value })}
-                  rows={12}
-                  spellCheck={false}
-                  className={`w-full rounded-lg border px-3 py-2 font-mono text-xs ${
-                    parsedDraftConfig ? "border-zinc-300" : "border-amber-400 bg-amber-50"
-                  }`}
-                />
+                </button>
+                {jsonExpanded && (
+                  <textarea
+                    value={draft.configText}
+                    onChange={(event) => setDraft({ ...draft, configText: event.target.value })}
+                    rows={14}
+                    spellCheck={false}
+                    className={`w-full rounded-lg border px-3 py-2 font-mono text-xs ${
+                      parsedDraftConfig ? "border-zinc-300" : "border-amber-400 bg-amber-50"
+                    }`}
+                  />
+                )}
               </div>
 
               {!parsedDraftConfig ? (

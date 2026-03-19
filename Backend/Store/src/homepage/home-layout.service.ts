@@ -38,7 +38,7 @@ export class HomeLayoutService {
   }
 
   private clampLimit(value: unknown, fallback: number) {
-    const n = Number(value || fallback);
+    const n = Number(value ?? fallback);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(1, Math.min(24, Math.floor(n)));
   }

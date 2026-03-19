@@ -535,10 +535,15 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
 }
 
 function ProductCarousel({ title, subtitle, products, config }: { title?: string; subtitle?: string; products: unknown[]; config?: Record<string, unknown> }) {
-  const list = uniqueBy(
+  const rawList = uniqueBy(
     toArray<Record<string, unknown>>(products),
     (product, idx) => asText(product.id) || asText(product.slug) || asText(product.title) || `product-${idx}`,
   );
+  const configLimit = Number(config?.limit);
+  const effectiveLimit = (Number.isFinite(configLimit) && configLimit >= 1)
+    ? Math.min(24, Math.floor(configLimit))
+    : rawList.length;
+  const list = rawList.slice(0, effectiveLimit);
   const mobileItems = Math.max(1, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
   const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
   const mobileCardPx = Math.max(176, Math.floor(380 / mobileItems));

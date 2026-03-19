@@ -60,6 +60,7 @@ export class ImportsController {
       () => Promise<unknown>
     > = {
       full: () => this.infortisaSync.fullSync(),
+      incremental: () => this.infortisaSync.syncProductsIncremental(),
       stock: () => this.infortisaSync.syncStockRealTime(),
       images: () => this.infortisaSync.syncImages(),
     };

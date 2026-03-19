@@ -157,11 +157,18 @@ export class ImportsConfigService {
     const apiKeyLast4 = apiKey ? apiKey.slice(-4) : undefined;
     const settings = normalizeImportRuntimeSettings({
       ...this.readRuntimeSettings(record?.settings_json),
+      stock_sync_enabled: input.stock_sync_enabled,
+      incremental_sync_enabled: input.incremental_sync_enabled,
+      full_sync_enabled: input.full_sync_enabled,
+      images_sync_enabled: input.images_sync_enabled,
       stock_sync_cron: input.stock_sync_cron,
       incremental_sync_cron: input.incremental_sync_cron,
       full_sync_cron: input.full_sync_cron,
+      images_sync_cron: input.images_sync_cron,
       stock_batch_size: input.stock_batch_size,
       full_sync_batch_size: input.full_sync_batch_size,
+      full_sync_batch_delay_ms: input.full_sync_batch_delay_ms,
+      image_sync_take: input.image_sync_take,
       catalog_page_size:
         input.catalog_page_size === undefined
           ? undefined

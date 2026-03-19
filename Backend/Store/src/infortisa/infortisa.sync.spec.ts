@@ -10,6 +10,9 @@ describe('InfortisaSyncService', () => {
 
   beforeEach(() => {
     prisma = {
+      supplierIntegration: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       product: {
         updateMany: jest.fn().mockResolvedValue(undefined),
         findMany: jest.fn(),
@@ -140,5 +143,53 @@ describe('InfortisaSyncService', () => {
 
     await expect(service.syncFullCatalog()).rejects.toThrow(/truncation/i);
     expect(products.upsertFromInfortisa).not.toHaveBeenCalled();
+  });
+
+  it('reloads runtime settings including images cron and per-job toggles', async () => {
+    prisma.supplierIntegration.findUnique.mockResolvedValue({
+      is_active: true,
+      settings_json: {
+        stock_sync_enabled: true,
+        incremental_sync_enabled: false,
+        full_sync_enabled: true,
+        images_sync_enabled: true,
+        images_sync_cron: '15 * * * *',
+        full_sync_batch_delay_ms: 250,
+        image_sync_take: 25,
+      },
+    });
+
+    await service.reloadRuntimeSettings();
+
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(3);
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-stock-sync',
+      expect.anything(),
+    );
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-full-sync',
+      expect.anything(),
+    );
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-images-sync',
+      expect.anything(),
+    );
+  });
+
+  it('uses runtime image take limit when syncing images', async () => {
+    prisma.product.findMany.mockResolvedValue([]);
+    prisma.supplierIntegration.findUnique.mockResolvedValue({
+      is_active: true,
+      settings_json: {
+        image_sync_take: 12,
+      },
+    });
+
+    await service.reloadRuntimeSettings();
+    await service.syncImages();
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 12 }),
+    );
   });
 });

@@ -43,6 +43,22 @@ export class UpdateImportIntegrationConfigDto {
   notes?: string;
 
   @IsOptional()
+  @IsBoolean()
+  stock_sync_enabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  incremental_sync_enabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  full_sync_enabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  images_sync_enabled?: boolean;
+
+  @IsOptional()
   @IsString()
   @MaxLength(120)
   @Transform(trimString)
@@ -61,6 +77,12 @@ export class UpdateImportIntegrationConfigDto {
   full_sync_cron?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(trimString)
+  images_sync_cron?: string;
+
+  @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsInt()
   @Min(1)
@@ -73,6 +95,20 @@ export class UpdateImportIntegrationConfigDto {
   @Min(1)
   @Max(10000)
   full_sync_batch_size?: number;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsInt()
+  @Min(0)
+  @Max(60000)
+  full_sync_batch_delay_ms?: number;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsInt()
+  @Min(1)
+  @Max(5000)
+  image_sync_take?: number;
 
   @IsOptional()
   @Transform(({ value }) => (value === '' ? null : value))

@@ -16,6 +16,7 @@ describe('ImportsController', () => {
 
   const infortisaSync = {
     fullSync: jest.fn(),
+    syncProductsIncremental: jest.fn(),
     syncStockRealTime: jest.fn(),
     syncImages: jest.fn(),
     listImportRuns: jest.fn(),
@@ -133,6 +134,28 @@ describe('ImportsController', () => {
       includeSecret: false,
       enforceSecretRead: true,
     });
+  });
+
+
+  it('triggers incremental sync and logs execution', async () => {
+    (infortisaSync.syncProductsIncremental as jest.Mock).mockResolvedValue({ id: 'run-3' });
+
+    const req = {
+      user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },
+      method: 'POST',
+      originalUrl: '/admin/imports/run',
+      ip: '127.0.0.1',
+      get: jest.fn().mockReturnValue('jest'),
+    } as any;
+
+    const result = await controller.run({ mode: 'incremental' }, req);
+
+    expect(infortisaSync.syncProductsIncremental).toHaveBeenCalledTimes(1);
+    expect(prisma.syncLog.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { type: 'manual_incremental' } }),
+    );
+    expect(result.success).toBe(true);
+    expect(result.data.mode).toBe('incremental');
   });
 
   it('triggers stock sync and logs execution', async () => {

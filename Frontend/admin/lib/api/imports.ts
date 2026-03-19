@@ -68,11 +68,18 @@ export interface ImportConnectionTestResponse {
 }
 
 export interface ImportRuntimeSettings {
+  stock_sync_enabled: boolean;
+  incremental_sync_enabled: boolean;
+  full_sync_enabled: boolean;
+  images_sync_enabled: boolean;
   stock_sync_cron: string;
   incremental_sync_cron: string;
   full_sync_cron: string;
+  images_sync_cron: string;
   stock_batch_size: number;
   full_sync_batch_size: number;
+  full_sync_batch_delay_ms: number;
+  image_sync_take: number;
   catalog_page_size?: number | null;
 }
 
@@ -96,11 +103,18 @@ export interface UpdateImportConfigInput {
   api_key?: string;
   is_active?: boolean;
   notes?: string;
+  stock_sync_enabled?: boolean;
+  incremental_sync_enabled?: boolean;
+  full_sync_enabled?: boolean;
+  images_sync_enabled?: boolean;
   stock_sync_cron?: string;
   incremental_sync_cron?: string;
   full_sync_cron?: string;
+  images_sync_cron?: string;
   stock_batch_size?: number;
   full_sync_batch_size?: number;
+  full_sync_batch_delay_ms?: number;
+  image_sync_take?: number;
   catalog_page_size?: number | null;
 }
 
@@ -154,7 +168,7 @@ export async function testImportConnection(): Promise<ImportConnectionTestRespon
   });
 }
 
-export async function triggerImport(mode: "full" | "stock" | "images") {
+export async function triggerImport(mode: "full" | "incremental" | "stock" | "images") {
   return fetchWithAuth("/admin/imports/run", {
     method: "POST",
     body: JSON.stringify({ mode }),
@@ -162,7 +176,7 @@ export async function triggerImport(mode: "full" | "stock" | "images") {
 }
 
 export async function retryImport(
-  mode: "full" | "stock" | "images",
+  mode: "full" | "incremental" | "stock" | "images",
   reason: string,
 ) {
   return fetchWithAuth("/admin/imports/retry", {

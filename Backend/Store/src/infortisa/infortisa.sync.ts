@@ -67,6 +67,7 @@ export class InfortisaSyncService implements OnModuleInit {
   private readonly STOCK_SYNC_JOB = 'infortisa-stock-sync';
   private readonly INCREMENTAL_SYNC_JOB = 'infortisa-incremental-sync';
   private readonly FULL_SYNC_JOB = 'infortisa-full-sync';
+  private readonly IMAGES_SYNC_JOB = 'infortisa-images-sync';
   private runtimeSettings: ImportRuntimeSettings = DEFAULT_IMPORT_RUNTIME_SETTINGS;
 
   constructor(
@@ -92,25 +93,31 @@ export class InfortisaSyncService implements OnModuleInit {
         : undefined,
     );
 
-    const enabled = record?.is_active ?? true;
+    const integrationEnabled = record?.is_active ?? true;
 
     this.configureCronJob(
       this.STOCK_SYNC_JOB,
       this.runtimeSettings.stock_sync_cron,
       () => void this.syncStockRealTime(),
-      enabled,
+      integrationEnabled && this.runtimeSettings.stock_sync_enabled,
     );
     this.configureCronJob(
       this.INCREMENTAL_SYNC_JOB,
       this.runtimeSettings.incremental_sync_cron,
       () => void this.syncProductsIncremental(),
-      enabled,
+      integrationEnabled && this.runtimeSettings.incremental_sync_enabled,
     );
     this.configureCronJob(
       this.FULL_SYNC_JOB,
       this.runtimeSettings.full_sync_cron,
       () => void this.fullSync(),
-      enabled,
+      integrationEnabled && this.runtimeSettings.full_sync_enabled,
+    );
+    this.configureCronJob(
+      this.IMAGES_SYNC_JOB,
+      this.runtimeSettings.images_sync_cron,
+      () => void this.syncImages(),
+      integrationEnabled && this.runtimeSettings.images_sync_enabled,
     );
   }
 
@@ -343,7 +350,7 @@ export class InfortisaSyncService implements OnModuleInit {
         this.mergeProductBatchStats(totals, stats);
 
         if (i + this.fullSyncBatchSize < allProducts.length) {
-          await this.delay(1000);
+          await this.delay(this.runtimeSettings.full_sync_batch_delay_ms);
         }
       }
 
@@ -406,7 +413,7 @@ export class InfortisaSyncService implements OnModuleInit {
             none: {},
           },
         },
-        take: 50,
+        take: this.runtimeSettings.image_sync_take,
       });
 
       for (const product of products) {

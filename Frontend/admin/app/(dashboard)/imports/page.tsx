@@ -34,7 +34,7 @@ import {
   Save,
 } from "lucide-react";
 
-type ImportMode = "full" | "stock" | "images";
+type ImportMode = "full" | "incremental" | "stock" | "images";
 
 type ImportConfigForm = {
   display_name: string;
@@ -42,11 +42,18 @@ type ImportConfigForm = {
   api_key: string;
   is_active: boolean;
   notes: string;
+  stock_sync_enabled: boolean;
+  incremental_sync_enabled: boolean;
+  full_sync_enabled: boolean;
+  images_sync_enabled: boolean;
   stock_sync_cron: string;
   incremental_sync_cron: string;
   full_sync_cron: string;
+  images_sync_cron: string;
   stock_batch_size: string;
   full_sync_batch_size: string;
+  full_sync_batch_delay_ms: string;
+  image_sync_take: string;
   catalog_page_size: string;
 };
 
@@ -230,11 +237,18 @@ export default function ImportsPage() {
     api_key: "",
     is_active: true,
     notes: "",
+    stock_sync_enabled: true,
+    incremental_sync_enabled: true,
+    full_sync_enabled: true,
+    images_sync_enabled: false,
     stock_sync_cron: "",
     incremental_sync_cron: "",
     full_sync_cron: "",
+    images_sync_cron: "",
     stock_batch_size: "",
     full_sync_batch_size: "",
+    full_sync_batch_delay_ms: "",
+    image_sync_take: "",
     catalog_page_size: "",
   });
 
@@ -294,11 +308,18 @@ export default function ImportsPage() {
         api_key: includeSecret ? data.api_key || "" : "",
         is_active: data.is_active,
         notes: data.notes || "",
+        stock_sync_enabled: data.settings.stock_sync_enabled,
+        incremental_sync_enabled: data.settings.incremental_sync_enabled,
+        full_sync_enabled: data.settings.full_sync_enabled,
+        images_sync_enabled: data.settings.images_sync_enabled,
         stock_sync_cron: data.settings.stock_sync_cron,
         incremental_sync_cron: data.settings.incremental_sync_cron,
         full_sync_cron: data.settings.full_sync_cron,
+        images_sync_cron: data.settings.images_sync_cron,
         stock_batch_size: String(data.settings.stock_batch_size),
         full_sync_batch_size: String(data.settings.full_sync_batch_size),
+        full_sync_batch_delay_ms: String(data.settings.full_sync_batch_delay_ms),
+        image_sync_take: String(data.settings.image_sync_take),
         catalog_page_size: data.settings.catalog_page_size
           ? String(data.settings.catalog_page_size)
           : "",
@@ -350,11 +371,18 @@ export default function ImportsPage() {
         api_key: form.api_key.trim() || undefined,
         is_active: form.is_active,
         notes: form.notes,
+        stock_sync_enabled: form.stock_sync_enabled,
+        incremental_sync_enabled: form.incremental_sync_enabled,
+        full_sync_enabled: form.full_sync_enabled,
+        images_sync_enabled: form.images_sync_enabled,
         stock_sync_cron: form.stock_sync_cron,
         incremental_sync_cron: form.incremental_sync_cron,
         full_sync_cron: form.full_sync_cron,
+        images_sync_cron: form.images_sync_cron,
         stock_batch_size: Number(form.stock_batch_size),
         full_sync_batch_size: Number(form.full_sync_batch_size),
+        full_sync_batch_delay_ms: Number(form.full_sync_batch_delay_ms),
+        image_sync_take: Number(form.image_sync_take),
         catalog_page_size: form.catalog_page_size.trim()
           ? Number(form.catalog_page_size)
           : null,
@@ -688,9 +716,44 @@ export default function ImportsPage() {
                   Runtime scheduling and fetch tuning
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Control the cron cadence and how many supplier records are
-                  processed per batch or requested per catalog page.
+                  Turn individual jobs on or off, define cron cadence, and tune
+                  how aggressively the supplier API is consumed.
                 </p>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Stock sync", "Keeps inventory levels fresh.", "stock_sync_enabled"],
+                  ["Incremental products", "Applies product deltas between full syncs.", "incremental_sync_enabled"],
+                  ["Full catalog", "Runs the heavy catalog refresh.", "full_sync_enabled"],
+                  ["Image sync", "Backfills product media automatically.", "images_sync_enabled"],
+                ].map(([label, description, key]) => (
+                  <label
+                    key={key}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="block font-semibold text-slate-900">{label}</span>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {description}
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={form[key as keyof Pick<ImportConfigForm, "stock_sync_enabled" | "incremental_sync_enabled" | "full_sync_enabled" | "images_sync_enabled">] as boolean}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            [key]: event.target.checked,
+                          }))
+                        }
+                        disabled={!canUpdateConfig || !form.is_active}
+                        className="mt-1 h-4 w-4 rounded border-slate-300"
+                      />
+                    </span>
+                  </label>
+                ))}
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -699,51 +762,28 @@ export default function ImportsPage() {
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Stock sync cron
                     </label>
-                    <input
-                      value={form.stock_sync_cron}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          stock_sync_cron: event.target.value,
-                        }))
-                      }
-                      disabled={!canUpdateConfig}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    />
+                    <input value={form.stock_sync_cron} onChange={(event) => setForm((current) => ({ ...current, stock_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Incremental products cron
                     </label>
-                    <input
-                      value={form.incremental_sync_cron}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          incremental_sync_cron: event.target.value,
-                        }))
-                      }
-                      disabled={!canUpdateConfig}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    />
+                    <input value={form.incremental_sync_cron} onChange={(event) => setForm((current) => ({ ...current, incremental_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Full catalog cron
                     </label>
-                    <input
-                      value={form.full_sync_cron}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          full_sync_cron: event.target.value,
-                        }))
-                      }
-                      disabled={!canUpdateConfig}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    />
+                    <input value={form.full_sync_cron} onChange={(event) => setForm((current) => ({ ...current, full_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Images cron
+                    </label>
+                    <input value={form.images_sync_cron} onChange={(event) => setForm((current) => ({ ...current, images_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
                 </div>
 
@@ -752,58 +792,35 @@ export default function ImportsPage() {
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Stock batch size
                     </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={form.stock_batch_size}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          stock_batch_size: event.target.value,
-                        }))
-                      }
-                      disabled={!canUpdateConfig}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    />
+                    <input type="number" min={1} value={form.stock_batch_size} onChange={(event) => setForm((current) => ({ ...current, stock_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Full sync batch size
                     </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={form.full_sync_batch_size}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          full_sync_batch_size: event.target.value,
-                        }))
-                      }
-                      disabled={!canUpdateConfig}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    />
+                    <input type="number" min={1} value={form.full_sync_batch_size} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Full sync inter-batch delay (ms)
+                    </label>
+                    <input type="number" min={0} value={form.full_sync_batch_delay_ms} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_delay_ms: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Image sync take limit
+                    </label>
+                    <input type="number" min={1} value={form.image_sync_take} onChange={(event) => setForm((current) => ({ ...current, image_sync_take: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Catalog page size override
                     </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={form.catalog_page_size}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          catalog_page_size: event.target.value,
-                        }))
-                      }
-                      disabled={!canUpdateConfig}
-                      placeholder="Blank = provider default"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    />
+                    <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Blank = provider default" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                     <p className="mt-2 text-xs text-slate-500">
                       Leave blank to use the provider-reported/default page size.
                     </p>
@@ -815,7 +832,7 @@ export default function ImportsPage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <button
           onClick={() => void runImport("full")}
           disabled={running !== null}
@@ -837,6 +854,30 @@ export default function ImportsPage() {
           <p className="font-semibold text-slate-900">Retry full import</p>
           <p className="mt-1 text-sm text-slate-500">
             Re-run full sync with an explicit retry reason.
+          </p>
+        </button>
+
+        <button
+          onClick={() => void runImport("incremental")}
+          disabled={running !== null}
+          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <RefreshCw className="mb-3 h-5 w-5 text-slate-700" />
+          <p className="font-semibold text-slate-900">Run incremental import</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Pull only changed products from the supplier API.
+          </p>
+        </button>
+
+        <button
+          onClick={() => void runRetry("incremental")}
+          disabled={running !== null}
+          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <RefreshCw className="mb-3 h-5 w-5 text-amber-700" />
+          <p className="font-semibold text-slate-900">Retry incremental import</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Re-run the product delta sync with a retry reason.
           </p>
         </button>
 

@@ -873,6 +873,7 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
+      const heroLimit = 6;
       const [items, activeBanners] = await Promise.all([
         this.prisma.homePageSectionItem.findMany({
           where: { section_id: section.id },
@@ -882,7 +883,6 @@ export class HomeLayoutService {
         this.prisma.banner.findMany({
           where: { is_active: true },
           orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
-          take: 6,
         }),
       ]);
 
@@ -919,10 +919,12 @@ export class HomeLayoutService {
         (banner) => !seen.has(banner.id),
       );
 
-      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
-        banner_id: banner.id,
-        banner,
-      }));
+      return [...curatedOrderedBanners, ...remainingActiveBanners]
+        .slice(0, heroLimit)
+        .map((banner) => ({
+          banner_id: banner.id,
+          banner,
+        }));
     }
 
 

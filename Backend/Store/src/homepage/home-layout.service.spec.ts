@@ -202,6 +202,82 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(heroSection.resolved[0]?.banner?.id).toBe('banner-active');
     expect(prisma.banner.findMany).toHaveBeenCalled();
   });
+
+  it('keeps curated active banners even when they sort after the first six active banners', async () => {
+    const activeBanners = Array.from({ length: 7 }, (_, index) => ({
+      id: `banner-${index + 1}`,
+      image: `/hero-${index + 1}.jpg`,
+      title_text: `Hero ${index + 1}`,
+      subtitle_text: `Sub ${index + 1}`,
+      button_text: `Shop ${index + 1}`,
+      button_link: `/products/${index + 1}`,
+      sort_order: index + 1,
+      is_active: true,
+    }));
+
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-7',
+            banner: { id: 'banner-7', is_active: true },
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest.fn().mockResolvedValue(activeBanners),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(heroSection.type).toBe('HERO_CAROUSEL');
+    expect(heroSection.resolved).toHaveLength(6);
+    expect(heroSection.resolved.map((x: any) => x.banner_id)).toEqual([
+      'banner-7',
+      'banner-1',
+      'banner-2',
+      'banner-3',
+      'banner-4',
+      'banner-5',
+    ]);
+    expect(prisma.banner.findMany).toHaveBeenCalledWith({
+      where: { is_active: true },
+      orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+    });
+  });
+
   it('keeps curated active banner order and appends new active banners from Banner module', async () => {
     const prisma = {
       homePageSection: {

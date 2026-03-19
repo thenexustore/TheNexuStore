@@ -4,22 +4,15 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { generateDeterministicProductSlug } from './product-slug.util';
 
-export interface InfortisaCatalogFetchMeta {
-  page: number;
-  pageSize: number;
-  totalReceived: number;
-  totalExpected: number | null;
-  totalPages: number | null;
-  offset: number | null;
-  limit: number | null;
-  hasMore: boolean | null;
-  raw: Record<string, unknown>;
-}
-
-export interface InfortisaCatalogFetchResult {
-  items: any[];
-  meta: InfortisaCatalogFetchMeta;
-}
+export type InfortisaHealthStatus = {
+  healthy: boolean;
+  provider: 'infortisa';
+  base_url: string;
+  checked_at: string;
+  auth_configured: boolean;
+  latency_ms: number;
+  error_summary?: string;
+};
 
 @Injectable()
 export class InfortisaService implements OnModuleInit {
@@ -619,17 +612,74 @@ export class InfortisaService implements OnModuleInit {
     }
   }
 
-  async checkServiceHealth(): Promise<boolean> {
+  private summarizeHealthError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const responseData = error.response?.data;
+      const details =
+        typeof responseData === 'string'
+          ? responseData
+          : responseData && typeof responseData === 'object'
+            ? JSON.stringify(responseData)
+            : error.message;
+
+      return status
+        ? `HTTP ${status}: ${details}`
+        : details || 'Unknown provider error';
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'Unknown provider error';
+  }
+
+  async getHealthStatus(): Promise<InfortisaHealthStatus> {
+    const checkedAt = new Date().toISOString();
+    const startedAt = Date.now();
+    const authConfigured = this.token.trim().length > 0;
+
     try {
       const client = await this.getClient();
       const response = await client.get('/api/Ficha/Get', {
         params: { user: this.token },
       });
-      return response.status === 200;
-    } catch (error: any) {
-      this.logger.error('Health check failed', error.message);
-      return false;
+      const healthy =
+        response.data === 'Su servicio está funcionando correctamente.';
+
+      return {
+        healthy,
+        provider: 'infortisa',
+        base_url: this.baseURL,
+        checked_at: checkedAt,
+        auth_configured: authConfigured,
+        latency_ms: Date.now() - startedAt,
+        ...(healthy
+          ? {}
+          : {
+              error_summary: `Unexpected provider response: ${String(response.data)}`,
+            }),
+      };
+    } catch (error: unknown) {
+      const errorSummary = this.summarizeHealthError(error);
+      this.logger.error('Service health check failed', errorSummary);
+
+      return {
+        healthy: false,
+        provider: 'infortisa',
+        base_url: this.baseURL,
+        checked_at: checkedAt,
+        auth_configured: authConfigured,
+        latency_ms: Date.now() - startedAt,
+        error_summary: errorSummary,
+      };
     }
+  }
+
+  async checkServiceHealth(): Promise<boolean> {
+    const health = await this.getHealthStatus();
+    return health.healthy;
   }
 
   async getTariffFile(

@@ -15,7 +15,6 @@ import { ProductsService } from '../user/products/products.service';
 import { InfortisaSyncService } from './infortisa.sync';
 import { AdminGuard } from '../admin/admin.guard';
 
-@UseGuards(AdminGuard)
 @Controller('admin/infortisa')
 export class InfortisaController {
   constructor(
@@ -25,6 +24,7 @@ export class InfortisaController {
     private readonly syncService: InfortisaSyncService,
   ) {}
 
+  @UseGuards(AdminGuard)
   @Delete('clean')
   async cleanDatabase() {
     try {
@@ -44,6 +44,7 @@ export class InfortisaController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Post('sync')
   async fullSync() {
     try {
@@ -90,21 +91,10 @@ export class InfortisaController {
 
   @Get('health')
   async checkHealth() {
-    try {
-      const isHealthy = await this.infortisa.checkServiceHealth();
-      return {
-        healthy: isHealthy,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error: any) {
-      return {
-        healthy: false,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      };
-    }
+    return this.infortisa.getHealthStatus();
   }
 
+  @UseGuards(AdminGuard)
   @Get('product/:sku')
   async getProduct(@Param('sku') sku: string) {
     try {
@@ -121,6 +111,7 @@ export class InfortisaController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Post('sync/images')
   async syncImages() {
     try {
@@ -137,6 +128,7 @@ export class InfortisaController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Get('stats')
   async getStats() {
     try {
@@ -168,6 +160,7 @@ export class InfortisaController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Post('sync/full')
   async triggerFullSync() {
     try {
@@ -184,6 +177,7 @@ export class InfortisaController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Post('sync/stock')
   async triggerStockSync() {
     try {
@@ -200,6 +194,7 @@ export class InfortisaController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Get('tariff')
   async getTariff(@Query('format') format = 'standard') {
     try {

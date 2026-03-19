@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { API_URL } from "../lib/env";
 import Image from "next/image";
@@ -17,6 +17,7 @@ import {
 import { registerUser, resendOtp, verifyOtp } from "../lib/auth";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "../components/StoreBrandLogo";
+import { useAuth } from "../providers/AuthProvider";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
@@ -30,6 +31,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const [step, setStep] = useState("register");
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
@@ -95,7 +97,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await verifyOtp({ email: form.email, otp });
-      router.replace("/login");
+      await refreshUser();
+      router.replace("/account");
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Invalid verification code"));
     } finally {

@@ -16,6 +16,7 @@ import { RequestMetricsService } from './common/request-metrics.service';
 import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import express from 'express';
+import { corsOriginDelegate } from './common/cors.util';
 
 async function bootstrap() {
   loadEnv();
@@ -93,33 +94,8 @@ async function bootstrap() {
     }),
   );
 
-  const envOrigins = (process.env.CORS_ORIGINS ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  const allowedOrigins = new Set<string>([
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:4000',
-    'https://www.thenexustore.com',
-    'https://admin.thenexustore.com',
-    'https://nexus-store-vpq8.vercel.app',
-    'https://nexus-store-eight.vercel.app',
-    process.env.FRONTEND_URL ?? '',
-    process.env.ADMIN_URL ?? '',
-    ...envOrigins,
-  ]);
-
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error(`Not allowed by CORS: ${origin}`));
-    },
+    origin: corsOriginDelegate,
     credentials: true,
   });
 

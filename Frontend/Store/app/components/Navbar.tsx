@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -24,6 +25,7 @@ import {
 } from "../lib/products";
 import { CategoryDrawer } from "./CategoryDrawer";
 import {
+  findCategoryTrailBySlug,
   normalizeCategoryTree,
   resolveCategoryScopeSlug,
 } from "../lib/category-navigation";
@@ -65,6 +67,7 @@ export default function Navbar() {
   );
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const t = useTranslations("nav");
   const searchRef = useRef<HTMLDivElement>(null);
@@ -75,6 +78,14 @@ export default function Navbar() {
     [categoryTreeState],
   );
   const filteredCategories = canonicalCategoryTree;
+  const activeCategorySlug =
+    searchParams.get("category") ||
+    searchParams.get("categories")?.split(",")[0] ||
+    null;
+  const activeCategoryTrail = useMemo(
+    () => findCategoryTrailBySlug(canonicalCategoryTree, activeCategorySlug),
+    [canonicalCategoryTree, activeCategorySlug],
+  );
   const activeMobilePath = useMemo(() => {
     const path: CategoryTreeNode[] = [];
     let level = canonicalCategoryTree;
@@ -89,7 +100,8 @@ export default function Navbar() {
     return path;
   }, [canonicalCategoryTree, mobileCategoryPath]);
   const activeMobileNode = activeMobilePath[activeMobilePath.length - 1];
-  const visibleMobileTreeCategories = activeMobileNode?.children ?? filteredCategories;
+  const visibleMobileTreeCategories =
+    activeMobileNode?.children ?? filteredCategories;
   const visibleMobileCategories =
     categorySearch.trim().length >= 2
       ? categorySearchResults
@@ -323,12 +335,16 @@ export default function Navbar() {
   useEffect(() => {
     if (!sidebarOpen) return;
 
+    if (categorySearch.trim().length < 2 && activeCategoryTrail.length > 0) {
+      setMobileCategoryPath(activeCategoryTrail.map((item) => item.id));
+    }
+
     const timer = window.setTimeout(() => {
       mobileCategorySearchRef.current?.focus();
     }, 80);
 
     return () => window.clearTimeout(timer);
-  }, [sidebarOpen]);
+  }, [sidebarOpen, categorySearch, activeCategoryTrail]);
 
   useEffect(() => {
     if (!mobileCategoryPath.length) return;
@@ -684,6 +700,7 @@ export default function Navbar() {
         onQueryChange={setCategorySearch}
         onClose={closeMobilePanels}
         onNavigate={handleCategoryClick}
+        activeCategorySlug={activeCategorySlug}
       />
 
       {sidebarOpen && (
@@ -778,7 +795,9 @@ export default function Navbar() {
                           {t("home")}
                         </button>
                       </div>
-                      <p className="text-xs text-slate-500">{t("currentPath")}</p>
+                      <p className="text-xs text-slate-500">
+                        {t("currentPath")}
+                      </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {activeMobilePath.map((item, index) => (
                           <button
@@ -793,37 +812,45 @@ export default function Navbar() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCategoryClick(activeMobileNode.slug)}
+                        onClick={() =>
+                          handleCategoryClick(activeMobileNode.slug)
+                        }
                         className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A]"
                       >
-                        {t("viewAllInCategory", { name: activeMobileNode.name })}
+                        {t("viewAllInCategory", {
+                          name: activeMobileNode.name,
+                        })}
                       </button>
                     </div>
                   ) : null}
 
-                  {visibleMobileTreeCategories.map((category) => (
+                  {visibleMobileTreeCategories.map((category) => {
+                    const isCurrentCategory =
+                      activeCategorySlug === category.slug;
+
+                    return (
                       <div
                         key={category.id}
-                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1"
+                        className={`flex items-center gap-2 rounded-lg border bg-white p-1 ${isCurrentCategory ? "border-indigo-300 ring-1 ring-indigo-100" : "border-slate-200"}`}
                       >
                         <button
                           type="button"
                           onClick={() => handleMobileCategorySelect(category)}
-                          className="flex flex-1 items-center justify-between gap-3 text-left px-3 py-2.5 rounded-md text-gray-700 hover:bg-gray-50 hover:text-[#0B123A] transition-colors font-medium"
+                          className={`flex flex-1 items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left font-medium transition-colors ${isCurrentCategory ? "bg-indigo-50 text-[#0B123A]" : "text-gray-700 hover:bg-gray-50 hover:text-[#0B123A]"}`}
                         >
                           <span className="min-w-0">
                             <span className="block">{category.name}</span>
-                              {category.children.length > 0 ? (
-                                <span className="mt-1 block text-xs font-normal text-slate-500">
-                                  {t("exploreSubcategories", {
-                                    count: category.children.length,
-                                  })}
-                                </span>
-                              ) : (
-                                <span className="mt-1 block text-xs font-normal text-slate-500">
-                                  {t("viewProducts")}
-                                </span>
-                              )}
+                            {category.children.length > 0 ? (
+                              <span className="mt-1 block text-xs font-normal text-slate-500">
+                                {t("exploreSubcategories", {
+                                  count: category.children.length,
+                                })}
+                              </span>
+                            ) : (
+                              <span className="mt-1 block text-xs font-normal text-slate-500">
+                                {t("viewProducts")}
+                              </span>
+                            )}
                           </span>
                           {category.children.length > 0 ? (
                             <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
@@ -832,7 +859,7 @@ export default function Navbar() {
                         <button
                           type="button"
                           onClick={() => handleCategoryClick(category.slug)}
-                          className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-[#0B123A] hover:text-[#0B123A]"
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isCurrentCategory ? "border-indigo-300 bg-indigo-50 text-[#0B123A]" : "border-slate-200 text-slate-600 hover:border-[#0B123A] hover:text-[#0B123A]"}`}
                           aria-label={t("viewProductsOf", {
                             name: category.name,
                           })}
@@ -840,16 +867,6 @@ export default function Navbar() {
                           {t("view")}
                         </button>
                       </div>
-                    ))}
-                  {filteredCategories.map((category) => {
-                    return (
-                      <button
-                        key={category.id}
-                        onClick={() => handleCategoryClick(category.slug)}
-                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-[#0B123A] transition-colors font-medium flex justify-between items-center cursor-pointer"
-                      >
-                        <span>{category.name}</span>
-                      </button>
                     );
                   })}
                 </div>

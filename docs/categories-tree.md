@@ -69,6 +69,31 @@ The backfill will:
 - In non-JSON mode it also prints a preview of affected categories; in JSON mode it emits the full audit payload.
 - With `--output`, it writes that same audit payload to disk.
 
+## Targeted smoke before deploy
+
+For the category normalization rollout, run this focused backend smoke before deploying changes that touch taxonomy inference, imports, or the admin taxonomy audit:
+
+```bash
+cd Backend/Store
+npm run smoke:taxonomy-admin
+```
+
+This smoke intentionally covers:
+- canonical parent inference and slug mapping (`infortisa-category-mapping.util.spec.ts`),
+- admin taxonomy audit summaries (`admin-categories.service.spec.ts`),
+- manual import/retry audit logging (`imports.controller.spec.ts`),
+- and category/product filtering against the normalized hierarchy (`products.service.spec.ts`).
+
+For local parity with CI on taxonomy/navigation changes, also run the TypeScript checks explicitly in both apps:
+
+```bash
+cd Backend/Store
+npm run typecheck
+
+cd ../../Frontend/Store
+npm run typecheck
+```
+
 ## Store UX
 
 - Mobile: `CategoryDrawer` supports drilldown, back, breadcrumb and "View all" links.

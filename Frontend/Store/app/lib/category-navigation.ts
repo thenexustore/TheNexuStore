@@ -76,10 +76,40 @@ function sanitizeSiblingNodes(
   );
 }
 
-export function normalizeCategoryTree(tree: CategoryTreeNode[]): CategoryTreeNode[] {
+function findCategoryTrailInternal(
+  nodes: CategoryTreeNode[],
+  slug: string,
+): CategoryTreeNode[] | null {
+  for (const node of nodes) {
+    if (node.slug === slug) {
+      return [node];
+    }
+
+    const childTrail = findCategoryTrailInternal(node.children, slug);
+    if (childTrail) {
+      return [node, ...childTrail];
+    }
+  }
+
+  return null;
+}
+
+export function normalizeCategoryTree(
+  tree: CategoryTreeNode[],
+): CategoryTreeNode[] {
   return sanitizeSiblingNodes(tree);
 }
 
-export function resolveCategoryScopeSlug(category: Pick<CategoryTreeNode, "slug">): string {
+export function findCategoryTrailBySlug(
+  tree: CategoryTreeNode[],
+  slug?: string | null,
+): CategoryTreeNode[] {
+  if (!slug) return [];
+  return findCategoryTrailInternal(tree, slug) ?? [];
+}
+
+export function resolveCategoryScopeSlug(
+  category: Pick<CategoryTreeNode, "slug">,
+): string {
   return category.slug;
 }

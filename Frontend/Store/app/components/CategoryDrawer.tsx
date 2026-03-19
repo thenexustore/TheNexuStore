@@ -16,6 +16,7 @@ type Props = {
   onQueryChange: (value: string) => void;
   onClose: () => void;
   onNavigate: (slug: string) => void;
+  activeCategorySlug?: string | null;
 };
 
 export function CategoryDrawer({
@@ -28,6 +29,7 @@ export function CategoryDrawer({
   onQueryChange,
   onClose,
   onNavigate,
+  activeCategorySlug,
 }: Props) {
   const t = useTranslations("nav");
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
@@ -73,6 +75,39 @@ export function CategoryDrawer({
 
     return () => window.clearTimeout(timer);
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !activeCategorySlug) return;
+
+    const activeParentFromSlug = tree.find(
+      (parent) =>
+        parent.slug === activeCategorySlug ||
+        parent.children.some(
+          (child) =>
+            child.slug === activeCategorySlug ||
+            child.children.some(
+              (grandchild) => grandchild.slug === activeCategorySlug,
+            ),
+        ),
+    );
+
+    if (!activeParentFromSlug) return;
+
+    setActiveParentId(activeParentFromSlug.id);
+
+    const activeChildFromSlug =
+      activeParentFromSlug.children.find(
+        (child) =>
+          child.slug === activeCategorySlug ||
+          child.children.some(
+            (grandchild) => grandchild.slug === activeCategorySlug,
+          ),
+      ) ??
+      activeParentFromSlug.children[0] ??
+      null;
+
+    setActiveChildId(activeChildFromSlug?.id ?? null);
+  }, [open, activeCategorySlug, tree]);
 
   return (
     <>
@@ -131,27 +166,29 @@ export function CategoryDrawer({
                   {t("searchCategoriesEmptyHint")}
                 </div>
               ) : null}
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {searchResults.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => onNavigate(item.slug)}
-                      className="group w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-sm text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition-colors group-hover:bg-white/15 group-hover:text-white">
-                          {t("levelIndicator", { count: item.depth })}
-                        </span>
-                        <ChevronRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
-                      </div>
-                      <p className="font-semibold">{item.name}</p>
-                      <p className="mt-2 text-[11px] font-medium uppercase tracking-wide opacity-60">
-                        {t("currentPath")}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 opacity-80">{item.path}</p>
-                    </button>
-                  ))}
-                </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {searchResults.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.slug)}
+                    className="group w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-sm text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition-colors group-hover:bg-white/15 group-hover:text-white">
+                        {t("levelIndicator", { count: item.depth })}
+                      </span>
+                      <ChevronRight className="h-4 w-4 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
+                    </div>
+                    <p className="font-semibold">{item.name}</p>
+                    <p className="mt-2 text-[11px] font-medium uppercase tracking-wide opacity-60">
+                      {t("currentPath")}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 opacity-80">
+                      {item.path}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="grid h-full grid-cols-1 md:grid-cols-[280px_320px_1fr]">
@@ -166,10 +203,13 @@ export function CategoryDrawer({
                 </div>
                 <div className="h-full space-y-1 overflow-y-auto pb-4">
                   {loading ? (
-                    <p className="px-2 text-sm text-slate-500">{t("loadingCategories")}</p>
+                    <p className="px-2 text-sm text-slate-500">
+                      {t("loadingCategories")}
+                    </p>
                   ) : (
                     tree.map((parent) => {
                       const isActive = activeParent?.id === parent.id;
+                      const isCurrent = activeCategorySlug === parent.slug;
                       const ParentIcon = getCategoryIcon(parent.slug);
                       return (
                         <button
@@ -181,7 +221,9 @@ export function CategoryDrawer({
                           className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                             isActive
                               ? "bg-[#0B123A] text-white"
-                              : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
+                              : isCurrent
+                                ? "bg-indigo-50 text-[#0B123A] ring-1 ring-indigo-200"
+                                : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
                           }`}
                         >
                           <span className="flex items-center gap-2">
@@ -227,6 +269,7 @@ export function CategoryDrawer({
                       ) : (
                         activeParent.children.map((child) => {
                           const isActive = activeChild?.id === child.id;
+                          const isCurrent = activeCategorySlug === child.slug;
 
                           return (
                             <div
@@ -238,7 +281,9 @@ export function CategoryDrawer({
                                 className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                                   isActive
                                     ? "bg-[#0B123A] text-white"
-                                    : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
+                                    : isCurrent
+                                      ? "bg-indigo-50 text-[#0B123A] ring-1 ring-indigo-200"
+                                      : "text-slate-700 hover:bg-[#0B123A] hover:text-white"
                                 }`}
                               >
                                 {child.name}
@@ -246,7 +291,9 @@ export function CategoryDrawer({
                               <button
                                 onClick={() => onNavigate(child.slug)}
                                 className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                                aria-label={t("viewProductsOf", { name: child.name })}
+                                aria-label={t("viewProductsOf", {
+                                  name: child.name,
+                                })}
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </button>
@@ -256,7 +303,9 @@ export function CategoryDrawer({
                       )}
                     </>
                   ) : (
-                    <p className="px-2 text-sm text-slate-500">{t("noDataAvailable")}</p>
+                    <p className="px-2 text-sm text-slate-500">
+                      {t("noDataAvailable")}
+                    </p>
                   )}
                 </div>
               </section>
@@ -269,7 +318,9 @@ export function CategoryDrawer({
                   <div className="mb-3 flex flex-wrap items-center gap-2 px-2">
                     <button
                       type="button"
-                      onClick={() => setActiveChildId(activeParent?.children[0]?.id ?? null)}
+                      onClick={() =>
+                        setActiveChildId(activeParent?.children[0]?.id ?? null)
+                      }
                       className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-[#0B123A] hover:text-[#0B123A]"
                     >
                       {activeParent?.name}
@@ -291,15 +342,24 @@ export function CategoryDrawer({
                       </button>
 
                       <div className="grid gap-2 sm:grid-cols-2">
-                        {activeChild.children.map((grandchild) => (
-                          <button
-                            key={grandchild.id}
-                            onClick={() => onNavigate(grandchild.slug)}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-left text-sm text-slate-700 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                          >
-                            {grandchild.name}
-                          </button>
-                        ))}
+                        {activeChild.children.map((grandchild) => {
+                          const isCurrent =
+                            activeCategorySlug === grandchild.slug;
+
+                          return (
+                            <button
+                              key={grandchild.id}
+                              onClick={() => onNavigate(grandchild.slug)}
+                              className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                                isCurrent
+                                  ? "border-indigo-300 bg-indigo-50 font-semibold text-[#0B123A]"
+                                  : "border-slate-200 text-slate-700 hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                              }`}
+                            >
+                              {grandchild.name}
+                            </button>
+                          );
+                        })}
                       </div>
                     </>
                   ) : (

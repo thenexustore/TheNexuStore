@@ -9,7 +9,6 @@ import {
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
-  testImportConnection,
   triggerImport,
   updateImportConfig,
   type ImportHistoryItem,
@@ -138,12 +137,32 @@ export default function ImportsPage() {
 
   async function loadRuns() {
     try {
-      const [runsData, providerStatsData] = await Promise.all([
-        fetchImportRuns(),
-        fetchProviderStats(),
-      ]);
-      setRuns(runsData);
-      setProviderStats(providerStatsData);
+      if (typeof window === "undefined") {
+        setPermissions([]);
+        return;
+      }
+
+      const raw = localStorage.getItem("admin_user");
+      if (!raw) {
+        setPermissions([]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as { permissions?: unknown };
+      setPermissions(
+        Array.isArray(parsed.permissions)
+          ? parsed.permissions.map((permission) => String(permission))
+          : [],
+      );
+    } catch {
+      setPermissions([]);
+    }
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const data = await fetchImportHistory(1, 30);
+      setItems(data.items);
     } catch (error: any) {
       toast.error(error.message || "Failed to load import observability");
     }
@@ -197,6 +216,28 @@ export default function ImportsPage() {
       setDetailLoadingId(null);
     }
   }
+
+  const ensureRunExpanded = async (runId: string) => {
+    const nextExpanded = expandedRunId === runId ? null : runId;
+    setExpandedRunId(nextExpanded);
+    if (nextExpanded === null || runDetails[runId]) {
+      return;
+    }
+
+    setDetailLoadingId(runId);
+    try {
+      const [detail, errors] = await Promise.all([
+        fetchImportRun(runId),
+        fetchImportRunErrors(runId),
+      ]);
+      setRunDetails((current) => ({ ...current, [runId]: detail }));
+      setRunErrors((current) => ({ ...current, [runId]: errors }));
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load run detail");
+    } finally {
+      setDetailLoadingId(null);
+    }
+  };
 
   useEffect(() => {
     void Promise.all([loadHistory(), loadRuns(), loadConfig(false)]);

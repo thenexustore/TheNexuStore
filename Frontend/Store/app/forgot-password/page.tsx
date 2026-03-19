@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import {
   Mail,
@@ -14,6 +14,18 @@ import { forgotPassword } from "../lib/auth";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "../components/StoreBrandLogo";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+}
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
 
@@ -22,7 +34,10 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
 
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
+  useEffect(
+    () => subscribeStoreBranding(setStoreBranding, { refreshRemote: false }),
+    [],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,8 +47,8 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPassword({ email });
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
-    } catch {
-      setError("SIGNAL_ERROR: FAILED_TO_TRANSMIT_OTP");
+    } catch (error) {
+      setError(getErrorMessage(error, "Failed to send OTP"));
     } finally {
       setLoading(false);
     }

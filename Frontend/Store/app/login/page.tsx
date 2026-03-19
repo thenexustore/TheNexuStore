@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { API_URL } from "../lib/env";
 import { Mail, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
@@ -18,7 +18,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
 
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
+  useEffect(
+    () => subscribeStoreBranding(setStoreBranding, { refreshRemote: false }),
+    [],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +30,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginUser({ email, password });
-      router.push("/store");
+      router.replace("/store");
     } catch (err: any) {
       setError(err?.message || "Invalid email or password");
     } finally {

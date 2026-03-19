@@ -6,6 +6,9 @@ import { cookies } from "next/headers";
 export const metadata: Metadata = {
   title: "TheNexuStore Admin",
   description: "Admin dashboard for TheNexuStore",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default async function RootLayout({

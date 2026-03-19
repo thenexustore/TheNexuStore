@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Link } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import {
   Lock,
   Key,
@@ -13,6 +13,18 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { resetPassword } from "../lib/auth";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+}
 
 // Next.js requires useSearchParams to be wrapped in a Suspense boundary
 function ResetForm() {
@@ -48,10 +60,10 @@ function ResetForm() {
       await resetPassword({ email, otp, password });
       setSuccess(true);
       setTimeout(() => {
-        router.push("/login");
+        router.replace("/login");
       }, 3000);
-    } catch (err: any) {
-      setError(err.message || "SIGNAL_ERROR: RESET_SEQUENCE_FAILED");
+    } catch (error) {
+      setError(getErrorMessage(error, "Reset password failed"));
     } finally {
       setLoading(false);
     }

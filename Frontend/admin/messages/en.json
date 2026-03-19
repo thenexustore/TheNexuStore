@@ -15,7 +15,7 @@
     "orders": "Orders",
     "coupons": "Coupons",
     "chat": "Chat",
-    "homeContent": "Homepage",
+    "homeContent": "Store Design",
     "banners": "Banners",
     "featuredProducts": "Featured products",
     "pricing": "Pricing",
@@ -23,6 +23,6 @@
     "imports": "Imports",
     "rmas": "Returns (RMA)",
     "settings": "Settings",
-    "homeComposer": "Home Composer"
+    "homeComposer": "Homepage"
   }
 }

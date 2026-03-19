@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getMe, logoutUser, updateProfile } from "../lib/auth";
+import { useRouter } from "@/i18n/navigation";
+import { getMe, updateProfile } from "../lib/auth";
+import { useAuth } from "../providers/AuthProvider";
 
 export default function AccountPage() {
   const router = useRouter();
+  const { logout, refreshUser } = useAuth();
   const [user, setUser] = useState(null as any);
   const [edit, setEdit] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -126,12 +128,13 @@ export default function AccountPage() {
     setLoading(true);
     setError("");
     try {
-      await updateProfile({
+      const updatedUser = await updateProfile({
         profile: normalizedProfile,
         ...(hasAnyAddressField ? { address: normalizedAddress } : {}),
       });
-      const fresh = await getMe();
+      const fresh = updatedUser ?? (await getMe());
       setUser(fresh);
+      await refreshUser();
       setEdit(false);
     } catch (err: any) {
       setError(err?.message || "Failed to update profile");
@@ -177,7 +180,7 @@ export default function AccountPage() {
               </>
             )}
             <button
-              onClick={() => logoutUser().then(() => router.push("/login"))}
+              onClick={() => logout().then(() => router.push("/login"))}
               className="btn btn-danger"
             >
               Logout

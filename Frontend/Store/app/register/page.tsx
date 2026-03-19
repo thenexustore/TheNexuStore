@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { API_URL } from "../lib/env";
 import Image from "next/image";
@@ -47,7 +47,10 @@ export default function RegisterPage() {
     password: "",
   });
 
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
+  useEffect(
+    () => subscribeStoreBranding(setStoreBranding, { refreshRemote: false }),
+    [],
+  );
 
   useEffect(() => {
     if (!image) return;
@@ -95,7 +98,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await verifyOtp({ email: form.email, otp });
-      router.replace("/login");
+      router.replace("/account");
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Invalid verification code"));
     } finally {

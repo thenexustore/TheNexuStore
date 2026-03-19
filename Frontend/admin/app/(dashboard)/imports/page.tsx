@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchImportConfig,
   fetchImportHistory,
@@ -9,7 +9,6 @@ import {
   fetchImportRuns,
   fetchProviderStats,
   retryImport,
-  testImportConnection,
   triggerImport,
   updateImportConfig,
   type ImportHistoryItem,
@@ -129,12 +128,8 @@ export default function ImportsPage() {
 
   const loadRuns = async () => {
     try {
-      const [runsData, providerStatsData] = await Promise.all([
-        fetchImportRuns(),
-        fetchProviderStats(),
-      ]);
-      setRuns(runsData);
-      setProviderStats(providerStatsData);
+      const data = await fetchImportHistory(1, 30);
+      setItems(data.items);
     } catch (error: any) {
       toast.error(error.message || "Failed to load import observability");
     }

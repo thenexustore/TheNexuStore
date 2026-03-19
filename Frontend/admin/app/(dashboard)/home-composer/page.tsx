@@ -341,7 +341,7 @@ export default function HomeComposerPage() {
 
 
   const curatedLimit = useMemo(() => {
-    const raw = Number(parsedDraftConfig?.limit || 0);
+    const raw = Number(parsedDraftConfig?.limit ?? 0);
     if (!Number.isFinite(raw) || raw <= 0) return selectedSection?.type === "HERO_CAROUSEL" ? 6 : 24;
     return Math.max(1, Math.min(24, Math.floor(raw)));
   }, [parsedDraftConfig, selectedSection]);
@@ -1358,18 +1358,26 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Límite</span>
+                      <span className="mb-1 block text-zinc-500">Total productos en carrusel <span className="text-zinc-400 font-normal">(límite)</span></span>
                       <input
                         type="number"
-                        value={asNumber(config.limit, 12)}
-                        onChange={(event) =>
+                        min={1}
+                        max={24}
+                        value={asNumber(config.limit, 4)}
+                        onChange={(event) => {
+                          const newLimit = Math.max(1, Math.min(24, Number(event.target.value) || 1));
+                          const currentDesktop = Math.max(2, asNumber(config.items_desktop, 4));
+                          const currentMobile = Math.max(1, asNumber(config.items_mobile, 2));
                           updateDraftConfig({
                             ...config,
-                            limit: Math.max(1, Number(event.target.value) || 1),
-                          })
-                        }
+                            limit: newLimit,
+                            items_desktop: Math.min(currentDesktop, newLimit),
+                            items_mobile: Math.min(currentMobile, newLimit),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
+                      <p className="mt-1 text-xs text-zinc-400">Cuántos productos carga el carrusel en total (máx. 24).</p>
                     </label>
 
                     <label className="flex items-center gap-2 text-sm text-zinc-700">
@@ -1462,33 +1470,47 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Ítems en desktop</span>
+                      <span className="mb-1 block text-zinc-500">Visible por fila en desktop</span>
                       <input
                         type="number"
+                        min={1}
+                        max={6}
                         value={asNumber(config.items_desktop, 4)}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const newDesktop = Math.max(1, Math.min(6, Number(event.target.value) || 1));
+                          const currentLimit = Math.max(1, asNumber(config.limit, 4));
                           updateDraftConfig({
                             ...config,
-                            items_desktop: Math.max(2, Number(event.target.value) || 2),
-                          })
-                        }
+                            items_desktop: newDesktop,
+                            limit: Math.max(currentLimit, newDesktop),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
+                      <p className="mt-1 text-xs text-zinc-400">Columnas visibles a la vez en pantalla grande.</p>
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Ítems en móvil</span>
+                      <span className="mb-1 block text-zinc-500">Visible por fila en móvil</span>
                       <input
                         type="number"
+                        min={1}
+                        max={4}
                         value={asNumber(config.items_mobile, 2)}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const newMobile = Math.max(1, Math.min(4, Number(event.target.value) || 1));
+                          const currentDesktop = Math.max(newMobile, asNumber(config.items_desktop, 4));
+                          const currentLimit = Math.max(1, asNumber(config.limit, 4));
                           updateDraftConfig({
                             ...config,
-                            items_mobile: Math.max(1, Number(event.target.value) || 1),
-                          })
-                        }
+                            items_mobile: newMobile,
+                            items_desktop: currentDesktop,
+                            limit: Math.max(currentLimit, currentDesktop),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
+                      <p className="mt-1 text-xs text-zinc-400">Columnas visibles a la vez en móvil.</p>
                     </label>
 
                     <label className="text-sm">
@@ -1739,16 +1761,23 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Límite</span>
+                      <span className="mb-1 block text-zinc-500">Total marcas a mostrar <span className="text-zinc-400 font-normal">(límite)</span></span>
                       <input
                         type="number"
+                        min={1}
+                        max={24}
                         value={asNumber(config.limit, 12)}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const newLimit = Math.max(1, Math.min(24, Number(event.target.value) || 1));
+                          const currentDesktop = Math.max(2, asNumber(config.items_desktop, 6));
+                          const currentMobile = Math.max(2, asNumber(config.items_mobile, 2));
                           updateDraftConfig({
                             ...config,
-                            limit: Math.max(1, Number(event.target.value) || 1),
-                          })
-                        }
+                            limit: newLimit,
+                            items_desktop: Math.min(currentDesktop, newLimit),
+                            items_mobile: Math.min(currentMobile, newLimit),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
@@ -1783,31 +1812,43 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Ítems en desktop</span>
+                      <span className="mb-1 block text-zinc-500">Visible por fila en desktop</span>
                       <input
                         type="number"
+                        min={1}
+                        max={8}
                         value={asNumber(config.items_desktop, 6)}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const newDesktop = Math.max(1, Math.min(8, Number(event.target.value) || 1));
+                          const currentLimit = Math.max(1, asNumber(config.limit, 12));
                           updateDraftConfig({
                             ...config,
-                            items_desktop: Math.max(2, Number(event.target.value) || 2),
-                          })
-                        }
+                            items_desktop: newDesktop,
+                            limit: Math.max(currentLimit, newDesktop),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
 
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Ítems en móvil</span>
+                      <span className="mb-1 block text-zinc-500">Visible por fila en móvil</span>
                       <input
                         type="number"
+                        min={1}
+                        max={4}
                         value={asNumber(config.items_mobile, 2)}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const newMobile = Math.max(1, Math.min(4, Number(event.target.value) || 1));
+                          const currentDesktop = Math.max(newMobile, asNumber(config.items_desktop, 6));
+                          const currentLimit = Math.max(1, asNumber(config.limit, 12));
                           updateDraftConfig({
                             ...config,
-                            items_mobile: Math.max(2, Number(event.target.value) || 2),
-                          })
-                        }
+                            items_mobile: newMobile,
+                            items_desktop: currentDesktop,
+                            limit: Math.max(currentLimit, currentDesktop),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
@@ -1836,16 +1877,23 @@ export default function HomeComposerPage() {
                       </select>
                     </label>
                     <label className="text-sm">
-                      <span className="mb-1 block text-zinc-500">Límite</span>
+                      <span className="mb-1 block text-zinc-500">Total categorías a mostrar <span className="text-zinc-400 font-normal">(límite)</span></span>
                       <input
                         type="number"
+                        min={1}
+                        max={24}
                         value={asNumber(config.limit, 10)}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const newLimit = Math.max(1, Math.min(24, Number(event.target.value) || 1));
+                          const currentDesktop = Math.max(2, asNumber(config.items_desktop, 6));
+                          const currentMobile = Math.max(2, asNumber(config.items_mobile, 2));
                           updateDraftConfig({
                             ...config,
-                            limit: Math.max(1, Number(event.target.value) || 1),
-                          })
-                        }
+                            limit: newLimit,
+                            items_desktop: Math.min(currentDesktop, newLimit),
+                            items_mobile: Math.min(currentMobile, newLimit),
+                          });
+                        }}
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>

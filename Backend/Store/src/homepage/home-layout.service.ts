@@ -649,24 +649,43 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const [items, activeBanners] = await Promise.all([
-        this.prisma.homePageSectionItem.findMany({
-          where: { section_id: section.id },
-          orderBy: { position: 'asc' },
-          include: { banner: true },
-        }),
+      const items = await this.prisma.homePageSectionItem.findMany({
+        where: { section_id: section.id },
+        orderBy: { position: 'asc' },
+        include: { banner: true },
+      });
+
+      const curatedBannerIds = Array.from(
+        new Set(
+          items
+            .map((item) => item.banner_id || item.banner?.id || null)
+            .filter((bannerId): bannerId is string => Boolean(bannerId)),
+        ),
+      );
+
+      const [activeBanners, curatedActiveBanners] = await Promise.all([
         this.prisma.banner.findMany({
           where: { is_active: true },
           orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
           take: 6,
         }),
+        curatedBannerIds.length
+          ? this.prisma.banner.findMany({
+              where: {
+                is_active: true,
+                id: { in: curatedBannerIds },
+              },
+            })
+          : Promise.resolve([]),
       ]);
 
-      if (!activeBanners.length) {
+      if (!activeBanners.length && !curatedActiveBanners.length) {
         return [];
       }
 
-      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const activeBannerById = new Map(
+        [...curatedActiveBanners, ...activeBanners].map((banner) => [banner.id, banner]),
+      );
       const seen = new Set<string>();
       const curatedOrderedBanners = items
         .map((item) => {
@@ -695,10 +714,12 @@ export class HomeLayoutService {
         (banner) => !seen.has(banner.id),
       );
 
-      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
-        banner_id: banner.id,
-        banner,
-      }));
+      return [...curatedOrderedBanners, ...remainingActiveBanners]
+        .slice(0, 6)
+        .map((banner) => ({
+          banner_id: banner.id,
+          banner,
+        }));
     }
 
 

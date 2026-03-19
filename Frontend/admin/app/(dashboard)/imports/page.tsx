@@ -97,6 +97,73 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function cronToHuman(expr: string): string {
+  if (!expr?.trim()) return "";
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return expr;
+  const [min, hour, dom, month, dow] = parts;
+
+  // Every N minutes: */N * * * *
+  const minStepMatch = /^\*\/(\d+)$/.exec(min);
+  if (minStepMatch && hour === "*" && dom === "*" && month === "*" && dow === "*") {
+    const n = Number(minStepMatch[1]);
+    return n === 1 ? "Cada minuto" : `Cada ${n} minutos`;
+  }
+
+  // Every hour at minute 0: 0 * * * *
+  if (min === "0" && hour === "*" && dom === "*" && month === "*" && dow === "*") {
+    return "Cada hora";
+  }
+
+  // Every N hours: 0 */N * * *
+  const hourStepMatch = /^\*\/(\d+)$/.exec(hour);
+  if (hourStepMatch && min === "0" && dom === "*" && month === "*" && dow === "*") {
+    const n = Number(hourStepMatch[1]);
+    return n === 1 ? "Cada hora" : `Cada ${n} horas`;
+  }
+
+  // Daily at H:M: M H * * *
+  if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom === "*" && month === "*" && dow === "*") {
+    const h = String(hour).padStart(2, "0");
+    const m = String(min).padStart(2, "0");
+    if (h === "00" && m === "00") return "Cada día a medianoche";
+    return `Cada día a las ${h}:${m}`;
+  }
+
+  // Weekly on weekday at H:M: M H * * d
+  if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom === "*" && month === "*" && /^\d$/.test(dow)) {
+    const dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+    const diaName = dias[Number(dow)];
+    if (!diaName) return expr;
+    const h = String(hour).padStart(2, "0");
+    const m = String(min).padStart(2, "0");
+    return `Cada ${diaName} a las ${h}:${m}`;
+  }
+
+  return expr;
+}
+
+const CRON_PRESETS_FREQUENT = [
+  { label: "Cada 5 min", value: "*/5 * * * *" },
+  { label: "Cada 15 min", value: "*/15 * * * *" },
+  { label: "Cada 30 min", value: "*/30 * * * *" },
+  { label: "Cada hora", value: "0 * * * *" },
+];
+
+const CRON_PRESETS_MODERATE = [
+  { label: "Cada hora", value: "0 * * * *" },
+  { label: "Cada 2h", value: "0 */2 * * *" },
+  { label: "Cada 6h", value: "0 */6 * * *" },
+  { label: "Cada 12h", value: "0 */12 * * *" },
+];
+
+const CRON_PRESETS_DAILY = [
+  { label: "Cada 6h", value: "0 */6 * * *" },
+  { label: "Cada 12h", value: "0 */12 * * *" },
+  { label: "Cada día 2:00", value: "0 2 * * *" },
+  { label: "Cada día medianoche", value: "0 0 * * *" },
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -782,70 +849,110 @@ export default function ImportsPage() {
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Stock sync cron
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Cron sincronización de stock
                     </label>
-                    <input value={form.stock_sync_cron} onChange={(event) => setForm((current) => ({ ...current, stock_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                    <input value={form.stock_sync_cron} onChange={(event) => setForm((current) => ({ ...current, stock_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="*/5 * * * *" />
+                    {form.stock_sync_cron && (
+                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.stock_sync_cron)}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {CRON_PRESETS_FREQUENT.map((preset) => (
+                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, stock_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Incremental products cron
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Cron productos incrementales
                     </label>
-                    <input value={form.incremental_sync_cron} onChange={(event) => setForm((current) => ({ ...current, incremental_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                    <input value={form.incremental_sync_cron} onChange={(event) => setForm((current) => ({ ...current, incremental_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="0 * * * *" />
+                    {form.incremental_sync_cron && (
+                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.incremental_sync_cron)}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {CRON_PRESETS_MODERATE.map((preset) => (
+                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, incremental_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Full catalog cron
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Cron catálogo completo
                     </label>
-                    <input value={form.full_sync_cron} onChange={(event) => setForm((current) => ({ ...current, full_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                    <input value={form.full_sync_cron} onChange={(event) => setForm((current) => ({ ...current, full_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="0 2 * * *" />
+                    {form.full_sync_cron && (
+                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.full_sync_cron)}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {CRON_PRESETS_DAILY.map((preset) => (
+                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, full_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Images cron
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Cron sincronización de imágenes
                     </label>
-                    <input value={form.images_sync_cron} onChange={(event) => setForm((current) => ({ ...current, images_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                    <input value={form.images_sync_cron} onChange={(event) => setForm((current) => ({ ...current, images_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="30 2 * * *" />
+                    {form.images_sync_cron && (
+                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.images_sync_cron)}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {CRON_PRESETS_DAILY.map((preset) => (
+                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, images_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Stock batch size
+                      Tamaño de lote (stock)
                     </label>
                     <input type="number" min={1} value={form.stock_batch_size} onChange={(event) => setForm((current) => ({ ...current, stock_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Full sync batch size
+                      Tamaño de lote (catálogo completo)
                     </label>
                     <input type="number" min={1} value={form.full_sync_batch_size} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Full sync inter-batch delay (ms)
+                      Pausa entre lotes (ms)
                     </label>
                     <input type="number" min={0} value={form.full_sync_batch_delay_ms} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_delay_ms: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Image sync take limit
+                      Límite de imágenes por ciclo
                     </label>
                     <input type="number" min={1} value={form.image_sync_take} onChange={(event) => setForm((current) => ({ ...current, image_sync_take: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Catalog page size override
+                      Tamaño de página del catálogo
                     </label>
-                    <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Blank = provider default" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                    <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Por defecto: 1000" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
                     <p className="mt-2 text-xs text-slate-500">
-                      Leave blank to use the provider-reported/default page size.
+                      Necesario para importar todo el catálogo. Se recomienda <strong>1000</strong>. Si el proveedor no devuelve metadatos de paginación, el sistema usará modo sonda para obtener todas las páginas automáticamente.
                     </p>
                   </div>
                 </div>
@@ -897,6 +1004,9 @@ export default function ImportsPage() {
                   <div>
                     <dt className="text-xs uppercase tracking-wide text-slate-500">Cron</dt>
                     <dd className="mt-1 break-all rounded-lg bg-white px-2 py-1 font-mono text-xs text-slate-700">{job.cron}</dd>
+                    {job.cron && cronToHuman(job.cron) !== job.cron && (
+                      <dd className="mt-0.5 text-xs font-medium text-emerald-600">{cronToHuman(job.cron)}</dd>
+                    )}
                   </div>
                   <div>
                     <dt className="text-xs uppercase tracking-wide text-slate-500">Próxima ejecución</dt>

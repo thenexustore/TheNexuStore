@@ -38,7 +38,7 @@ export const DEFAULT_IMPORT_RUNTIME_SETTINGS: ImportRuntimeSettings = {
   full_sync_batch_size: 500,
   full_sync_batch_delay_ms: 1000,
   image_sync_take: 50,
-  catalog_page_size: null,
+  catalog_page_size: 1000,
 };
 
 function parseBoolean(value: unknown, field: string) {

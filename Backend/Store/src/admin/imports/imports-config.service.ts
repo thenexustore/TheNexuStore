@@ -91,7 +91,7 @@ export class ImportsConfigService {
   }
 
   async getIntegrationRecord() {
-    return this.prisma.supplierIntegration.findUnique({
+    return (this.prisma as any).supplierIntegration.findUnique({
       where: { provider: INTEGRATION_PROVIDER },
     });
   }
@@ -138,7 +138,7 @@ export class ImportsConfigService {
     const encryptedApiKey = apiKey ? this.encryptApiKey(apiKey) : undefined;
     const apiKeyLast4 = apiKey ? apiKey.slice(-4) : undefined;
 
-    await this.prisma.supplierIntegration.upsert({
+    await (this.prisma as any).supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
       update: {
         display_name: input.display_name.trim(),
@@ -172,7 +172,7 @@ export class ImportsConfigService {
   async testConnection() {
     const healthy = await this.infortisaService.checkServiceHealth();
 
-    await this.prisma.supplierIntegration.upsert({
+    await (this.prisma as any).supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
       update: { last_healthcheck_at: new Date() },
       create: {

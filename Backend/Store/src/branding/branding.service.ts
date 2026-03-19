@@ -59,7 +59,12 @@ export class BrandingService {
     try {
       const raw = await fs.readFile(this.settingsPath, 'utf8');
       const parsed = JSON.parse(raw) as BrandingSettingsPayload;
-      return this.normalize({ ...DEFAULT_BRANDING, ...parsed });
+      const normalized = this.normalize({ ...DEFAULT_BRANDING, ...parsed });
+      normalized.brandLogoUrl = await this.validateBrandingAssetUrl(normalized.brandLogoUrl);
+      normalized.brandLogoDarkUrl = await this.validateBrandingAssetUrl(
+        normalized.brandLogoDarkUrl,
+      );
+      return normalized;
     } catch {
       return DEFAULT_BRANDING;
     }
@@ -107,5 +112,19 @@ export class BrandingService {
     if (mimeType === 'image/webp') return 'webp';
     if (mimeType === 'image/svg+xml') return 'svg';
     return null;
+  }
+
+  private async validateBrandingAssetUrl(url: string): Promise<string> {
+    if (!url) return '';
+    // Matches branding-assets uploaded via saveLogoDataUrl (e.g. /branding-assets/logo-light.png)
+    const match = url.match(/\/branding-assets\/(logo-(?:light|dark)\.[a-zA-Z0-9]+)(?:\?.*)?$/);
+    if (!match) return url;
+    const filePath = join(this.assetsDir, match[1]);
+    try {
+      await fs.access(filePath);
+      return url;
+    } catch {
+      return '';
+    }
   }
 }

@@ -129,6 +129,7 @@ Redsys logic is security-sensitive (signatures, callbacks, order state transitio
 - [ ] Identify all affected files/apps (backend/store/admin/ops/docs).
 - [ ] Propose the minimal safe fix first.
 - [ ] Run relevant checks (lint/tests/typecheck/smoke as applicable).
+- [ ] Before handing off a PR, run merge-readiness checks (`bash ops/check_merge_readiness.sh`) and, for risky cross-app work, `bash ops/check_merge_readiness.sh --with-build`.
 - [ ] Explain key risks and non-obvious side effects.
 - [ ] Provide manual QA steps covering user-visible behavior.
 

@@ -333,7 +333,7 @@ export class HomepageSectionsService {
       return config;
     }
 
-    return {
+    const next: Record<string, any> = {
       ...config,
       carousel_enabled: Boolean(config.carousel_enabled ?? true),
       carousel_autoplay: Boolean(config.carousel_autoplay ?? true),
@@ -356,6 +356,16 @@ export class HomepageSectionsService {
         2,
       ),
     };
+
+    if (type === HomepageSectionType.FEATURED_PICKS && (next.source || 'query') === 'query') {
+      next.query = {
+        ...(next.query || {}),
+        featuredOnly: next.query?.featuredOnly ?? next.featured_only ?? true,
+      };
+      next.featured_only = next.query.featuredOnly;
+    }
+
+    return next;
   }
 
   private shouldBackfillLegacyConfig(
@@ -854,9 +864,10 @@ export class HomepageSectionsService {
       [HomepageQuerySortBy.PRICE_DESC]: ProductSortBy.PRICE_HIGH_TO_LOW,
     };
 
-    const featuredOnly = Boolean(
-      query.featuredOnly ?? config.featured_only ?? false,
-    );
+    const featuredOnly =
+      sectionType === HomepageSectionType.FEATURED_PICKS
+        ? Boolean(query.featuredOnly ?? config.featured_only ?? true)
+        : Boolean(query.featuredOnly ?? config.featured_only ?? false);
     const selectedSort = query.sortBy || config.sort_by || ProductSortBy.NEWEST;
 
     if (

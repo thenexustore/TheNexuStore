@@ -291,6 +291,187 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(heroSection.resolved[0]?.banner?.title_text).toBe('Hero 2');
   });
 
+
+  it('resolves curated active hero banners even when they fall outside fallback banner cap', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-7',
+            banner: { id: 'banner-7', is_active: true },
+            href: '/curated-hero',
+            image_url: '/curated-hero.jpg',
+            label: 'Curated hero',
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest
+          .fn()
+          .mockImplementation(({ where, take }: any) => {
+            if (where?.id?.in) {
+              return Promise.resolve([
+                {
+                  id: 'banner-7',
+                  image: '/hero-7.jpg',
+                  title_text: 'Hero 7',
+                  sort_order: 7,
+                  is_active: true,
+                },
+              ]);
+            }
+
+            return Promise.resolve(
+              Array.from({ length: take ?? 6 }, (_, index) => ({
+                id: `banner-${index + 1}`,
+                image: `/hero-${index + 1}.jpg`,
+                title_text: `Hero ${index + 1}`,
+                sort_order: index + 1,
+                is_active: true,
+              })),
+            );
+          }),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(heroSection.resolved[0]?.banner_id).toBe('banner-7');
+    expect(heroSection.resolved[0]?.href).toBe('/curated-hero');
+    expect(prisma.banner.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: ['banner-7'] }, is_active: true },
+      }),
+    );
+  });
+
+  it('preserves curated hero overrides while hydrating linked banner data', async () => {
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-2',
+            banner: { id: 'banner-2', is_active: true },
+            href: '/override-link',
+            image_url: '/override-image.jpg',
+            label: 'Override label',
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest
+          .fn()
+          .mockImplementation(({ where }: any) => {
+            if (where?.id?.in) {
+              return Promise.resolve([
+                {
+                  id: 'banner-2',
+                  image: '/hero-2.jpg',
+                  title_text: 'Hero 2',
+                  button_link: '/default-link',
+                  sort_order: 2,
+                  is_active: true,
+                },
+              ]);
+            }
+
+            return Promise.resolve([
+              {
+                id: 'banner-1',
+                image: '/hero-1.jpg',
+                title_text: 'Hero 1',
+                sort_order: 1,
+                is_active: true,
+              },
+              {
+                id: 'banner-2',
+                image: '/hero-2.jpg',
+                title_text: 'Hero 2',
+                button_link: '/default-link',
+                sort_order: 2,
+                is_active: true,
+              },
+            ]);
+          }),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroItem = (payload.sections[0] as any).resolved[0];
+
+    expect(heroItem).toEqual(
+      expect.objectContaining({
+        id: 'item-1',
+        href: '/override-link',
+        image_url: '/override-image.jpg',
+        label: 'Override label',
+        banner_id: 'banner-2',
+      }),
+    );
+    expect(heroItem.banner.title_text).toBe('Hero 2');
+  });
+
   it('falls back BEST_DEALS to featured products when no deals are available', async () => {
     const prisma = {
       homePageSection: {

@@ -74,18 +74,84 @@ describe('category-taxonomy.util', () => {
 
   it('includes seeded parent categories with no children (empty children array)', () => {
     const taxonomyRows = [
-      { id: 'p1', name: 'Ordenadores y portátiles', slug: 'ordenadores-portatiles', parent_id: null, sort_order: 10 },
-      { id: 'p2', name: 'Componentes y almacenamiento', slug: 'componentes-almacenamiento', parent_id: null, sort_order: 20 },
-      { id: 'p3', name: 'Monitores y periféricos', slug: 'monitores-perifericos', parent_id: null, sort_order: 30 },
-      { id: 'p4', name: 'Impresión y escaneado', slug: 'impresion-escaneado', parent_id: null, sort_order: 40 },
-      { id: 'p5', name: 'Redes y servidores', slug: 'redes-servidores', parent_id: null, sort_order: 50 },
-      { id: 'p6', name: 'Telefonía y movilidad', slug: 'telefonia-movilidad', parent_id: null, sort_order: 60 },
-      { id: 'p7', name: 'TV, audio y vídeo', slug: 'tv-audio-video', parent_id: null, sort_order: 65 },
-      { id: 'p8', name: 'Software y seguridad', slug: 'software-seguridad', parent_id: null, sort_order: 70 },
-      { id: 'p9', name: 'Gaming y smart home', slug: 'gaming-smart-home', parent_id: null, sort_order: 80 },
-      { id: 'p10', name: 'Accesorios y consumibles', slug: 'accesorios-consumibles', parent_id: null, sort_order: 90 },
+      {
+        id: 'p1',
+        name: 'Ordenadores y portátiles',
+        slug: 'ordenadores-portatiles',
+        parent_id: null,
+        sort_order: 10,
+      },
+      {
+        id: 'p2',
+        name: 'Componentes y almacenamiento',
+        slug: 'componentes-almacenamiento',
+        parent_id: null,
+        sort_order: 20,
+      },
+      {
+        id: 'p3',
+        name: 'Monitores y periféricos',
+        slug: 'monitores-perifericos',
+        parent_id: null,
+        sort_order: 30,
+      },
+      {
+        id: 'p4',
+        name: 'Impresión y escaneado',
+        slug: 'impresion-escaneado',
+        parent_id: null,
+        sort_order: 40,
+      },
+      {
+        id: 'p5',
+        name: 'Redes y servidores',
+        slug: 'redes-servidores',
+        parent_id: null,
+        sort_order: 50,
+      },
+      {
+        id: 'p6',
+        name: 'Telefonía y movilidad',
+        slug: 'telefonia-movilidad',
+        parent_id: null,
+        sort_order: 60,
+      },
+      {
+        id: 'p7',
+        name: 'TV, audio y vídeo',
+        slug: 'tv-audio-video',
+        parent_id: null,
+        sort_order: 65,
+      },
+      {
+        id: 'p8',
+        name: 'Software y seguridad',
+        slug: 'software-seguridad',
+        parent_id: null,
+        sort_order: 70,
+      },
+      {
+        id: 'p9',
+        name: 'Gaming y smart home',
+        slug: 'gaming-smart-home',
+        parent_id: null,
+        sort_order: 80,
+      },
+      {
+        id: 'p10',
+        name: 'Accesorios y consumibles',
+        slug: 'accesorios-consumibles',
+        parent_id: null,
+        sort_order: 90,
+      },
       // Only p1 has a child
-      { id: 'c1', name: 'Portátiles', slug: 'ordenadores-portatiles-portatiles', parent_id: 'p1', sort_order: 1 },
+      {
+        id: 'c1',
+        name: 'Portátiles',
+        slug: 'ordenadores-portatiles-portatiles',
+        parent_id: 'p1',
+        sort_order: 1,
+      },
     ];
 
     const tree = buildCategoryTaxonomyTree(taxonomyRows, 3);
@@ -107,7 +173,9 @@ describe('category-taxonomy.util', () => {
     const ordenadores = tree.find((n) => n.slug === 'ordenadores-portatiles')!;
     expect(ordenadores.children).toHaveLength(1);
 
-    const componentes = tree.find((n) => n.slug === 'componentes-almacenamiento')!;
+    const componentes = tree.find(
+      (n) => n.slug === 'componentes-almacenamiento',
+    )!;
     expect(componentes.children).toHaveLength(0);
   });
 
@@ -152,9 +220,9 @@ describe('category-taxonomy.util', () => {
     expect(printing?.children.map((node) => node.slug)).toContain(
       'impresion-escaneado-familia-impresoras-multifuncion',
     );
-    expect(
-      printing?.children[0]?.children.map((node) => node.slug),
-    ).toContain('accesorios-impresora');
+    expect(printing?.children[0]?.children.map((node) => node.slug)).toContain(
+      'accesorios-impresora',
+    );
   });
 
   it('creates synthetic level-2 parent buckets under canonical grandparents', () => {
@@ -183,7 +251,9 @@ describe('category-taxonomy.util', () => {
     ]);
 
     const tree = buildCategoryTaxonomyTree(normalized, 3);
-    const root = tree.find((node) => node.slug === 'componentes-almacenamiento');
+    const root = tree.find(
+      (node) => node.slug === 'componentes-almacenamiento',
+    );
 
     expect(root?.children.map((node) => node.slug)).toEqual([
       'componentes-almacenamiento-familia-componentes-pc',
@@ -236,6 +306,60 @@ describe('category-taxonomy.util', () => {
       subfamilyName: 'Altavoz WiFi multiroom',
       expectedSlug: 'tv-audio-video-familia-audio-home-cinema',
     },
+    {
+      grandparentSlug: 'redes-servidores',
+      familyName: 'Networking',
+      subfamilyName: 'Firewall UTM',
+      expectedSlug: 'redes-servidores-familia-seguridad-edge-conectividad',
+    },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Movilidad profesional',
+      subfamilyName: 'Terminal PDA de radiofrecuencia',
+      expectedSlug: 'telefonia-movilidad-familia-movilidad-profesional-gps-rf',
+    },
+    {
+      grandparentSlug: 'monitores-perifericos',
+      familyName: 'Periféricos',
+      subfamilyName: 'Escáner de mano y lector de código',
+      expectedSlug: 'monitores-perifericos-familia-digitalizacion-lectores',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Accesorios',
+      subfamilyName: 'Brazo monitor ergonómico',
+      expectedSlug: 'accesorios-consumibles-familia-soportes-ergonomia',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Consumibles',
+      subfamilyName: 'Spray de limpieza',
+      expectedSlug: 'accesorios-consumibles-familia-limpieza-mantenimiento',
+    },
+    {
+      grandparentSlug: 'componentes-almacenamiento',
+      familyName: 'Componentes',
+      subfamilyName: 'Chasis ATX para PC',
+      expectedSlug: 'componentes-almacenamiento-familia-cajas-montaje',
+    },
+    {
+      grandparentSlug: 'gaming-smart-home',
+      familyName: 'Gaming',
+      subfamilyName: 'Silla gaming premium',
+      expectedSlug: 'gaming-smart-home-familia-mobiliario-gaming-simracing',
+    },
+    {
+      grandparentSlug: 'software-seguridad',
+      familyName: 'Gestión empresarial',
+      subfamilyName: 'TPV y facturación',
+      expectedSlug: 'software-seguridad-familia-gestion-facturacion-pdv',
+    },
+    {
+      grandparentSlug: 'software-seguridad',
+      familyName: 'Seguridad',
+      subfamilyName: 'Certificado digital y firma electrónica',
+      expectedSlug: 'software-seguridad-familia-identidad-firma-compliance',
+    },
   ])(
     'matches expected level-2 parent for $familyName / $subfamilyName',
     ({ grandparentSlug, familyName, subfamilyName, expectedSlug }) => {
@@ -276,7 +400,9 @@ describe('category-taxonomy.util', () => {
     ]);
 
     const tree = buildCategoryTaxonomyTree(normalized, 3);
-    const canonical = tree.find((node) => node.slug === 'ordenadores-portatiles');
+    const canonical = tree.find(
+      (node) => node.slug === 'ordenadores-portatiles',
+    );
 
     expect(
       tree.filter((node) => node.slug === 'ordenadores-portatiles'),
@@ -284,9 +410,9 @@ describe('category-taxonomy.util', () => {
     expect(canonical?.children.map((node) => node.slug)).toContain(
       'ordenadores-portatiles-familia-portatiles',
     );
-    expect(
-      canonical?.children[0]?.children.map((node) => node.slug),
-    ).toContain('portatiles');
+    expect(canonical?.children[0]?.children.map((node) => node.slug)).toContain(
+      'portatiles',
+    );
     expect(canonical?.children.map((node) => node.slug)).not.toContain(
       'ordenadores-y-portatiles',
     );

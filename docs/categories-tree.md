@@ -84,6 +84,20 @@ This smoke intentionally covers:
 - manual import/retry audit logging (`imports.controller.spec.ts`),
 - and category/product filtering against the normalized hierarchy (`products.service.spec.ts`).
 
+For PR/merge safety before handing off taxonomy/navigation work, run the repository merge-readiness script from the repo root:
+
+```bash
+bash ops/check_merge_readiness.sh
+```
+
+If the change is cross-app or likely to affect deployment/build output, run the stricter variant too:
+
+```bash
+bash ops/check_merge_readiness.sh --with-build
+```
+
+This checks for merge conflict markers across the repo and then runs merge-marker + typecheck validation in `Backend/Store`, `Frontend/Store`, and `Frontend/admin`; the `--with-build` variant also runs all three builds.
+
 For local parity with CI on taxonomy/navigation changes, also run the TypeScript checks explicitly in both apps:
 
 ```bash

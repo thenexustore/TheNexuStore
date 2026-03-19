@@ -127,7 +127,7 @@ What it does:
 5. Store/Admin builds
 6. PM2 restarts with `--update-env`
 7. PM2 save
-8. Local health checks (ports 3000/3001/4000)
+8. Local health checks (ports 3000/3001/4000), including the real Infortisa provider probe
 
 If a legacy checkout still contains both `middleware.ts` and `proxy.ts`, deploy scripts automatically remove `middleware.ts` before build to avoid Next.js 16 conflict.
 
@@ -154,7 +154,7 @@ sudo /usr/local/bin/nexus_rollback.sh /root/nexus_backups/20260304_120000
 
 ## 8) Infortisa verification and full sync safe run
 
-Health endpoint:
+Health endpoint (must reflect the real provider state, not a local fallback). Expect JSON fields `healthy`, `provider`, `base_url`, `checked_at`, `auth_configured`, `latency_ms`, and `error_summary` on failures:
 
 ```bash
 curl -sS http://127.0.0.1:4000/admin/infortisa/health ; echo

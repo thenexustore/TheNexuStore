@@ -291,6 +291,81 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(heroSection.resolved[0]?.banner?.title_text).toBe('Hero 2');
   });
 
+
+  it('keeps curated active HERO banners even when they sort below the default fallback window', async () => {
+    const activeBanners = Array.from({ length: 8 }, (_, index) => ({
+      id: `banner-${index + 1}`,
+      image: `/hero-${index + 1}.jpg`,
+      title_text: `Hero ${index + 1}`,
+      subtitle_text: `Sub ${index + 1}`,
+      button_text: `Shop ${index + 1}`,
+      button_link: `/products/${index + 1}`,
+      sort_order: index + 1,
+      is_active: true,
+    }));
+
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: 'banner-8',
+            banner: { id: 'banner-8', is_active: true },
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest.fn().mockResolvedValue(activeBanners),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(prisma.banner.findMany).toHaveBeenCalledWith({
+      where: { is_active: true },
+      orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+    });
+    expect(heroSection.resolved).toHaveLength(6);
+    expect(heroSection.resolved.map((x: any) => x.banner_id)).toEqual([
+      'banner-8',
+      'banner-1',
+      'banner-2',
+      'banner-3',
+      'banner-4',
+      'banner-5',
+    ]);
+  });
+
   it('falls back BEST_DEALS to featured products when no deals are available', async () => {
     const prisma = {
       homePageSection: {

@@ -9,6 +9,13 @@ const TARGET_LABEL: Record<CuratedTarget, string> = {
   banners: "banners",
 };
 
+const TARGET_ICON: Record<CuratedTarget, string> = {
+  products: "🛍️",
+  brands: "🏷️",
+  categories: "🗂️",
+  banners: "🖼️",
+};
+
 type Props = {
   currentTarget: CuratedTarget;
   items: HomeSectionItem[];
@@ -48,19 +55,25 @@ export default function CuratedItemsPanel({
 }: Props) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3">
-      <div className="mb-1 text-sm font-medium">Selección manual ({TARGET_LABEL[currentTarget]})</div>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-base">{TARGET_ICON[currentTarget]}</span>
+        <span className="text-sm font-medium">Selección manual ({TARGET_LABEL[currentTarget]})</span>
+      </div>
       <p className="mb-3 text-xs text-zinc-500">
         Añade elementos y ordénalos. El orden aquí será el orden de visualización en tienda.
       </p>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded-full bg-zinc-100 px-2 py-1 text-zinc-700">Añadidos: {items.length}</span>
-        <span className="rounded-full bg-zinc-100 px-2 py-1 text-zinc-700">Límite: {curatedLimit}</span>
+        <span className="rounded-full bg-zinc-100 border border-zinc-200 px-2 py-1 text-zinc-700">
+          {items.length} / {curatedLimit} añadidos
+        </span>
         <span
-          className={`rounded-full px-2 py-1 ${
-            curatedRemaining === 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"
+          className={`rounded-full px-2 py-1 border ${
+            curatedRemaining === 0
+              ? "bg-amber-50 border-amber-200 text-amber-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-700"
           }`}
         >
-          {curatedRemaining === 0 ? "Límite alcanzado" : `Disponibles: ${curatedRemaining}`}
+          {curatedRemaining === 0 ? "⚠️ Límite alcanzado" : `${curatedRemaining} disponibles`}
         </span>
       </div>
 
@@ -71,9 +84,9 @@ export default function CuratedItemsPanel({
           placeholder={`Buscar ${TARGET_LABEL[currentTarget]}...`}
           className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm"
         />
-        <div className="max-h-44 space-y-1 overflow-auto rounded-lg border border-zinc-200 bg-white p-2">
+        <div className="max-h-48 space-y-1 overflow-auto rounded-lg border border-zinc-200 bg-white p-2">
           {optionsLoading ? (
-            <div className="text-xs text-zinc-500">Buscando...</div>
+            <div className="py-2 text-center text-xs text-zinc-500">Buscando...</div>
           ) : searchOptions.length ? (
             searchOptions.map((option) => {
               const alreadyAdded = items.some((item) => {
@@ -88,94 +101,146 @@ export default function CuratedItemsPanel({
                   key={option.id}
                   disabled={saving || alreadyAdded || curatedRemaining === 0}
                   onClick={() => onAdd(option)}
-                  className="flex w-full items-center justify-between rounded-md border border-zinc-200 px-2 py-1 text-left text-xs hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-left text-xs transition ${
+                    alreadyAdded
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-zinc-200 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  }`}
                 >
-                  <span className="truncate pr-2">{option.label}</span>
-                  <span>{alreadyAdded ? "Añadido" : "Añadir"}</span>
+                  <div className="min-w-0 flex-1 pr-2">
+                    <div className="truncate font-medium">{option.label}</div>
+                    {option.subtitle ? (
+                      <div className="truncate text-zinc-400">{option.subtitle}</div>
+                    ) : null}
+                  </div>
+                  <span className={`flex-shrink-0 text-[11px] ${alreadyAdded ? "text-emerald-600" : "text-zinc-500"}`}>
+                    {alreadyAdded ? "✓ Añadido" : "+ Añadir"}
+                  </span>
                 </button>
               );
             })
+          ) : searchQuery ? (
+            <div className="py-2 text-center text-xs text-zinc-500">Sin resultados para &quot;{searchQuery}&quot;</div>
           ) : (
-            <div className="text-xs text-zinc-500">Sin resultados</div>
+            <div className="py-2 text-center text-xs text-zinc-400">Escribe para buscar {TARGET_LABEL[currentTarget]}</div>
           )}
         </div>
       </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white p-2">
-        <div className="mb-2 text-xs font-medium text-zinc-500">Orden actual</div>
+        <div className="mb-2 text-xs font-medium text-zinc-500">
+          Orden actual ({items.length} elemento{items.length !== 1 ? "s" : ""})
+        </div>
         {itemsLoading ? (
-          <div className="text-xs text-zinc-500">Cargando ítems...</div>
+          <div className="py-2 text-center text-xs text-zinc-500">Cargando ítems...</div>
         ) : items.length ? (
-          <div className="space-y-1">
-            {items.map((item, index) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-md border border-zinc-200 px-2 py-1 text-xs"
-              >
-                <span className="truncate pr-2">
-                  {item.label || item.product_id || item.brand_id || item.category_id || item.banner_id || item.id}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    disabled={saving || index === 0}
-                    onClick={() => onMove(item, -1)}
-                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
-                    title="Subir"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    disabled={saving || index === items.length - 1}
-                    onClick={() => onMove(item, 1)}
-                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
-                    title="Bajar"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    disabled={saving || !onEditImage}
-                    onClick={() => onEditImage?.(item)}
-                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
-                    title="URL imagen"
-                  >
-                    Img URL
-                  </button>
-                  <button
-                    disabled={saving || !onUploadImage}
-                    onClick={() => onUploadImage?.(item)}
-                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
-                    title="Subir imagen"
-                  >
-                    Subir Img
-                  </button>
-                  <button
-                    disabled={saving || !onEditLink}
-                    onClick={() => onEditLink?.(item)}
-                    className="rounded border border-zinc-300 bg-white px-1 disabled:opacity-50"
-                    title="Enlace"
-                  >
-                    Link
-                  </button>
-                  <button
-                    disabled={saving}
-                    onClick={() => onDelete(item.id)}
-                    className="rounded border border-rose-300 bg-rose-50 px-1 text-rose-700 disabled:opacity-50"
-                    title="Eliminar"
-                  >
-                    x
-                  </button>
+          <div className="space-y-1.5">
+            {items.map((item, index) => {
+              const displayName = item.label || item.product_id || item.brand_id || item.category_id || item.banner_id || item.id;
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-md border border-zinc-200 bg-zinc-50 p-2 text-xs"
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-mono text-zinc-600">#{index + 1}</span>
+                        <span className="truncate font-medium text-zinc-900">{displayName}</span>
+                      </div>
+                      {item.href ? (
+                        <div className="mt-0.5 truncate text-[11px] text-zinc-400">
+                          🔗 {item.href}
+                        </div>
+                      ) : null}
+                      {item.image_url ? (
+                        <div className="mt-0.5 flex items-center gap-1">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.image_url}
+                            alt=""
+                            className="h-6 w-6 rounded object-cover border border-zinc-200"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                          />
+                          <span className="truncate text-[11px] text-zinc-400 max-w-[140px]">{item.image_url}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-1">
+                      <button
+                        disabled={saving || index === 0}
+                        onClick={() => onMove(item, -1)}
+                        className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 disabled:opacity-40 hover:bg-zinc-50"
+                        title="Subir"
+                        aria-label="Subir"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        disabled={saving || index === items.length - 1}
+                        onClick={() => onMove(item, 1)}
+                        className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 disabled:opacity-40 hover:bg-zinc-50"
+                        title="Bajar"
+                        aria-label="Bajar"
+                      >
+                        ↓
+                      </button>
+                      {onEditImage ? (
+                        <button
+                          disabled={saving}
+                          onClick={() => onEditImage(item)}
+                          className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
+                          title="Editar URL de imagen"
+                          aria-label="Editar URL de imagen"
+                        >
+                          🖼 URL
+                        </button>
+                      ) : null}
+                      {onUploadImage ? (
+                        <button
+                          disabled={saving}
+                          onClick={() => onUploadImage(item)}
+                          className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
+                          title="Subir imagen"
+                          aria-label="Subir imagen"
+                        >
+                          📤 Img
+                        </button>
+                      ) : null}
+                      {onEditLink ? (
+                        <button
+                          disabled={saving}
+                          onClick={() => onEditLink(item)}
+                          className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
+                          title="Editar enlace"
+                          aria-label="Editar enlace"
+                        >
+                          🔗 Link
+                        </button>
+                      ) : null}
+                      <button
+                        disabled={saving}
+                        onClick={() => onDelete(item.id)}
+                        className="rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-rose-700 disabled:opacity-40 hover:bg-rose-100"
+                        title="Eliminar ítem"
+                        aria-label="Eliminar ítem"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <div className="text-xs text-zinc-500">No hay ítems curados todavía.</div>
+          <div className="py-3 text-center text-xs text-zinc-500">No hay ítems curados todavía.</div>
         )}
       </div>
 
       {!itemsLoading && items.length === 0 ? (
-        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-          Este bloque no tiene contenido curado; añade elementos antes de publicar.
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          ⚠️ Este bloque no tiene contenido curado; añade elementos antes de publicar.
         </div>
       ) : null}
     </div>

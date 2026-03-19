@@ -6,9 +6,12 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { getMe, logoutUser } from "../lib/auth";
+import { isAuthScreenPath } from "../lib/route-visibility";
 
 interface Address {
   full_name?: string;
@@ -36,6 +39,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  sessionReady: boolean;
   login: (userData: User) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
@@ -53,9 +57,12 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const pathname = usePathname();
+  const skipUserBootstrap = isAuthScreenPath(pathname);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string>("");
+  const [sessionReady, setSessionReady] = useState(false);
 
   const toAuthUser = useCallback((userData: NonNullable<Awaited<ReturnType<typeof getMe>>>): User => {
     const firstName = userData.firstName ?? userData.first_name ?? "";
@@ -82,6 +89,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("session_id", newSessionId);
       setSessionId(newSessionId);
     }
+
+    setSessionReady(true);
   }, []);
 
   // Load user on mount
@@ -101,14 +110,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [toAuthUser]);
 
   useEffect(() => {
+    if (skipUserBootstrap) {
+      setIsLoading(false);
+      return;
+    }
+
     void refreshUser();
-  }, [refreshUser]);
+  }, [refreshUser, skipUserBootstrap]);
 
-  const login = (userData: User) => {
+  const login = useCallback((userData: User) => {
     setUser(userData);
-  };
+    setIsLoading(false);
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await logoutUser();
     } catch (error) {
@@ -117,23 +132,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       // Keep session ID for guest cart
     }
-  };
+  }, []);
 
-  const getSessionId = () => {
-    return sessionId;
-  };
+  const getSessionId = useCallback(() => sessionId, [sessionId]);
+
+  const value = useMemo(
+    () => ({
+      user,
+      isLoading,
+      sessionReady,
+      login,
+      logout,
+      refreshUser,
+      getSessionId,
+    }),
+    [getSessionId, isLoading, login, logout, refreshUser, sessionReady, user],
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        login,
-        logout,
-        refreshUser,
-        getSessionId,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

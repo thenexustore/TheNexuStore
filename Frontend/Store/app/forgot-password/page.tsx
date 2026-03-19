@@ -34,7 +34,10 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
 
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
+  useEffect(
+    () => subscribeStoreBranding(setStoreBranding, { refreshRemote: false }),
+    [],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

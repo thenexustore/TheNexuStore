@@ -3,6 +3,10 @@ import { API_URL } from "./env";
 export const ADMIN_SETTINGS_KEY = "admin_settings";
 export const ADMIN_SETTINGS_EVENT = "admin-settings-updated";
 export const BRANDING_COOKIE_KEY = "tns_branding";
+const BRANDING_LAST_SYNC_KEY = "admin_settings_synced_at";
+const BRANDING_SYNC_TTL_MS = 5 * 60 * 1000;
+
+let brandingRequestInFlight: Promise<BrandingSettings | null> | null = null;
 
 type BrandingSettings = {
   brandLogoMode?: "custom";
@@ -14,6 +18,19 @@ type BrandingSettings = {
   brandLogoBrightness?: number;
   brandLogoSaturation?: number;
 };
+
+function readLastBrandingSync(): number {
+  if (typeof window === "undefined") return 0;
+
+  const raw = window.localStorage.getItem(BRANDING_LAST_SYNC_KEY);
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function markBrandingSynced(timestamp = Date.now()): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(BRANDING_LAST_SYNC_KEY, String(timestamp));
+}
 
 export type StoreBranding = {
   srcCandidates: string[];
@@ -93,15 +110,36 @@ export function loadStoreBranding(): StoreBranding {
 }
 
 
-async function fetchRemoteBrandingSettings(): Promise<BrandingSettings | null> {
-  try {
-    const response = await fetch(`${API_URL}/branding/settings`, { credentials: "include", cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok || !payload?.success || !payload?.data) return null;
-    return payload.data as BrandingSettings;
-  } catch {
-    return null;
+async function fetchRemoteBrandingSettings(force = false): Promise<BrandingSettings | null> {
+  if (typeof window === "undefined") return null;
+
+  if (!force) {
+    const lastSyncedAt = readLastBrandingSync();
+    if (lastSyncedAt > 0 && Date.now() - lastSyncedAt < BRANDING_SYNC_TTL_MS) {
+      return null;
+    }
   }
+
+  if (!brandingRequestInFlight) {
+    brandingRequestInFlight = (async () => {
+      try {
+        const response = await fetch(`${API_URL}/branding/settings`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload?.success || !payload?.data) return null;
+        markBrandingSynced();
+        return payload.data as BrandingSettings;
+      } catch {
+        return null;
+      } finally {
+        brandingRequestInFlight = null;
+      }
+    })();
+  }
+
+  return brandingRequestInFlight;
 }
 
 function persistBrandingSnapshot(next: BrandingSettings): void {
@@ -115,19 +153,26 @@ function persistBrandingSnapshot(next: BrandingSettings): void {
   }
 }
 
-export function subscribeStoreBranding(listener: (branding: StoreBranding) => void): () => void {
+export function subscribeStoreBranding(
+  listener: (branding: StoreBranding) => void,
+  options?: { refreshRemote?: boolean; forceRemoteRefresh?: boolean },
+): () => void {
   if (typeof window === "undefined") return () => undefined;
 
   const sync = () => listener(loadStoreBranding());
   window.addEventListener("storage", sync);
   window.addEventListener(ADMIN_SETTINGS_EVENT, sync);
 
-  void (async () => {
-    const remote = await fetchRemoteBrandingSettings();
-    if (!remote) return;
-    persistBrandingSnapshot(remote);
-    window.dispatchEvent(new CustomEvent(ADMIN_SETTINGS_EVENT));
-  })();
+  if (options?.refreshRemote !== false) {
+    void (async () => {
+      const remote = await fetchRemoteBrandingSettings(
+        options?.forceRemoteRefresh === true,
+      );
+      if (!remote) return;
+      persistBrandingSnapshot(remote);
+      window.dispatchEvent(new CustomEvent(ADMIN_SETTINGS_EVENT));
+    })();
+  }
 
   return () => {
     window.removeEventListener("storage", sync);

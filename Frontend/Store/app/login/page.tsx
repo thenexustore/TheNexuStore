@@ -8,11 +8,9 @@ import { Mail, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
 import { loginUser } from "../lib/auth";
 import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "../lib/admin-branding";
 import StoreBrandLogo from "../components/StoreBrandLogo";
-import { useAuth } from "../providers/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { refreshUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +18,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
 
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
+  useEffect(
+    () => subscribeStoreBranding(setStoreBranding, { refreshRemote: false }),
+    [],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +30,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginUser({ email, password });
-      await refreshUser();
       router.replace("/store");
     } catch (err: any) {
       setError(err?.message || "Invalid email or password");

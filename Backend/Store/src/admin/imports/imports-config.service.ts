@@ -171,22 +171,23 @@ export class ImportsConfigService {
 
   async testConnection() {
     const healthy = await this.infortisaService.checkServiceHealth();
+    const checkedAt = new Date();
 
     await (this.prisma as any).supplierIntegration.upsert({
       where: { provider: INTEGRATION_PROVIDER },
-      update: { last_healthcheck_at: new Date() },
+      update: { last_healthcheck_at: checkedAt },
       create: {
         provider: INTEGRATION_PROVIDER,
         display_name: INTEGRATION_FALLBACK_NAME,
         base_url: INTEGRATION_FALLBACK_BASE_URL,
         is_active: true,
-        last_healthcheck_at: new Date(),
+        last_healthcheck_at: checkedAt,
       },
     });
 
     return {
       ok: healthy,
-      checked_at: new Date().toISOString(),
+      checked_at: checkedAt.toISOString(),
     };
   }
 }

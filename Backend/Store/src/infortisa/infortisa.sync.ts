@@ -35,7 +35,7 @@ type ProductBatchStats = {
 type ImportRunSummary = {
   id: string;
   provider: string;
-  mode: SyncMode;
+  mode: string;
   started_at: Date;
   finished_at: Date | null;
   status: 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED';
@@ -527,11 +527,11 @@ export class InfortisaSyncService {
 
   private async createImportRun(input: {
     provider: string;
-    mode: SyncMode;
+    mode: string;
     startedAt: Date;
     requestMeta?: Prisma.InputJsonValue;
   }) {
-    return (this.prisma as any).importRun.create({
+    return this.prisma.importRun.create({
       data: {
         provider: input.provider,
         mode: input.mode,
@@ -545,7 +545,7 @@ export class InfortisaSyncService {
     id: string,
     data: Record<string, unknown>,
   ) {
-    await (this.prisma as any).importRun.update({
+    await this.prisma.importRun.update({
       where: { id },
       data,
     });
@@ -569,7 +569,7 @@ export class InfortisaSyncService {
     },
   ) {
     await this.prisma.$transaction(async (tx) => {
-      await (tx as any).importRun.update({
+      await tx.importRun.update({
         where: { id },
         data: {
           finished_at: input.finishedAt,
@@ -587,7 +587,7 @@ export class InfortisaSyncService {
       });
 
       if (input.incidents.length > 0) {
-        await (tx as any).importRunError.createMany({
+        await tx.importRunError.createMany({
           data: input.incidents.map((incident) => ({
             import_run_id: id,
             sku: incident.sku ?? undefined,
@@ -608,7 +608,7 @@ export class InfortisaSyncService {
     const message = this.extractErrorMessage(error);
 
     await this.prisma.$transaction(async (tx) => {
-      await (tx as any).importRun.update({
+      await tx.importRun.update({
         where: { id },
         data: {
           finished_at: new Date(),
@@ -621,7 +621,7 @@ export class InfortisaSyncService {
         },
       });
 
-      await (tx as any).importRunError.create({
+      await tx.importRunError.create({
         data: {
           import_run_id: id,
           stage: 'run',
@@ -633,7 +633,105 @@ export class InfortisaSyncService {
   }
 
   private async getImportRunSummary(id: string): Promise<ImportRunSummary> {
-    return (this.prisma as any).importRun.findUniqueOrThrow({ where: { id } });
+    return this.prisma.importRun.findUniqueOrThrow({ where: { id } });
+  }
+
+  async listImportRuns(limit = 20) {
+    return this.prisma.importRun.findMany({
+      orderBy: { started_at: 'desc' },
+      take: limit,
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 5,
+        },
+      },
+    });
+  }
+
+  async getImportRunById(id: string) {
+    return this.prisma.importRun.findUnique({
+      where: { id },
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 50,
+        },
+      },
+    });
+  }
+
+  async getImportRunErrors(id: string, limit = 100) {
+    return this.prisma.importRunError.findMany({
+      where: { import_run_id: id },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getProviderStats() {
+    const provider = this.PROVIDER.toLowerCase();
+    const runs = await this.prisma.importRun.findMany({
+      where: { provider },
+      orderBy: { started_at: 'desc' },
+      take: 50,
+      include: {
+        errors: {
+          orderBy: { created_at: 'desc' },
+          take: 5,
+        },
+      },
+    });
+
+    const latestRun = runs[0] ?? null;
+    const statusCounts = runs.reduce<Record<string, number>>((acc, run) => {
+      acc[run.status] = (acc[run.status] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const aggregates = runs.reduce(
+      (acc, run) => {
+        acc.source_items_received += run.source_items_received ?? 0;
+        acc.processed_count += run.processed_count ?? 0;
+        acc.persisted_count += run.persisted_count ?? 0;
+        acc.validation_skipped_count += run.validation_skipped_count ?? 0;
+        acc.created_count += run.created_count ?? 0;
+        acc.updated_count += run.updated_count ?? 0;
+        acc.skipped_count += run.skipped_count ?? 0;
+        acc.error_count += run.error_count ?? 0;
+        acc.archived_count += run.archived_count ?? 0;
+        return acc;
+      },
+      {
+        source_items_received: 0,
+        processed_count: 0,
+        persisted_count: 0,
+        validation_skipped_count: 0,
+        created_count: 0,
+        updated_count: 0,
+        skipped_count: 0,
+        error_count: 0,
+        archived_count: 0,
+      },
+    );
+
+    const differenceReceivedVsPersisted =
+      aggregates.source_items_received - aggregates.persisted_count;
+    const note =
+      runs.length === 0
+        ? 'No import runs recorded yet.'
+        : differenceReceivedVsPersisted === 0
+          ? `La API devolvió ${aggregates.source_items_received} elementos y el catálogo persistió ${aggregates.persisted_count}.`
+          : `La API devolvió ${aggregates.source_items_received} elementos pero el catálogo persistió ${aggregates.persisted_count}.`;
+
+    return {
+      provider,
+      latestRun,
+      statusCounts,
+      aggregates,
+      difference_received_vs_persisted: differenceReceivedVsPersisted,
+      note,
+    };
   }
 
   async listImportRuns(limit = 20) {

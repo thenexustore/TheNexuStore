@@ -1,19 +1,65 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
-import { InfortisaService } from './infortisa.service';
+import {
+  InfortisaCatalogFetchResult,
+  InfortisaService,
+} from './infortisa.service';
 import { ProductsService } from '../user/products/products.service';
 import {
   extractInfortisaStock,
   extractLifecycleCode,
 } from './infortisa-normalization.util';
 
+type SyncMode = 'full' | 'incremental' | 'stock' | 'images';
+
+type RunErrorInput = {
+  sku?: string | null;
+  stage: string;
+  message: string;
+  rawPayload?: Prisma.InputJsonValue;
+};
+
+type ProductBatchStats = {
+  processed: number;
+  persisted: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  validationSkipped: number;
+  errors: number;
+  incidents: RunErrorInput[];
+};
+
+type ImportRunSummary = {
+  id: string;
+  provider: string;
+  mode: SyncMode;
+  started_at: Date;
+  finished_at: Date | null;
+  status: 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED';
+  source_items_received: number;
+  processed_count: number;
+  persisted_count: number;
+  validation_skipped_count: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  error_count: number;
+  archived_count: number;
+  request_meta_json: Prisma.JsonValue | null;
+  result_meta_json: Prisma.JsonValue | null;
+};
+
 @Injectable()
 export class InfortisaSyncService {
   private readonly logger = new Logger(InfortisaSyncService.name);
   private readonly BATCH_SIZE = 100;
-
-  private readonly emptyBatchStats = { created: 0, updated: 0, skipped: 0 };
+  private readonly FULL_SYNC_BATCH_SIZE = 500;
+  private readonly PROVIDER = 'infortisa';
+  private readonly MAX_INCIDENTS = 10;
+  private readonly DEFAULT_LAST_SYNC = '01/01/2024 00:00:00';
 
   constructor(
     private prisma: PrismaService,
@@ -25,8 +71,11 @@ export class InfortisaSyncService {
   async fullSync() {
     try {
       this.logger.log('Starting full synchronization');
-      await this.syncFullCatalog();
-      this.logger.log('Full synchronization completed successfully');
+      const summary = await this.syncFullCatalog();
+      this.logger.log(
+        `Full synchronization completed successfully: received=${summary.sourceItemsReceived}, total=${summary.sourceTotalExpected ?? 'unknown'}, pages=${summary.sourcePages}`,
+      );
+      return summary;
     } catch (error: any) {
       this.logger.error('Full synchronization failed', error.stack);
       throw error;
@@ -35,88 +84,242 @@ export class InfortisaSyncService {
 
   @Cron('*/5 * * * *')
   async syncStockRealTime() {
-    const startTime = Date.now();
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'stock',
+      startedAt,
+      requestMeta: { job: 'stock_realtime' },
+    });
 
     try {
       this.logger.debug('Starting real-time stock sync');
       const lastSync = await this.getLastSync('stock_realtime');
       const items = await this.infortisa.getModifiedStock(lastSync);
-
       const batches = this.chunkArray(items, this.BATCH_SIZE);
+      let processed = 0;
+      let errors = 0;
+      const incidents: RunErrorInput[] = [];
+
+      await this.updateImportRunProgress(run.id, {
+        source_items_received: items.length,
+        result_meta_json: {
+          last_sync_cursor: lastSync,
+          batches: batches.length,
+        },
+      });
 
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           batch.map((product) => this.processStockUpdate(product)),
         );
+
+        results.forEach((result, index) => {
+          processed += 1;
+          if (result.status === 'rejected') {
+            errors += 1;
+            this.pushIncident(incidents, {
+              sku: this.normalizeSku(batch[index]?.SKU),
+              stage: 'stock_update',
+              message: this.extractErrorMessage(result.reason),
+              rawPayload: this.safeJson(batch[index]),
+            });
+          }
+        });
 
         this.logger.debug(`Processed batch ${i + 1}/${batches.length}`);
       }
 
       await this.setLastSync('stock_realtime');
+      const finishedAt = new Date();
+      const duration = finishedAt.getTime() - startedAt.getTime();
+      const status: ImportRunSummary['status'] = errors > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
 
-      const duration = Date.now() - startTime;
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status,
+        processed_count: processed,
+        persisted_count: processed - errors,
+        validation_skipped_count: 0,
+        created_count: 0,
+        updated_count: processed - errors,
+        skipped_count: 0,
+        error_count: errors,
+        resultMeta: {
+          last_sync_cursor: lastSync,
+          duration_ms: duration,
+          items_received_from_provider: items.length,
+          items_persisted_in_catalog: processed - errors,
+          provider_vs_catalog_label:
+            items.length === processed - errors
+              ? `La API devolvió ${items.length} y se guardaron ${processed - errors}`
+              : `La API devolvió ${items.length} pero solo se guardaron ${processed - errors}`,
+          sample_incidents: incidents,
+        },
+        incidents,
+      });
 
       this.logger.debug(
         `Real-time stock sync completed: ${items.length} items in ${duration}ms`,
       );
+
+      return this.getImportRunSummary(run.id);
     } catch (error: any) {
+      await this.failImportRun(run.id, error, { job: 'stock_realtime' });
       this.logger.error('Real-time stock sync failed', error.stack);
+      throw error;
     }
   }
 
   @Cron(CronExpression.EVERY_HOUR)
   async syncProductsIncremental() {
-    const startTime = Date.now();
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'incremental',
+      startedAt,
+      requestMeta: { job: 'product_incremental' },
+    });
 
     try {
       const lastSync = await this.getLastSync('product_incremental');
       const items = await this.infortisa.getModifiedProducts(lastSync);
-
       const activeItems = items.filter(
         (p) => !['D', 'X'].includes(extractLifecycleCode(p)),
       );
+      const lifecycleSkippedCount = items.length - activeItems.length;
 
-      const stats = await this.processProductsBatch(activeItems);
+      await this.updateImportRunProgress(run.id, {
+        source_items_received: items.length,
+        skipped_count: lifecycleSkippedCount,
+        result_meta_json: {
+          last_sync_cursor: lastSync,
+          dropped_by_lifecycle: lifecycleSkippedCount,
+        },
+      });
+
+      const stats = await this.processProductsBatch(activeItems, 'incremental_upsert');
       await this.setLastSync('product_incremental');
 
-      const duration = Date.now() - startTime;
+      const finishedAt = new Date();
+      const duration = finishedAt.getTime() - startedAt.getTime();
+      const status = this.resolveRunStatus(stats.errors, stats.validationSkipped);
+
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status,
+        processed_count: stats.processed,
+        persisted_count: stats.persisted,
+        validation_skipped_count: stats.validationSkipped,
+        created_count: stats.created,
+        updated_count: stats.updated,
+        skipped_count: lifecycleSkippedCount + stats.skipped,
+        error_count: stats.errors,
+        resultMeta: {
+          last_sync_cursor: lastSync,
+          duration_ms: duration,
+          items_received_from_provider: items.length,
+          items_processed_after_lifecycle_filter: activeItems.length,
+          items_persisted_in_catalog: stats.persisted,
+          items_discarded_by_validation: stats.validationSkipped,
+          provider_vs_catalog_label:
+            items.length === stats.persisted
+              ? `La API devolvió ${items.length} y se guardaron ${stats.persisted}`
+              : `La API devolvió ${items.length} pero solo se guardaron ${stats.persisted}`,
+          sample_incidents: stats.incidents,
+        },
+        incidents: stats.incidents,
+      });
 
       this.logger.log(
-        `Product incremental sync: ${activeItems.length} items processed in ${duration}ms (created=${stats.created}, updated=${stats.updated}, skipped=${stats.skipped})`,
+        `Product incremental sync: ${activeItems.length} items processed in ${duration}ms (created=${stats.created}, updated=${stats.updated}, skipped=${lifecycleSkippedCount + stats.skipped}, validationSkipped=${stats.validationSkipped}, errors=${stats.errors})`,
       );
+
+      return this.getImportRunSummary(run.id);
     } catch (error: any) {
+      await this.failImportRun(run.id, error, { job: 'product_incremental' });
       this.logger.error('Product incremental sync failed', error.stack);
+      throw error;
     }
   }
 
   async syncFullCatalog() {
     this.logger.log('Starting full catalog sync');
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'full',
+      startedAt,
+      requestMeta: { job: 'full_catalog' },
+    });
 
     try {
-      const allProducts = await this.infortisa.getAllProducts();
+      const catalog = await this.infortisa.getAllProductsPaged();
+      this.assertCatalogNotProbablyTruncated(catalog);
+
+      const allProducts = catalog.items;
       const batchSize = 500;
       const totals = { ...this.emptyBatchStats };
 
-      for (let i = 0; i < allProducts.length; i += batchSize) {
-        const batch = allProducts.slice(i, i + batchSize);
-        const stats = await this.processProductsBatch(batch);
-        totals.created += stats.created;
-        totals.updated += stats.updated;
-        totals.skipped += stats.skipped;
+      for (let i = 0; i < allProducts.length; i += this.FULL_SYNC_BATCH_SIZE) {
+        const batch = allProducts.slice(i, i + this.FULL_SYNC_BATCH_SIZE);
+        const stats = await this.processProductsBatch(batch, 'full_upsert');
+        this.mergeProductBatchStats(totals, stats);
 
-        if (i + batchSize < allProducts.length) {
+        if (i + this.FULL_SYNC_BATCH_SIZE < allProducts.length) {
           await this.delay(1000);
         }
       }
 
-      await this.handleDiscontinuedProducts(allProducts);
+      const archivedCount = await this.handleDiscontinuedProducts(allProducts);
+      const finishedAt = new Date();
+      const status = this.resolveRunStatus(totals.errors, totals.validationSkipped);
+
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status,
+        processed_count: totals.processed,
+        persisted_count: totals.persisted,
+        validation_skipped_count: totals.validationSkipped,
+        created_count: totals.created,
+        updated_count: totals.updated,
+        skipped_count: totals.skipped,
+        error_count: totals.errors,
+        archived_count: archivedCount,
+        resultMeta: {
+          duration_ms: finishedAt.getTime() - startedAt.getTime(),
+          items_received_from_provider: allProducts.length,
+          items_persisted_in_catalog: totals.persisted,
+          items_discarded_by_validation: totals.validationSkipped,
+          provider_vs_catalog_label:
+            allProducts.length === totals.persisted
+              ? `La API devolvió ${allProducts.length} y se guardaron ${totals.persisted}`
+              : `La API devolvió ${allProducts.length} pero solo se guardaron ${totals.persisted}`,
+          sample_incidents: totals.incidents,
+        },
+        incidents: totals.incidents,
+      });
+
+      const summary = {
+        created: totals.created,
+        updated: totals.updated,
+        skipped: totals.skipped,
+        sourceItemsReceived: catalog.meta.totalReceived,
+        sourceTotalExpected: catalog.meta.totalExpected,
+        sourcePageSize: catalog.meta.pageSize,
+        sourcePages: catalog.meta.totalPages ?? 1,
+      };
 
       this.logger.log(
-        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped})`,
+        `Full catalog sync completed: ${allProducts.length} products (created=${totals.created}, updated=${totals.updated}, skipped=${totals.skipped}, source_pages=${summary.sourcePages}, source_page_size=${summary.sourcePageSize}, source_total=${summary.sourceTotalExpected ?? 'unknown'})`,
       );
+
+      return summary;
     } catch (error: any) {
+      await this.failImportRun(run.id, error, { job: 'full_catalog' });
       this.logger.error('Full catalog sync failed', error.stack);
+      throw error;
     }
   }
 
@@ -162,59 +365,113 @@ export class InfortisaSyncService {
       }
     } catch (error: any) {
       this.logger.error('Image sync failed', error.stack);
+      throw error;
+    }
+  }
+
+  private assertCatalogNotProbablyTruncated(
+    catalog: InfortisaCatalogFetchResult,
+  ) {
+    const technicalLimits = new Set([100, 250, 500, 1000, 2000, 5000, 10000]);
+    const { totalReceived, totalExpected, totalPages, pageSize, limit } =
+      catalog.meta;
+
+    const probableLimit = [pageSize, limit].find(
+      (value): value is number =>
+        typeof value === 'number' && technicalLimits.has(value),
+    );
+
+    const probablyTruncated =
+      (totalExpected !== null && totalExpected > totalReceived) ||
+      ((totalPages === null || totalPages === 1) &&
+        probableLimit !== undefined &&
+        totalReceived === probableLimit);
+
+    if (probablyTruncated) {
+      throw new Error(
+        `Probable Infortisa catalog truncation detected (received=${totalReceived}, total=${totalExpected ?? 'unknown'}, pages=${totalPages ?? 1}, pageSize=${pageSize})`,
+      );
     }
   }
 
   private async processStockUpdate(product: any) {
-    try {
-      const sku = await this.prisma.sku.findUnique({
-        where: { sku_code: product.SKU },
-      });
+    const sku = await this.prisma.sku.findUnique({
+      where: { sku_code: product.SKU },
+    });
 
-      if (sku) {
-        const warehouse = await this.prisma.warehouse.findFirst({
-          where: { code: 'INFORTISA' },
-        });
-
-        if (warehouse) {
-          const { qtyOnHandForCatalog } = extractInfortisaStock(product);
-
-          await this.prisma.inventoryLevel.upsert({
-            where: {
-              warehouse_id_sku_id: {
-                warehouse_id: warehouse.id,
-                sku_id: sku.id,
-              },
-            },
-            update: {
-              qty_on_hand: qtyOnHandForCatalog,
-              updated_at: new Date(),
-            },
-            create: {
-              warehouse_id: warehouse.id,
-              sku_id: sku.id,
-              qty_on_hand: qtyOnHandForCatalog,
-              qty_reserved: 0,
-            },
-          });
-        }
-      }
-    } catch (error: any) {
-      this.logger.warn(`Failed to update stock for product ${product.SKU}`);
+    if (!sku) {
+      throw new Error(`SKU ${product.SKU} not found in catalog`);
     }
+
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { code: 'INFORTISA' },
+    });
+
+    if (!warehouse) {
+      throw new Error('INFORTISA warehouse not found');
+    }
+
+    const { qtyOnHandForCatalog } = extractInfortisaStock(product);
+
+    await this.prisma.inventoryLevel.upsert({
+      where: {
+        warehouse_id_sku_id: {
+          warehouse_id: warehouse.id,
+          sku_id: sku.id,
+        },
+      },
+      update: {
+        qty_on_hand: qtyOnHandForCatalog,
+        updated_at: new Date(),
+      },
+      create: {
+        warehouse_id: warehouse.id,
+        sku_id: sku.id,
+        qty_on_hand: qtyOnHandForCatalog,
+        qty_reserved: 0,
+      },
+    });
   }
 
-  private async processProductsBatch(products: any[]) {
-    const stats = { ...this.emptyBatchStats };
+  private async processProductsBatch(products: any[], stage: string) {
+    const stats = this.emptyProductBatchStats();
 
     for (const product of products) {
       try {
         const result = await this.products.upsertFromInfortisa(product);
-        stats[result] += 1;
+        stats.processed += 1;
+
+        if (result === 'skipped') {
+          stats.skipped += 1;
+          stats.validationSkipped += 1;
+          this.pushIncident(stats.incidents, {
+            sku: this.normalizeSku(product?.SKU),
+            stage,
+            message: 'Discarded by validation before persisting to catalog',
+            rawPayload: this.safeJson(product),
+          });
+          continue;
+        }
+
+        stats.persisted += 1;
+        if (result === 'created') {
+          stats.created += 1;
+        }
+        if (result === 'updated') {
+          stats.updated += 1;
+        }
       } catch (error: any) {
+        stats.processed += 1;
+        stats.errors += 1;
+        this.pushIncident(stats.incidents, {
+          sku: this.normalizeSku(product?.SKU),
+          stage,
+          message: this.extractErrorMessage(error),
+          rawPayload: this.safeJson(product),
+        });
         this.logger.warn(
-          `Failed to process product ${product.SKU}`,
-          error.message,
+          `Failed to process product ${product?.SKU}`,
+          error?.message,
         );
       }
     }
@@ -225,8 +482,7 @@ export class InfortisaSyncService {
   private async handleDiscontinuedProducts(allProducts: any[]) {
     try {
       const activeSkus = allProducts.map((p) => p.SKU).filter(Boolean);
-
-      await this.prisma.product.updateMany({
+      const result = await this.prisma.product.updateMany({
         where: {
           skus: {
             every: {
@@ -238,8 +494,11 @@ export class InfortisaSyncService {
           status: 'ARCHIVED',
         },
       });
+
+      return result.count;
     } catch (error: any) {
       this.logger.error('Failed to handle discontinued products', error.stack);
+      return 0;
     }
   }
 
@@ -249,9 +508,9 @@ export class InfortisaSyncService {
       if (row?.last_sync) {
         return new Date(row.last_sync).toISOString();
       }
-      return '01/01/2024 00:00:00';
+      return this.DEFAULT_LAST_SYNC;
     } catch {
-      return '01/01/2024 00:00:00';
+      return this.DEFAULT_LAST_SYNC;
     }
   }
 
@@ -265,6 +524,184 @@ export class InfortisaSyncService {
     } catch (error: any) {
       this.logger.error(`Failed to set last sync for ${type}`, error.stack);
     }
+  }
+
+  private async createImportRun(input: {
+    provider: string;
+    mode: SyncMode;
+    startedAt: Date;
+    requestMeta?: Prisma.InputJsonValue;
+  }) {
+    return (this.prisma as any).importRun.create({
+      data: {
+        provider: input.provider,
+        mode: input.mode,
+        started_at: input.startedAt,
+        request_meta_json: input.requestMeta,
+      },
+    });
+  }
+
+  private async updateImportRunProgress(
+    id: string,
+    data: Record<string, unknown>,
+  ) {
+    await (this.prisma as any).importRun.update({
+      where: { id },
+      data,
+    });
+  }
+
+  private async finalizeImportRun(
+    id: string,
+    input: {
+      finishedAt: Date;
+      status: 'RUNNING' | 'SUCCESS' | 'PARTIAL_SUCCESS' | 'FAILED';
+      processed_count: number;
+      persisted_count: number;
+      validation_skipped_count: number;
+      created_count: number;
+      updated_count: number;
+      skipped_count: number;
+      error_count: number;
+      archived_count?: number;
+      resultMeta: Prisma.InputJsonValue;
+      incidents: RunErrorInput[];
+    },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await (tx as any).importRun.update({
+        where: { id },
+        data: {
+          finished_at: input.finishedAt,
+          status: input.status,
+          processed_count: input.processed_count,
+          persisted_count: input.persisted_count,
+          validation_skipped_count: input.validation_skipped_count,
+          created_count: input.created_count,
+          updated_count: input.updated_count,
+          skipped_count: input.skipped_count,
+          error_count: input.error_count,
+          archived_count: input.archived_count ?? 0,
+          result_meta_json: input.resultMeta,
+        },
+      });
+
+      if (input.incidents.length > 0) {
+        await (tx as any).importRunError.createMany({
+          data: input.incidents.map((incident) => ({
+            import_run_id: id,
+            sku: incident.sku ?? undefined,
+            stage: incident.stage,
+            message: incident.message,
+            raw_payload_json: incident.rawPayload,
+          })),
+        });
+      }
+    });
+  }
+
+  private async failImportRun(
+    id: string,
+    error: unknown,
+    extraMeta?: Record<string, unknown>,
+  ) {
+    const message = this.extractErrorMessage(error);
+
+    await this.prisma.$transaction(async (tx) => {
+      await (tx as any).importRun.update({
+        where: { id },
+        data: {
+          finished_at: new Date(),
+          status: 'FAILED',
+          error_count: { increment: 1 },
+          result_meta_json: this.safeJson({
+            ...(extraMeta ?? {}),
+            fatal_error: message,
+          }),
+        },
+      });
+
+      await (tx as any).importRunError.create({
+        data: {
+          import_run_id: id,
+          stage: 'run',
+          message,
+          raw_payload_json: this.safeJson(extraMeta ?? {}),
+        },
+      });
+    });
+  }
+
+  private async getImportRunSummary(id: string): Promise<ImportRunSummary> {
+    return (this.prisma as any).importRun.findUniqueOrThrow({ where: { id } });
+  }
+
+  private resolveRunStatus(errors: number, validationSkipped: number) {
+    if (errors > 0) {
+      return 'PARTIAL_SUCCESS' as const;
+    }
+    if (validationSkipped > 0) {
+      return 'PARTIAL_SUCCESS' as const;
+    }
+    return 'SUCCESS' as const;
+  }
+
+  private emptyProductBatchStats(): ProductBatchStats {
+    return {
+      processed: 0,
+      persisted: 0,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      validationSkipped: 0,
+      errors: 0,
+      incidents: [],
+    };
+  }
+
+  private mergeProductBatchStats(target: ProductBatchStats, next: ProductBatchStats) {
+    target.processed += next.processed;
+    target.persisted += next.persisted;
+    target.created += next.created;
+    target.updated += next.updated;
+    target.skipped += next.skipped;
+    target.validationSkipped += next.validationSkipped;
+    target.errors += next.errors;
+    next.incidents.forEach((incident) => this.pushIncident(target.incidents, incident));
+  }
+
+  private pushIncident(collection: RunErrorInput[], incident: RunErrorInput) {
+    if (collection.length >= this.MAX_INCIDENTS) {
+      return;
+    }
+    collection.push(incident);
+  }
+
+  private normalizeSku(value: unknown) {
+    if (value == null) {
+      return null;
+    }
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private extractErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error';
+    }
+  }
+
+  private safeJson(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
   }
 
   private chunkArray<T>(array: T[], size: number): T[][] {

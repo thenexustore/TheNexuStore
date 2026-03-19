@@ -2,7 +2,8 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
+  NotFoundException,
+  Param,
   Post,
   Query,
   Req,
@@ -51,7 +52,7 @@ export class ImportsController {
       images: () => this.infortisaSync.syncImages(),
     };
 
-    await modeHandlers[body.mode]();
+    const result = await modeHandlers[body.mode]();
 
     const durationMs = Date.now() - startedAt;
     const detailsParts = [
@@ -62,6 +63,35 @@ export class ImportsController {
 
     if (body.reason) {
       detailsParts.push(`reason=${body.reason}`);
+    }
+
+    if (result && typeof result === 'object') {
+      const summary = result as Record<string, unknown>;
+      if (typeof summary.sourceItemsReceived === 'number') {
+        detailsParts.push(
+          `source_items_received=${summary.sourceItemsReceived}`,
+        );
+      }
+      if (typeof summary.sourceTotalExpected === 'number') {
+        detailsParts.push(
+          `source_total_expected=${summary.sourceTotalExpected}`,
+        );
+      }
+      if (typeof summary.sourcePageSize === 'number') {
+        detailsParts.push(`source_page_size=${summary.sourcePageSize}`);
+      }
+      if (typeof summary.sourcePages === 'number') {
+        detailsParts.push(`source_pages=${summary.sourcePages}`);
+      }
+      if (typeof summary.created === 'number') {
+        detailsParts.push(`created=${summary.created}`);
+      }
+      if (typeof summary.updated === 'number') {
+        detailsParts.push(`updated=${summary.updated}`);
+      }
+      if (typeof summary.skipped === 'number') {
+        detailsParts.push(`skipped=${summary.skipped}`);
+      }
     }
 
     await this.prisma.syncLog.upsert({
@@ -90,13 +120,18 @@ export class ImportsController {
         mode: body.mode,
         durationMs,
         ...(body.reason ? { reason: body.reason } : {}),
+        ...(runResult && typeof runResult === 'object' ? { run: runResult } : {}),
       },
     });
 
     return {
       mode: body.mode,
       durationMs,
+      run: runResult,
       ...(body.reason ? { reason: body.reason } : {}),
+      ...(result && typeof result === 'object'
+        ? (result as Record<string, unknown>)
+        : {}),
     };
   }
 
@@ -167,6 +202,33 @@ export class ImportsController {
         totalPages: Math.ceil(total / limitNum),
       },
     };
+  }
+
+  @Get('runs')
+  async runs() {
+    const items = await this.infortisaSync.listImportRuns();
+    return { success: true, data: items };
+  }
+
+  @Get('runs/:id')
+  async runDetail(@Param('id') id: string) {
+    const item = await this.infortisaSync.getImportRunById(id);
+    if (!item) {
+      throw new NotFoundException('Import run not found');
+    }
+    return { success: true, data: item };
+  }
+
+  @Get('runs/:id/errors')
+  async runErrors(@Param('id') id: string) {
+    const errors = await this.infortisaSync.getImportRunErrors(id);
+    return { success: true, data: errors };
+  }
+
+  @Get('provider-stats')
+  async providerStats() {
+    const stats = await this.infortisaSync.getProviderStats();
+    return { success: true, data: stats };
   }
 
   @Post('run')

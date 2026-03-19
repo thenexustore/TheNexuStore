@@ -217,22 +217,310 @@ export class InfortisaService implements OnModuleInit {
     };
   }
 
-  async getAllProducts(): Promise<any[]> {
-    try {
-      const client = await this.getClient();
-      const response = await client.get('/api/Product/Get');
-      const data = response.data.items || response.data || [];
+  private pickNumber(
+    source: Record<string, unknown>,
+    keys: string[],
+  ): number | null {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  }
 
-      if (!Array.isArray(data)) {
-        this.logger.warn('Unexpected response format from getAllProducts');
-        return [];
+  private pickBoolean(
+    source: Record<string, unknown>,
+    keys: string[],
+  ): boolean | null {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'boolean') {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+      }
+    }
+    return null;
+  }
+
+  private getArrayPayload(payload: unknown): any[] | null {
+    if (Array.isArray(payload)) return payload;
+    if (payload && typeof payload === 'object') {
+      const record = payload as Record<string, unknown>;
+      const candidate =
+        record.items ?? record.data ?? record.results ?? record.value;
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  private buildCatalogMeta(
+    payload: unknown,
+    items: any[],
+    requestedPage = 1,
+  ): InfortisaCatalogFetchMeta {
+    const record =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>)
+        : {};
+
+    const page =
+      this.pickNumber(record, ['page', 'Page', 'currentPage', 'CurrentPage']) ??
+      requestedPage;
+    const pageSize =
+      this.pickNumber(record, [
+        'pageSize',
+        'PageSize',
+        'perPage',
+        'PerPage',
+        'limit',
+        'Limit',
+      ]) ?? items.length;
+    const totalExpected = this.pickNumber(record, [
+      'total',
+      'Total',
+      'totalCount',
+      'TotalCount',
+      'count',
+      'Count',
+    ]);
+    const totalPages = this.pickNumber(record, [
+      'totalPages',
+      'TotalPages',
+      'pages',
+      'Pages',
+      'pageCount',
+      'PageCount',
+    ]);
+    const offset = this.pickNumber(record, [
+      'offset',
+      'Offset',
+      'skip',
+      'Skip',
+    ]);
+    const limit = this.pickNumber(record, [
+      'limit',
+      'Limit',
+      'pageSize',
+      'PageSize',
+      'perPage',
+      'PerPage',
+    ]);
+    const hasMore = this.pickBoolean(record, [
+      'hasMore',
+      'HasMore',
+      'more',
+      'More',
+      'hasNextPage',
+      'HasNextPage',
+    ]);
+
+    const raw: Record<string, unknown> = {};
+    for (const key of [
+      'page',
+      'Page',
+      'currentPage',
+      'CurrentPage',
+      'pageSize',
+      'PageSize',
+      'perPage',
+      'PerPage',
+      'total',
+      'Total',
+      'totalCount',
+      'TotalCount',
+      'count',
+      'Count',
+      'totalPages',
+      'TotalPages',
+      'pages',
+      'Pages',
+      'pageCount',
+      'PageCount',
+      'offset',
+      'Offset',
+      'skip',
+      'Skip',
+      'limit',
+      'Limit',
+      'hasMore',
+      'HasMore',
+      'more',
+      'More',
+      'hasNextPage',
+      'HasNextPage',
+      'truncated',
+      'Truncated',
+      'isTruncated',
+      'IsTruncated',
+      'maxResults',
+      'MaxResults',
+    ]) {
+      if (key in record) raw[key] = record[key];
+    }
+
+    return {
+      page,
+      pageSize,
+      totalReceived: items.length,
+      totalExpected,
+      totalPages,
+      offset,
+      limit,
+      hasMore,
+      raw,
+    };
+  }
+
+  private ensureNotTruncated(
+    payload: unknown,
+    meta: InfortisaCatalogFetchMeta,
+  ) {
+    const record =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>)
+        : {};
+    const explicitTruncated = this.pickBoolean(record, [
+      'truncated',
+      'Truncated',
+      'isTruncated',
+      'IsTruncated',
+    ]);
+    const maxResults = this.pickNumber(record, ['maxResults', 'MaxResults']);
+
+    const looksTruncated =
+      explicitTruncated === true ||
+      (meta.totalExpected !== null &&
+        meta.totalExpected > meta.totalReceived &&
+        meta.totalPages === null &&
+        meta.hasMore === null) ||
+      (maxResults !== null &&
+        meta.totalReceived === maxResults &&
+        meta.totalExpected !== null &&
+        meta.totalExpected > meta.totalReceived);
+
+    if (looksTruncated) {
+      throw new Error(
+        `Infortisa product catalog appears truncated (received=${meta.totalReceived}, total=${meta.totalExpected ?? 'unknown'}, page=${meta.page}, totalPages=${meta.totalPages ?? 'unknown'})`,
+      );
+    }
+  }
+
+  private extractCatalogPage(
+    payload: unknown,
+    requestedPage = 1,
+  ): InfortisaCatalogFetchResult {
+    const items = this.getArrayPayload(payload);
+    if (!items) {
+      throw new Error(
+        'Unexpected response format from Infortisa /api/Product/Get: no valid items array',
+      );
+    }
+
+    const meta = this.buildCatalogMeta(payload, items, requestedPage);
+    this.ensureNotTruncated(payload, meta);
+
+    const transformed = items.map((product) =>
+      this.transformInfortisaProduct(product),
+    );
+    return {
+      items: transformed,
+      meta: {
+        ...meta,
+        totalReceived: transformed.length,
+      },
+    };
+  }
+
+  async getAllProductsPaged(): Promise<InfortisaCatalogFetchResult> {
+    try {
+      const firstResponse = await this.client.get('/api/Product/Get');
+      const firstPage = this.extractCatalogPage(firstResponse.data, 1);
+      const pages = [firstPage];
+
+      const hasPagination =
+        (firstPage.meta.totalPages !== null && firstPage.meta.totalPages > 1) ||
+        firstPage.meta.hasMore === true;
+
+      if (!hasPagination) {
+        this.logger.log(
+          `Infortisa /api/Product/Get metadata: pages=1 pageSize=${firstPage.meta.pageSize} received=${firstPage.meta.totalReceived} total=${firstPage.meta.totalExpected ?? 'unknown'}`,
+        );
+
+        if (
+          firstPage.meta.totalExpected !== null &&
+          firstPage.meta.totalExpected !== firstPage.meta.totalReceived
+        ) {
+          throw new Error(
+            `Infortisa product catalog count mismatch without pagination (received=${firstPage.meta.totalReceived}, total=${firstPage.meta.totalExpected})`,
+          );
+        }
+
+        return firstPage;
       }
 
-      return data.map((product) => this.transformInfortisaProduct(product));
+      const totalPages = firstPage.meta.totalPages ?? 1;
+      const pageSize = firstPage.meta.pageSize;
+
+      for (let page = 2; page <= totalPages; page += 1) {
+        const response = await this.client.get('/api/Product/Get', {
+          params: { page, pageSize },
+        });
+        const nextPage = this.extractCatalogPage(response.data, page);
+        pages.push(nextPage);
+      }
+
+      const items = pages.flatMap((page) => page.items);
+      const totalExpected = pages[0].meta.totalExpected;
+
+      this.logger.log(
+        `Infortisa /api/Product/Get pagination detected: pages=${pages.length} pageSize=${pageSize} received=${items.length} total=${totalExpected ?? 'unknown'}`,
+      );
+
+      if (totalExpected !== null && totalExpected !== items.length) {
+        throw new Error(
+          `Infortisa product catalog pagination mismatch (received=${items.length}, total=${totalExpected}, pages=${pages.length})`,
+        );
+      }
+
+      return {
+        items,
+        meta: {
+          ...pages[0].meta,
+          page: 1,
+          pageSize,
+          totalReceived: items.length,
+          totalExpected,
+          totalPages: pages.length,
+          hasMore: false,
+          raw: {
+            ...pages[0].meta.raw,
+            resolvedPages: pages.length,
+          },
+        },
+      };
     } catch (error: any) {
-      this.logger.error('Get all products failed', error.message);
+      this.logger.error('Get all products paged failed', error.message);
       throw error;
     }
+  }
+
+  async getAllProducts(): Promise<any[]> {
+    const result = await this.getAllProductsPaged();
+    return result.items;
   }
 
   async getModifiedProducts(date: string): Promise<any[]> {

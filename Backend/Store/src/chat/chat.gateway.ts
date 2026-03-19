@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
 import { ChatSenderType } from '@prisma/client';
+import { corsOriginDelegate } from '../common/cors.util';
 
 interface AuthenticatedSocket {
   id: string;
@@ -23,14 +24,7 @@ interface AuthenticatedSocket {
 @WebSocketGateway({
   path: '/chat-ws',
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://www.thenexustore.com',
-      'https://admin.thenexustore.com',
-      'https://nexus-store-vpq8.vercel.app',
-      'https://nexus-store-eight.vercel.app',
-    ],
+    origin: corsOriginDelegate,
     credentials: true,
   },
 })

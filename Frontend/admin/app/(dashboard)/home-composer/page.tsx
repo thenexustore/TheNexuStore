@@ -970,7 +970,7 @@ export default function HomeComposerPage() {
     : `${SITE_URL}/${locale}/store`;
 
   if (loading) {
-    return <div className="p-6 text-sm text-zinc-600">Cargando Compositor de Inicio…</div>;
+    return <div className="p-6 text-sm text-zinc-600">Cargando Página Principal…</div>;
   }
 
   const config = parsedDraftConfig || {};
@@ -984,7 +984,7 @@ export default function HomeComposerPage() {
     <div className="space-y-6 p-6">
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Compositor de Inicio</span>
+          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Página Principal</span>
           <a href="#composer-banners-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
             Ir a Banners integrados
           </a>
@@ -997,7 +997,7 @@ export default function HomeComposerPage() {
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900"><Sparkles className="h-5 w-5 text-indigo-500" />Compositor de Inicio</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900"><Sparkles className="h-5 w-5 text-indigo-500" />Página Principal</h1>
             <p className="text-sm text-zinc-500">
               Gestiona diseños de inicio, secciones y publicación por idioma desde un flujo más visual.
             </p>
@@ -2196,7 +2196,7 @@ export default function HomeComposerPage() {
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-zinc-900">Gestión de Banners</h3>
-              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+              <p className="text-xs text-zinc-500">Panel integrado dentro de Página Principal.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -2243,7 +2243,7 @@ export default function HomeComposerPage() {
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-zinc-900">Gestión de Productos destacados</h3>
-              <p className="text-xs text-zinc-500">Panel integrado dentro del Compositor de Inicio.</p>
+              <p className="text-xs text-zinc-500">Panel integrado dentro de Página Principal.</p>
             </div>
             <div className="flex items-center gap-2">
               <button

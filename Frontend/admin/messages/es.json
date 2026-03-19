@@ -15,7 +15,7 @@
     "orders": "Pedidos",
     "coupons": "Cupones",
     "chat": "Chat",
-    "homeContent": "Página Principal",
+    "homeContent": "Diseño Store",
     "banners": "Banners",
     "featuredProducts": "Productos destacados",
     "pricing": "Precios / PVP",
@@ -23,6 +23,6 @@
     "imports": "Importaciones",
     "rmas": "Devoluciones (RMA)",
     "settings": "Ajustes",
-    "homeComposer": "Compositor de Inicio"
+    "homeComposer": "Página Principal"
   }
 }

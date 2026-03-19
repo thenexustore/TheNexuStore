@@ -202,6 +202,151 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(heroSection.resolved[0]?.banner?.id).toBe('banner-active');
     expect(prisma.banner.findMany).toHaveBeenCalled();
   });
+
+  it('preserves curated active hero banners even when they fall outside the fallback top six', async () => {
+    const activeBanners = [
+      {
+        id: 'banner-1',
+        image: '/hero-1.jpg',
+        title_text: 'Hero 1',
+        subtitle_text: 'Sub 1',
+        button_text: 'Shop 1',
+        button_link: '/products/1',
+        sort_order: 1,
+        is_active: true,
+      },
+      {
+        id: 'banner-2',
+        image: '/hero-2.jpg',
+        title_text: 'Hero 2',
+        subtitle_text: 'Sub 2',
+        button_text: 'Shop 2',
+        button_link: '/products/2',
+        sort_order: 2,
+        is_active: true,
+      },
+      {
+        id: 'banner-3',
+        image: '/hero-3.jpg',
+        title_text: 'Hero 3',
+        subtitle_text: 'Sub 3',
+        button_text: 'Shop 3',
+        button_link: '/products/3',
+        sort_order: 3,
+        is_active: true,
+      },
+      {
+        id: 'banner-4',
+        image: '/hero-4.jpg',
+        title_text: 'Hero 4',
+        subtitle_text: 'Sub 4',
+        button_text: 'Shop 4',
+        button_link: '/products/4',
+        sort_order: 4,
+        is_active: true,
+      },
+      {
+        id: 'banner-5',
+        image: '/hero-5.jpg',
+        title_text: 'Hero 5',
+        subtitle_text: 'Sub 5',
+        button_text: 'Shop 5',
+        button_link: '/products/5',
+        sort_order: 5,
+        is_active: true,
+      },
+      {
+        id: 'banner-6',
+        image: '/hero-6.jpg',
+        title_text: 'Hero 6',
+        subtitle_text: 'Sub 6',
+        button_text: 'Shop 6',
+        button_link: '/products/6',
+        sort_order: 6,
+        is_active: true,
+      },
+    ];
+    const curatedBanner = {
+      id: 'banner-7',
+      image: '/hero-7.jpg',
+      title_text: 'Hero 7',
+      subtitle_text: 'Sub 7',
+      button_text: 'Shop 7',
+      button_link: '/products/7',
+      sort_order: 7,
+      is_active: true,
+    };
+    const prisma = {
+      homePageSection: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hero-sec',
+            type: 'HERO_CAROUSEL',
+            title: 'Hero',
+            subtitle: null,
+            variant: null,
+            config: {},
+          },
+        ]),
+      },
+      homePageLayout: {
+        findUnique: jest.fn(),
+      },
+      homePageSectionItem: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'item-1',
+            section_id: 'hero-sec',
+            position: 1,
+            banner_id: curatedBanner.id,
+            banner: { id: curatedBanner.id, is_active: true },
+          },
+        ]),
+      },
+      banner: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(activeBanners)
+          .mockResolvedValueOnce([curatedBanner]),
+      },
+    } as any;
+
+    const productsService = {
+      getDealsProducts: jest.fn().mockResolvedValue([]),
+      getProducts: jest.fn().mockResolvedValue({ products: [] }),
+    } as any;
+
+    const service = new HomeLayoutService(prisma, productsService);
+    jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
+      id: 'layout-hero',
+      locale: 'es',
+      name: 'Hero layout',
+    });
+
+    const payload = await service.resolveHome('es');
+    const heroSection = payload.sections[0] as any;
+
+    expect(heroSection.type).toBe('HERO_CAROUSEL');
+    expect(heroSection.resolved).toHaveLength(6);
+    expect(heroSection.resolved.map((x: any) => x.banner_id)).toEqual([
+      'banner-7',
+      'banner-1',
+      'banner-2',
+      'banner-3',
+      'banner-4',
+      'banner-5',
+    ]);
+    expect(prisma.banner.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { in: [curatedBanner.id] },
+          is_active: true,
+        }),
+      }),
+    );
+  });
+
   it('keeps curated active banner order and appends new active banners from Banner module', async () => {
     const prisma = {
       homePageSection: {

@@ -8,6 +8,7 @@ import { ProductsService } from './products/products.service';
 import { AuditLogController } from './audit-log.controller';
 import { AuditLogService } from './audit-log.service';
 import { ImportsController } from './imports/imports.controller';
+import { ImportsConfigService } from './imports/imports-config.service';
 import { RmaController } from './rma/rma.controller';
 import { RmaService } from './rma/rma.service';
 import { AdminGuard } from './admin.guard';
@@ -51,6 +52,7 @@ import { AdminCategoriesModule } from './categories/admin-categories.module';
     AdminGuard,
     PrismaService,
     AuditLogService,
+    ImportsConfigService,
     RmaService,
   ],
   exports: [AdminGuard],

@@ -1,4 +1,8 @@
-import { applyRounding, computePricing, pickWinningRule } from './pricing.engine';
+import {
+  applyRounding,
+  computePricing,
+  pickWinningRule,
+} from './pricing.engine';
 
 describe('pricing.engine', () => {
   it('applies rounding modes', () => {
@@ -11,9 +15,33 @@ describe('pricing.engine', () => {
 
   it('resolves precedence by priority and scope', () => {
     const winner = pickWinningRule([
-      { id: '1', scope: 'GLOBAL', priority: 10, margin_pct: 10, discount_pct: 0, rounding_mode: 'NONE', updated_at: new Date('2026-01-01') },
-      { id: '2', scope: 'SKU', priority: 10, margin_pct: 11, discount_pct: 0, rounding_mode: 'NONE', updated_at: new Date('2026-01-01') },
-      { id: '3', scope: 'BRAND', priority: 11, margin_pct: 12, discount_pct: 0, rounding_mode: 'NONE', updated_at: new Date('2026-01-01') },
+      {
+        id: '1',
+        scope: 'GLOBAL',
+        priority: 10,
+        margin_pct: 10,
+        discount_pct: 0,
+        rounding_mode: 'NONE',
+        updated_at: new Date('2026-01-01'),
+      },
+      {
+        id: '2',
+        scope: 'SKU',
+        priority: 10,
+        margin_pct: 11,
+        discount_pct: 0,
+        rounding_mode: 'NONE',
+        updated_at: new Date('2026-01-01'),
+      },
+      {
+        id: '3',
+        scope: 'BRAND',
+        priority: 11,
+        margin_pct: 12,
+        discount_pct: 0,
+        rounding_mode: 'NONE',
+        updated_at: new Date('2026-01-01'),
+      },
     ] as any);
     expect(winner?.id).toBe('3');
   });

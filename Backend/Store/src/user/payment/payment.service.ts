@@ -11,7 +11,12 @@ import {
   RedsysNotification,
   RedsysPaymentMethod,
 } from './redsys.service';
-import { PaymentProvider, PaymentStatus, OrderStatus, Prisma } from '@prisma/client';
+import {
+  PaymentProvider,
+  PaymentStatus,
+  OrderStatus,
+  Prisma,
+} from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { RetryService } from '../../common/retry.service';
 
@@ -37,7 +42,8 @@ export interface PaymentResult {
 @Injectable()
 export class PaymentService {
   private readonly BASE_URL = process.env.BASE_URL || 'http://localhost:4000';
-  private readonly FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+  private readonly FRONTEND_URL =
+    process.env.FRONTEND_URL || 'http://localhost:3000';
   private readonly REDSYS_NOTIFY_URL =
     process.env.REDSYS_NOTIFY_URL || `${this.BASE_URL}/payments/redsys/notify`;
   private readonly REDSYS_OK_URL =
@@ -75,7 +81,9 @@ export class PaymentService {
           paymentMethod: 'BIZUM',
         });
       default:
-        throw new BadRequestException(`Payment provider ${dto.provider} not supported`);
+        throw new BadRequestException(
+          `Payment provider ${dto.provider} not supported`,
+        );
     }
   }
 
@@ -102,15 +110,26 @@ export class PaymentService {
 
     if (order.customer_id) {
       if (!input.customerId || input.customerId !== order.customer_id) {
-        throw new ForbiddenException('You are not allowed to initiate this payment');
+        throw new ForbiddenException(
+          'You are not allowed to initiate this payment',
+        );
       }
     }
 
-    if (!order.customer_id && (!input.trackingToken || input.trackingToken !== order.tracking_token)) {
-      throw new ForbiddenException('Tracking token is required for guest payment');
+    if (
+      !order.customer_id &&
+      (!input.trackingToken || input.trackingToken !== order.tracking_token)
+    ) {
+      throw new ForbiddenException(
+        'Tracking token is required for guest payment',
+      );
     }
 
-    return this.processRedsys(order, input.paymentMethod ?? 'CARD', input.customerPhone);
+    return this.processRedsys(
+      order,
+      input.paymentMethod ?? 'CARD',
+      input.customerPhone,
+    );
   }
 
   private async processCOD(orderId: string): Promise<PaymentResult> {
@@ -146,7 +165,9 @@ export class PaymentService {
         },
       });
 
-      const discounts = await tx.orderDiscount.findMany({ where: { order_id: orderId } });
+      const discounts = await tx.orderDiscount.findMany({
+        where: { order_id: orderId },
+      });
       for (const discount of discounts) {
         await tx.coupon.update({
           where: { id: discount.coupon_id },
@@ -157,7 +178,10 @@ export class PaymentService {
       return created;
     });
 
-    this.logger.log('COD payment transaction completed', 'PaymentService', { orderId, paymentId: payment.id });
+    this.logger.log('COD payment transaction completed', 'PaymentService', {
+      orderId,
+      paymentId: payment.id,
+    });
 
     return {
       success: true,
@@ -223,7 +247,8 @@ export class PaymentService {
     }
 
     const merchantOrderReference =
-      payment.provider_payment_id || this.redsysService.createMerchantOrderReference(payment.id);
+      payment.provider_payment_id ||
+      this.redsysService.createMerchantOrderReference(payment.id);
     if (!payment.provider_payment_id) {
       payment = await this.prisma.payment.update({
         where: { id: payment.id },
@@ -285,7 +310,9 @@ export class PaymentService {
     };
   }
 
-  async handleRedsysNotification(notification: RedsysNotification): Promise<void> {
+  async handleRedsysNotification(
+    notification: RedsysNotification,
+  ): Promise<void> {
     const result = await this.retryService.execute(
       () => this.redsysService.processNotification(notification),
       3,
@@ -301,19 +328,26 @@ export class PaymentService {
     });
 
     if (!payment) {
-      this.logger.warn('Payment not found for REDSYS notification', 'PaymentService', {
-        merchantOrderReference: result.merchantOrderReference,
-      });
+      this.logger.warn(
+        'Payment not found for REDSYS notification',
+        'PaymentService',
+        {
+          merchantOrderReference: result.merchantOrderReference,
+        },
+      );
       return;
     }
 
     const expectedAmountInCents = Math.round(Number(payment.amount) * 100);
-    const expectedCurrency = this.redsysService.getCurrencyNumericCode(payment.currency);
+    const expectedCurrency = this.redsysService.getCurrencyNumericCode(
+      payment.currency,
+    );
     const expectedMerchantCode = this.redsysService.getConfiguredMerchantCode();
     const expectedTerminal = this.redsysService.getConfiguredTerminal();
 
     this.redsysService.assertNotificationMatchesExpected(result, {
-      merchantOrderReference: payment.provider_payment_id || result.merchantOrderReference,
+      merchantOrderReference:
+        payment.provider_payment_id || result.merchantOrderReference,
       amountInCents: expectedAmountInCents,
       currency: expectedCurrency,
       merchantCode: expectedMerchantCode,
@@ -324,13 +358,21 @@ export class PaymentService {
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
-          raw_response: this.buildRedsysRawResponse(payment.raw_response, notification, result),
+          raw_response: this.buildRedsysRawResponse(
+            payment.raw_response,
+            notification,
+            result,
+          ),
         },
       });
-      this.logger.log('Ignoring already-processed REDSYS notification', 'PaymentService', {
-        paymentId: payment.id,
-        status: payment.status,
-      });
+      this.logger.log(
+        'Ignoring already-processed REDSYS notification',
+        'PaymentService',
+        {
+          paymentId: payment.id,
+          status: payment.status,
+        },
+      );
       return;
     }
 
@@ -487,7 +529,10 @@ export class PaymentService {
       return this.withPaymentStatus(this.FRONTEND_URL, status);
     }
 
-    const resolvedStatus = this.resolveRedsysReturnStatus(payment.status, status);
+    const resolvedStatus = this.resolveRedsysReturnStatus(
+      payment.status,
+      status,
+    );
     return this.withPaymentStatus(
       `${this.FRONTEND_URL}/order/track/${payment.order.tracking_token}`,
       resolvedStatus,
@@ -526,7 +571,11 @@ export class PaymentService {
     }
   }
 
-  private appendQueryParam(baseUrl: string, key: string, value: string): string {
+  private appendQueryParam(
+    baseUrl: string,
+    key: string,
+    value: string,
+  ): string {
     try {
       const parsed = new URL(baseUrl);
       parsed.searchParams.set(key, value);
@@ -563,17 +612,22 @@ export class PaymentService {
       redsys: {
         ...existingRedsys,
         responseCode: result.responseCode,
-        responseMessage: this.redsysService.getResponseMessage(result.responseCode),
+        responseMessage: this.redsysService.getResponseMessage(
+          result.responseCode,
+        ),
         authCode: result.authCode ?? null,
         merchantOrderReference: result.merchantOrderReference,
         payMethod: result.payMethod ?? existingRedsys.payMethod ?? null,
         processedPayMethod:
-          result.processedPayMethod ?? existingRedsys.processedPayMethod ?? null,
+          result.processedPayMethod ??
+          existingRedsys.processedPayMethod ??
+          null,
         merchantCode: result.merchantCode,
         terminal: result.terminal,
         amountInCents: result.amountInCents,
         currency: result.currency,
-        merchantData: result.merchantData ?? existingRedsys.merchantData ?? null,
+        merchantData:
+          result.merchantData ?? existingRedsys.merchantData ?? null,
         signatureVersion: result.signatureVersion,
         gatewayParams: result.rawParams,
         lastNotificationAt: new Date().toISOString(),

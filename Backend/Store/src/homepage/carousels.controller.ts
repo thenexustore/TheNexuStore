@@ -69,7 +69,6 @@ export class CarouselsController {
     };
   }
 
-
   private async resolveCategorySlug(value?: string) {
     const raw = String(value || '').trim();
     if (!raw) return undefined;
@@ -133,7 +132,6 @@ export class CarouselsController {
       in_stock_only: inStockOnly,
     });
   }
-
 
   @Get('categories')
   async getCategories(

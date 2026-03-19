@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ChatSenderType, ChatStatus } from '@prisma/client';
@@ -13,10 +17,7 @@ export class ChatService {
     private jwtService: JwtService,
   ) {}
 
-  async createConversation(
-    customerId: string,
-    dto: CreateConversationDto,
-  ) {
+  async createConversation(customerId: string, dto: CreateConversationDto) {
     const conv = await this.prisma.chatConversation.create({
       data: {
         customer_id: customerId,
@@ -158,10 +159,7 @@ export class ChatService {
     return { conversations, total, page, limit };
   }
 
-  async updateConversationStatus(
-    conversationId: string,
-    status: ChatStatus,
-  ) {
+  async updateConversationStatus(conversationId: string, status: ChatStatus) {
     const conv = await this.prisma.chatConversation.findUnique({
       where: { id: conversationId },
     });
@@ -178,13 +176,17 @@ export class ChatService {
     await this.prisma.chatMessage.updateMany({
       where: {
         conversation_id: conversationId,
-        sender_type: byCustomer ? ChatSenderType.STAFF : ChatSenderType.CUSTOMER,
+        sender_type: byCustomer
+          ? ChatSenderType.STAFF
+          : ChatSenderType.CUSTOMER,
       },
       data: { is_read: true },
     });
   }
 
-  async initGuest(sessionRef: string | null): Promise<{ accessToken: string; sessionRef: string }> {
+  async initGuest(
+    sessionRef: string | null,
+  ): Promise<{ accessToken: string; sessionRef: string }> {
     if (sessionRef) {
       const existing = await this.prisma.guestChatSession.findUnique({
         where: { session_ref: sessionRef },

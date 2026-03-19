@@ -44,7 +44,10 @@ export class AuditLogService {
     before: Record<string, unknown>,
     after: Record<string, unknown>,
   ) {
-    const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+    const keys = new Set([
+      ...Object.keys(before || {}),
+      ...Object.keys(after || {}),
+    ]);
     const diff: Record<string, { before: unknown; after: unknown }> = {};
 
     for (const key of keys) {
@@ -99,7 +102,10 @@ export class AuditLogService {
         },
       });
     } catch (error) {
-      this.logger.error('Failed to write admin audit log', (error as Error)?.stack);
+      this.logger.error(
+        'Failed to write admin audit log',
+        (error as Error)?.stack,
+      );
     }
   }
 

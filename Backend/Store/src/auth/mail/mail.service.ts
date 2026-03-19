@@ -15,7 +15,9 @@ export class MailService {
     const pass = process.env.MAIL_PASS?.trim();
 
     if (!user || !pass) {
-      throw new Error('Mail credentials are not configured. Set MAIL_USER and MAIL_PASS.');
+      throw new Error(
+        'Mail credentials are not configured. Set MAIL_USER and MAIL_PASS.',
+      );
     }
 
     const host = process.env.MAIL_HOST?.trim() || 'smtp.gmail.com';
@@ -37,14 +39,22 @@ export class MailService {
       },
     });
 
-    this.logger.log(`Mail transport configured (${host}:${port}, secure=${secure})`);
+    this.logger.log(
+      `Mail transport configured (${host}:${port}, secure=${secure})`,
+    );
     return this.transporter;
   }
 
   private getFromAddress(): string {
-    const fromAddress = (process.env.MAIL_FROM || process.env.MAIL_USER || '').trim();
+    const fromAddress = (
+      process.env.MAIL_FROM ||
+      process.env.MAIL_USER ||
+      ''
+    ).trim();
     if (!fromAddress) {
-      throw new Error('Mail sender is not configured. Set MAIL_FROM or MAIL_USER.');
+      throw new Error(
+        'Mail sender is not configured. Set MAIL_FROM or MAIL_USER.',
+      );
     }
 
     const fromName = (process.env.MAIL_FROM_NAME || 'NEXUS').trim();

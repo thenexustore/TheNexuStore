@@ -124,9 +124,10 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     expect(payload.sections).toHaveLength(1);
     expect(payload.sections[0].type).toBe('HERO_CAROUSEL');
     expect(Array.isArray(payload.sections[0].resolved)).toBe(true);
-    expect((payload.sections[0].resolved as any[])[0]?.banner?.id).toBe('banner-1');
+    expect((payload.sections[0].resolved as any[])[0]?.banner?.id).toBe(
+      'banner-1',
+    );
   });
-
 
   it('falls back HERO_CAROUSEL to active banners when curated items reference inactive or missing banners', async () => {
     const prisma = {
@@ -195,7 +196,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const heroSection = payload.sections[0] as any;
+    const heroSection = payload.sections[0];
 
     expect(heroSection.type).toBe('HERO_CAROUSEL');
     expect(heroSection.resolved).toHaveLength(1);
@@ -260,7 +261,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const heroSection = payload.sections[0] as any;
+    const heroSection = payload.sections[0];
 
     expect(heroSection.type).toBe('HERO_CAROUSEL');
     expect(heroSection.resolved).toHaveLength(6);
@@ -355,7 +356,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const heroSection = payload.sections[0] as any;
+    const heroSection = payload.sections[0];
 
     expect(heroSection.type).toBe('HERO_CAROUSEL');
     expect(heroSection.resolved).toHaveLength(3);
@@ -419,7 +420,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.type).toBe('PRODUCT_CAROUSEL');
     expect(section.resolved).toHaveLength(1);
     expect(section.resolved[0].id).toBe('prod-1');
@@ -456,7 +457,12 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       product: {
         count: jest.fn().mockResolvedValue(3),
         findMany: jest.fn().mockResolvedValue([
-          { id: 'p-1', title: 'Category 1 rack', slug: 'category-1-rack', media: [{ url: '/category-1-cover.jpg' }] },
+          {
+            id: 'p-1',
+            title: 'Category 1 rack',
+            slug: 'category-1-rack',
+            media: [{ url: '/category-1-cover.jpg' }],
+          },
         ]),
       },
     } as any;
@@ -474,7 +480,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.type).toBe('CATEGORY_STRIP');
     expect(section.resolved).toHaveLength(1);
     expect(section.resolved[0].image_url).toBe('/category-1-cover.jpg');
@@ -502,19 +508,50 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       homePageLayout: { findUnique: jest.fn() },
       category: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'cat-a', name: 'Portátiles', slug: 'portatiles', sort_order: 5, is_active: true, parent_id: null },
-          { id: 'cat-b', name: 'Consumibles varios', slug: 'consumibles', sort_order: 1, is_active: true, parent_id: null },
-          { id: 'cat-c', name: 'Impresoras', slug: 'impresoras', sort_order: 8, is_active: true, parent_id: null },
+          {
+            id: 'cat-a',
+            name: 'Portátiles',
+            slug: 'portatiles',
+            sort_order: 5,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'cat-b',
+            name: 'Consumibles varios',
+            slug: 'consumibles',
+            sort_order: 1,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'cat-c',
+            name: 'Impresoras',
+            slug: 'impresoras',
+            sort_order: 8,
+            is_active: true,
+            parent_id: null,
+          },
         ]),
       },
       product: {
         count: jest.fn().mockImplementation(({ where }) => {
-          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-a')) return Promise.resolve(8);
-          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-b')) return Promise.resolve(20);
-          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-c')) return Promise.resolve(4);
+          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-a'))
+            return Promise.resolve(8);
+          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-b'))
+            return Promise.resolve(20);
+          if (where?.OR?.some((x: any) => x.main_category_id === 'cat-c'))
+            return Promise.resolve(4);
           return Promise.resolve(0);
         }),
-        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p-1',
+            title: 'fallback',
+            slug: 'fallback',
+            media: [{ url: '/fallback.jpg' }],
+          },
+        ]),
       },
     } as any;
 
@@ -526,10 +563,13 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.type).toBe('CATEGORY_STRIP');
     expect(section.resolved).toHaveLength(2);
-    expect(section.resolved.map((x: any) => x.slug)).toEqual(['portatiles', 'impresoras']);
+    expect(section.resolved.map((x: any) => x.slug)).toEqual([
+      'portatiles',
+      'impresoras',
+    ]);
   });
 
   it('picks fallback category image using product-title/category keyword matching', async () => {
@@ -549,14 +589,31 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       homePageLayout: { findUnique: jest.fn() },
       category: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'cat-network', name: 'Switches de Red', slug: 'switches-red', sort_order: 1, is_active: true, parent_id: null },
+          {
+            id: 'cat-network',
+            name: 'Switches de Red',
+            slug: 'switches-red',
+            sort_order: 1,
+            is_active: true,
+            parent_id: null,
+          },
         ]),
       },
       product: {
         count: jest.fn().mockResolvedValue(10),
         findMany: jest.fn().mockResolvedValue([
-          { id: 'p-random', title: 'Silla ergonómica oficina', slug: 'silla-ergonomica', media: [{ url: '/silla.jpg' }] },
-          { id: 'p-switch', title: 'Switch de red gigabit 24 puertos', slug: 'switch-red-gigabit', media: [{ url: '/switch.jpg' }] },
+          {
+            id: 'p-random',
+            title: 'Silla ergonómica oficina',
+            slug: 'silla-ergonomica',
+            media: [{ url: '/silla.jpg' }],
+          },
+          {
+            id: 'p-switch',
+            title: 'Switch de red gigabit 24 puertos',
+            slug: 'switch-red-gigabit',
+            media: [{ url: '/switch.jpg' }],
+          },
         ]),
       },
     } as any;
@@ -569,11 +626,9 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.resolved[0].image_url).toBe('/switch.jpg');
   });
-
-
 
   it('derives parent category image from active child category products', async () => {
     const prisma = {
@@ -594,7 +649,14 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
         findMany: jest
           .fn()
           .mockResolvedValueOnce([
-            { id: 'parent-network', name: 'Redes y servidores', slug: 'redes-servidores', sort_order: 1, is_active: true, parent_id: null },
+            {
+              id: 'parent-network',
+              name: 'Redes y servidores',
+              slug: 'redes-servidores',
+              sort_order: 1,
+              is_active: true,
+              parent_id: null,
+            },
           ])
           .mockResolvedValueOnce([
             { id: 'child-switches', parent_id: 'parent-network' },
@@ -603,7 +665,12 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       product: {
         count: jest.fn().mockResolvedValue(7),
         findMany: jest.fn().mockResolvedValue([
-          { id: 'p-switch', title: 'Switch de red 24 puertos', slug: 'switch-red', media: [{ url: '/switch-parent.jpg' }] },
+          {
+            id: 'p-switch',
+            title: 'Switch de red 24 puertos',
+            slug: 'switch-red',
+            media: [{ url: '/switch-parent.jpg' }],
+          },
         ]),
       },
     } as any;
@@ -616,7 +683,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.resolved[0].image_url).toBe('/switch-parent.jpg');
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -645,16 +712,35 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       },
       homePageLayout: { findUnique: jest.fn() },
       category: {
-        findMany: jest
-          .fn()
-          .mockResolvedValueOnce([
-            { id: 'parent-a', name: 'Networking', slug: 'networking', sort_order: 2, is_active: true, parent_id: null },
-            { id: 'parent-b', name: 'Storage', slug: 'storage', sort_order: 3, is_active: true, parent_id: null },
-          ]),
+        findMany: jest.fn().mockResolvedValueOnce([
+          {
+            id: 'parent-a',
+            name: 'Networking',
+            slug: 'networking',
+            sort_order: 2,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'parent-b',
+            name: 'Storage',
+            slug: 'storage',
+            sort_order: 3,
+            is_active: true,
+            parent_id: null,
+          },
+        ]),
       },
       product: {
         count: jest.fn().mockResolvedValue(3),
-        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p-1',
+            title: 'fallback',
+            slug: 'fallback',
+            media: [{ url: '/fallback.jpg' }],
+          },
+        ]),
       },
     } as any;
 
@@ -666,7 +752,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.resolved).toHaveLength(2);
     expect(prisma.category.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -695,14 +781,42 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       homePageLayout: { findUnique: jest.fn() },
       category: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'cat-c', name: 'Zeta', slug: 'zeta', sort_order: 3, is_active: true, parent_id: null },
-          { id: 'cat-a', name: 'Alpha', slug: 'alpha', sort_order: 2, is_active: true, parent_id: null },
-          { id: 'cat-b', name: 'Beta', slug: 'beta', sort_order: 1, is_active: true, parent_id: null },
+          {
+            id: 'cat-c',
+            name: 'Zeta',
+            slug: 'zeta',
+            sort_order: 3,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'cat-a',
+            name: 'Alpha',
+            slug: 'alpha',
+            sort_order: 2,
+            is_active: true,
+            parent_id: null,
+          },
+          {
+            id: 'cat-b',
+            name: 'Beta',
+            slug: 'beta',
+            sort_order: 1,
+            is_active: true,
+            parent_id: null,
+          },
         ]),
       },
       product: {
         count: jest.fn().mockResolvedValue(1),
-        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p-1',
+            title: 'fallback',
+            slug: 'fallback',
+            media: [{ url: '/fallback.jpg' }],
+          },
+        ]),
       },
     } as any;
 
@@ -714,8 +828,12 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
-    expect(section.resolved.map((x: any) => x.slug)).toEqual(['alpha', 'beta', 'zeta']);
+    const section = payload.sections[0];
+    expect(section.resolved.map((x: any) => x.slug)).toEqual([
+      'alpha',
+      'beta',
+      'zeta',
+    ]);
   });
 
   it('fills CATEGORY_STRIP auto mode with child categories when parent pool is below configured limit', async () => {
@@ -737,12 +855,40 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
         findMany: jest
           .fn()
           .mockResolvedValueOnce([
-            { id: 'parent-a', name: 'Networking', slug: 'networking', sort_order: 1, is_active: true, parent_id: null },
-            { id: 'parent-b', name: 'Storage', slug: 'storage', sort_order: 2, is_active: true, parent_id: null },
+            {
+              id: 'parent-a',
+              name: 'Networking',
+              slug: 'networking',
+              sort_order: 1,
+              is_active: true,
+              parent_id: null,
+            },
+            {
+              id: 'parent-b',
+              name: 'Storage',
+              slug: 'storage',
+              sort_order: 2,
+              is_active: true,
+              parent_id: null,
+            },
           ])
           .mockResolvedValueOnce([
-            { id: 'child-cables', name: 'Cables', slug: 'cables', sort_order: 3, is_active: true, parent_id: 'parent-a' },
-            { id: 'child-routers', name: 'Routers', slug: 'routers', sort_order: 4, is_active: true, parent_id: 'parent-a' },
+            {
+              id: 'child-cables',
+              name: 'Cables',
+              slug: 'cables',
+              sort_order: 3,
+              is_active: true,
+              parent_id: 'parent-a',
+            },
+            {
+              id: 'child-routers',
+              name: 'Routers',
+              slug: 'routers',
+              sort_order: 4,
+              is_active: true,
+              parent_id: 'parent-a',
+            },
           ])
           .mockResolvedValueOnce([
             { id: 'child-sw', parent_id: 'parent-a' },
@@ -751,7 +897,14 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       },
       product: {
         count: jest.fn().mockResolvedValue(2),
-        findMany: jest.fn().mockResolvedValue([{ id: 'p-1', title: 'fallback', slug: 'fallback', media: [{ url: '/fallback.jpg' }] }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'p-1',
+            title: 'fallback',
+            slug: 'fallback',
+            media: [{ url: '/fallback.jpg' }],
+          },
+        ]),
       },
     } as any;
 
@@ -763,13 +916,12 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    const section = payload.sections[0] as any;
+    const section = payload.sections[0];
     expect(section.resolved).toHaveLength(4);
     expect(section.resolved.map((x: any) => x.slug)).toEqual(
       expect.arrayContaining(['networking', 'storage', 'cables', 'routers']),
     );
   });
-
 
   it('supports CATEGORY source with parent_and_descendants scope for product carousel', async () => {
     const prisma = {
@@ -792,7 +944,9 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
       },
       homePageLayout: { findUnique: jest.fn() },
       category: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'child-cat', parent_id: 'parent-cat' }]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'child-cat', parent_id: 'parent-cat' }]),
       },
       product: {
         findMany: jest.fn().mockResolvedValue([
@@ -803,14 +957,22 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
             slug: 'switch-24',
             brand: { name: 'Nexus' },
             media: [{ url: '/switch.jpg' }],
-            skus: [{ prices: [{ sale_price: 100, compare_at_price: 120 }], inventory: [{ qty_on_hand: 5 }] }],
+            skus: [
+              {
+                prices: [{ sale_price: 100, compare_at_price: 120 }],
+                inventory: [{ qty_on_hand: 5 }],
+              },
+            ],
           },
         ]),
       },
       featuredProduct: { findMany: jest.fn().mockResolvedValue([]) },
     } as any;
 
-    const service = new HomeLayoutService(prisma, { getProducts: jest.fn(), getDealsProducts: jest.fn() } as any);
+    const service = new HomeLayoutService(prisma, {
+      getProducts: jest.fn(),
+      getDealsProducts: jest.fn(),
+    } as any);
     jest.spyOn<any, any>(service as any, 'getActiveLayout').mockResolvedValue({
       id: 'layout-category',
       locale: 'es',
@@ -818,7 +980,7 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    expect((payload.sections[0] as any).resolved).toHaveLength(1);
+    expect(payload.sections[0].resolved).toHaveLength(1);
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -840,7 +1002,11 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
             title: 'Category picks',
             subtitle: null,
             variant: null,
-            config: { source: 'CATEGORY', query: { categoryId: 'cat-123' }, limit: 8 },
+            config: {
+              source: 'CATEGORY',
+              query: { categoryId: 'cat-123' },
+              limit: 8,
+            },
           },
         ]),
       },
@@ -861,16 +1027,14 @@ describe('HomeLayoutService legacy bridges for Home Composer', () => {
     });
 
     const payload = await service.resolveHome('es');
-    expect((payload.sections[0] as any).resolved).toHaveLength(1);
+    expect(payload.sections[0].resolved).toHaveLength(1);
     expect(productsService.getProducts).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'cat-123', limit: 8 }),
     );
   });
 });
 
-
 describe('HomeLayoutService section ordering integrity', () => {
-
   it('rejects reorder payload with duplicated section ids', async () => {
     const prisma = {
       homePageSection: {
@@ -891,7 +1055,6 @@ describe('HomeLayoutService section ordering integrity', () => {
       }),
     ).rejects.toThrow('Section ids must be unique');
   });
-
 
   it('rejects reorder payload with duplicated positions', async () => {
     const prisma = {
@@ -971,7 +1134,10 @@ describe('HomeLayoutService section ordering integrity', () => {
     });
 
     expect(prisma.homePageSection.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'sec-3' }, data: { position: 1 } }),
+      expect.objectContaining({
+        where: { id: 'sec-3' },
+        data: { position: 1 },
+      }),
     );
     expect(result.map((x: any) => x.id)).toEqual(['sec-3', 'sec-1', 'sec-2']);
   });
@@ -979,12 +1145,13 @@ describe('HomeLayoutService section ordering integrity', () => {
   it('reindexes positions after removing a section', async () => {
     const prisma = {
       homePageSection: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'sec-2', layout_id: 'layout-1' }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'sec-2', layout_id: 'layout-1' }),
         delete: jest.fn().mockResolvedValue({ id: 'sec-2' }),
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'sec-1' },
-          { id: 'sec-3' },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'sec-1' }, { id: 'sec-3' }]),
         update: jest.fn().mockResolvedValue({}),
       },
       $transaction: jest.fn(async (ops) => Promise.all(ops)),
@@ -994,15 +1161,25 @@ describe('HomeLayoutService section ordering integrity', () => {
 
     await service.removeSection('sec-2');
 
-    expect(prisma.homePageSection.findUnique).toHaveBeenCalledWith({ where: { id: 'sec-2' } });
-    expect(prisma.homePageSection.delete).toHaveBeenCalledWith({ where: { id: 'sec-2' } });
+    expect(prisma.homePageSection.findUnique).toHaveBeenCalledWith({
+      where: { id: 'sec-2' },
+    });
+    expect(prisma.homePageSection.delete).toHaveBeenCalledWith({
+      where: { id: 'sec-2' },
+    });
     expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ where: { id: 'sec-1' }, data: { position: 1 } }),
+      expect.objectContaining({
+        where: { id: 'sec-1' },
+        data: { position: 1 },
+      }),
     );
     expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ where: { id: 'sec-3' }, data: { position: 2 } }),
+      expect.objectContaining({
+        where: { id: 'sec-3' },
+        data: { position: 2 },
+      }),
     );
   });
 });

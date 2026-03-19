@@ -7,10 +7,7 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const mockedBcrypt = jest.requireMock('bcrypt') as {
-  compare: jest.Mock;
-  hash: jest.Mock;
-};
+const mockedBcrypt = jest.requireMock('bcrypt');
 
 describe('AuthService', () => {
   const prisma = {

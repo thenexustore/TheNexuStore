@@ -29,13 +29,17 @@ describe('AdminService orders behavior', () => {
   it('throws NotFoundException when adding note to missing order', async () => {
     (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.addOrderNote('missing', 'note')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.addOrderNote('missing', 'note'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('throws NotFoundException when order detail does not exist', async () => {
     (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.getOrderById('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getOrderById('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('bulk updates order status with deduplicated ids', async () => {

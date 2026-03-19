@@ -45,7 +45,10 @@ export class CouponsService {
 
   async update(id: string, dto: UpdateCouponDto) {
     const existingCoupon = await this.findById(id);
-    this.validateDateWindow(dto.starts_at ?? undefined, dto.ends_at ?? undefined);
+    this.validateDateWindow(
+      dto.starts_at ?? undefined,
+      dto.ends_at ?? undefined,
+    );
 
     this.validatePercentValue(
       dto.type ?? existingCoupon.type,

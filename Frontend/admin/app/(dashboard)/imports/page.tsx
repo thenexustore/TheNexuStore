@@ -18,6 +18,7 @@ import {
   type ImportRunError,
   type ImportRuntimeOverviewResponse,
   type ProviderStatsResponse,
+  type CatalogProbeResponse,
 } from "@/lib/api";
 import { toast } from "sonner";
 import {

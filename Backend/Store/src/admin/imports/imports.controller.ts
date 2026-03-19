@@ -15,6 +15,7 @@ import { Request } from 'express';
 import { Roles } from '../../auth/staff-auth/roles.decorator';
 import { Permissions } from '../../auth/staff-auth/permissions.decorator';
 import { InfortisaSyncService } from '../../infortisa/infortisa.sync';
+import { InfortisaService } from '../../infortisa/infortisa.service';
 import { PrismaService } from '../../common/prisma.service';
 import { AdminGuard } from '../admin.guard';
 import { AuditLogService } from '../audit-log.service';
@@ -44,6 +45,7 @@ export class ImportsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly infortisaSync: InfortisaSyncService,
+    private readonly infortisaService: InfortisaService,
     private readonly auditLogService: AuditLogService,
     private readonly importsConfigService: ImportsConfigService,
   ) {}
@@ -275,5 +277,18 @@ export class ImportsController {
       message: `Retry ${body.mode} executed successfully`,
       data,
     };
+  }
+
+  @Get('catalog-probe')
+  @Permissions('imports:config:read')
+  async catalogProbe() {
+    try {
+      const result = await this.infortisaService.catalogProbe();
+      return { success: true, data: result };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Catalog probe failed';
+      return { success: false, error: message };
+    }
   }
 }

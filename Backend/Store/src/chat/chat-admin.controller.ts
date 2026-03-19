@@ -72,7 +72,10 @@ export class ChatAdminController {
     @Param('id') id: string,
     @Body() dto: UpdateConversationStatusDto,
   ) {
-    const conv = await this.chatService.updateConversationStatus(id, dto.status);
+    const conv = await this.chatService.updateConversationStatus(
+      id,
+      dto.status,
+    );
     return { success: true, data: conv };
   }
 }

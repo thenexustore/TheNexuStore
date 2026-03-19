@@ -14,7 +14,9 @@ export interface DashboardAlert {
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  private buildSyncAlerts(syncLogs: Array<{ type: string; last_sync: Date; details?: string | null }>) {
+  private buildSyncAlerts(
+    syncLogs: Array<{ type: string; last_sync: Date; details?: string | null }>,
+  ) {
     const alerts: DashboardAlert[] = [];
 
     if (syncLogs.length === 0) {

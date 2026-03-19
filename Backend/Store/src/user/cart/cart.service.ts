@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { UpdateCartItemDto, AddToCartDto } from './dto/cart.dto';
-import { CartItemDto, CartResponseDto, AppliedCouponDto } from './dto/cart-response.dto';
+import {
+  CartItemDto,
+  CartResponseDto,
+  AppliedCouponDto,
+} from './dto/cart-response.dto';
 import { CouponService } from '../coupon/coupon.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
 
@@ -154,7 +158,11 @@ export class CartService {
     );
   }
 
-  private buildDestinationOverride(destination?: { country?: string; region?: string; postal_code?: string }) {
+  private buildDestinationOverride(destination?: {
+    country?: string;
+    region?: string;
+    postal_code?: string;
+  }) {
     return {
       country: destination?.country || 'ES',
       region: destination?.region || '',
@@ -208,9 +216,15 @@ export class CartService {
 
     const coupon = await this.couponService.getCartCoupon(cart.id);
     if (coupon) {
-      const validation = await this.couponService.validateCoupon(coupon.code, subtotal);
+      const validation = await this.couponService.validateCoupon(
+        coupon.code,
+        subtotal,
+      );
       if (validation.isValid && validation.coupon) {
-        discount = this.couponService.calculateDiscount(validation.coupon, subtotal);
+        discount = this.couponService.calculateDiscount(
+          validation.coupon,
+          subtotal,
+        );
         appliedCoupon = {
           code: coupon.code,
           type: coupon.type,
@@ -257,7 +271,6 @@ export class CartService {
     };
   }
 
-
   async validateCoupon(
     couponCode: string,
     customerId?: string,
@@ -271,7 +284,10 @@ export class CartService {
       subtotal += price * item.qty;
     }
 
-    const validation = await this.couponService.validateCoupon(couponCode, subtotal);
+    const validation = await this.couponService.validateCoupon(
+      couponCode,
+      subtotal,
+    );
     if (!validation.isValid || !validation.coupon) {
       throw new BadRequestException(validation.error || 'Invalid coupon');
     }
@@ -293,7 +309,7 @@ export class CartService {
     sessionId?: string,
   ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(customerId, sessionId);
-    
+
     let subtotal = 0;
     for (const item of cart.items) {
       const price = await this.getCurrentPrice(item.sku.sku_code);

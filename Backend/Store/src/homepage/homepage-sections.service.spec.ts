@@ -21,33 +21,45 @@ describe('HomepageSectionsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new HomepageSectionsService(prisma, productsService, bannersService);
+    service = new HomepageSectionsService(
+      prisma,
+      productsService,
+      bannersService,
+    );
     (prisma.category.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.brand.findUnique as jest.Mock).mockResolvedValue(null);
   });
 
   it('defaults featured picks query configs to featured-only during normalization', () => {
-    const normalized = (service as any).normalizeProductCarouselConfig(HomepageSectionType.FEATURED_PICKS, {
-      source: 'query',
-      query: { type: 'products', limit: 12 },
-    });
+    const normalized = (service as any).normalizeProductCarouselConfig(
+      HomepageSectionType.FEATURED_PICKS,
+      {
+        source: 'query',
+        query: { type: 'products', limit: 12 },
+      },
+    );
 
     expect(normalized.query.featuredOnly).toBe(true);
     expect(normalized.featured_only).toBe(true);
   });
 
   it('preserves explicit featuredOnly=false overrides for featured picks', () => {
-    const normalized = (service as any).normalizeProductCarouselConfig(HomepageSectionType.FEATURED_PICKS, {
-      source: 'query',
-      query: { type: 'products', featuredOnly: false },
-    });
+    const normalized = (service as any).normalizeProductCarouselConfig(
+      HomepageSectionType.FEATURED_PICKS,
+      {
+        source: 'query',
+        query: { type: 'products', featuredOnly: false },
+      },
+    );
 
     expect(normalized.query.featuredOnly).toBe(false);
     expect(normalized.featured_only).toBe(false);
   });
 
   it('uses featured_only=true by default when querying featured picks', async () => {
-    (productsService.getProducts as jest.Mock).mockResolvedValue({ products: [{ id: 'p1' }] });
+    (productsService.getProducts as jest.Mock).mockResolvedValue({
+      products: [{ id: 'p1' }],
+    });
 
     const result = await (service as any).executeProductsQuery(
       { source: 'query', query: { type: 'products', limit: 12 } },

@@ -51,11 +51,17 @@ export class CouponService {
       return { isValid: false, error: 'Coupon has expired' };
     }
 
-    if (coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
+    if (
+      coupon.usage_limit !== null &&
+      coupon.usage_count >= coupon.usage_limit
+    ) {
       return { isValid: false, error: 'Coupon usage limit reached' };
     }
 
-    if (coupon.min_order_amount !== null && subtotal < Number(coupon.min_order_amount)) {
+    if (
+      coupon.min_order_amount !== null &&
+      subtotal < Number(coupon.min_order_amount)
+    ) {
       return {
         isValid: false,
         error: `Minimum order amount is €${Number(coupon.min_order_amount).toFixed(2)}`,

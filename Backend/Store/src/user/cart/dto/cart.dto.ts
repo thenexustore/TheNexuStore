@@ -37,7 +37,6 @@ export class CartQueryDto {
   session_id?: string;
 }
 
-
 export class CartTotalsQueryDto extends CartQueryDto {
   @IsOptional()
   @IsString()

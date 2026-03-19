@@ -11,7 +11,12 @@ export class AppLogger implements LoggerService {
     this.write('log', message, context, meta);
   }
 
-  error(message: string, trace?: string, context?: string, meta?: LogMeta): void {
+  error(
+    message: string,
+    trace?: string,
+    context?: string,
+    meta?: LogMeta,
+  ): void {
     this.write('error', message, context, {
       ...meta,
       trace,
@@ -30,7 +35,12 @@ export class AppLogger implements LoggerService {
     this.write('verbose', message, context, meta);
   }
 
-  private write(level: LogLevel, message: string, context?: string, meta?: LogMeta): void {
+  private write(
+    level: LogLevel,
+    message: string,
+    context?: string,
+    meta?: LogMeta,
+  ): void {
     const requestId = this.requestContext.getRequestId();
     const timestamp = new Date().toISOString();
     const payload = {
@@ -49,18 +59,15 @@ export class AppLogger implements LoggerService {
 
     const humanMessage = `[${payload.context}]${requestId ? ` [${requestId}]` : ''} ${message}`;
     if (level === 'error') {
-      // eslint-disable-next-line no-console
       console.error(humanMessage, meta ?? '');
       return;
     }
 
     if (level === 'warn') {
-      // eslint-disable-next-line no-console
       console.warn(humanMessage, meta ?? '');
       return;
     }
 
-    // eslint-disable-next-line no-console
     console.log(humanMessage, meta ?? '');
   }
 }

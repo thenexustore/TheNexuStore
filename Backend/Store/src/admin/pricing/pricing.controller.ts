@@ -1,7 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AdminGuard } from '../admin.guard';
 import { PricingAdminService } from './pricing.service';
-import { PreviewDto, RecalculateDto, RulePayloadDto, RulesQueryDto } from './dto/pricing.dto';
+import {
+  PreviewDto,
+  RecalculateDto,
+  RulePayloadDto,
+  RulesQueryDto,
+} from './dto/pricing.dto';
 
 @Controller('admin/pricing')
 @UseGuards(AdminGuard)
@@ -19,7 +34,10 @@ export class PricingAdminController {
   }
 
   @Put('rules/:id')
-  async updateRule(@Param('id') id: string, @Body() dto: Partial<RulePayloadDto>) {
+  async updateRule(
+    @Param('id') id: string,
+    @Body() dto: Partial<RulePayloadDto>,
+  ) {
     return { success: true, data: await this.service.updateRule(id, dto) };
   }
 

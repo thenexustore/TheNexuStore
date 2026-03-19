@@ -57,23 +57,28 @@ export class AdminCategoriesService {
     const totalCategories = allCategories.length;
     const parentRows = allCategories.filter((c) => c.parent_id === null);
     const childRows = allCategories.filter((c) => c.parent_id !== null);
-    const byId = new Map(allCategories.map((category) => [category.id, category]));
+    const byId = new Map(
+      allCategories.map((category) => [category.id, category]),
+    );
     const level2Rows = allCategories.filter(
       (c) =>
         c.slug.includes('-familia-') &&
         Boolean(c.parent?.slug && knownParentSlugs.includes(c.parent.slug)),
     );
-    const resolveCanonicalAncestorSlug = (category: (typeof allCategories)[number]) => {
+    const resolveCanonicalAncestorSlug = (
+      category: (typeof allCategories)[number],
+    ) => {
       const directParentSlug = category.parent?.slug
         ? resolveCanonicalParentSlug(category.parent.slug)
         : null;
       if (directParentSlug) return directParentSlug;
 
       const parent = category.parent_id ? byId.get(category.parent_id) : null;
-      const grandparent =
-        parent?.parent_id ? byId.get(parent.parent_id) : null;
+      const grandparent = parent?.parent_id ? byId.get(parent.parent_id) : null;
 
-      return grandparent?.slug ? resolveCanonicalParentSlug(grandparent.slug) : null;
+      return grandparent?.slug
+        ? resolveCanonicalParentSlug(grandparent.slug)
+        : null;
     };
 
     const orphanedCategories = parentRows
@@ -109,8 +114,8 @@ export class AdminCategoriesService {
         const parentSlug = c.parent?.slug ?? null;
         return Boolean(
           parentSlug &&
-            knownParentSlugs.includes(parentSlug) &&
-            !c.slug.includes('-familia-'),
+          knownParentSlugs.includes(parentSlug) &&
+          !c.slug.includes('-familia-'),
         );
       })
       .map((c) => ({

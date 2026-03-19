@@ -6,9 +6,7 @@ import { AuthModule } from 'src/auth/auth.module';
 import { PricingService } from '../../pricing/pricing.service';
 
 @Module({
-  imports: [
-    AuthModule,
-  ],
+  imports: [AuthModule],
   controllers: [ProductsController],
   providers: [ProductsService, PrismaService, PricingService],
   exports: [ProductsService],

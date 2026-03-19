@@ -47,11 +47,18 @@ describe('ProductsService bulk actions', () => {
       where: { id: { in: ['p1', 'p2'] } },
       data: { status: 'ACTIVE' },
     });
-    expect(result).toEqual({ affected: 2, ids: ['p1', 'p2'], status: 'ACTIVE' });
+    expect(result).toEqual({
+      affected: 2,
+      ids: ['p1', 'p2'],
+      status: 'ACTIVE',
+    });
   });
 
   it('bulk deletes products and related entities', async () => {
-    (prisma.sku.findMany as jest.Mock).mockResolvedValue([{ id: 's1' }, { id: 's2' }]);
+    (prisma.sku.findMany as jest.Mock).mockResolvedValue([
+      { id: 's1' },
+      { id: 's2' },
+    ]);
     (prisma.product.deleteMany as jest.Mock).mockResolvedValue({ count: 2 });
 
     const result = await service.bulkDeleteProducts(['p1', 'p2']);

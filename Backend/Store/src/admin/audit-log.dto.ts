@@ -35,7 +35,6 @@ export class AuditLogsQueryDto {
   @IsDate()
   from?: Date;
 
-
   @IsOptional()
   @Type(() => Date)
   @IsDate()

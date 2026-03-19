@@ -15,7 +15,12 @@ describe('AuditLogController', () => {
   });
 
   it('forwards validated query filters and writes audit trail', async () => {
-    (auditLogService.list as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, totalPages: 0 });
+    (auditLogService.list as jest.Mock).mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      totalPages: 0,
+    });
 
     const req = {
       user: { id: 'staff-1', email: 'admin@test.com', role: 'ADMIN' },

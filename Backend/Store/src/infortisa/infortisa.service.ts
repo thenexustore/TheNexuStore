@@ -4,6 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { generateDeterministicProductSlug } from './product-slug.util';
 
+const PROVIDER = 'INFORTISA';
+const DEFAULT_BASE_URL = 'https://apiv2.infortisa.com';
+
 export type InfortisaHealthStatus = {
   healthy: boolean;
   provider: 'infortisa';
@@ -12,6 +15,23 @@ export type InfortisaHealthStatus = {
   auth_configured: boolean;
   latency_ms: number;
   error_summary?: string;
+};
+
+export type InfortisaCatalogFetchMeta = {
+  page: number;
+  pageSize: number;
+  totalReceived: number;
+  totalExpected: number | null;
+  totalPages: number | null;
+  offset: number | null;
+  limit: number | null;
+  hasMore: boolean | null;
+  raw: Record<string, unknown>;
+};
+
+export type InfortisaCatalogFetchResult = {
+  items: any[];
+  meta: InfortisaCatalogFetchMeta;
 };
 
 @Injectable()
@@ -447,7 +467,8 @@ export class InfortisaService implements OnModuleInit {
 
   async getAllProductsPaged(): Promise<InfortisaCatalogFetchResult> {
     try {
-      const firstResponse = await this.client.get('/api/Product/Get');
+      const client = await this.getClient();
+      const firstResponse = await client.get('/api/Product/Get');
       const firstPage = this.extractCatalogPage(firstResponse.data, 1);
       const pages = [firstPage];
 
@@ -476,7 +497,7 @@ export class InfortisaService implements OnModuleInit {
       const pageSize = firstPage.meta.pageSize;
 
       for (let page = 2; page <= totalPages; page += 1) {
-        const response = await this.client.get('/api/Product/Get', {
+        const response = await client.get('/api/Product/Get', {
           params: { page, pageSize },
         });
         const nextPage = this.extractCatalogPage(response.data, page);

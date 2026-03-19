@@ -628,12 +628,26 @@ export class HomeLayoutService {
   private async resolveSection(section: any) {
     const config = (section.config || {}) as Record<string, any>;
     if (section.type === HomeSectionType.HERO_CAROUSEL) {
-      const [items, activeBanners] = await Promise.all([
-        this.prisma.homePageSectionItem.findMany({
-          where: { section_id: section.id },
-          orderBy: { position: 'asc' },
-          include: { banner: true },
-        }),
+      const items = await this.prisma.homePageSectionItem.findMany({
+        where: { section_id: section.id },
+        orderBy: { position: 'asc' },
+        include: { banner: true },
+      });
+
+      const curatedBannerIds = Array.from(
+        new Set(
+          items
+            .map((item) => item.banner_id || item.banner?.id || null)
+            .filter((bannerId): bannerId is string => !!bannerId),
+        ),
+      );
+
+      const [curatedActiveBanners, fallbackActiveBanners] = await Promise.all([
+        curatedBannerIds.length
+          ? this.prisma.banner.findMany({
+              where: { id: { in: curatedBannerIds }, is_active: true },
+            })
+          : Promise.resolve([]),
         this.prisma.banner.findMany({
           where: { is_active: true },
           orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
@@ -641,26 +655,30 @@ export class HomeLayoutService {
         }),
       ]);
 
-      if (!activeBanners.length) {
+      if (!curatedActiveBanners.length && !fallbackActiveBanners.length) {
         return [];
       }
 
-      const activeBannerById = new Map(activeBanners.map((banner) => [banner.id, banner]));
+      const activeBannerById = new Map(
+        [...curatedActiveBanners, ...fallbackActiveBanners].map((banner) => [banner.id, banner]),
+      );
       const seen = new Set<string>();
-      const curatedOrderedBanners = items
+      const curatedResolvedItems = items
         .map((item) => {
           const bannerId = item.banner_id || item.banner?.id || null;
           if (!bannerId) return null;
-          return activeBannerById.get(bannerId) || null;
-        })
-        .filter((banner): banner is (typeof activeBanners)[number] => {
-          if (!banner) return false;
-          if (seen.has(banner.id)) return false;
+          const banner = activeBannerById.get(bannerId);
+          if (!banner || seen.has(banner.id)) return null;
           seen.add(banner.id);
-          return true;
-        });
+          return {
+            ...item,
+            banner_id: banner.id,
+            banner,
+          };
+        })
+        .filter(Boolean);
 
-      if (!curatedOrderedBanners.length) {
+      if (!curatedResolvedItems.length) {
         const fallbackReason = items.length
           ? 'curated items without active linked banners'
           : 'no curated items';
@@ -670,14 +688,14 @@ export class HomeLayoutService {
         );
       }
 
-      const remainingActiveBanners = activeBanners.filter(
-        (banner) => !seen.has(banner.id),
-      );
+      const remainingActiveBanners = fallbackActiveBanners
+        .filter((banner) => !seen.has(banner.id))
+        .map((banner) => ({
+          banner_id: banner.id,
+          banner,
+        }));
 
-      return [...curatedOrderedBanners, ...remainingActiveBanners].map((banner) => ({
-        banner_id: banner.id,
-        banner,
-      }));
+      return [...curatedResolvedItems, ...remainingActiveBanners];
     }
 
 

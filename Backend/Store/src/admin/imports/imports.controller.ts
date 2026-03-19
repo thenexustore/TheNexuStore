@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -120,14 +121,14 @@ export class ImportsController {
         mode: body.mode,
         durationMs,
         ...(body.reason ? { reason: body.reason } : {}),
-        ...(runResult && typeof runResult === 'object' ? { run: runResult } : {}),
+        ...(result && typeof result === 'object' ? { run: result } : {}),
       },
     });
 
     return {
       mode: body.mode,
       durationMs,
-      run: runResult,
+      run: result,
       ...(body.reason ? { reason: body.reason } : {}),
       ...(result && typeof result === 'object'
         ? (result as Record<string, unknown>)

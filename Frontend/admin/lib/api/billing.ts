@@ -1,4 +1,5 @@
 import { fetchWithAuth } from "../utils";
+import { API_URL } from "../env";
 
 export type BillingDocumentType = "INVOICE" | "QUOTE" | "CREDIT_NOTE";
 export type BillingDocumentStatus = "DRAFT" | "ISSUED" | "SENT" | "PAID" | "VOID";
@@ -306,7 +307,7 @@ export function getBillingExportUrl(params: {
   if (params.status) query.set("status", params.status);
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const baseUrl = API_URL;
   return `${baseUrl}/admin/billing/export?${query.toString()}`;
 }
 
@@ -322,7 +323,7 @@ export async function downloadBillingExport(params: {
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   const token = localStorage.getItem("admin_token") ?? "";
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const baseUrl = API_URL;
   const response = await fetch(
     `${baseUrl}/admin/billing/export?${query.toString()}`,
     { headers: { Authorization: `Bearer ${token}` } },

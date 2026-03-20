@@ -213,21 +213,29 @@ export default function CheckoutPage() {
 
       const response = await createOrder(orderData, getSessionId());
       if (paymentMethod === "REDSYS" || paymentMethod === "BIZUM") {
-        const redsysIntent = await createRedsysPayment(
-          {
-            order_id: response.order.id,
-            payment_method: paymentMethod,
-            tracking_token: response.order.tracking_token || response.order.id,
-            phone: formData.shipping_address.phone || undefined,
-          },
-          getSessionId(),
-        );
-        const redsysForm: RedsysRedirectFormData = redsysIntent?.formData || {
-          Ds_SignatureVersion: redsysIntent?.Ds_SignatureVersion || "",
-          Ds_MerchantParameters: redsysIntent?.Ds_MerchantParameters || "",
-          Ds_Signature: redsysIntent?.Ds_Signature || "",
-          formUrl: redsysIntent?.formUrl || "",
-        };
+        let redsysForm: RedsysRedirectFormData | null =
+          response.payment_intent?.form_data || null;
+
+        // Keep a backward-compatible fallback for flows that still need
+        // an explicit payment creation call outside checkout order creation.
+        if (!redsysForm?.formUrl) {
+          const redsysIntent = await createRedsysPayment(
+            {
+              order_id: response.order.id,
+              payment_method: paymentMethod,
+              tracking_token: response.order.tracking_token || response.order.id,
+              phone: formData.shipping_address.phone || undefined,
+            },
+            getSessionId(),
+          );
+
+          redsysForm = redsysIntent?.formData || {
+            Ds_SignatureVersion: redsysIntent?.Ds_SignatureVersion || "",
+            Ds_MerchantParameters: redsysIntent?.Ds_MerchantParameters || "",
+            Ds_Signature: redsysIntent?.Ds_Signature || "",
+            formUrl: redsysIntent?.formUrl || "",
+          };
+        }
 
         if (
           redsysForm?.formUrl &&

@@ -58,6 +58,15 @@ function getApiErrorMessage(payload: unknown, fallback: string): string {
   return parsed ?? fallback;
 }
 
+function toFetchFailureMessage(url: string, error: unknown): string {
+  const detail =
+    error instanceof Error && error.message.trim().length > 0
+      ? error.message.trim()
+      : "Network request failed";
+
+  return `Unable to reach API at ${url}. ${detail}`;
+}
+
 const isMutationMethod = (method: string) =>
   ["POST", "PUT", "PATCH", "DELETE"].includes(method);
 
@@ -108,12 +117,17 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     headers["x-csrf-token"] = await fetchCsrfToken();
   }
 
-  const response = await fetch(url, {
-    ...options,
-    method,
-    headers,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      method,
+      headers,
+      credentials: "include",
+    });
+  } catch (error) {
+    throw new Error(toFetchFailureMessage(url, error));
+  }
 
   const payload = await response.json().catch(() => null);
 

@@ -26,6 +26,8 @@
     "prisma:generate": "prisma generate",
     "prebuild": "npm run prisma:generate && npm run check:home-controller-duplicates",
     "prestart": "npm run prisma:generate",
+    "prestart:dev": "npm run prisma:generate",
+    "prestart:debug": "npm run prisma:generate",
     "prestart:prod": "npm run prisma:generate",
     "config:smoke": "node scripts/config-smoke.cjs",
     "smoke:http": "node scripts/http-smoke.cjs",

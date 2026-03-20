@@ -181,7 +181,7 @@ export default function Navbar() {
       const response = await productAPI.getCategoryTree(5);
       setCategoryTree(response.items ?? []);
     } catch (error) {
-      console.error("Failed to load categories tree:", error);
+      console.warn("Failed to load categories tree. Showing empty menu.", error);
       setCategoryTree([]);
     } finally {
       setCategoriesLoading(false);

@@ -3,6 +3,8 @@ import { API_URL } from "./env";
 export const ADMIN_SETTINGS_KEY = "admin_settings";
 export const ADMIN_SETTINGS_EVENT = "admin-settings-updated";
 export const BRANDING_COOKIE_KEY = "tns_branding";
+const STORE_BRANDING_SNAPSHOT_KEY = "store_branding_snapshot";
+const STORE_BRANDING_EVENT = "store-branding-updated";
 const BRANDING_LAST_SYNC_KEY = "admin_settings_synced_at";
 const BRANDING_SYNC_TTL_MS = 5 * 60 * 1000;
 
@@ -57,18 +59,13 @@ function buildCandidates(raw: BrandingSettings, dark = false): string[] {
   return Array.from(new Set(out.filter(Boolean))).map((src) => withVersion(src, version));
 }
 
-function decodeCookieBranding(documentCookie: string): BrandingSettings {
-  const cookie = documentCookie
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${BRANDING_COOKIE_KEY}=`));
-
-  if (!cookie) return {};
+function readBrandingSnapshot(): BrandingSettings {
+  if (typeof window === "undefined") return {};
 
   try {
-    const raw = decodeURIComponent(cookie.slice(`${BRANDING_COOKIE_KEY}=`.length));
-    const decoded = decodeURIComponent(escape(atob(raw)));
-    return JSON.parse(decoded) as BrandingSettings;
+    return JSON.parse(
+      window.localStorage.getItem(STORE_BRANDING_SNAPSHOT_KEY) || "{}",
+    ) as BrandingSettings;
   } catch {
     return {};
   }
@@ -86,18 +83,7 @@ export function loadStoreBranding(): StoreBranding {
     };
   }
 
-  let raw: BrandingSettings = {};
-  try {
-    raw = JSON.parse(localStorage.getItem(ADMIN_SETTINGS_KEY) || "{}") as BrandingSettings;
-  } catch {
-    raw = {};
-  }
-
-  const cookieRaw = decodeCookieBranding(document.cookie);
-  const merged: BrandingSettings = {
-    ...raw,
-    ...cookieRaw,
-  };
+  const merged = readBrandingSnapshot();
 
   return {
     srcCandidates: buildCandidates(merged, false),
@@ -144,13 +130,11 @@ async function fetchRemoteBrandingSettings(force = false): Promise<BrandingSetti
 
 function persistBrandingSnapshot(next: BrandingSettings): void {
   if (typeof window === "undefined") return;
-  try {
-    const current = JSON.parse(localStorage.getItem(ADMIN_SETTINGS_KEY) || "{}") as BrandingSettings;
-    const merged = { ...current, ...next };
-    localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(merged));
-  } catch {
-    localStorage.setItem(ADMIN_SETTINGS_KEY, JSON.stringify(next));
-  }
+
+  window.localStorage.setItem(
+    STORE_BRANDING_SNAPSHOT_KEY,
+    JSON.stringify(next),
+  );
 }
 
 export function subscribeStoreBranding(
@@ -159,9 +143,20 @@ export function subscribeStoreBranding(
 ): () => void {
   if (typeof window === "undefined") return () => undefined;
 
-  const sync = () => listener(loadStoreBranding());
+  const sync = (event?: Event) => {
+    if (
+      event instanceof StorageEvent &&
+      event.key !== null &&
+      event.key !== STORE_BRANDING_SNAPSHOT_KEY
+    ) {
+      return;
+    }
+
+    listener(loadStoreBranding());
+  };
+
   window.addEventListener("storage", sync);
-  window.addEventListener(ADMIN_SETTINGS_EVENT, sync);
+  window.addEventListener(STORE_BRANDING_EVENT, sync);
 
   if (options?.refreshRemote !== false) {
     void (async () => {
@@ -170,12 +165,12 @@ export function subscribeStoreBranding(
       );
       if (!remote) return;
       persistBrandingSnapshot(remote);
-      window.dispatchEvent(new CustomEvent(ADMIN_SETTINGS_EVENT));
+      window.dispatchEvent(new CustomEvent(STORE_BRANDING_EVENT));
     })();
   }
 
   return () => {
     window.removeEventListener("storage", sync);
-    window.removeEventListener(ADMIN_SETTINGS_EVENT, sync);
+    window.removeEventListener(STORE_BRANDING_EVENT, sync);
   };
 }

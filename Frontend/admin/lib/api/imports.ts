@@ -85,7 +85,6 @@ export interface ImportRuntimeSettings {
   catalog_page_size?: number | null;
 }
 
-
 export interface ImportRuntimeJobOverview {
   key: "full" | "incremental" | "stock" | "stock_snapshot" | "images";
   job_name: string;

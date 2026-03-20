@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   fetchImportConfig,
   fetchImportHistory,
@@ -24,15 +24,20 @@ import {
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  BarChart2,
   Box,
   ChevronDown,
   ChevronUp,
+  Clock,
   Database,
   Eye,
   EyeOff,
   Globe,
   Image as ImageIcon,
+  Info,
   KeyRound,
+  Loader2,
+  Play,
   PlugZap,
   RefreshCw,
   Save,
@@ -40,6 +45,7 @@ import {
 } from "lucide-react";
 
 type ImportMode = "full" | "incremental" | "stock" | "stock_snapshot" | "images";
+type RunningState = { mode: ImportMode; action: "trigger" | "retry" } | null;
 
 type ImportConfigForm = {
   display_name: string;
@@ -117,11 +123,18 @@ function cronToHuman(expr: string): string {
     return "Cada hora";
   }
 
-  // Every N hours: 0 */N * * *
+  // Every N hours at minute 0: 0 */N * * *
   const hourStepMatch = /^\*\/(\d+)$/.exec(hour);
   if (hourStepMatch && min === "0" && dom === "*" && month === "*" && dow === "*") {
     const n = Number(hourStepMatch[1]);
     return n === 1 ? "Cada hora" : `Cada ${n} horas`;
+  }
+
+  // Every N hours at specific minute: M */N * * *
+  if (/^\d+$/.test(min) && hourStepMatch && dom === "*" && month === "*" && dow === "*") {
+    const n = Number(hourStepMatch[1]);
+    const m = String(min).padStart(2, "0");
+    return n === 1 ? `Cada hora a las :${m}` : `Cada ${n} horas a las :${m}`;
   }
 
   // Daily at H:M: M H * * *
@@ -164,6 +177,116 @@ const CRON_PRESETS_DAILY = [
   { label: "Cada 12h", value: "0 */12 * * *" },
   { label: "Cada día 2:00", value: "0 2 * * *" },
   { label: "Cada día medianoche", value: "0 0 * * *" },
+];
+
+const MODE_LABELS: Record<ImportMode, string> = {
+  full: "catálogo completo",
+  incremental: "incremental",
+  stock: "stock",
+  stock_snapshot: "reconciliación de stock",
+  images: "imágenes",
+};
+
+const ACTION_MODES: {
+  mode: ImportMode;
+  Icon: React.ElementType;
+  title: string;
+  description: string;
+}[] = [
+  {
+    mode: "full",
+    Icon: Database,
+    title: "Catálogo completo",
+    description: "Sincroniza todo el catálogo, stock y cambios de producto desde el proveedor.",
+  },
+  {
+    mode: "incremental",
+    Icon: RefreshCw,
+    title: "Incremental de productos",
+    description: "Obtiene solo los productos modificados desde la última sincronización.",
+  },
+  {
+    mode: "stock",
+    Icon: Box,
+    title: "Sincronización de stock",
+    description: "Actualiza los niveles de inventario desde el feed del proveedor.",
+  },
+  {
+    mode: "stock_snapshot",
+    Icon: BarChart2,
+    title: "Reconciliación de stock",
+    description: "Reconstruye el stock completo de todos los productos desde el feed completo del proveedor.",
+  },
+  {
+    mode: "images",
+    Icon: ImageIcon,
+    title: "Sincronización de imágenes",
+    description: "Rellena las imágenes de productos que faltan en el catálogo.",
+  },
+];
+
+type CronJobDef = {
+  mode: ImportMode;
+  cronKey: keyof ImportConfigForm;
+  enabledKey: keyof ImportConfigForm;
+  title: string;
+  description: string;
+  Icon: React.ElementType;
+  presets: { label: string; value: string }[];
+  defaultCron: string;
+};
+
+const CRON_JOB_DEFS: CronJobDef[] = [
+  {
+    mode: "stock",
+    cronKey: "stock_sync_cron",
+    enabledKey: "stock_sync_enabled",
+    title: "Sincronización de stock",
+    description: "Actualiza los niveles de inventario desde el feed del proveedor.",
+    Icon: Box,
+    presets: CRON_PRESETS_FREQUENT,
+    defaultCron: "*/5 * * * *",
+  },
+  {
+    mode: "stock_snapshot",
+    cronKey: "stock_snapshot_cron",
+    enabledKey: "stock_snapshot_enabled",
+    title: "Reconciliación de stock",
+    description: "Reconstruye el stock completo periódicamente desde el feed completo del proveedor.",
+    Icon: BarChart2,
+    presets: CRON_PRESETS_MODERATE,
+    defaultCron: "30 */6 * * *",
+  },
+  {
+    mode: "incremental",
+    cronKey: "incremental_sync_cron",
+    enabledKey: "incremental_sync_enabled",
+    title: "Productos incrementales",
+    description: "Aplica cambios de producto entre sincronizaciones completas.",
+    Icon: RefreshCw,
+    presets: CRON_PRESETS_MODERATE,
+    defaultCron: "0 * * * *",
+  },
+  {
+    mode: "full",
+    cronKey: "full_sync_cron",
+    enabledKey: "full_sync_enabled",
+    title: "Catálogo completo",
+    description: "Actualización completa del catálogo del proveedor.",
+    Icon: Database,
+    presets: CRON_PRESETS_DAILY,
+    defaultCron: "0 2 * * *",
+  },
+  {
+    mode: "images",
+    cronKey: "images_sync_cron",
+    enabledKey: "images_sync_enabled",
+    title: "Sincronización de imágenes",
+    description: "Rellena automáticamente las imágenes de productos que faltan.",
+    Icon: ImageIcon,
+    presets: CRON_PRESETS_DAILY,
+    defaultCron: "30 2 * * *",
+  },
 ];
 
 function formatDate(value?: string | null) {
@@ -238,10 +361,10 @@ function getSuspiciousImportAlert(
         pageSize: Number.isFinite(pageSize) ? pageSize : null,
         total: Number.isFinite(total) ? total : null,
         reason: totalMismatch
-          ? "Supplier metadata indicates more catalog items than were received."
+          ? "Los metadatos del proveedor indican más productos en el catálogo de los que se han recibido."
           : matchesTechnicalLimit || pageSizeLimitReached
-            ? "The supplier response matched a known technical limit exactly."
-            : "The supplier returned an unusually round item count.",
+            ? "La respuesta del proveedor coincide exactamente con un límite técnico conocido."
+            : "El proveedor devolvió un número de elementos sospechosamente redondo.",
       };
     }
   }
@@ -285,8 +408,11 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
+  const [cronJobSaving, setCronJobSaving] = useState<Record<ImportMode, boolean>>({
+    full: false, incremental: false, stock: false, stock_snapshot: false, images: false,
+  });
   const [connectionTesting, setConnectionTesting] = useState(false);
-  const [running, setRunning] = useState<ImportMode | null>(null);
+  const [running, setRunning] = useState<RunningState>(null);
   const [retryReason, setRetryReason] = useState("");
   const [items, setItems] = useState<ImportHistoryItem[]>([]);
   const [runs, setRuns] = useState<ImportRun[]>([]);
@@ -309,6 +435,9 @@ export default function ImportsPage() {
   const [configSource, setConfigSource] = useState<string | null>(null);
   const [catalogProbe, setCatalogProbe] = useState<CatalogProbeResponse | null>(null);
   const [catalogProbeLoading, setCatalogProbeLoading] = useState(false);
+  const [batchSettingsOpen, setBatchSettingsOpen] = useState(false);
+  const [productBlockersOpen, setProductBlockersOpen] = useState(false);
+  const [savedForm, setSavedForm] = useState<ImportConfigForm | null>(null);
   const [form, setForm] = useState<ImportConfigForm>({
     display_name: "",
     base_url: "",
@@ -351,7 +480,7 @@ export default function ImportsPage() {
       const data = await fetchImportHistory(1, 30);
       setItems(data.items);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load import history"));
+      toast.error(getErrorMessage(error, "Error al cargar el historial de importaciones"));
     } finally {
       setLoading(false);
     }
@@ -369,7 +498,7 @@ export default function ImportsPage() {
       setRuntimeOverview(runtimeOverviewData);
     } catch (error) {
       toast.error(
-        getErrorMessage(error, "Failed to load import observability"),
+        getErrorMessage(error, "Error al cargar la observabilidad de importaciones"),
       );
     }
   }
@@ -384,19 +513,19 @@ export default function ImportsPage() {
 
     try {
       const data = await fetchImportConfig(includeSecret);
-      setForm({
+      const newForm: ImportConfigForm = {
         display_name: data.display_name,
         base_url: data.base_url,
         api_key: includeSecret ? data.api_key || "" : "",
         is_active: data.is_active,
         notes: data.notes || "",
         stock_sync_enabled: data.settings.stock_sync_enabled,
-        stock_snapshot_enabled: data.settings.stock_snapshot_enabled,
+        stock_snapshot_enabled: data.settings.stock_snapshot_enabled ?? true,
         incremental_sync_enabled: data.settings.incremental_sync_enabled,
         full_sync_enabled: data.settings.full_sync_enabled,
         images_sync_enabled: data.settings.images_sync_enabled,
         stock_sync_cron: data.settings.stock_sync_cron,
-        stock_snapshot_cron: data.settings.stock_snapshot_cron,
+        stock_snapshot_cron: data.settings.stock_snapshot_cron ?? "",
         incremental_sync_cron: data.settings.incremental_sync_cron,
         full_sync_cron: data.settings.full_sync_cron,
         images_sync_cron: data.settings.images_sync_cron,
@@ -407,14 +536,16 @@ export default function ImportsPage() {
         catalog_page_size: data.settings.catalog_page_size
           ? String(data.settings.catalog_page_size)
           : "",
-      });
+      };
+      setForm(newForm);
+      setSavedForm(newForm);
       setStoredMaskedKey(data.api_key_masked || null);
       setLastHealthcheckAt(data.last_healthcheck_at || null);
       setConfigSource(data.source || null);
       setShowingSecret(includeSecret && Boolean(data.api_key));
     } catch (error) {
       toast.error(
-        getErrorMessage(error, "Failed to load API configuration"),
+        getErrorMessage(error, "Error al cargar la configuración de la API"),
       );
     } finally {
       setConfigLoading(false);
@@ -439,46 +570,78 @@ export default function ImportsPage() {
       setRunDetails((current) => ({ ...current, [runId]: detail }));
       setRunErrors((current) => ({ ...current, [runId]: errors }));
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load run detail"));
+      toast.error(getErrorMessage(error, "Error al cargar el detalle de la ejecución"));
     } finally {
       setDetailLoadingId(null);
     }
   }
 
+  function buildConfigPayload() {
+    return {
+      display_name: form.display_name,
+      base_url: form.base_url,
+      api_key: form.api_key.trim() || undefined,
+      is_active: form.is_active,
+      notes: form.notes,
+      stock_sync_enabled: form.stock_sync_enabled,
+      stock_snapshot_enabled: form.stock_snapshot_enabled,
+      incremental_sync_enabled: form.incremental_sync_enabled,
+      full_sync_enabled: form.full_sync_enabled,
+      images_sync_enabled: form.images_sync_enabled,
+      stock_sync_cron: form.stock_sync_cron,
+      stock_snapshot_cron: form.stock_snapshot_cron,
+      incremental_sync_cron: form.incremental_sync_cron,
+      full_sync_cron: form.full_sync_cron,
+      images_sync_cron: form.images_sync_cron,
+      stock_batch_size: Number(form.stock_batch_size),
+      full_sync_batch_size: Number(form.full_sync_batch_size),
+      full_sync_batch_delay_ms: Number(form.full_sync_batch_delay_ms),
+      image_sync_take: Number(form.image_sync_take),
+      catalog_page_size: form.catalog_page_size.trim()
+        ? Number(form.catalog_page_size)
+        : null,
+    };
+  }
+
   async function saveConfig() {
     setConfigSaving(true);
-
     try {
-      await updateImportConfig({
-        display_name: form.display_name,
-        base_url: form.base_url,
-        api_key: form.api_key.trim() || undefined,
-        is_active: form.is_active,
-        notes: form.notes,
-        stock_sync_enabled: form.stock_sync_enabled,
-        stock_snapshot_enabled: form.stock_snapshot_enabled,
-        incremental_sync_enabled: form.incremental_sync_enabled,
-        full_sync_enabled: form.full_sync_enabled,
-        images_sync_enabled: form.images_sync_enabled,
-        stock_sync_cron: form.stock_sync_cron,
-        stock_snapshot_cron: form.stock_snapshot_cron,
-        incremental_sync_cron: form.incremental_sync_cron,
-        full_sync_cron: form.full_sync_cron,
-        images_sync_cron: form.images_sync_cron,
-        stock_batch_size: Number(form.stock_batch_size),
-        full_sync_batch_size: Number(form.full_sync_batch_size),
-        full_sync_batch_delay_ms: Number(form.full_sync_batch_delay_ms),
-        image_sync_take: Number(form.image_sync_take),
-        catalog_page_size: form.catalog_page_size.trim()
-          ? Number(form.catalog_page_size)
-          : null,
-      });
-      toast.success("API configuration updated");
-      await loadConfig(showingSecret && canReadSecret);
+      await updateImportConfig(buildConfigPayload());
+      setSavedForm({ ...form });
+      toast.success("Configuración de API actualizada");
+      await Promise.all([loadConfig(showingSecret && canReadSecret), loadRuns()]);
     } catch (error) {
       toast.error(
-        getErrorMessage(error, "Failed to update API configuration"),
+        getErrorMessage(error, "Error al actualizar la configuración de la API"),
       );
+    } finally {
+      setConfigSaving(false);
+    }
+  }
+
+  async function saveCronJob(mode: ImportMode) {
+    setCronJobSaving((s) => ({ ...s, [mode]: true }));
+    try {
+      await updateImportConfig(buildConfigPayload());
+      setSavedForm({ ...form });
+      toast.success(`Cron de ${MODE_LABELS[mode]} guardado`);
+      await loadRuns();
+    } catch (error) {
+      toast.error(getErrorMessage(error, `Error al guardar el cron de ${MODE_LABELS[mode]}`));
+    } finally {
+      setCronJobSaving((s) => ({ ...s, [mode]: false }));
+    }
+  }
+
+  async function saveAllCrons() {
+    setConfigSaving(true);
+    try {
+      await updateImportConfig(buildConfigPayload());
+      setSavedForm({ ...form });
+      toast.success("Configuración de crons guardada");
+      await loadRuns();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Error al guardar la configuración de crons"));
     } finally {
       setConfigSaving(false);
     }
@@ -492,12 +655,12 @@ export default function ImportsPage() {
       setLastHealthcheckAt(result.checked_at || new Date().toISOString());
       toast.success(
         result.ok
-          ? "Connection to supplier API is healthy"
-          : "Supplier API responded as unhealthy",
+          ? "La conexión con la API del proveedor es correcta"
+          : "La API del proveedor respondió como no disponible",
       );
       await loadConfig(showingSecret && canReadSecret);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to test API connection"));
+      toast.error(getErrorMessage(error, "Error al probar la conexión con la API"));
     } finally {
       setConnectionTesting(false);
     }
@@ -505,7 +668,7 @@ export default function ImportsPage() {
 
   async function handleToggleSecret() {
     if (!canReadSecret) {
-      toast.error("You do not have permission to read the API key");
+      toast.error("No tienes permiso para ver la clave de API");
       return;
     }
 
@@ -513,15 +676,15 @@ export default function ImportsPage() {
   }
 
   async function runImport(mode: ImportMode) {
-    setRunning(mode);
+    setRunning({ mode, action: "trigger" });
 
     try {
       await triggerImport(mode);
-      toast.success(`Import ${mode} executed successfully`);
+      toast.success(`Importación de ${MODE_LABELS[mode]} ejecutada correctamente`);
       await Promise.all([loadHistory(), loadRuns()]);
     } catch (error) {
       toast.error(
-        getErrorMessage(error, `Failed to execute ${mode} import`),
+        getErrorMessage(error, `Error al ejecutar la importación de ${MODE_LABELS[mode]}`),
       );
     } finally {
       setRunning(null);
@@ -531,18 +694,18 @@ export default function ImportsPage() {
   async function runRetry(mode: ImportMode) {
     const reason = retryReason.trim();
     if (!reason) {
-      toast.error("Retry reason is required");
+      toast.error("El motivo del reintento es obligatorio");
       return;
     }
 
-    setRunning(mode);
+    setRunning({ mode, action: "retry" });
 
     try {
       await retryImport(mode, reason);
-      toast.success(`Retry ${mode} executed successfully`);
+      toast.success(`Reintento de ${MODE_LABELS[mode]} ejecutado correctamente`);
       await Promise.all([loadHistory(), loadRuns()]);
     } catch (error) {
-      toast.error(getErrorMessage(error, `Failed to retry ${mode} import`));
+      toast.error(getErrorMessage(error, `Error al reintentar la importación de ${MODE_LABELS[mode]}`));
     } finally {
       setRunning(null);
     }
@@ -554,7 +717,7 @@ export default function ImportsPage() {
       const result = await fetchCatalogProbe();
       setCatalogProbe(result);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to run catalog probe"));
+      toast.error(getErrorMessage(error, "Error al analizar el catálogo"));
     } finally {
       setCatalogProbeLoading(false);
     }
@@ -573,14 +736,23 @@ export default function ImportsPage() {
     ? runErrors[latestRun.id] ?? latestRun.errors ?? []
     : [];
 
+  function isCronJobDirty(def: CronJobDef): boolean {
+    return (
+      savedForm !== null &&
+      ((form[def.cronKey] as string) !== (savedForm[def.cronKey] as string) ||
+        (form[def.enabledKey] as boolean) !== (savedForm[def.enabledKey] as boolean))
+    );
+  }
+
+  const anyCronDirty = savedForm !== null && CRON_JOB_DEFS.some(isCronJobDirty);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Imports</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Importaciones</h1>
         <p className="mt-2 text-slate-500">
-          Total control of the supplier API from a single tab: configuration,
-          key visibility, health checks, structured runs, and what actually
-          reached the catalog.
+          Control total de la integración con el proveedor: configuración de la API, crons,
+          ejecuciones manuales, historial y diagnóstico del catálogo, todo desde aquí.
         </p>
       </div>
 
@@ -589,13 +761,13 @@ export default function ImportsPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="font-semibold">Potential supplier truncation detected</p>
+              <p className="font-semibold">Posible truncación del proveedor detectada</p>
               <p className="mt-1 text-sm">
-                {suspiciousAlert.reason} Latest run:
+                {suspiciousAlert.reason} Última ejecución:
                 <strong> {suspiciousAlert.item.type}</strong>
-                {` · received=${suspiciousAlert.received}`}
+                {` · recibidos=${suspiciousAlert.received}`}
                 {suspiciousAlert.pageSize
-                  ? ` · pageSize=${suspiciousAlert.pageSize}`
+                  ? ` · tamañoPágina=${suspiciousAlert.pageSize}`
                   : ""}
                 {suspiciousAlert.total
                   ? ` · total=${suspiciousAlert.total}`
@@ -610,11 +782,11 @@ export default function ImportsPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              API control center
+              Centro de control de la API
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Manage the API name, base URL, active status, current key, and
-              connection checks from the Imports tab.
+              Gestiona el nombre de la API, la URL base, el estado activo, la clave actual
+              y las comprobaciones de conexión desde la pestaña de importaciones.
             </p>
           </div>
 
@@ -625,7 +797,7 @@ export default function ImportsPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
               <PlugZap className="h-4 w-4" />
-              {connectionTesting ? "Testing..." : "Test connection"}
+              {connectionTesting ? "Probando..." : "Probar conexión"}
             </button>
 
             {canUpdateConfig ? (
@@ -635,7 +807,7 @@ export default function ImportsPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
-                {configSaving ? "Saving..." : "Save API config"}
+                {configSaving ? "Guardando..." : "Guardar configuración"}
               </button>
             ) : null}
           </div>
@@ -643,11 +815,11 @@ export default function ImportsPage() {
 
         {!canReadConfig ? (
           <p className="mt-4 text-sm text-slate-500">
-            Your account cannot read supplier API configuration.
+            Tu cuenta no puede leer la configuración de la API del proveedor.
           </p>
         ) : configLoading ? (
           <p className="mt-4 text-sm text-slate-500">
-            Loading API configuration...
+            Cargando configuración de API...
           </p>
         ) : (
           <>
@@ -655,7 +827,7 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <Database className="h-4 w-4" />
-                  API name
+                  Nombre de API
                 </div>
                 <p className="mt-2 text-lg font-semibold text-slate-900">
                   {form.display_name || "—"}
@@ -665,7 +837,7 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <Globe className="h-4 w-4" />
-                  Config source
+                  Fuente de configuración
                 </div>
                 <p className="mt-2 text-lg font-semibold text-slate-900">
                   {configSource || "—"}
@@ -675,7 +847,7 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <PlugZap className="h-4 w-4" />
-                  Last healthcheck
+                  Último healthcheck
                 </div>
                 <p className="mt-2 text-lg font-semibold text-slate-900">
                   {formatDate(lastHealthcheckAt)}
@@ -685,12 +857,12 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <KeyRound className="h-4 w-4" />
-                  Stored key
+                  Clave almacenada
                 </div>
                 <p className="mt-2 break-all text-lg font-semibold text-slate-900">
                   {showingSecret
                     ? form.api_key || "—"
-                    : storedMaskedKey || "No key stored"}
+                    : storedMaskedKey || "Sin clave almacenada"}
                 </p>
               </div>
             </div>
@@ -699,7 +871,7 @@ export default function ImportsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    API display name
+                    Nombre de la API
                   </label>
                   <input
                     value={form.display_name}
@@ -716,7 +888,7 @@ export default function ImportsPage() {
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Base URL
+                    URL base
                   </label>
                   <input
                     value={form.base_url}
@@ -744,7 +916,7 @@ export default function ImportsPage() {
                     disabled={!canUpdateConfig}
                     className="h-4 w-4 rounded border-slate-300"
                   />
-                  Integration active
+                  Integración activa
                 </label>
               </div>
 
@@ -752,7 +924,7 @@ export default function ImportsPage() {
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <label className="block text-sm font-medium text-slate-700">
-                      API key
+                      Clave de API
                     </label>
                     <button
                       type="button"
@@ -765,8 +937,8 @@ export default function ImportsPage() {
                         <Eye className="h-4 w-4" />
                       )}
                       {showingSecret
-                        ? "Hide current key"
-                        : "Show current key"}
+                        ? "Ocultar clave"
+                        : "Ver clave actual"}
                     </button>
                   </div>
                   <textarea
@@ -783,14 +955,14 @@ export default function ImportsPage() {
                   />
                   <p className="mt-2 text-xs text-slate-500">
                     {showingSecret
-                      ? "You are viewing the current stored key."
-                      : "The current key is masked by default. Use ‘Show current key’ if your permissions allow it."}
+                      ? "Estás viendo la clave almacenada actual."
+                      : "La clave se muestra enmascarada por defecto. Usa ‘Ver clave actual’ si tus permisos lo permiten."}
                   </p>
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Internal notes
+                    Notas internas
                   </label>
                   <textarea
                     value={form.notes}
@@ -807,394 +979,392 @@ export default function ImportsPage() {
                 </div>
               </div>
             </div>
-
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">
-                  Runtime scheduling and fetch tuning
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Turn individual jobs on or off, define cron cadence, and tune
-                  how aggressively the supplier API is consumed.
-                </p>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["Stock sync", "Keeps inventory levels fresh.", "stock_sync_enabled"],
-                  ["Stock snapshot", "Reconciles all supplier stock periodically.", "stock_snapshot_enabled"],
-                  ["Incremental products", "Applies product deltas between full syncs.", "incremental_sync_enabled"],
-                  ["Full catalog", "Runs the heavy catalog refresh.", "full_sync_enabled"],
-                  ["Image sync", "Backfills product media automatically.", "images_sync_enabled"],
-                ].map(([label, description, key]) => (
-                  <label
-                    key={key}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700"
-                  >
-                    <span className="flex items-start justify-between gap-3">
-                      <span>
-                        <span className="block font-semibold text-slate-900">{label}</span>
-                        <span className="mt-1 block text-xs text-slate-500">
-                          {description}
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={form[key as keyof Pick<ImportConfigForm, "stock_sync_enabled" | "stock_snapshot_enabled" | "incremental_sync_enabled" | "full_sync_enabled" | "images_sync_enabled">] as boolean}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            [key]: event.target.checked,
-                          }))
-                        }
-                        disabled={!canUpdateConfig || !form.is_active}
-                        className="mt-1 h-4 w-4 rounded border-slate-300"
-                      />
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron sincronización de stock
-                    </label>
-                    <input value={form.stock_sync_cron} onChange={(event) => setForm((current) => ({ ...current, stock_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="*/5 * * * *" />
-                    {form.stock_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.stock_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_FREQUENT.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, stock_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron reconciliación completa de stock
-                    </label>
-                    <input value={form.stock_snapshot_cron} onChange={(event) => setForm((current) => ({ ...current, stock_snapshot_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="30 */6 * * *" />
-                    {form.stock_snapshot_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.stock_snapshot_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_DAILY.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, stock_snapshot_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron productos incrementales
-                    </label>
-                    <input value={form.incremental_sync_cron} onChange={(event) => setForm((current) => ({ ...current, incremental_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="0 * * * *" />
-                    {form.incremental_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.incremental_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_MODERATE.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, incremental_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron catálogo completo
-                    </label>
-                    <input value={form.full_sync_cron} onChange={(event) => setForm((current) => ({ ...current, full_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="0 2 * * *" />
-                    {form.full_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.full_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_DAILY.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, full_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron sincronización de imágenes
-                    </label>
-                    <input value={form.images_sync_cron} onChange={(event) => setForm((current) => ({ ...current, images_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="30 2 * * *" />
-                    {form.images_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.images_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_DAILY.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, images_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Tamaño de lote (stock)
-                    </label>
-                    <input type="number" min={1} value={form.stock_batch_size} onChange={(event) => setForm((current) => ({ ...current, stock_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Tamaño de lote (catálogo completo)
-                    </label>
-                    <input type="number" min={1} value={form.full_sync_batch_size} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Pausa entre lotes (ms)
-                    </label>
-                    <input type="number" min={0} value={form.full_sync_batch_delay_ms} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_delay_ms: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Límite de imágenes por ciclo
-                    </label>
-                    <input type="number" min={1} value={form.image_sync_take} onChange={(event) => setForm((current) => ({ ...current, image_sync_take: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Tamaño de página del catálogo
-                    </label>
-                    <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Por defecto: 1000" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                    <p className="mt-2 text-xs text-slate-500">
-                      Necesario para importar todo el catálogo. Se recomienda <strong>1000</strong>. Si el proveedor no devuelve metadatos de paginación, el sistema usará modo sonda para obtener todas las páginas automáticamente.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         )}
       </section>
 
-      {runtimeOverview ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Estado efectivo del scheduler
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Muestra qué jobs están realmente activos ahora mismo, con su cron
-                aplicado y la próxima ejecución calculada.
-              </p>
-            </div>
-            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${runtimeOverview.integration_enabled ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-              {runtimeOverview.integration_enabled ? "Integración global activa" : "Integración global desactivada"}
-            </div>
+      {/* ── Cron Manager ── */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Gestión de crons</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Controla el horario, estado en tiempo real y ejecución manual de cada tarea.
+              Edita el cron, activa o desactiva el job y guarda los cambios individualmente.
+            </p>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void loadRuns()}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Actualizar
+            </button>
+            {canUpdateConfig ? (
+              <button
+                onClick={() => void saveAllCrons()}
+                disabled={configSaving || !anyCronDirty}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+              >
+                {configSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Guardar todos
+                {anyCronDirty ? <span className="ml-1 h-2 w-2 rounded-full bg-amber-400" /> : null}
+              </button>
+            ) : null}
+          </div>
+        </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4 md:grid-cols-2">
-            {runtimeOverview.jobs.map((job: ImportRuntimeOverviewResponse["jobs"][number]) => (
-              <div key={job.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold capitalize text-slate-900">{job.key}</p>
-                    <p className="mt-1 text-xs text-slate-500">{job.job_name}</p>
+        {runtimeOverview ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                runtimeOverview.integration_enabled
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-rose-100 text-rose-800"
+              }`}
+            >
+              {runtimeOverview.integration_enabled
+                ? "● Integración global activa"
+                : "○ Integración global desactivada"}
+            </span>
+            {!form.is_active && (
+              <span className="text-xs text-slate-500">
+                — Los crons no se ejecutarán mientras la integración esté desactivada.
+              </span>
+            )}
+          </div>
+        ) : null}
+
+        {configLoading ? (
+          <p className="mt-4 text-sm text-slate-500">Cargando configuración...</p>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {CRON_JOB_DEFS.map((def) => {
+              const liveJob = runtimeOverview?.jobs.find((j) => j.key === def.mode);
+              const isEnabled = form[def.enabledKey] as boolean;
+              const cronValue = form[def.cronKey] as string;
+              const isSaving = cronJobSaving[def.mode];
+              const isDirty = isCronJobDirty(def);
+
+              return (
+                <div
+                  key={def.mode}
+                  className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <def.Icon className="h-4 w-4 text-slate-700" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{def.title}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{def.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {isDirty && (
+                        <span
+                          className="h-2 w-2 rounded-full bg-amber-400"
+                          title="Cambios sin guardar"
+                        />
+                      )}
+                      {liveJob ? (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            liveJob.effective_enabled
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {liveJob.effective_enabled ? "● Activo" : "○ Inactivo"}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${job.effective_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
-                    {job.effective_enabled ? "Activo" : "Inactivo"}
-                  </span>
+
+                  {liveJob ? (
+                    <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      {liveJob.next_run_at ? (
+                        <span>
+                          Próxima:{" "}
+                          <strong className="text-slate-700">
+                            {formatDate(liveJob.next_run_at)}
+                          </strong>
+                        </span>
+                      ) : (
+                        <span>
+                          {liveJob.registered
+                            ? "Sin próxima ejecución calculada"
+                            : "No registrado en el scheduler"}
+                        </span>
+                      )}
+                      <span className="ml-auto font-mono text-slate-400">{liveJob.job_name}</span>
+                    </div>
+                  ) : null}
+
+                  <div className="flex-1 space-y-3 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-700">Habilitado</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          canUpdateConfig &&
+                          form.is_active &&
+                          setForm((c) => ({ ...c, [def.enabledKey]: !isEnabled }))
+                        }
+                        disabled={!canUpdateConfig || !form.is_active}
+                        role="switch"
+                        aria-checked={isEnabled}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isEnabled ? "bg-emerald-500" : "bg-slate-200"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none mt-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-150 ease-in-out ${
+                            isEnabled ? "translate-x-4" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600">
+                        Expresión cron
+                      </label>
+                      <input
+                        value={cronValue}
+                        onChange={(e) =>
+                          setForm((c) => ({ ...c, [def.cronKey]: e.target.value }))
+                        }
+                        disabled={!canUpdateConfig}
+                        placeholder={def.defaultCron}
+                        className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 font-mono text-sm disabled:bg-slate-50"
+                      />
+                      {cronValue && (
+                        <p className="mt-1 text-xs font-medium text-emerald-600">
+                          {cronToHuman(cronValue)}
+                        </p>
+                      )}
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {def.presets.map((preset) => (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() =>
+                              setForm((c) => ({ ...c, [def.cronKey]: preset.value }))
+                            }
+                            disabled={!canUpdateConfig}
+                            className={`rounded border px-2 py-0.5 text-xs transition-colors disabled:opacity-50 ${
+                              cronValue === preset.value
+                                ? "border-slate-700 bg-slate-900 text-white"
+                                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
+                    <button
+                      onClick={() => void runImport(def.mode)}
+                      disabled={running !== null}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {running?.mode === def.mode && running?.action === "trigger" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
+                      )}
+                      Ejecutar ahora
+                    </button>
+                    {canUpdateConfig ? (
+                      <button
+                        onClick={() => void saveCronJob(def.mode)}
+                        disabled={isSaving || !isDirty}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                        {isSaving ? "Guardando..." : isDirty ? "Guardar cambios" : "Sin cambios"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-
-                <dl className="mt-4 space-y-2 text-sm text-slate-600">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt>Habilitado en ajustes</dt>
-                    <dd>{job.enabled_in_settings ? "Sí" : "No"}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt>Registrado en scheduler</dt>
-                    <dd>{job.registered ? "Sí" : "No"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Cron</dt>
-                    <dd className="mt-1 break-all rounded-lg bg-white px-2 py-1 font-mono text-xs text-slate-700">{job.cron}</dd>
-                    {job.cron && cronToHuman(job.cron) !== job.cron && (
-                      <dd className="mt-0.5 text-xs font-medium text-emerald-600">{cronToHuman(job.cron)}</dd>
-                    )}
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Próxima ejecución</dt>
-                    <dd className="mt-1 text-slate-700">{formatDate(job.next_run_at ?? null)}</dd>
-                  </div>
-                </dl>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </section>
-      ) : null}
+        )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <button
-          onClick={() => void runImport("full")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Database className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run full catalog import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Sync complete catalog, stock and product changes.
-          </p>
-        </button>
+        {/* Batch settings (collapsible) */}
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setBatchSettingsOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <span>Ajustes avanzados de obtención</span>
+            {batchSettingsOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {batchSettingsOpen && (
+            <div className="border-t border-slate-100 bg-slate-50 p-4">
+              <p className="mb-3 text-xs text-slate-500">
+                Controla el tamaño de los lotes y la paginación del catálogo para ajustar el
+                consumo de la API del proveedor.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tamaño de lote (stock)
+                  </label>
+                  <input type="number" min={1} value={form.stock_batch_size} onChange={(event) => setForm((current) => ({ ...current, stock_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tamaño de lote (catálogo completo)
+                  </label>
+                  <input type="number" min={1} value={form.full_sync_batch_size} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Pausa entre lotes (ms)
+                  </label>
+                  <input type="number" min={0} value={form.full_sync_batch_delay_ms} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_delay_ms: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Límite de imágenes por ciclo
+                  </label>
+                  <input type="number" min={1} value={form.image_sync_take} onChange={(event) => setForm((current) => ({ ...current, image_sync_take: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tamaño de página del catálogo
+                  </label>
+                  <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Por defecto: 1000" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Se recomienda <strong>1000</strong>. Si el proveedor no devuelve metadatos de
+                    paginación, el sistema usará modo sonda para obtener todas las páginas
+                    automáticamente.
+                  </p>
+                </div>
+              </div>
+              {canUpdateConfig && (
+                <div className="mt-4 flex justify-end">
+                  <button onClick={() => void saveConfig()} disabled={configSaving} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+                    <Save className="h-4 w-4" />
+                    {configSaving ? "Guardando..." : "Guardar ajustes"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
-        <button
-          onClick={() => void runRetry("full")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Database className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry full import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run full sync with an explicit retry reason.
-          </p>
-        </button>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Acciones de importación</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Lanza una importación manual o reintenta una importación anterior con un motivo explícito.
+            </p>
+          </div>
+          {running !== null && (
+            <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-sm font-medium text-sky-800">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Ejecutando {MODE_LABELS[running.mode]}...
+            </div>
+          )}
+        </div>
 
-        <button
-          onClick={() => void runImport("incremental")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <RefreshCw className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run incremental import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Pull only changed products from the supplier API.
-          </p>
-        </button>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            Motivo del reintento{" "}
+            <span className="font-normal text-slate-400">(obligatorio para los reintentos)</span>
+          </label>
+          <input
+            value={retryReason}
+            onChange={(event) => setRetryReason(event.target.value)}
+            placeholder="Ej: Timeout del proveedor / desajuste de stock anterior"
+            maxLength={250}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+          />
+        </div>
 
-        <button
-          onClick={() => void runRetry("incremental")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <RefreshCw className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry incremental import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run the product delta sync with a retry reason.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runImport("stock")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Box className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run stock sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Refresh inventory levels from supplier feed.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runRetry("stock")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Box className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry stock sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run stock synchronization with retry reason.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runImport("stock_snapshot")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Box className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run stock reconciliation</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Rebuild all supplier stock from the full stock snapshot feed.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runRetry("stock_snapshot")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Box className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry stock reconciliation</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run the full supplier stock snapshot with a retry reason.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runImport("images")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <ImageIcon className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run image sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Backfill missing product images.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runRetry("images")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <ImageIcon className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry image sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run image synchronization with retry reason.
-          </p>
-        </button>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <label className="mb-2 block text-sm font-medium text-slate-700">
-          Retry reason (required for retry actions)
-        </label>
-        <input
-          value={retryReason}
-          onChange={(event) => setRetryReason(event.target.value)}
-          placeholder="e.g. Previous supplier timeout / stock mismatch"
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        />
-      </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {ACTION_MODES.map(({ mode, Icon, title, description }) => (
+            <div
+              key={mode}
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                  <Icon className="h-5 w-5 text-slate-700" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-slate-900">{title}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => void runImport(mode)}
+                  disabled={running !== null}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {running?.mode === mode && running?.action === "trigger" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Ejecutar
+                </button>
+                <button
+                  onClick={() => void runRetry(mode)}
+                  disabled={running !== null}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {running?.mode === mode && running?.action === "retry" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Reintentar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">Import history</h2>
+          <h2 className="text-lg font-bold text-slate-900">Historial de importaciones</h2>
           <button
             onClick={() => void loadHistory()}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh
+            Actualizar
           </button>
         </div>
 
         {loading ? (
-          <p className="text-slate-500">Loading history...</p>
+          <p className="text-slate-500">Cargando historial...</p>
         ) : items.length === 0 ? (
-          <p className="text-slate-500">No import history yet.</p>
+          <p className="text-slate-500">Sin historial de importaciones.</p>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
@@ -1209,7 +1379,15 @@ export default function ImportsPage() {
                   </p>
                 </div>
                 {item.details ? (
-                  <p className="mt-2 text-sm text-slate-600">{item.details}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                    {Object.entries(parseDetails(item.details)).map(([k, v]) => (
+                      <span key={k} className="text-xs text-slate-500">
+                        <span className="font-medium text-slate-700">{k}</span>
+                        {" = "}
+                        <span>{v}</span>
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
               </div>
             ))}
@@ -1221,11 +1399,11 @@ export default function ImportsPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Structured import runs
+              Ejecuciones de importación
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Inspect what the provider returned, what persisted, and the most
-              recent SKU-level incidents.
+              Inspecciona lo que devolvió el proveedor, lo que se persistió y los
+              últimos incidentes a nivel de SKU.
             </p>
           </div>
           <button
@@ -1233,29 +1411,29 @@ export default function ImportsPage() {
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh runs
+            Actualizar ejecuciones
           </button>
         </div>
 
         {providerStats ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard
-              label="Provider received"
+              label="Recibido del proveedor"
               value={providerStats.aggregates.source_items_received}
               tone="sky"
             />
             <MetricCard
-              label="Catalog persisted"
+              label="Persistido en catálogo"
               value={providerStats.aggregates.persisted_count}
               tone="emerald"
             />
             <MetricCard
-              label="Validation skipped"
+              label="Omitidos por validación"
               value={providerStats.aggregates.validation_skipped_count}
               tone="amber"
             />
             <MetricCard
-              label="Difference"
+              label="Diferencia"
               value={providerStats.difference_received_vs_persisted}
               tone="rose"
             />
@@ -1274,7 +1452,7 @@ export default function ImportsPage() {
               <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
               <div>
                 <p className="font-semibold text-slate-900">
-                  Latest run interpretation
+                  Interpretación de la última ejecución
                 </p>
                 <p className="mt-1 text-sm text-slate-700">
                   {formatDelta(
@@ -1289,7 +1467,7 @@ export default function ImportsPage() {
 
         {runs.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No structured runs recorded yet.
+            Sin ejecuciones registradas.
           </p>
         ) : (
           <div className="space-y-3">
@@ -1319,7 +1497,7 @@ export default function ImportsPage() {
                         </span>
                       </div>
                       <p className="text-sm text-slate-500">
-                        Started {formatDate(run.started_at)} · Finished{" "}
+                        Iniciado {formatDate(run.started_at)} · Finalizado{" "}
                         {formatDate(run.finished_at)}
                       </p>
                       <p className="text-sm text-slate-700">
@@ -1340,13 +1518,13 @@ export default function ImportsPage() {
                   {isExpanded ? (
                     <div className="border-t border-slate-200 bg-white p-4">
                       {detailLoadingId === run.id ? (
-                        <p className="text-sm text-slate-500">Loading detail...</p>
+                        <p className="text-sm text-slate-500">Cargando detalle...</p>
                       ) : (
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Provider
+                                Proveedor
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.source_items_received}
@@ -1354,7 +1532,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Processed
+                                Procesados
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.processed_count}
@@ -1362,7 +1540,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Persisted
+                                Persistidos
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.persisted_count}
@@ -1370,7 +1548,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Created
+                                Creados
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.created_count}
@@ -1378,7 +1556,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Updated
+                                Actualizados
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.updated_count}
@@ -1386,7 +1564,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Errors
+                                Errores
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.error_count}
@@ -1397,7 +1575,7 @@ export default function ImportsPage() {
                           <div className="grid gap-4 lg:grid-cols-2">
                             <div className="rounded-2xl border border-slate-200 p-4">
                               <h3 className="font-semibold text-slate-900">
-                                Run metadata
+                                Metadatos de la ejecución
                               </h3>
                               <pre className="mt-3 max-h-56 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-slate-100">
                                 {JSON.stringify(
@@ -1412,11 +1590,11 @@ export default function ImportsPage() {
 
                             <div className="rounded-2xl border border-slate-200 p-4">
                               <h3 className="font-semibold text-slate-900">
-                                Latest SKU incidents
+                                Últimos incidentes por SKU
                               </h3>
                               {errors.length === 0 ? (
                                 <p className="mt-3 text-sm text-slate-500">
-                                  No SKU incidents recorded for this run.
+                                  Sin incidentes SKU en esta ejecución.
                                 </p>
                               ) : (
                                 <div className="mt-3 space-y-3">
@@ -1426,7 +1604,7 @@ export default function ImportsPage() {
                                       className="rounded-xl border border-amber-200 bg-amber-50 p-3"
                                     >
                                       <p className="text-sm font-semibold text-slate-900">
-                                        {error.sku || "SKU unavailable"}
+                                        {error.sku || "SKU no disponible"}
                                       </p>
                                       <p className="mt-1 text-sm text-slate-700">
                                         {error.message}
@@ -1454,7 +1632,7 @@ export default function ImportsPage() {
         {latestIncidents.length > 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <h3 className="font-semibold text-slate-900">
-              Latest run incidents
+              Incidentes de la última ejecución
             </h3>
             <div className="mt-3 space-y-3">
               {latestIncidents.map((error) => (
@@ -1463,7 +1641,7 @@ export default function ImportsPage() {
                   className="rounded-xl border border-amber-200 bg-amber-50 p-3"
                 >
                   <p className="text-sm font-semibold text-slate-900">
-                    {error.sku || "SKU unavailable"}
+                    {error.sku || "SKU no disponible"}
                   </p>
                   <p className="mt-1 text-sm text-slate-700">{error.message}</p>
                   <p className="mt-1 text-xs text-slate-500">
@@ -1592,6 +1770,109 @@ export default function ImportsPage() {
             los de la base de datos y detectar posibles importaciones incompletas.
           </p>
         )}
+
+        {/* Product blockers (collapsible) */}
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setProductBlockersOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-slate-500" />
+              <span>¿Por qué pueden faltar productos en la tienda?</span>
+            </div>
+            {productBlockersOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {productBlockersOpen && (
+            <div className="border-t border-slate-100 bg-slate-50 p-4">
+              <p className="mb-4 text-sm text-slate-600">
+                Los productos pasan por varias fases antes de llegar a la tienda. Estas son las
+                causas más comunes de que un producto no sea visible:
+              </p>
+              <div className="space-y-3">
+                {(
+                  [
+                    {
+                      color: "amber",
+                      title: "Paginación incompleta del catálogo",
+                      body: "Si catalog_page_size no está configurado o el proveedor no devuelve metadatos de paginación, solo se importa la primera página. Usa «Analizar catálogo» y el modo sonda para obtener todo el catálogo.",
+                    },
+                    {
+                      color: "rose",
+                      title: "Código de ciclo de vida D o X",
+                      body: "Los productos con CodCicloVida = 'D' (descontinuado) o 'X' (inactivo) son omitidos durante la sincronización incremental y no se importan aunque existan en el catálogo.",
+                    },
+                    {
+                      color: "rose",
+                      title: "Producto archivado automáticamente",
+                      body: "Si la sincronización completa no recibe el SKU de un producto ya existente en la BD, ese producto se marca como ARCHIVED. Ocurre si el proveedor no devuelve el catálogo completo (ver paginación).",
+                    },
+                    {
+                      color: "slate",
+                      title: "Stock solo del almacén externo",
+                      body: "El stock de catálogo se calcula como StockCentral + StockPalma. El StockExterno no se incluye por ser stock de terceros no disponible para envío directo.",
+                    },
+                    {
+                      color: "slate",
+                      title: "Sin precio asignado",
+                      body: "Los productos sin SkuPrice configurado no aparecen en consultas ordenadas por precio. Asegúrate de que el módulo de precios haya procesado el SKU correspondiente.",
+                    },
+                    {
+                      color: "sky",
+                      title: "Integración desactivada o cron parado",
+                      body: "Si la integración está marcada como inactiva o los crons están deshabilitados, no se realizarán nuevas importaciones automáticas. Revisa el gestor de crons.",
+                    },
+                  ] as { color: string; title: string; body: string }[]
+                ).map(({ color, title, body }) => (
+                  <div
+                    key={title}
+                    className={`rounded-xl border p-4 ${
+                      color === "amber"
+                        ? "border-amber-200 bg-amber-50"
+                        : color === "rose"
+                          ? "border-rose-200 bg-rose-50"
+                          : color === "sky"
+                            ? "border-sky-200 bg-sky-50"
+                            : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        color === "amber"
+                          ? "text-amber-900"
+                          : color === "rose"
+                            ? "text-rose-900"
+                            : color === "sky"
+                              ? "text-sky-900"
+                              : "text-slate-900"
+                      }`}
+                    >
+                      {title}
+                    </p>
+                    <p
+                      className={`mt-1 text-xs ${
+                        color === "amber"
+                          ? "text-amber-800"
+                          : color === "rose"
+                            ? "text-rose-800"
+                            : color === "sky"
+                              ? "text-sky-800"
+                              : "text-slate-600"
+                      }`}
+                    >
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

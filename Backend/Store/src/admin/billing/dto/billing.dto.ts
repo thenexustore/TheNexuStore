@@ -288,6 +288,11 @@ export class UpdateBillingSettingsDto {
   @IsOptional()
   @IsString()
   credit_note_prefix?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  default_tax_rate?: number;
 }
 
 export class ExportBillingDocumentsDto {

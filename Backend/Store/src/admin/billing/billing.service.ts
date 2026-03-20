@@ -75,6 +75,9 @@ export class BillingService {
         ...(dto.credit_note_prefix !== undefined && {
           credit_note_prefix: dto.credit_note_prefix,
         }),
+        ...(dto.default_tax_rate !== undefined && {
+          default_tax_rate: dto.default_tax_rate,
+        }),
       },
     });
   }
@@ -396,6 +399,20 @@ export class BillingService {
     }
     if (quote.status === BillingDocumentStatus.VOID) {
       throw new BadRequestException('Cannot convert a void quote');
+    }
+
+    // Prevent converting the same quote twice
+    const existingConversion = await this.prisma.billingDocument.findFirst({
+      where: {
+        source_document_id: quoteId,
+        type: BillingDocumentType.INVOICE,
+        status: { not: BillingDocumentStatus.VOID },
+      },
+    });
+    if (existingConversion) {
+      throw new BadRequestException(
+        `This quote has already been converted to invoice ${existingConversion.document_number ?? existingConversion.id}`,
+      );
     }
 
     const { number, seriesId } = await this.assignNextNumber(
@@ -741,7 +758,7 @@ export class BillingService {
     }
 
     const lineItems = order.items.map((item, i) => {
-      const taxRate = 0.21;
+      const taxRate = Number(settings.default_tax_rate);
       const lineSubtotal = Number(item.unit_price) * item.qty;
       const taxAmountLine = lineSubtotal * taxRate;
       const lineTotal = lineSubtotal + taxAmountLine;

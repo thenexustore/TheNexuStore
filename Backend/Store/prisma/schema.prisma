@@ -1268,6 +1268,7 @@ model BillingSettings {
   invoice_prefix    String   @default("INV")
   quote_prefix      String   @default("PRE")
   credit_note_prefix String  @default("ABO")
+  default_tax_rate  Decimal  @default(0.21) @db.Decimal(5, 4)
   extra_json        Json?
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt

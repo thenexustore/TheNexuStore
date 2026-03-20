@@ -61,8 +61,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data, message: 'Settings updated successfully' };
   }
@@ -96,8 +95,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { type: data.type },
     });
     return { success: true, data, message: 'Document created successfully' };
@@ -119,8 +117,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data, message: 'Document updated successfully' };
   }
@@ -137,8 +134,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data };
   }
@@ -160,8 +156,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { document_number: data.document_number },
     });
     return { success: true, data, message: 'Document issued successfully' };
@@ -188,8 +183,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { quote_id: id, invoice_number: data.document_number },
     });
     return {
@@ -221,8 +215,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: { new_number: dto.new_number, reason: dto.reason },
     });
     return { success: true, data, message: 'Document number updated' };
@@ -251,8 +244,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data, message: 'Template created successfully' };
   }
@@ -273,8 +265,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data, message: 'Template updated successfully' };
   }
@@ -291,8 +282,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data };
   }
@@ -332,8 +322,7 @@ export class BillingController {
       path: req.originalUrl,
       ipAddress: req.ip,
       userAgent: req.get('user-agent') || undefined,
-      requestId:
-        ((req as any).requestId ?? req.get('x-request-id')) || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
       metadata: {
         billing_document_id: data.billing_document?.id,
         tracking_url: dto.tracking_url,

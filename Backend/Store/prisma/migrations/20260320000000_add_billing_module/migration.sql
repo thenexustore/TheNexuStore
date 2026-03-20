@@ -41,6 +41,7 @@ CREATE TABLE "billing_settings" (
     "invoice_prefix" TEXT NOT NULL DEFAULT 'INV',
     "quote_prefix" TEXT NOT NULL DEFAULT 'PRE',
     "credit_note_prefix" TEXT NOT NULL DEFAULT 'ABO',
+    "default_tax_rate" DECIMAL(5,4) NOT NULL DEFAULT 0.21,
     "extra_json" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

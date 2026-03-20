@@ -378,6 +378,80 @@ export class InfortisaSyncService implements OnModuleInit {
     }
   }
 
+  async syncStockForSku(rawSku: string) {
+    const sku = this.normalizeSku(rawSku);
+
+    if (!sku) {
+      throw new Error('SKU is required for targeted stock sync');
+    }
+
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'stock',
+      startedAt,
+      requestMeta: {
+        job: 'stock_single_sku',
+        sku,
+      },
+    });
+
+    try {
+      const { supplierProduct, result } =
+        await this.refreshCatalogSkuFromSupplier(sku);
+      const catalog = await this.products.getBySku(sku);
+      const {
+        stockCentral,
+        stockPalma,
+        stockExterno,
+        qtyOnHandForCatalog,
+      } = extractInfortisaStock(supplierProduct);
+      const finishedAt = new Date();
+
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status: 'SUCCESS',
+        processed_count: 1,
+        persisted_count: 1,
+        validation_skipped_count: 0,
+        created_count: result === 'created' ? 1 : 0,
+        updated_count: result === 'updated' ? 1 : 0,
+        skipped_count: 0,
+        error_count: 0,
+        resultMeta: {
+          job: 'stock_single_sku',
+          sku,
+          supplier_stock_central: stockCentral,
+          supplier_stock_palma: stockPalma,
+          supplier_stock_external: stockExterno,
+          supplier_qty_for_catalog: qtyOnHandForCatalog,
+          catalog_stock_quantity: catalog.stock_quantity,
+          catalog_in_stock: catalog.in_stock,
+        },
+        incidents: [],
+      });
+
+      return {
+        run_id: run.id,
+        sku,
+        result,
+        supplier: {
+          stock_central: stockCentral,
+          stock_palma: stockPalma,
+          stock_external: stockExterno,
+          qty_on_hand_for_catalog: qtyOnHandForCatalog,
+        },
+        catalog,
+      };
+    } catch (error: any) {
+      await this.failImportRun(run.id, error, {
+        job: 'stock_single_sku',
+        sku,
+      });
+      throw error;
+    }
+  }
+
   async syncProductsIncremental() {
     const startedAt = new Date();
     const run = await this.createImportRun({
@@ -608,12 +682,28 @@ export class InfortisaSyncService implements OnModuleInit {
   }
 
   private async processStockUpdate(product: any) {
-    const sku = await this.prisma.sku.findUnique({
-      where: { sku_code: product.SKU },
+    const normalizedSku = this.normalizeSku(product?.SKU);
+
+    if (!normalizedSku) {
+      throw new Error('Stock payload missing SKU');
+    }
+
+    let sku = await this.prisma.sku.findUnique({
+      where: { sku_code: normalizedSku },
     });
 
+    let stockSource = product;
+
     if (!sku) {
-      throw new Error(`SKU ${product.SKU} not found in catalog`);
+      const refreshed = await this.refreshCatalogSkuFromSupplier(normalizedSku);
+      sku = await this.prisma.sku.findUnique({
+        where: { sku_code: normalizedSku },
+      });
+      stockSource = refreshed.supplierProduct;
+    }
+
+    if (!sku) {
+      throw new Error(`SKU ${normalizedSku} not found in catalog`);
     }
 
     const warehouse = await this.prisma.warehouse.findFirst({
@@ -624,7 +714,7 @@ export class InfortisaSyncService implements OnModuleInit {
       throw new Error('INFORTISA warehouse not found');
     }
 
-    const { qtyOnHandForCatalog } = extractInfortisaStock(product);
+    const { qtyOnHandForCatalog } = extractInfortisaStock(stockSource);
 
     await this.prisma.inventoryLevel.upsert({
       where: {
@@ -644,6 +734,20 @@ export class InfortisaSyncService implements OnModuleInit {
         qty_reserved: 0,
       },
     });
+  }
+
+  private async refreshCatalogSkuFromSupplier(sku: string) {
+    const supplierProduct = await this.infortisa.getProductBySku(sku);
+    const result = await this.products.upsertFromInfortisa(supplierProduct);
+
+    if (result === 'skipped') {
+      throw new Error(`SKU ${sku} was discarded during supplier refresh`);
+    }
+
+    return {
+      supplierProduct,
+      result,
+    };
   }
 
   private async processProductsBatch(products: any[], stage: string) {

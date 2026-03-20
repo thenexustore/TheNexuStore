@@ -14,7 +14,7 @@ describe('InfortisaSyncService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       },
       product: {
-        updateMany: jest.fn().mockResolvedValue(undefined),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn(),
       },
       sku: { findMany: jest.fn(), findUnique: jest.fn() },
@@ -84,6 +84,7 @@ describe('InfortisaSyncService', () => {
     };
     products = {
       upsertFromInfortisa: jest.fn().mockResolvedValue('created'),
+      getBySku: jest.fn(),
     };
     schedulerRegistry = {
       getCronJob: jest.fn(() => {
@@ -243,6 +244,77 @@ describe('InfortisaSyncService', () => {
 
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 12 }),
+    );
+  });
+
+  it('syncs a single sku from supplier and returns refreshed stock', async () => {
+    infortisa.getProductBySku.mockResolvedValue({
+      SKU: 'NTETMM0078',
+      Name: 'SPC 2339N Movil Stella 3 4G BT FM + Dock Rojo',
+      Stock: 15,
+      StockPalma: 0,
+      StockExterno: 0,
+    });
+    products.upsertFromInfortisa.mockResolvedValue('updated');
+    products.getBySku.mockResolvedValue({
+      sku_code: 'NTETMM0078',
+      stock_quantity: 15,
+      in_stock: true,
+    });
+
+    const result = await service.syncStockForSku(' NTETMM0078 ');
+
+    expect(infortisa.getProductBySku).toHaveBeenCalledWith('NTETMM0078');
+    expect(products.upsertFromInfortisa).toHaveBeenCalledWith(
+      expect.objectContaining({ SKU: 'NTETMM0078' }),
+    );
+    expect(products.getBySku).toHaveBeenCalledWith('NTETMM0078');
+    expect(result).toMatchObject({
+      sku: 'NTETMM0078',
+      result: 'updated',
+      supplier: {
+        stock_central: 15,
+        stock_palma: 0,
+        qty_on_hand_for_catalog: 15,
+      },
+      catalog: {
+        stock_quantity: 15,
+        in_stock: true,
+      },
+    });
+  });
+
+  it('fails stock updates with a clear message when supplier payload has no sku', async () => {
+    await expect(
+      (service as any).processStockUpdate({ SKU: '   ' }),
+    ).rejects.toThrow('Stock payload missing SKU');
+
+    expect(prisma.sku.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('self-heals stock updates by backfilling missing skus from supplier', async () => {
+    prisma.sku.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'sku-1', sku_code: 'NTETMM0078' });
+    prisma.warehouse.findFirst.mockResolvedValue({ id: 'warehouse-1' });
+    infortisa.getProductBySku.mockResolvedValue({
+      SKU: 'NTETMM0078',
+      Name: 'SPC 2339N Movil Stella 3 4G BT FM + Dock Rojo',
+      Stock: 15,
+      StockPalma: 0,
+    });
+    products.upsertFromInfortisa.mockResolvedValue('updated');
+
+    await (service as any).processStockUpdate({ SKU: 'NTETMM0078', Stock: 15 });
+
+    expect(infortisa.getProductBySku).toHaveBeenCalledWith('NTETMM0078');
+    expect(products.upsertFromInfortisa).toHaveBeenCalledWith(
+      expect.objectContaining({ SKU: 'NTETMM0078' }),
+    );
+    expect(prisma.inventoryLevel.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ qty_on_hand: 15 }),
+      }),
     );
   });
 });

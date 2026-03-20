@@ -195,6 +195,24 @@ export class InfortisaController {
   }
 
   @UseGuards(AdminGuard)
+  @Post('sync/stock/:sku')
+  async triggerStockSyncForSku(@Param('sku') sku: string) {
+    try {
+      const result = await this.syncService.syncStockForSku(sku);
+      return {
+        success: true,
+        message: `Stock sync completed for ${result.sku}`,
+        data: result,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  @UseGuards(AdminGuard)
   @Get('tariff')
   async getTariff(@Query('format') format = 'standard') {
     try {

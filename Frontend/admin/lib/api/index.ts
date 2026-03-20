@@ -115,3 +115,14 @@ export {
   type Rma,
   type RmaStatus,
 } from "./rmas";
+
+export {
+  fetchDeploySettings,
+  saveDeploySettings,
+  clearDeploySecret,
+  triggerDeploy,
+  fetchDeployStatus,
+  type DeploySettingsPublic,
+  type DeploySettingsInput,
+  type DeployStatus,
+} from "./deploy";

@@ -2,6 +2,7 @@ import { InfortisaSyncService } from './infortisa.sync';
 import { InfortisaCatalogFetchResult } from './infortisa.service';
 
 describe('InfortisaSyncService', () => {
+  const STOCK_FIXTURE_SKU = 'SKU-STOCK-001';
   let service: InfortisaSyncService;
   let prisma: any;
   let infortisa: any;
@@ -167,13 +168,18 @@ describe('InfortisaSyncService', () => {
       is_active: true,
       settings_json: {
         stock_sync_enabled: true,
+        stock_snapshot_enabled: true,
         incremental_sync_enabled: false,
         full_sync_enabled: true,
         images_sync_enabled: true,
       },
     });
     schedulerRegistry.getCronJob = jest.fn((name: string) => {
-      if (name === 'infortisa-stock-sync' || name === 'infortisa-full-sync') {
+      if (
+        name === 'infortisa-stock-sync' ||
+        name === 'infortisa-stock-snapshot' ||
+        name === 'infortisa-full-sync'
+      ) {
         return runningJob;
       }
       throw new Error('missing');
@@ -186,6 +192,12 @@ describe('InfortisaSyncService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           key: 'stock',
+          effective_enabled: true,
+          registered: true,
+          next_run_at: '2026-03-20T02:00:00.000Z',
+        }),
+        expect.objectContaining({
+          key: 'stock_snapshot',
           effective_enabled: true,
           registered: true,
           next_run_at: '2026-03-20T02:00:00.000Z',
@@ -205,9 +217,11 @@ describe('InfortisaSyncService', () => {
       is_active: true,
       settings_json: {
         stock_sync_enabled: true,
+        stock_snapshot_enabled: true,
         incremental_sync_enabled: false,
         full_sync_enabled: true,
         images_sync_enabled: true,
+        stock_snapshot_cron: '0 */6 * * *',
         images_sync_cron: '15 * * * *',
         full_sync_batch_delay_ms: 250,
         image_sync_take: 25,
@@ -216,9 +230,13 @@ describe('InfortisaSyncService', () => {
 
     await service.reloadRuntimeSettings();
 
-    expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(3);
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(4);
     expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
       'infortisa-stock-sync',
+      expect.anything(),
+    );
+    expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      'infortisa-stock-snapshot',
       expect.anything(),
     );
     expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
@@ -250,28 +268,28 @@ describe('InfortisaSyncService', () => {
 
   it('syncs a single sku from supplier and returns refreshed stock', async () => {
     infortisa.getProductBySku.mockResolvedValue({
-      SKU: 'NTETMM0078',
-      Name: 'SPC 2339N Movil Stella 3 4G BT FM + Dock Rojo',
+      SKU: STOCK_FIXTURE_SKU,
+      Name: 'Fixture product',
       Stock: 15,
       StockPalma: 0,
       StockExterno: 0,
     });
     products.upsertFromInfortisa.mockResolvedValue('updated');
     products.getBySku.mockResolvedValue({
-      sku_code: 'NTETMM0078',
+      sku_code: STOCK_FIXTURE_SKU,
       stock_quantity: 15,
       in_stock: true,
     });
 
-    const result = await service.syncStockForSku(' NTETMM0078 ');
+    const result = await service.syncStockForSku(` ${STOCK_FIXTURE_SKU} `);
 
-    expect(infortisa.getProductBySku).toHaveBeenCalledWith('NTETMM0078');
+    expect(infortisa.getProductBySku).toHaveBeenCalledWith(STOCK_FIXTURE_SKU);
     expect(products.upsertFromInfortisa).toHaveBeenCalledWith(
-      expect.objectContaining({ SKU: 'NTETMM0078' }),
+      expect.objectContaining({ SKU: STOCK_FIXTURE_SKU }),
     );
-    expect(products.getBySku).toHaveBeenCalledWith('NTETMM0078');
+    expect(products.getBySku).toHaveBeenCalledWith(STOCK_FIXTURE_SKU);
     expect(result).toMatchObject({
-      sku: 'NTETMM0078',
+      sku: STOCK_FIXTURE_SKU,
       result: 'updated',
       supplier: {
         stock_central: 15,
@@ -296,21 +314,21 @@ describe('InfortisaSyncService', () => {
   it('self-heals stock updates by backfilling missing skus from supplier', async () => {
     prisma.sku.findUnique
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'sku-1', sku_code: 'NTETMM0078' });
+      .mockResolvedValueOnce({ id: 'sku-1', sku_code: STOCK_FIXTURE_SKU });
     prisma.warehouse.findFirst.mockResolvedValue({ id: 'warehouse-1' });
     infortisa.getProductBySku.mockResolvedValue({
-      SKU: 'NTETMM0078',
-      Name: 'SPC 2339N Movil Stella 3 4G BT FM + Dock Rojo',
+      SKU: STOCK_FIXTURE_SKU,
+      Name: 'Fixture product',
       Stock: 15,
       StockPalma: 0,
     });
     products.upsertFromInfortisa.mockResolvedValue('updated');
 
-    await (service as any).processStockUpdate({ SKU: 'NTETMM0078', Stock: 15 });
+    await (service as any).processStockUpdate({ SKU: STOCK_FIXTURE_SKU, Stock: 15 });
 
-    expect(infortisa.getProductBySku).toHaveBeenCalledWith('NTETMM0078');
+    expect(infortisa.getProductBySku).toHaveBeenCalledWith(STOCK_FIXTURE_SKU);
     expect(products.upsertFromInfortisa).toHaveBeenCalledWith(
-      expect.objectContaining({ SKU: 'NTETMM0078' }),
+      expect.objectContaining({ SKU: STOCK_FIXTURE_SKU }),
     );
     expect(prisma.inventoryLevel.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -321,12 +339,12 @@ describe('InfortisaSyncService', () => {
 
   it('keeps the real-time stock cursor when retryable sku updates fail', async () => {
     infortisa.getModifiedStock.mockResolvedValue([
-      { SKU: 'NTETMM0078', Stock: 15 },
+      { SKU: STOCK_FIXTURE_SKU, Stock: 15 },
     ]);
     prisma.syncLog.findUnique.mockResolvedValue(null);
     prisma.sku.findUnique.mockImplementation(async ({ where }: any) => {
-      if (where.sku_code === 'NTETMM0078') {
-        return { id: 'sku-1', sku_code: 'NTETMM0078' };
+      if (where.sku_code === STOCK_FIXTURE_SKU) {
+        return { id: 'sku-1', sku_code: STOCK_FIXTURE_SKU };
       }
       return null;
     });
@@ -351,7 +369,7 @@ describe('InfortisaSyncService', () => {
 
   it('runs a full stock snapshot reconciliation for all supplier items', async () => {
     infortisa.getStockAndPrice.mockResolvedValue([
-      { SKU: 'NTETMM0078', Stock: 15, StockPalma: 0 },
+      { SKU: STOCK_FIXTURE_SKU, Stock: 15, StockPalma: 0 },
       { SKU: 'SKU-2', Stock: 4, StockPalma: 1 },
     ]);
     prisma.sku.findUnique.mockImplementation(async ({ where }: any) => ({

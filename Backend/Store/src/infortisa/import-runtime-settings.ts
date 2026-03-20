@@ -6,10 +6,12 @@ export const INFORTISA_DEFAULT_BASE_URL = 'https://apiv2.infortisa.com';
 
 export type ImportRuntimeSettings = {
   stock_sync_enabled: boolean;
+  stock_snapshot_enabled: boolean;
   incremental_sync_enabled: boolean;
   full_sync_enabled: boolean;
   images_sync_enabled: boolean;
   stock_sync_cron: string;
+  stock_snapshot_cron: string;
   incremental_sync_cron: string;
   full_sync_cron: string;
   images_sync_cron: string;
@@ -27,10 +29,12 @@ export type PartialImportRuntimeSettings =
 
 export const DEFAULT_IMPORT_RUNTIME_SETTINGS: ImportRuntimeSettings = {
   stock_sync_enabled: true,
+  stock_snapshot_enabled: true,
   incremental_sync_enabled: true,
   full_sync_enabled: true,
   images_sync_enabled: false,
   stock_sync_cron: '*/5 * * * *',
+  stock_snapshot_cron: '30 */6 * * *',
   incremental_sync_cron: '0 * * * *',
   full_sync_cron: '0 2 * * *',
   images_sync_cron: '30 2 * * *',
@@ -119,6 +123,9 @@ export function normalizeImportRuntimeSettings(
     stock_sync_enabled:
       parseBoolean(source.stock_sync_enabled, 'stock_sync_enabled') ??
       DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_sync_enabled,
+    stock_snapshot_enabled:
+      parseBoolean(source.stock_snapshot_enabled, 'stock_snapshot_enabled') ??
+      DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_snapshot_enabled,
     incremental_sync_enabled:
       parseBoolean(
         source.incremental_sync_enabled,
@@ -133,6 +140,9 @@ export function normalizeImportRuntimeSettings(
     stock_sync_cron:
       parseCronExpression(source.stock_sync_cron, 'stock_sync_cron') ??
       DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_sync_cron,
+    stock_snapshot_cron:
+      parseCronExpression(source.stock_snapshot_cron, 'stock_snapshot_cron') ??
+      DEFAULT_IMPORT_RUNTIME_SETTINGS.stock_snapshot_cron,
     incremental_sync_cron:
       parseCronExpression(
         source.incremental_sync_cron,

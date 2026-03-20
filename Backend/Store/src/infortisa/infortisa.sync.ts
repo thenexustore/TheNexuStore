@@ -18,7 +18,7 @@ import {
   type ImportRuntimeSettings,
 } from './import-runtime-settings';
 
-type SyncMode = 'full' | 'incremental' | 'stock' | 'images';
+type SyncMode = 'full' | 'incremental' | 'stock' | 'stock_snapshot' | 'images';
 
 type RunErrorInput = {
   sku?: string | null;
@@ -83,6 +83,7 @@ export class InfortisaSyncService implements OnModuleInit {
   private readonly MAX_INCIDENTS = 10;
   private readonly DEFAULT_LAST_SYNC = '01/01/2024 00:00:00';
   private readonly STOCK_SYNC_JOB = 'infortisa-stock-sync';
+  private readonly STOCK_SNAPSHOT_JOB = 'infortisa-stock-snapshot';
   private readonly INCREMENTAL_SYNC_JOB = 'infortisa-incremental-sync';
   private readonly FULL_SYNC_JOB = 'infortisa-full-sync';
   private readonly IMAGES_SYNC_JOB = 'infortisa-images-sync';
@@ -119,6 +120,12 @@ export class InfortisaSyncService implements OnModuleInit {
       this.runtimeSettings.stock_sync_cron,
       () => void this.syncStockRealTime(),
       integrationEnabled && this.runtimeSettings.stock_sync_enabled,
+    );
+    this.configureCronJob(
+      this.STOCK_SNAPSHOT_JOB,
+      this.runtimeSettings.stock_snapshot_cron,
+      () => void this.syncStockSnapshot(),
+      integrationEnabled && this.runtimeSettings.stock_snapshot_enabled,
     );
     this.configureCronJob(
       this.INCREMENTAL_SYNC_JOB,
@@ -203,6 +210,12 @@ export class InfortisaSyncService implements OnModuleInit {
         job_name: this.STOCK_SYNC_JOB,
         cron: settings.stock_sync_cron,
         enabled_in_settings: settings.stock_sync_enabled,
+      },
+      {
+        key: 'stock_snapshot',
+        job_name: this.STOCK_SNAPSHOT_JOB,
+        cron: settings.stock_snapshot_cron,
+        enabled_in_settings: settings.stock_snapshot_enabled,
       },
       {
         key: 'incremental',
@@ -396,7 +409,7 @@ export class InfortisaSyncService implements OnModuleInit {
     const startedAt = new Date();
     const run = await this.createImportRun({
       provider: this.PROVIDER,
-      mode: 'stock',
+      mode: 'stock_snapshot',
       startedAt,
       requestMeta: { job: 'stock_snapshot' },
     });

@@ -69,10 +69,12 @@ export interface ImportConnectionTestResponse {
 
 export interface ImportRuntimeSettings {
   stock_sync_enabled: boolean;
+  stock_snapshot_enabled: boolean;
   incremental_sync_enabled: boolean;
   full_sync_enabled: boolean;
   images_sync_enabled: boolean;
   stock_sync_cron: string;
+  stock_snapshot_cron: string;
   incremental_sync_cron: string;
   full_sync_cron: string;
   images_sync_cron: string;
@@ -85,7 +87,7 @@ export interface ImportRuntimeSettings {
 
 
 export interface ImportRuntimeJobOverview {
-  key: "full" | "incremental" | "stock" | "images";
+  key: "full" | "incremental" | "stock" | "stock_snapshot" | "images";
   job_name: string;
   cron: string;
   enabled_in_settings: boolean;
@@ -122,10 +124,12 @@ export interface UpdateImportConfigInput {
   is_active?: boolean;
   notes?: string;
   stock_sync_enabled?: boolean;
+  stock_snapshot_enabled?: boolean;
   incremental_sync_enabled?: boolean;
   full_sync_enabled?: boolean;
   images_sync_enabled?: boolean;
   stock_sync_cron?: string;
+  stock_snapshot_cron?: string;
   incremental_sync_cron?: string;
   full_sync_cron?: string;
   images_sync_cron?: string;
@@ -190,7 +194,7 @@ export async function testImportConnection(): Promise<ImportConnectionTestRespon
   });
 }
 
-export async function triggerImport(mode: "full" | "incremental" | "stock" | "images") {
+export async function triggerImport(mode: "full" | "incremental" | "stock" | "stock_snapshot" | "images") {
   return fetchWithAuth("/admin/imports/run", {
     method: "POST",
     body: JSON.stringify({ mode }),
@@ -198,7 +202,7 @@ export async function triggerImport(mode: "full" | "incremental" | "stock" | "im
 }
 
 export async function retryImport(
-  mode: "full" | "incremental" | "stock" | "images",
+  mode: "full" | "incremental" | "stock" | "stock_snapshot" | "images",
   reason: string,
 ) {
   return fetchWithAuth("/admin/imports/retry", {

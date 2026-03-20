@@ -39,7 +39,7 @@ import {
   Search,
 } from "lucide-react";
 
-type ImportMode = "full" | "incremental" | "stock" | "images";
+type ImportMode = "full" | "incremental" | "stock" | "stock_snapshot" | "images";
 
 type ImportConfigForm = {
   display_name: string;
@@ -48,10 +48,12 @@ type ImportConfigForm = {
   is_active: boolean;
   notes: string;
   stock_sync_enabled: boolean;
+  stock_snapshot_enabled: boolean;
   incremental_sync_enabled: boolean;
   full_sync_enabled: boolean;
   images_sync_enabled: boolean;
   stock_sync_cron: string;
+  stock_snapshot_cron: string;
   incremental_sync_cron: string;
   full_sync_cron: string;
   images_sync_cron: string;
@@ -314,10 +316,12 @@ export default function ImportsPage() {
     is_active: true,
     notes: "",
     stock_sync_enabled: true,
+    stock_snapshot_enabled: true,
     incremental_sync_enabled: true,
     full_sync_enabled: true,
     images_sync_enabled: false,
     stock_sync_cron: "",
+    stock_snapshot_cron: "",
     incremental_sync_cron: "",
     full_sync_cron: "",
     images_sync_cron: "",
@@ -387,10 +391,12 @@ export default function ImportsPage() {
         is_active: data.is_active,
         notes: data.notes || "",
         stock_sync_enabled: data.settings.stock_sync_enabled,
+        stock_snapshot_enabled: data.settings.stock_snapshot_enabled,
         incremental_sync_enabled: data.settings.incremental_sync_enabled,
         full_sync_enabled: data.settings.full_sync_enabled,
         images_sync_enabled: data.settings.images_sync_enabled,
         stock_sync_cron: data.settings.stock_sync_cron,
+        stock_snapshot_cron: data.settings.stock_snapshot_cron,
         incremental_sync_cron: data.settings.incremental_sync_cron,
         full_sync_cron: data.settings.full_sync_cron,
         images_sync_cron: data.settings.images_sync_cron,
@@ -450,10 +456,12 @@ export default function ImportsPage() {
         is_active: form.is_active,
         notes: form.notes,
         stock_sync_enabled: form.stock_sync_enabled,
+        stock_snapshot_enabled: form.stock_snapshot_enabled,
         incremental_sync_enabled: form.incremental_sync_enabled,
         full_sync_enabled: form.full_sync_enabled,
         images_sync_enabled: form.images_sync_enabled,
         stock_sync_cron: form.stock_sync_cron,
+        stock_snapshot_cron: form.stock_snapshot_cron,
         incremental_sync_cron: form.incremental_sync_cron,
         full_sync_cron: form.full_sync_cron,
         images_sync_cron: form.images_sync_cron,
@@ -814,6 +822,7 @@ export default function ImportsPage() {
               <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {[
                   ["Stock sync", "Keeps inventory levels fresh.", "stock_sync_enabled"],
+                  ["Stock snapshot", "Reconciles all supplier stock periodically.", "stock_snapshot_enabled"],
                   ["Incremental products", "Applies product deltas between full syncs.", "incremental_sync_enabled"],
                   ["Full catalog", "Runs the heavy catalog refresh.", "full_sync_enabled"],
                   ["Image sync", "Backfills product media automatically.", "images_sync_enabled"],
@@ -831,7 +840,7 @@ export default function ImportsPage() {
                       </span>
                       <input
                         type="checkbox"
-                        checked={form[key as keyof Pick<ImportConfigForm, "stock_sync_enabled" | "incremental_sync_enabled" | "full_sync_enabled" | "images_sync_enabled">] as boolean}
+                        checked={form[key as keyof Pick<ImportConfigForm, "stock_sync_enabled" | "stock_snapshot_enabled" | "incremental_sync_enabled" | "full_sync_enabled" | "images_sync_enabled">] as boolean}
                         onChange={(event) =>
                           setForm((current) => ({
                             ...current,
@@ -859,6 +868,23 @@ export default function ImportsPage() {
                     <div className="mt-2 flex flex-wrap gap-1">
                       {CRON_PRESETS_FREQUENT.map((preset) => (
                         <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, stock_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Cron reconciliación completa de stock
+                    </label>
+                    <input value={form.stock_snapshot_cron} onChange={(event) => setForm((current) => ({ ...current, stock_snapshot_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="30 */6 * * *" />
+                    {form.stock_snapshot_cron && (
+                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.stock_snapshot_cron)}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {CRON_PRESETS_DAILY.map((preset) => (
+                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, stock_snapshot_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
                           {preset.label}
                         </button>
                       ))}
@@ -1019,7 +1045,7 @@ export default function ImportsPage() {
         </section>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <button
           onClick={() => void runImport("full")}
           disabled={running !== null}
@@ -1089,6 +1115,30 @@ export default function ImportsPage() {
           <p className="font-semibold text-slate-900">Retry stock sync</p>
           <p className="mt-1 text-sm text-slate-500">
             Re-run stock synchronization with retry reason.
+          </p>
+        </button>
+
+        <button
+          onClick={() => void runImport("stock_snapshot")}
+          disabled={running !== null}
+          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <Box className="mb-3 h-5 w-5 text-slate-700" />
+          <p className="font-semibold text-slate-900">Run stock reconciliation</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Rebuild all supplier stock from the full stock snapshot feed.
+          </p>
+        </button>
+
+        <button
+          onClick={() => void runRetry("stock_snapshot")}
+          disabled={running !== null}
+          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
+        >
+          <Box className="mb-3 h-5 w-5 text-amber-700" />
+          <p className="font-semibold text-slate-900">Retry stock reconciliation</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Re-run the full supplier stock snapshot with a retry reason.
           </p>
         </button>
 

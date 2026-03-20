@@ -370,13 +370,15 @@ export class ProductsService {
         };
       }
 
-      const skusConditions: any = {
-        inventory: {
+      const skusConditions: any = {};
+
+      if (in_stock_only) {
+        skusConditions.inventory = {
           some: {
             qty_on_hand: { gt: 0 },
           },
-        },
-      };
+        };
+      }
 
       if (min_price !== undefined || max_price !== undefined) {
         skusConditions.prices = {

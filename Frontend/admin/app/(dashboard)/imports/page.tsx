@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  BarChart2,
   Box,
   ChevronDown,
   ChevronUp,
@@ -43,7 +44,7 @@ import {
   Search,
 } from "lucide-react";
 
-type ImportMode = "full" | "incremental" | "stock" | "images";
+type ImportMode = "full" | "incremental" | "stock" | "stock_snapshot" | "images";
 type RunningState = { mode: ImportMode; action: "trigger" | "retry" } | null;
 
 type ImportConfigForm = {
@@ -53,10 +54,12 @@ type ImportConfigForm = {
   is_active: boolean;
   notes: string;
   stock_sync_enabled: boolean;
+  stock_snapshot_enabled: boolean;
   incremental_sync_enabled: boolean;
   full_sync_enabled: boolean;
   images_sync_enabled: boolean;
   stock_sync_cron: string;
+  stock_snapshot_cron: string;
   incremental_sync_cron: string;
   full_sync_cron: string;
   images_sync_cron: string;
@@ -120,11 +123,18 @@ function cronToHuman(expr: string): string {
     return "Cada hora";
   }
 
-  // Every N hours: 0 */N * * *
+  // Every N hours at minute 0: 0 */N * * *
   const hourStepMatch = /^\*\/(\d+)$/.exec(hour);
   if (hourStepMatch && min === "0" && dom === "*" && month === "*" && dow === "*") {
     const n = Number(hourStepMatch[1]);
     return n === 1 ? "Cada hora" : `Cada ${n} horas`;
+  }
+
+  // Every N hours at specific minute: M */N * * *
+  if (/^\d+$/.test(min) && hourStepMatch && dom === "*" && month === "*" && dow === "*") {
+    const n = Number(hourStepMatch[1]);
+    const m = String(min).padStart(2, "0");
+    return n === 1 ? `Cada hora a las :${m}` : `Cada ${n} horas a las :${m}`;
   }
 
   // Daily at H:M: M H * * *
@@ -173,6 +183,7 @@ const MODE_LABELS: Record<ImportMode, string> = {
   full: "catálogo completo",
   incremental: "incremental",
   stock: "stock",
+  stock_snapshot: "reconciliación de stock",
   images: "imágenes",
 };
 
@@ -199,6 +210,12 @@ const ACTION_MODES: {
     Icon: Box,
     title: "Sincronización de stock",
     description: "Actualiza los niveles de inventario desde el feed del proveedor.",
+  },
+  {
+    mode: "stock_snapshot",
+    Icon: BarChart2,
+    title: "Reconciliación de stock",
+    description: "Reconstruye el stock completo de todos los productos desde el feed completo del proveedor.",
   },
   {
     mode: "images",
@@ -229,6 +246,16 @@ const CRON_JOB_DEFS: CronJobDef[] = [
     Icon: Box,
     presets: CRON_PRESETS_FREQUENT,
     defaultCron: "*/5 * * * *",
+  },
+  {
+    mode: "stock_snapshot",
+    cronKey: "stock_snapshot_cron",
+    enabledKey: "stock_snapshot_enabled",
+    title: "Reconciliación de stock",
+    description: "Reconstruye el stock completo periódicamente desde el feed completo del proveedor.",
+    Icon: BarChart2,
+    presets: CRON_PRESETS_MODERATE,
+    defaultCron: "30 */6 * * *",
   },
   {
     mode: "incremental",
@@ -382,7 +409,7 @@ export default function ImportsPage() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
   const [cronJobSaving, setCronJobSaving] = useState<Record<ImportMode, boolean>>({
-    full: false, incremental: false, stock: false, images: false,
+    full: false, incremental: false, stock: false, stock_snapshot: false, images: false,
   });
   const [connectionTesting, setConnectionTesting] = useState(false);
   const [running, setRunning] = useState<RunningState>(null);
@@ -418,10 +445,12 @@ export default function ImportsPage() {
     is_active: true,
     notes: "",
     stock_sync_enabled: true,
+    stock_snapshot_enabled: true,
     incremental_sync_enabled: true,
     full_sync_enabled: true,
     images_sync_enabled: false,
     stock_sync_cron: "",
+    stock_snapshot_cron: "",
     incremental_sync_cron: "",
     full_sync_cron: "",
     images_sync_cron: "",
@@ -491,10 +520,12 @@ export default function ImportsPage() {
         is_active: data.is_active,
         notes: data.notes || "",
         stock_sync_enabled: data.settings.stock_sync_enabled,
+        stock_snapshot_enabled: data.settings.stock_snapshot_enabled ?? true,
         incremental_sync_enabled: data.settings.incremental_sync_enabled,
         full_sync_enabled: data.settings.full_sync_enabled,
         images_sync_enabled: data.settings.images_sync_enabled,
         stock_sync_cron: data.settings.stock_sync_cron,
+        stock_snapshot_cron: data.settings.stock_snapshot_cron ?? "",
         incremental_sync_cron: data.settings.incremental_sync_cron,
         full_sync_cron: data.settings.full_sync_cron,
         images_sync_cron: data.settings.images_sync_cron,
@@ -553,10 +584,12 @@ export default function ImportsPage() {
       is_active: form.is_active,
       notes: form.notes,
       stock_sync_enabled: form.stock_sync_enabled,
+      stock_snapshot_enabled: form.stock_snapshot_enabled,
       incremental_sync_enabled: form.incremental_sync_enabled,
       full_sync_enabled: form.full_sync_enabled,
       images_sync_enabled: form.images_sync_enabled,
       stock_sync_cron: form.stock_sync_cron,
+      stock_snapshot_cron: form.stock_snapshot_cron,
       incremental_sync_cron: form.incremental_sync_cron,
       full_sync_cron: form.full_sync_cron,
       images_sync_cron: form.images_sync_cron,
@@ -1010,7 +1043,7 @@ export default function ImportsPage() {
         {configLoading ? (
           <p className="mt-4 text-sm text-slate-500">Cargando configuración...</p>
         ) : (
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {CRON_JOB_DEFS.map((def) => {
               const liveJob = runtimeOverview?.jobs.find((j) => j.key === def.mode);
               const isEnabled = form[def.enabledKey] as boolean;
@@ -1274,7 +1307,7 @@ export default function ImportsPage() {
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {ACTION_MODES.map(({ mode, Icon, title, description }) => (
             <div
               key={mode}

@@ -23,6 +23,7 @@ import { PricingAdminModule } from './pricing/pricing.module';
 import { CategoriesModule } from '../user/categories/categories.module';
 import { InfortisaModule } from '../infortisa/infortisa.module';
 import { AdminCategoriesModule } from './categories/admin-categories.module';
+import { DeployModule } from './deploy/deploy.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AdminCategoriesModule } from './categories/admin-categories.module';
     CategoriesModule,
     InfortisaModule,
     AdminCategoriesModule,
+    DeployModule,
   ],
   controllers: [
     AdminController,

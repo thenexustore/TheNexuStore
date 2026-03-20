@@ -306,9 +306,33 @@ export function getBillingExportUrl(params: {
   if (params.status) query.set("status", params.status);
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("admin_token") : "";
-  query.set("token", token ?? "");
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   return `${baseUrl}/admin/billing/export?${query.toString()}`;
+}
+
+export async function downloadBillingExport(params: {
+  type?: BillingDocumentType;
+  status?: BillingDocumentStatus;
+  from?: string;
+  to?: string;
+}): Promise<void> {
+  const query = new URLSearchParams();
+  if (params.type) query.set("type", params.type);
+  if (params.status) query.set("status", params.status);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  const token = localStorage.getItem("admin_token") ?? "";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const response = await fetch(
+    `${baseUrl}/admin/billing/export?${query.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) throw new Error(`Export failed (${response.status})`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "billing-export.csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }

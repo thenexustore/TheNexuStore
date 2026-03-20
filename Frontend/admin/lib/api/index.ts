@@ -147,7 +147,7 @@ export {
   updateBillingTemplate,
   deleteBillingTemplate,
   markOrderDelivered,
-  getBillingExportUrl,
+  downloadBillingExport,
   type BillingDocument,
   type BillingDocumentItem,
   type BillingDocumentsResponse,

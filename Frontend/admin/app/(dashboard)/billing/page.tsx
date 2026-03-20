@@ -27,7 +27,7 @@ import {
   updateBillingDocumentNumber,
   fetchBillingSettings,
   updateBillingSettings,
-  getBillingExportUrl,
+  downloadBillingExport,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -36,6 +36,12 @@ import {
   type BillingNumberAudit,
 } from "@/lib/api";
 import { toast } from "sonner";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type BillingDocumentWithAudits = BillingDocument & {
+  number_audits?: BillingNumberAudit[];
+};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -135,9 +141,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(false);
 
   // Detail modal
-  const [selectedDoc, setSelectedDoc] = useState<
-    (BillingDocument & { number_audits?: BillingNumberAudit[] }) | null
-  >(null);
+  const [selectedDoc, setSelectedDoc] =
+    useState<BillingDocumentWithAudits | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   // Create form modal
@@ -232,7 +237,7 @@ export default function BillingPage() {
     try {
       const doc = await issueBillingDocument(id);
       toast.success(`Documento emitido: ${doc.document_number}`);
-      if (selectedDoc?.id === id) setSelectedDoc(doc as BillingDocument & { number_audits?: BillingNumberAudit[] });
+      if (selectedDoc?.id === id) setSelectedDoc(doc as BillingDocumentWithAudits);
       await loadDocs(page);
     } catch (err: unknown) {
       toast.error(
@@ -302,7 +307,7 @@ export default function BillingPage() {
       toast.success("Número actualizado");
       setEditNumberDoc(null);
       if (selectedDoc?.id === updated.id)
-        setSelectedDoc(updated as BillingDocument & { number_audits?: BillingNumberAudit[] });
+        setSelectedDoc(updated as BillingDocumentWithAudits);
       await loadDocs(page);
     } catch (err: unknown) {
       toast.error(
@@ -413,14 +418,19 @@ export default function BillingPage() {
 
   // ─── Export ────────────────────────────────────────────────────────────────
 
-  const handleExport = () => {
-    const url = getBillingExportUrl({
-      type: tab === "ALL" ? undefined : tab,
-      status: statusFilter || undefined,
-      from: fromDate || undefined,
-      to: toDate || undefined,
-    });
-    window.open(url, "_blank");
+  const handleExport = async () => {
+    try {
+      await downloadBillingExport({
+        type: tab === "ALL" ? undefined : tab,
+        status: statusFilter || undefined,
+        from: fromDate || undefined,
+        to: toDate || undefined,
+      });
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error exportando documentos",
+      );
+    }
   };
 
   // ─── Create item helpers ───────────────────────────────────────────────────

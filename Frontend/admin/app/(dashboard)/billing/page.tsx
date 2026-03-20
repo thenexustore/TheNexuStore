@@ -43,6 +43,20 @@ type BillingDocumentWithAudits = BillingDocument & {
   number_audits?: BillingNumberAudit[];
 };
 
+type CreateItemState = {
+  description: string;
+  qty: string;
+  unit_price: string;
+  tax_rate: string;
+};
+
+type CreateFormState = {
+  notes: string;
+  payment_method: BillingPaymentMethod | "";
+  language: "ES" | "EN";
+  items: CreateItemState[];
+};
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<BillingDocumentType, string> = {

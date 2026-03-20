@@ -27,13 +27,16 @@ import {
   Box,
   ChevronDown,
   ChevronUp,
+  Clock,
   Database,
   Eye,
   EyeOff,
   Globe,
   Image as ImageIcon,
+  Info,
   KeyRound,
   Loader2,
+  Play,
   PlugZap,
   RefreshCw,
   Save,
@@ -205,6 +208,60 @@ const ACTION_MODES: {
   },
 ];
 
+type CronJobDef = {
+  mode: ImportMode;
+  cronKey: keyof ImportConfigForm;
+  enabledKey: keyof ImportConfigForm;
+  title: string;
+  description: string;
+  Icon: React.ElementType;
+  presets: { label: string; value: string }[];
+  defaultCron: string;
+};
+
+const CRON_JOB_DEFS: CronJobDef[] = [
+  {
+    mode: "stock",
+    cronKey: "stock_sync_cron",
+    enabledKey: "stock_sync_enabled",
+    title: "Sincronización de stock",
+    description: "Actualiza los niveles de inventario desde el feed del proveedor.",
+    Icon: Box,
+    presets: CRON_PRESETS_FREQUENT,
+    defaultCron: "*/5 * * * *",
+  },
+  {
+    mode: "incremental",
+    cronKey: "incremental_sync_cron",
+    enabledKey: "incremental_sync_enabled",
+    title: "Productos incrementales",
+    description: "Aplica cambios de producto entre sincronizaciones completas.",
+    Icon: RefreshCw,
+    presets: CRON_PRESETS_MODERATE,
+    defaultCron: "0 * * * *",
+  },
+  {
+    mode: "full",
+    cronKey: "full_sync_cron",
+    enabledKey: "full_sync_enabled",
+    title: "Catálogo completo",
+    description: "Actualización completa del catálogo del proveedor.",
+    Icon: Database,
+    presets: CRON_PRESETS_DAILY,
+    defaultCron: "0 2 * * *",
+  },
+  {
+    mode: "images",
+    cronKey: "images_sync_cron",
+    enabledKey: "images_sync_enabled",
+    title: "Sincronización de imágenes",
+    description: "Rellena automáticamente las imágenes de productos que faltan.",
+    Icon: ImageIcon,
+    presets: CRON_PRESETS_DAILY,
+    defaultCron: "30 2 * * *",
+  },
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -324,6 +381,9 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
+  const [cronJobSaving, setCronJobSaving] = useState<Record<ImportMode, boolean>>({
+    full: false, incremental: false, stock: false, images: false,
+  });
   const [connectionTesting, setConnectionTesting] = useState(false);
   const [running, setRunning] = useState<RunningState>(null);
   const [retryReason, setRetryReason] = useState("");
@@ -348,6 +408,9 @@ export default function ImportsPage() {
   const [configSource, setConfigSource] = useState<string | null>(null);
   const [catalogProbe, setCatalogProbe] = useState<CatalogProbeResponse | null>(null);
   const [catalogProbeLoading, setCatalogProbeLoading] = useState(false);
+  const [batchSettingsOpen, setBatchSettingsOpen] = useState(false);
+  const [productBlockersOpen, setProductBlockersOpen] = useState(false);
+  const [savedForm, setSavedForm] = useState<ImportConfigForm | null>(null);
   const [form, setForm] = useState<ImportConfigForm>({
     display_name: "",
     base_url: "",
@@ -421,7 +484,7 @@ export default function ImportsPage() {
 
     try {
       const data = await fetchImportConfig(includeSecret);
-      setForm({
+      const newForm: ImportConfigForm = {
         display_name: data.display_name,
         base_url: data.base_url,
         api_key: includeSecret ? data.api_key || "" : "",
@@ -442,7 +505,9 @@ export default function ImportsPage() {
         catalog_page_size: data.settings.catalog_page_size
           ? String(data.settings.catalog_page_size)
           : "",
-      });
+      };
+      setForm(newForm);
+      setSavedForm(newForm);
       setStoredMaskedKey(data.api_key_masked || null);
       setLastHealthcheckAt(data.last_healthcheck_at || null);
       setConfigSource(data.source || null);
@@ -480,38 +545,70 @@ export default function ImportsPage() {
     }
   }
 
+  function buildConfigPayload() {
+    return {
+      display_name: form.display_name,
+      base_url: form.base_url,
+      api_key: form.api_key.trim() || undefined,
+      is_active: form.is_active,
+      notes: form.notes,
+      stock_sync_enabled: form.stock_sync_enabled,
+      incremental_sync_enabled: form.incremental_sync_enabled,
+      full_sync_enabled: form.full_sync_enabled,
+      images_sync_enabled: form.images_sync_enabled,
+      stock_sync_cron: form.stock_sync_cron,
+      incremental_sync_cron: form.incremental_sync_cron,
+      full_sync_cron: form.full_sync_cron,
+      images_sync_cron: form.images_sync_cron,
+      stock_batch_size: Number(form.stock_batch_size),
+      full_sync_batch_size: Number(form.full_sync_batch_size),
+      full_sync_batch_delay_ms: Number(form.full_sync_batch_delay_ms),
+      image_sync_take: Number(form.image_sync_take),
+      catalog_page_size: form.catalog_page_size.trim()
+        ? Number(form.catalog_page_size)
+        : null,
+    };
+  }
+
   async function saveConfig() {
     setConfigSaving(true);
-
     try {
-      await updateImportConfig({
-        display_name: form.display_name,
-        base_url: form.base_url,
-        api_key: form.api_key.trim() || undefined,
-        is_active: form.is_active,
-        notes: form.notes,
-        stock_sync_enabled: form.stock_sync_enabled,
-        incremental_sync_enabled: form.incremental_sync_enabled,
-        full_sync_enabled: form.full_sync_enabled,
-        images_sync_enabled: form.images_sync_enabled,
-        stock_sync_cron: form.stock_sync_cron,
-        incremental_sync_cron: form.incremental_sync_cron,
-        full_sync_cron: form.full_sync_cron,
-        images_sync_cron: form.images_sync_cron,
-        stock_batch_size: Number(form.stock_batch_size),
-        full_sync_batch_size: Number(form.full_sync_batch_size),
-        full_sync_batch_delay_ms: Number(form.full_sync_batch_delay_ms),
-        image_sync_take: Number(form.image_sync_take),
-        catalog_page_size: form.catalog_page_size.trim()
-          ? Number(form.catalog_page_size)
-          : null,
-      });
+      await updateImportConfig(buildConfigPayload());
+      setSavedForm({ ...form });
       toast.success("Configuración de API actualizada");
-      await loadConfig(showingSecret && canReadSecret);
+      await Promise.all([loadConfig(showingSecret && canReadSecret), loadRuns()]);
     } catch (error) {
       toast.error(
         getErrorMessage(error, "Error al actualizar la configuración de la API"),
       );
+    } finally {
+      setConfigSaving(false);
+    }
+  }
+
+  async function saveCronJob(mode: ImportMode) {
+    setCronJobSaving((s) => ({ ...s, [mode]: true }));
+    try {
+      await updateImportConfig(buildConfigPayload());
+      setSavedForm({ ...form });
+      toast.success(`Cron de ${MODE_LABELS[mode]} guardado`);
+      await loadRuns();
+    } catch (error) {
+      toast.error(getErrorMessage(error, `Error al guardar el cron de ${MODE_LABELS[mode]}`));
+    } finally {
+      setCronJobSaving((s) => ({ ...s, [mode]: false }));
+    }
+  }
+
+  async function saveAllCrons() {
+    setConfigSaving(true);
+    try {
+      await updateImportConfig(buildConfigPayload());
+      setSavedForm({ ...form });
+      toast.success("Configuración de crons guardada");
+      await loadRuns();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Error al guardar la configuración de crons"));
     } finally {
       setConfigSaving(false);
     }
@@ -605,6 +702,16 @@ export default function ImportsPage() {
   const latestIncidents = latestRun
     ? runErrors[latestRun.id] ?? latestRun.errors ?? []
     : [];
+
+  function isCronJobDirty(def: CronJobDef): boolean {
+    return (
+      savedForm !== null &&
+      ((form[def.cronKey] as string) !== (savedForm[def.cronKey] as string) ||
+        (form[def.enabledKey] as boolean) !== (savedForm[def.enabledKey] as boolean))
+    );
+  }
+
+  const anyCronDirty = savedForm !== null && CRON_JOB_DEFS.some(isCronJobDirty);
 
   return (
     <div className="space-y-6">
@@ -839,242 +946,303 @@ export default function ImportsPage() {
                 </div>
               </div>
             </div>
-
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">
-                  Programación de tareas y ajustes de obtención
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Activa o desactiva cada tarea, define la cadencia del cron y ajusta
-                  la agresividad con la que se consume la API del proveedor.
-                </p>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["Sincronización de stock", "Mantiene el inventario actualizado.", "stock_sync_enabled"],
-                  ["Productos incrementales", "Aplica cambios de producto entre sincronizaciones completas.", "incremental_sync_enabled"],
-                  ["Catálogo completo", "Ejecuta la actualización completa del catálogo.", "full_sync_enabled"],
-                  ["Sincronización de imágenes", "Rellena automáticamente las imágenes de los productos.", "images_sync_enabled"],
-                ].map(([label, description, key]) => (
-                  <label
-                    key={key}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700"
-                  >
-                    <span className="flex items-start justify-between gap-3">
-                      <span>
-                        <span className="block font-semibold text-slate-900">{label}</span>
-                        <span className="mt-1 block text-xs text-slate-500">
-                          {description}
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={form[key as keyof Pick<ImportConfigForm, "stock_sync_enabled" | "incremental_sync_enabled" | "full_sync_enabled" | "images_sync_enabled">] as boolean}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            [key]: event.target.checked,
-                          }))
-                        }
-                        disabled={!canUpdateConfig || !form.is_active}
-                        className="mt-1 h-4 w-4 rounded border-slate-300"
-                      />
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron sincronización de stock
-                    </label>
-                    <input value={form.stock_sync_cron} onChange={(event) => setForm((current) => ({ ...current, stock_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="*/5 * * * *" />
-                    {form.stock_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.stock_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_FREQUENT.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, stock_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron productos incrementales
-                    </label>
-                    <input value={form.incremental_sync_cron} onChange={(event) => setForm((current) => ({ ...current, incremental_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="0 * * * *" />
-                    {form.incremental_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.incremental_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_MODERATE.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, incremental_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron catálogo completo
-                    </label>
-                    <input value={form.full_sync_cron} onChange={(event) => setForm((current) => ({ ...current, full_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="0 2 * * *" />
-                    {form.full_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.full_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_DAILY.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, full_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Cron sincronización de imágenes
-                    </label>
-                    <input value={form.images_sync_cron} onChange={(event) => setForm((current) => ({ ...current, images_sync_cron: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm disabled:bg-slate-50" placeholder="30 2 * * *" />
-                    {form.images_sync_cron && (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">{cronToHuman(form.images_sync_cron)}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {CRON_PRESETS_DAILY.map((preset) => (
-                        <button key={preset.value} type="button" onClick={() => setForm((c) => ({ ...c, images_sync_cron: preset.value }))} disabled={!canUpdateConfig} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Tamaño de lote (stock)
-                    </label>
-                    <input type="number" min={1} value={form.stock_batch_size} onChange={(event) => setForm((current) => ({ ...current, stock_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Tamaño de lote (catálogo completo)
-                    </label>
-                    <input type="number" min={1} value={form.full_sync_batch_size} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Pausa entre lotes (ms)
-                    </label>
-                    <input type="number" min={0} value={form.full_sync_batch_delay_ms} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_delay_ms: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Límite de imágenes por ciclo
-                    </label>
-                    <input type="number" min={1} value={form.image_sync_take} onChange={(event) => setForm((current) => ({ ...current, image_sync_take: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Tamaño de página del catálogo
-                    </label>
-                    <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Por defecto: 1000" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
-                    <p className="mt-2 text-xs text-slate-500">
-                      Necesario para importar todo el catálogo. Se recomienda <strong>1000</strong>. Si el proveedor no devuelve metadatos de paginación, el sistema usará modo sonda para obtener todas las páginas automáticamente.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         )}
       </section>
 
-      {runtimeOverview ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Estado efectivo del scheduler
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Muestra qué jobs están realmente activos ahora mismo, con su cron
-                aplicado y la próxima ejecución calculada.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+      {/* ── Cron Manager ── */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Gestión de crons</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Controla el horario, estado en tiempo real y ejecución manual de cada tarea.
+              Edita el cron, activa o desactiva el job y guarda los cambios individualmente.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void loadRuns()}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Actualizar
+            </button>
+            {canUpdateConfig ? (
               <button
-                onClick={() => void loadRuns()}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                onClick={() => void saveAllCrons()}
+                disabled={configSaving || !anyCronDirty}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
               >
-                <RefreshCw className="h-4 w-4" />
-                Actualizar
+                {configSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Guardar todos
+                {anyCronDirty ? <span className="ml-1 h-2 w-2 rounded-full bg-amber-400" /> : null}
               </button>
-              <div className={`rounded-full px-3 py-1 text-xs font-semibold ${runtimeOverview.integration_enabled ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                {runtimeOverview.integration_enabled ? "Integración global activa" : "Integración global desactivada"}
-              </div>
-            </div>
+            ) : null}
           </div>
+        </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4 md:grid-cols-2">
-            {runtimeOverview.jobs.map((job: ImportRuntimeOverviewResponse["jobs"][number]) => (
-              <div key={job.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold capitalize text-slate-900">
-                      {job.key === "full"
-                        ? "Catálogo completo"
-                        : job.key === "incremental"
-                          ? "Incremental"
-                          : job.key === "stock"
-                            ? "Stock"
-                            : "Imágenes"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">{job.job_name}</p>
+        {runtimeOverview ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                runtimeOverview.integration_enabled
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-rose-100 text-rose-800"
+              }`}
+            >
+              {runtimeOverview.integration_enabled
+                ? "● Integración global activa"
+                : "○ Integración global desactivada"}
+            </span>
+            {!form.is_active && (
+              <span className="text-xs text-slate-500">
+                — Los crons no se ejecutarán mientras la integración esté desactivada.
+              </span>
+            )}
+          </div>
+        ) : null}
+
+        {configLoading ? (
+          <p className="mt-4 text-sm text-slate-500">Cargando configuración...</p>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {CRON_JOB_DEFS.map((def) => {
+              const liveJob = runtimeOverview?.jobs.find((j) => j.key === def.mode);
+              const isEnabled = form[def.enabledKey] as boolean;
+              const cronValue = form[def.cronKey] as string;
+              const isSaving = cronJobSaving[def.mode];
+              const isDirty = isCronJobDirty(def);
+
+              return (
+                <div
+                  key={def.mode}
+                  className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <def.Icon className="h-4 w-4 text-slate-700" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{def.title}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{def.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {isDirty && (
+                        <span
+                          className="h-2 w-2 rounded-full bg-amber-400"
+                          title="Cambios sin guardar"
+                        />
+                      )}
+                      {liveJob ? (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            liveJob.effective_enabled
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {liveJob.effective_enabled ? "● Activo" : "○ Inactivo"}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${job.effective_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
-                    {job.effective_enabled ? "Activo" : "Inactivo"}
-                  </span>
+
+                  {liveJob ? (
+                    <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      {liveJob.next_run_at ? (
+                        <span>
+                          Próxima:{" "}
+                          <strong className="text-slate-700">
+                            {formatDate(liveJob.next_run_at)}
+                          </strong>
+                        </span>
+                      ) : (
+                        <span>
+                          {liveJob.registered
+                            ? "Sin próxima ejecución calculada"
+                            : "No registrado en el scheduler"}
+                        </span>
+                      )}
+                      <span className="ml-auto font-mono text-slate-400">{liveJob.job_name}</span>
+                    </div>
+                  ) : null}
+
+                  <div className="flex-1 space-y-3 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-700">Habilitado</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          canUpdateConfig &&
+                          form.is_active &&
+                          setForm((c) => ({ ...c, [def.enabledKey]: !isEnabled }))
+                        }
+                        disabled={!canUpdateConfig || !form.is_active}
+                        role="switch"
+                        aria-checked={isEnabled}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isEnabled ? "bg-emerald-500" : "bg-slate-200"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none mt-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-150 ease-in-out ${
+                            isEnabled ? "translate-x-4" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600">
+                        Expresión cron
+                      </label>
+                      <input
+                        value={cronValue}
+                        onChange={(e) =>
+                          setForm((c) => ({ ...c, [def.cronKey]: e.target.value }))
+                        }
+                        disabled={!canUpdateConfig}
+                        placeholder={def.defaultCron}
+                        className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 font-mono text-sm disabled:bg-slate-50"
+                      />
+                      {cronValue && (
+                        <p className="mt-1 text-xs font-medium text-emerald-600">
+                          {cronToHuman(cronValue)}
+                        </p>
+                      )}
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {def.presets.map((preset) => (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() =>
+                              setForm((c) => ({ ...c, [def.cronKey]: preset.value }))
+                            }
+                            disabled={!canUpdateConfig}
+                            className={`rounded border px-2 py-0.5 text-xs transition-colors disabled:opacity-50 ${
+                              cronValue === preset.value
+                                ? "border-slate-700 bg-slate-900 text-white"
+                                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
+                    <button
+                      onClick={() => void runImport(def.mode)}
+                      disabled={running !== null}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {running?.mode === def.mode && running?.action === "trigger" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
+                      )}
+                      Ejecutar ahora
+                    </button>
+                    {canUpdateConfig ? (
+                      <button
+                        onClick={() => void saveCronJob(def.mode)}
+                        disabled={isSaving || !isDirty}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                        {isSaving ? "Guardando..." : isDirty ? "Guardar cambios" : "Sin cambios"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-
-                <dl className="mt-4 space-y-2 text-sm text-slate-600">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt>Habilitado en ajustes</dt>
-                    <dd>{job.enabled_in_settings ? "Sí" : "No"}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt>Registrado en scheduler</dt>
-                    <dd>{job.registered ? "Sí" : "No"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Cron</dt>
-                    <dd className="mt-1 break-all rounded-lg bg-white px-2 py-1 font-mono text-xs text-slate-700">{job.cron}</dd>
-                    {job.cron && cronToHuman(job.cron) !== job.cron && (
-                      <dd className="mt-0.5 text-xs font-medium text-emerald-600">{cronToHuman(job.cron)}</dd>
-                    )}
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">Próxima ejecución</dt>
-                    <dd className="mt-1 text-slate-700">{formatDate(job.next_run_at ?? null)}</dd>
-                  </div>
-                </dl>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </section>
-      ) : null}
+        )}
+
+        {/* Batch settings (collapsible) */}
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setBatchSettingsOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <span>Ajustes avanzados de obtención</span>
+            {batchSettingsOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {batchSettingsOpen && (
+            <div className="border-t border-slate-100 bg-slate-50 p-4">
+              <p className="mb-3 text-xs text-slate-500">
+                Controla el tamaño de los lotes y la paginación del catálogo para ajustar el
+                consumo de la API del proveedor.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tamaño de lote (stock)
+                  </label>
+                  <input type="number" min={1} value={form.stock_batch_size} onChange={(event) => setForm((current) => ({ ...current, stock_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tamaño de lote (catálogo completo)
+                  </label>
+                  <input type="number" min={1} value={form.full_sync_batch_size} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_size: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Pausa entre lotes (ms)
+                  </label>
+                  <input type="number" min={0} value={form.full_sync_batch_delay_ms} onChange={(event) => setForm((current) => ({ ...current, full_sync_batch_delay_ms: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Límite de imágenes por ciclo
+                  </label>
+                  <input type="number" min={1} value={form.image_sync_take} onChange={(event) => setForm((current) => ({ ...current, image_sync_take: event.target.value }))} disabled={!canUpdateConfig} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tamaño de página del catálogo
+                  </label>
+                  <input type="number" min={1} value={form.catalog_page_size} onChange={(event) => setForm((current) => ({ ...current, catalog_page_size: event.target.value }))} disabled={!canUpdateConfig} placeholder="Por defecto: 1000" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Se recomienda <strong>1000</strong>. Si el proveedor no devuelve metadatos de
+                    paginación, el sistema usará modo sonda para obtener todas las páginas
+                    automáticamente.
+                  </p>
+                </div>
+              </div>
+              {canUpdateConfig && (
+                <div className="mt-4 flex justify-end">
+                  <button onClick={() => void saveConfig()} disabled={configSaving} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+                    <Save className="h-4 w-4" />
+                    {configSaving ? "Guardando..." : "Guardar ajustes"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1569,6 +1737,109 @@ export default function ImportsPage() {
             los de la base de datos y detectar posibles importaciones incompletas.
           </p>
         )}
+
+        {/* Product blockers (collapsible) */}
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setProductBlockersOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-slate-500" />
+              <span>¿Por qué pueden faltar productos en la tienda?</span>
+            </div>
+            {productBlockersOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {productBlockersOpen && (
+            <div className="border-t border-slate-100 bg-slate-50 p-4">
+              <p className="mb-4 text-sm text-slate-600">
+                Los productos pasan por varias fases antes de llegar a la tienda. Estas son las
+                causas más comunes de que un producto no sea visible:
+              </p>
+              <div className="space-y-3">
+                {(
+                  [
+                    {
+                      color: "amber",
+                      title: "Paginación incompleta del catálogo",
+                      body: "Si catalog_page_size no está configurado o el proveedor no devuelve metadatos de paginación, solo se importa la primera página. Usa «Analizar catálogo» y el modo sonda para obtener todo el catálogo.",
+                    },
+                    {
+                      color: "rose",
+                      title: "Código de ciclo de vida D o X",
+                      body: "Los productos con CodCicloVida = 'D' (descontinuado) o 'X' (inactivo) son omitidos durante la sincronización incremental y no se importan aunque existan en el catálogo.",
+                    },
+                    {
+                      color: "rose",
+                      title: "Producto archivado automáticamente",
+                      body: "Si la sincronización completa no recibe el SKU de un producto ya existente en la BD, ese producto se marca como ARCHIVED. Ocurre si el proveedor no devuelve el catálogo completo (ver paginación).",
+                    },
+                    {
+                      color: "slate",
+                      title: "Stock solo del almacén externo",
+                      body: "El stock de catálogo se calcula como StockCentral + StockPalma. El StockExterno no se incluye por ser stock de terceros no disponible para envío directo.",
+                    },
+                    {
+                      color: "slate",
+                      title: "Sin precio asignado",
+                      body: "Los productos sin SkuPrice configurado no aparecen en consultas ordenadas por precio. Asegúrate de que el módulo de precios haya procesado el SKU correspondiente.",
+                    },
+                    {
+                      color: "sky",
+                      title: "Integración desactivada o cron parado",
+                      body: "Si la integración está marcada como inactiva o los crons están deshabilitados, no se realizarán nuevas importaciones automáticas. Revisa el gestor de crons.",
+                    },
+                  ] as { color: string; title: string; body: string }[]
+                ).map(({ color, title, body }) => (
+                  <div
+                    key={title}
+                    className={`rounded-xl border p-4 ${
+                      color === "amber"
+                        ? "border-amber-200 bg-amber-50"
+                        : color === "rose"
+                          ? "border-rose-200 bg-rose-50"
+                          : color === "sky"
+                            ? "border-sky-200 bg-sky-50"
+                            : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        color === "amber"
+                          ? "text-amber-900"
+                          : color === "rose"
+                            ? "text-rose-900"
+                            : color === "sky"
+                              ? "text-sky-900"
+                              : "text-slate-900"
+                      }`}
+                    >
+                      {title}
+                    </p>
+                    <p
+                      className={`mt-1 text-xs ${
+                        color === "amber"
+                          ? "text-amber-800"
+                          : color === "rose"
+                            ? "text-rose-800"
+                            : color === "sky"
+                              ? "text-sky-800"
+                              : "text-slate-600"
+                      }`}
+                    >
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

@@ -34,6 +34,7 @@ import {
   type BillingPaymentMethod,
   type BillingSettings,
   type BillingNumberAudit,
+  type BillingDocumentItem,
 } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -56,6 +57,8 @@ type CreateFormState = {
   language: "ES" | "EN";
   items: CreateItemState[];
 };
+
+type InputEv = { target: { value: string } };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -163,10 +166,10 @@ export default function BillingPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createType, setCreateType] = useState<BillingDocumentType>("INVOICE");
   const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({
+  const [createForm, setCreateForm] = useState<CreateFormState>({
     notes: "",
-    payment_method: "" as BillingPaymentMethod | "",
-    language: "ES" as "ES" | "EN",
+    payment_method: "",
+    language: "ES",
     items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
   });
 
@@ -348,7 +351,7 @@ export default function BillingPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const validItems = createForm.items.filter(
-      (i) => i.description.trim() && i.unit_price,
+      (i: CreateItemState) => i.description.trim() && i.unit_price,
     );
     if (validItems.length === 0) {
       toast.error("Añade al menos una línea con descripción y precio");
@@ -361,7 +364,7 @@ export default function BillingPage() {
         language: createForm.language,
         payment_method: createForm.payment_method || undefined,
         notes: createForm.notes || undefined,
-        items: validItems.map((i, idx) => ({
+        items: validItems.map((i: CreateItemState, idx: number) => ({
           description: i.description,
           qty: Number(i.qty) || 1,
           unit_price: Number(i.unit_price) || 0,
@@ -450,7 +453,7 @@ export default function BillingPage() {
   // ─── Create item helpers ───────────────────────────────────────────────────
 
   const addCreateItem = () => {
-    setCreateForm((f) => ({
+    setCreateForm((f: CreateFormState) => ({
       ...f,
       items: [
         ...f.items,
@@ -460,16 +463,16 @@ export default function BillingPage() {
   };
 
   const removeCreateItem = (idx: number) => {
-    setCreateForm((f) => ({
+    setCreateForm((f: CreateFormState) => ({
       ...f,
-      items: f.items.filter((_, i) => i !== idx),
+      items: f.items.filter((_: CreateItemState, i: number) => i !== idx),
     }));
   };
 
   const updateCreateItem = (idx: number, field: string, value: string) => {
-    setCreateForm((f) => ({
+    setCreateForm((f: CreateFormState) => ({
       ...f,
-      items: f.items.map((item, i) =>
+      items: f.items.map((item: CreateItemState, i: number) =>
         i === idx ? { ...item, [field]: value } : item,
       ),
     }));
@@ -549,14 +552,14 @@ export default function BillingPage() {
             type="text"
             placeholder="Buscar número, cliente, NIF..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadDocs(1)}
+            onChange={(e: InputEv) => setSearch(e.target.value)}
+            onKeyDown={(e: { key: string }) => e.key === "Enter" && loadDocs(1)}
             className="pl-9 pr-4 py-2 rounded-lg border border-zinc-300 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-zinc-900"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) =>
+          onChange={(e: InputEv) =>
             setStatusFilter(e.target.value as BillingDocumentStatus | "")
           }
           className="px-3 py-2 rounded-lg border border-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
@@ -571,14 +574,14 @@ export default function BillingPage() {
         <input
           type="date"
           value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
+          onChange={(e: InputEv) => setFromDate(e.target.value)}
           className="px-3 py-2 rounded-lg border border-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
           title="Fecha desde"
         />
         <input
           type="date"
           value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
+          onChange={(e: InputEv) => setToDate(e.target.value)}
           className="px-3 py-2 rounded-lg border border-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
           title="Fecha hasta"
         />
@@ -643,7 +646,7 @@ export default function BillingPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
-                {docs.map((doc) => (
+                {docs.map((doc: BillingDocument) => (
                   <tr
                     key={doc.id}
                     className="hover:bg-zinc-50 transition cursor-pointer"
@@ -682,7 +685,7 @@ export default function BillingPage() {
                     <td className="px-4 py-3 text-right">
                       <div
                         className="flex items-center justify-end gap-1"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e: { stopPropagation(): void }) => e.stopPropagation()}
                       >
                         <button
                           onClick={() => openDetail(doc.id)}
@@ -784,7 +787,7 @@ export default function BillingPage() {
             <div className="flex items-center justify-between p-5 border-b">
               <h2 className="text-lg font-bold text-zinc-900">
                 {selectedDoc
-                  ? `${TYPE_LABELS[selectedDoc.type]} · ${selectedDoc.document_number ?? "Borrador"}`
+                  ? `${TYPE_LABELS[selectedDoc.type as BillingDocumentType]} · ${selectedDoc.document_number ?? "Borrador"}`
                   : "Cargando..."}
               </h2>
               <button
@@ -804,18 +807,18 @@ export default function BillingPage() {
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${TYPE_COLORS[selectedDoc.type]}`}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${TYPE_COLORS[selectedDoc.type as BillingDocumentType]}`}
                   >
-                    {TYPE_LABELS[selectedDoc.type]}
+                    {TYPE_LABELS[selectedDoc.type as BillingDocumentType]}
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[selectedDoc.status]}`}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[selectedDoc.status as BillingDocumentStatus]}`}
                   >
-                    {STATUS_LABELS[selectedDoc.status]}
+                    {STATUS_LABELS[selectedDoc.status as BillingDocumentStatus]}
                   </span>
                   {selectedDoc.payment_method && (
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600">
-                      {PAYMENT_METHOD_LABELS[selectedDoc.payment_method]}
+                      {PAYMENT_METHOD_LABELS[selectedDoc.payment_method as BillingPaymentMethod]}
                     </span>
                   )}
                 </div>
@@ -927,7 +930,7 @@ export default function BillingPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-50">
-                        {selectedDoc.items?.map((item) => (
+                        {selectedDoc.items?.map((item: BillingDocumentItem) => (
                           <tr key={item.id}>
                             <td className="px-3 py-2 text-zinc-800">
                               {item.description}
@@ -1001,7 +1004,7 @@ export default function BillingPage() {
                         Historial de numeración
                       </p>
                       <div className="space-y-2">
-                        {selectedDoc.number_audits.map((audit) => (
+                        {selectedDoc.number_audits.map((audit: BillingNumberAudit) => (
                           <div
                             key={audit.id}
                             className="rounded-lg border bg-zinc-50 px-4 py-2 text-xs text-zinc-600"
@@ -1152,7 +1155,7 @@ export default function BillingPage() {
                 </label>
                 <input
                   value={editNumberValue}
-                  onChange={(e) => setEditNumberValue(e.target.value)}
+                  onChange={(e: InputEv) => setEditNumberValue(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-900"
                   placeholder="INV_2026_0000001"
                 />
@@ -1163,7 +1166,7 @@ export default function BillingPage() {
                 </label>
                 <input
                   value={editNumberReason}
-                  onChange={(e) => setEditNumberReason(e.target.value)}
+                  onChange={(e: InputEv) => setEditNumberReason(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
                   placeholder="Corrección de error, inicio de serie..."
                 />
@@ -1224,7 +1227,7 @@ export default function BillingPage() {
                   </label>
                   <select
                     value={createType}
-                    onChange={(e) =>
+                    onChange={(e: InputEv) =>
                       setCreateType(e.target.value as BillingDocumentType)
                     }
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
@@ -1240,8 +1243,8 @@ export default function BillingPage() {
                   </label>
                   <select
                     value={createForm.language}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({
                         ...f,
                         language: e.target.value as "ES" | "EN",
                       }))
@@ -1261,8 +1264,8 @@ export default function BillingPage() {
                 </label>
                 <select
                   value={createForm.payment_method}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({
+                  onChange={(e: InputEv) =>
+                    setCreateForm((f: CreateFormState) => ({
                       ...f,
                       payment_method: e.target.value as
                         | BillingPaymentMethod
@@ -1287,8 +1290,8 @@ export default function BillingPage() {
                 </label>
                 <textarea
                   value={createForm.notes}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, notes: e.target.value }))
+                  onChange={(e: InputEv) =>
+                    setCreateForm((f: CreateFormState) => ({ ...f, notes: e.target.value }))
                   }
                   rows={2}
                   className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900"
@@ -1311,14 +1314,14 @@ export default function BillingPage() {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {createForm.items.map((item, idx) => (
+                  {createForm.items.map((item: CreateItemState, idx: number) => (
                     <div
                       key={idx}
                       className="grid grid-cols-12 gap-2 items-start"
                     >
                       <input
                         value={item.description}
-                        onChange={(e) =>
+                        onChange={(e: InputEv) =>
                           updateCreateItem(idx, "description", e.target.value)
                         }
                         placeholder="Descripción del producto/servicio"
@@ -1326,7 +1329,7 @@ export default function BillingPage() {
                       />
                       <input
                         value={item.qty}
-                        onChange={(e) =>
+                        onChange={(e: InputEv) =>
                           updateCreateItem(idx, "qty", e.target.value)
                         }
                         placeholder="Cant."
@@ -1337,7 +1340,7 @@ export default function BillingPage() {
                       />
                       <input
                         value={item.unit_price}
-                        onChange={(e) =>
+                        onChange={(e: InputEv) =>
                           updateCreateItem(idx, "unit_price", e.target.value)
                         }
                         placeholder="Precio €"
@@ -1349,7 +1352,7 @@ export default function BillingPage() {
                       <div className="col-span-2 relative">
                         <input
                           value={String(Number(item.tax_rate) * 100)}
-                          onChange={(e) =>
+                          onChange={(e: InputEv) =>
                             updateCreateItem(
                               idx,
                               "tax_rate",
@@ -1381,15 +1384,15 @@ export default function BillingPage() {
               </div>
 
               {/* Total preview */}
-              {createForm.items.some((i) => i.unit_price) && (
+              {createForm.items.some((i: CreateItemState) => i.unit_price) && (
                 <div className="rounded-lg bg-zinc-50 p-3 text-sm text-right">
                   {(() => {
-                    const subtotal = createForm.items.reduce((s, i) => {
+                    const subtotal = createForm.items.reduce((s: number, i: CreateItemState) => {
                       const ls =
                         Number(i.qty || 1) * Number(i.unit_price || 0);
                       return s + ls;
                     }, 0);
-                    const tax = createForm.items.reduce((s, i) => {
+                    const tax = createForm.items.reduce((s: number, i: CreateItemState) => {
                       const ls =
                         Number(i.qty || 1) * Number(i.unit_price || 0);
                       return s + ls * Number(i.tax_rate || 0.21);
@@ -1488,8 +1491,8 @@ export default function BillingPage() {
                         value={
                           (settingsForm as Record<string, unknown>)[key] as string ?? ""
                         }
-                        onChange={(e) =>
-                          setSettingsForm((f) => ({
+                        onChange={(e: InputEv) =>
+                          setSettingsForm((f: Partial<BillingSettings>) => ({
                             ...f,
                             [key]: e.target.value,
                           }))
@@ -1519,8 +1522,8 @@ export default function BillingPage() {
                           value={
                             (settingsForm as Record<string, unknown>)[key] as string ?? ""
                           }
-                          onChange={(e) =>
-                            setSettingsForm((f) => ({
+                          onChange={(e: InputEv) =>
+                            setSettingsForm((f: Partial<BillingSettings>) => ({
                               ...f,
                               [key]: e.target.value,
                             }))
@@ -1545,8 +1548,8 @@ export default function BillingPage() {
                           ? String(Number(settingsForm.default_tax_rate) * 100)
                           : ""
                       }
-                      onChange={(e) =>
-                        setSettingsForm((f) => ({
+                      onChange={(e: InputEv) =>
+                        setSettingsForm((f: Partial<BillingSettings>) => ({
                           ...f,
                           default_tax_rate: Number(e.target.value) / 100,
                         }))

@@ -51,8 +51,8 @@ export function useURLSync() {
       params.delete("max_price");
     }
 
-    if (newFilters.in_stock_only) {
-      params.set("in_stock_only", "true");
+    if (newFilters.in_stock_only === false) {
+      params.set("in_stock_only", "false");
     } else {
       params.delete("in_stock_only");
     }

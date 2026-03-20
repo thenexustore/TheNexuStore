@@ -74,6 +74,30 @@ describe('InfortisaService catalog contract handling', () => {
     );
   });
 
+  it('preserves stock from getProductBySku responses that expose Stock instead of StockCentral', async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        SKU: 'NTETMM0078',
+        Name: 'SPC 2339N Movil Stella 3 4G BT FM + Dock Rojo',
+        Stock: 15,
+        StockPalma: 0,
+      },
+    });
+
+    const result = await service.getProductBySku('NTETMM0078');
+
+    expect(result).toMatchObject({
+      SKU: 'NTETMM0078',
+      Stock: 15,
+      StockPalma: 0,
+      STOCKCENTRAL: 15,
+      STOCKPALMA: 0,
+    });
+    expect(getMock).toHaveBeenCalledWith('/api/Product/GetProductBySku', {
+      params: { sku: 'NTETMM0078' },
+    });
+  });
+
   it('throws when non-paginated metadata shows fewer items than total', async () => {
     getMock.mockResolvedValueOnce({
       data: {

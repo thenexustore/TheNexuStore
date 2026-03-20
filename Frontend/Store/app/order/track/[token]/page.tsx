@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { getOrderByTrackingToken, type Order, type OrderItem } from "@/app/lib/checkout";
+import { useOrderTrackingSocket } from "@/app/hooks/useOrderTrackingSocket";
 import {
   CheckCircle2,
   Clock3,
@@ -130,6 +131,14 @@ export default function OrderTrackingPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const hasLoadedRef = useRef(false);
 
+  const { connected } = useOrderTrackingSocket({
+    trackingToken: token || null,
+    enabled: Boolean(token),
+    onUpdate: () => {
+      setRefreshKey((value) => value + 1);
+    },
+  });
+
   useEffect(() => {
     if (!token) return;
 
@@ -181,12 +190,14 @@ export default function OrderTrackingPage() {
     (paymentStatus === "success" && !isOrderPaid && !isOrderFailed);
 
   useEffect(() => {
-    if (!token || !order || !isPaymentPending || isOrderFailed) return;
+    if (!token || !order || connected) return;
+    const refreshDelay =
+      isPaymentPending && !isOrderFailed ? 3500 : 15000;
     const timer = setTimeout(() => {
       setRefreshKey((value) => value + 1);
-    }, 3500);
+    }, refreshDelay);
     return () => clearTimeout(timer);
-  }, [token, order, isPaymentPending, isOrderFailed]);
+  }, [token, order, isPaymentPending, isOrderFailed, connected]);
 
   if (loading) {
     return (
@@ -236,6 +247,9 @@ export default function OrderTrackingPage() {
                 </h1>
                 <p className="mt-3 text-sm text-blue-100">
                   Track payment, packing, and shipment updates in real time.
+                </p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-blue-100/80">
+                  {connected ? "Live updates connected" : "Auto-refresh fallback active"}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -425,6 +439,11 @@ export default function OrderTrackingPage() {
                     <span className="font-semibold text-slate-900">
                       Carrier: {shipment.carrier}
                     </span>
+                    {shipment.service_level && (
+                      <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
+                        {shipment.service_level}
+                      </span>
+                    )}
                     <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
                       {formatStatus(shipment.status)}
                     </span>
@@ -444,6 +463,25 @@ export default function OrderTrackingPage() {
                       <Truck className="h-4 w-4" />
                       View carrier tracking
                     </a>
+                  )}
+                  {shipment.tracking_events && shipment.tracking_events.length > 0 && (
+                    <div className="mt-4 space-y-2 border-t border-slate-200 pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Live Tracking Events
+                      </p>
+                      {shipment.tracking_events.map((event) => (
+                        <div key={event.id} className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold text-slate-800">
+                              {formatStatus(event.status)}
+                            </span>
+                            <span>{new Date(event.event_time).toLocaleString("en-GB")}</span>
+                          </div>
+                          {event.location && <p className="mt-1">{event.location}</p>}
+                          {event.details && <p className="mt-1">{event.details}</p>}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}

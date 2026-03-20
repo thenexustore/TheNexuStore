@@ -44,6 +44,10 @@ describe('PaymentService', () => {
     execute: jest.fn(),
   } as unknown as RetryService;
 
+  const orderTrackingEvents = {
+    notifyByOrderId: jest.fn(),
+  } as any;
+
   let service: PaymentService;
 
   beforeEach(() => {
@@ -57,7 +61,13 @@ describe('PaymentService', () => {
       REDSYS_KO_URL: 'https://api.thenexustore.com/payments/redsys/ko',
     };
 
-    service = new PaymentService(prisma, redsysService, logger, retryService);
+    service = new PaymentService(
+      prisma,
+      redsysService,
+      logger,
+      retryService,
+      orderTrackingEvents,
+    );
 
     (redsysService.getCurrencyNumericCode as jest.Mock).mockReturnValue('978');
     (redsysService.getConfiguredMerchantCode as jest.Mock).mockReturnValue(

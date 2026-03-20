@@ -12,11 +12,14 @@ import {
 } from "lucide-react";
 import {
   addOrderNote,
+  createOrderShipment,
   fetchOrderById,
   fetchOrders,
   fetchOrderTimeline,
+  updateOrderShipment,
   type Order,
   type OrderDetail,
+  type OrderShipment,
   type OrderTimelineEntry,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -40,6 +43,38 @@ const statusIcons: Record<string, any> = {
   REFUNDED: XCircle,
 };
 
+const SHIPMENT_STATUS_OPTIONS = [
+  "PENDING",
+  "SHIPPED",
+  "IN_TRANSIT",
+  "DELIVERED",
+  "EXCEPTION",
+];
+
+type ShipmentDraft = {
+  carrier: string;
+  service_level: string;
+  tracking_number: string;
+  tracking_url: string;
+  status: string;
+};
+
+const createEmptyShipmentDraft = (): ShipmentDraft => ({
+  carrier: "Infortisa",
+  service_level: "",
+  tracking_number: "",
+  tracking_url: "",
+  status: "PENDING",
+});
+
+const toShipmentDraft = (shipment: OrderShipment): ShipmentDraft => ({
+  carrier: shipment.carrier || "",
+  service_level: shipment.service_level || "",
+  tracking_number: shipment.tracking_number || "",
+  tracking_url: shipment.tracking_url || "",
+  status: shipment.status || "PENDING",
+});
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +88,13 @@ export default function OrdersPage() {
   const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
   const [timeline, setTimeline] = useState<OrderTimelineEntry[]>([]);
   const [note, setNote] = useState("");
+  const [shipmentDraft, setShipmentDraft] = useState<ShipmentDraft>(() =>
+    createEmptyShipmentDraft(),
+  );
+  const [shipmentEdits, setShipmentEdits] = useState<
+    Record<string, ShipmentDraft>
+  >({});
+  const [shipmentBusyKey, setShipmentBusyKey] = useState<string | null>(null);
   const [adminSettings, setAdminSettings] = useState(() => loadAdminSettings());
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
@@ -79,16 +121,29 @@ export default function OrdersPage() {
     }
   }, [adminSettings.ordersPageSize, page, search, status]);
 
+  const refreshOrderDetail = useCallback(async (orderId: string) => {
+    const [detail, timelineData] = await Promise.all([
+      fetchOrderById(orderId),
+      fetchOrderTimeline(orderId),
+    ]);
+    setOrderDetail(detail);
+    setTimeline(timelineData);
+    setShipmentDraft(createEmptyShipmentDraft());
+    setShipmentEdits(
+      Object.fromEntries(
+        (detail.shipments || []).map((shipment) => [
+          shipment.id,
+          toShipmentDraft(shipment),
+        ]),
+      ),
+    );
+  }, []);
+
   const openOrderDetail = async (orderId: string) => {
     try {
       setSelectedOrderId(orderId);
       setDetailLoading(true);
-      const [detail, timelineData] = await Promise.all([
-        fetchOrderById(orderId),
-        fetchOrderTimeline(orderId),
-      ]);
-      setOrderDetail(detail);
-      setTimeline(timelineData);
+      await refreshOrderDetail(orderId);
     } catch (error: any) {
       toast.error(error.message || "Failed to load order detail");
       setSelectedOrderId(null);
@@ -106,10 +161,62 @@ export default function OrdersPage() {
       await addOrderNote(selectedOrderId, trimmed);
       setNote("");
       toast.success("Internal note added");
-      const timelineData = await fetchOrderTimeline(selectedOrderId);
-      setTimeline(timelineData);
+      await refreshOrderDetail(selectedOrderId);
     } catch (error: any) {
       toast.error(error.message || "Failed to add note");
+    }
+  };
+
+  const submitShipmentCreate = async () => {
+    if (!selectedOrderId) return;
+    const carrier = shipmentDraft.carrier.trim();
+    if (!carrier) {
+      toast.error("Carrier is required");
+      return;
+    }
+
+    try {
+      setShipmentBusyKey("new");
+      await createOrderShipment(selectedOrderId, {
+        carrier,
+        service_level: shipmentDraft.service_level.trim() || undefined,
+        tracking_number: shipmentDraft.tracking_number.trim() || undefined,
+        tracking_url: shipmentDraft.tracking_url.trim() || undefined,
+        status: shipmentDraft.status,
+      });
+      toast.success("Shipment created");
+      setShipmentDraft(createEmptyShipmentDraft());
+      await refreshOrderDetail(selectedOrderId);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create shipment");
+    } finally {
+      setShipmentBusyKey(null);
+    }
+  };
+
+  const submitShipmentUpdate = async (shipmentId: string) => {
+    if (!selectedOrderId) return;
+    const draft = shipmentEdits[shipmentId];
+    if (!draft?.carrier.trim()) {
+      toast.error("Carrier is required");
+      return;
+    }
+
+    try {
+      setShipmentBusyKey(shipmentId);
+      await updateOrderShipment(selectedOrderId, shipmentId, {
+        carrier: draft.carrier.trim(),
+        service_level: draft.service_level.trim() || undefined,
+        tracking_number: draft.tracking_number.trim() || undefined,
+        tracking_url: draft.tracking_url.trim() || undefined,
+        status: draft.status,
+      });
+      toast.success("Shipment updated");
+      await refreshOrderDetail(selectedOrderId);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update shipment");
+    } finally {
+      setShipmentBusyKey(null);
     }
   };
 
@@ -347,6 +454,211 @@ export default function OrdersPage() {
                           ) : (
                             <p className="text-xs text-gray-500">No payment records yet.</p>
                           )}
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <h4 className="text-sm font-semibold mb-2">Shipments & Live Tracking</h4>
+                        <div className="space-y-3">
+                          {orderDetail.shipments?.length ? (
+                            orderDetail.shipments.map((shipment) => {
+                              const draft = shipmentEdits[shipment.id] || toShipmentDraft(shipment);
+                              const isBusy = shipmentBusyKey === shipment.id;
+
+                              return (
+                                <div key={shipment.id} className="rounded border bg-gray-50 p-3 text-xs space-y-2">
+                                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                    <input
+                                      value={draft.carrier}
+                                      onChange={(e) =>
+                                        setShipmentEdits((current) => ({
+                                          ...current,
+                                          [shipment.id]: {
+                                            ...draft,
+                                            carrier: e.target.value,
+                                          },
+                                        }))
+                                      }
+                                      placeholder="Carrier"
+                                      className="rounded border px-2 py-1.5"
+                                    />
+                                    <select
+                                      value={draft.status}
+                                      onChange={(e) =>
+                                        setShipmentEdits((current) => ({
+                                          ...current,
+                                          [shipment.id]: {
+                                            ...draft,
+                                            status: e.target.value,
+                                          },
+                                        }))
+                                      }
+                                      className="rounded border px-2 py-1.5"
+                                    >
+                                      {SHIPMENT_STATUS_OPTIONS.map((status) => (
+                                        <option key={status} value={status}>
+                                          {status}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      value={draft.service_level}
+                                      onChange={(e) =>
+                                        setShipmentEdits((current) => ({
+                                          ...current,
+                                          [shipment.id]: {
+                                            ...draft,
+                                            service_level: e.target.value,
+                                          },
+                                        }))
+                                      }
+                                      placeholder="Service level"
+                                      className="rounded border px-2 py-1.5"
+                                    />
+                                    <input
+                                      value={draft.tracking_number}
+                                      onChange={(e) =>
+                                        setShipmentEdits((current) => ({
+                                          ...current,
+                                          [shipment.id]: {
+                                            ...draft,
+                                            tracking_number: e.target.value,
+                                          },
+                                        }))
+                                      }
+                                      placeholder="Tracking number"
+                                      className="rounded border px-2 py-1.5"
+                                    />
+                                    <input
+                                      value={draft.tracking_url}
+                                      onChange={(e) =>
+                                        setShipmentEdits((current) => ({
+                                          ...current,
+                                          [shipment.id]: {
+                                            ...draft,
+                                            tracking_url: e.target.value,
+                                          },
+                                        }))
+                                      }
+                                      placeholder="Tracking URL"
+                                      className="rounded border px-2 py-1.5 md:col-span-2"
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-[11px] text-gray-500">
+                                      Last update: {new Date(shipment.updated_at || shipment.created_at || Date.now()).toLocaleString()}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => submitShipmentUpdate(shipment.id)}
+                                      disabled={Boolean(shipmentBusyKey)}
+                                      className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50"
+                                    >
+                                      {isBusy ? "Saving..." : "Save shipment"}
+                                    </button>
+                                  </div>
+                                  {shipment.tracking_events?.length ? (
+                                    <div className="rounded border bg-white p-2">
+                                      <p className="font-medium text-gray-700">Tracking events</p>
+                                      <div className="mt-2 space-y-2">
+                                        {shipment.tracking_events.map((event) => (
+                                          <div key={event.id} className="rounded border p-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="font-medium">{event.status}</span>
+                                              <span className="text-[11px] text-gray-500">
+                                                {new Date(event.event_time).toLocaleString()}
+                                              </span>
+                                            </div>
+                                            {event.details && (
+                                              <p className="mt-1 text-[11px] text-gray-600">
+                                                {event.details}
+                                              </p>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p className="text-xs text-gray-500">No shipments created yet.</p>
+                          )}
+
+                          <div className="rounded border border-dashed bg-white p-3 text-xs space-y-2">
+                            <p className="font-medium text-gray-700">Create shipment</p>
+                            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                              <input
+                                value={shipmentDraft.carrier}
+                                onChange={(e) =>
+                                  setShipmentDraft((current) => ({
+                                    ...current,
+                                    carrier: e.target.value,
+                                  }))
+                                }
+                                placeholder="Carrier"
+                                className="rounded border px-2 py-1.5"
+                              />
+                              <select
+                                value={shipmentDraft.status}
+                                onChange={(e) =>
+                                  setShipmentDraft((current) => ({
+                                    ...current,
+                                    status: e.target.value,
+                                  }))
+                                }
+                                className="rounded border px-2 py-1.5"
+                              >
+                                {SHIPMENT_STATUS_OPTIONS.map((status) => (
+                                  <option key={status} value={status}>
+                                    {status}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                value={shipmentDraft.service_level}
+                                onChange={(e) =>
+                                  setShipmentDraft((current) => ({
+                                    ...current,
+                                    service_level: e.target.value,
+                                  }))
+                                }
+                                placeholder="Service level"
+                                className="rounded border px-2 py-1.5"
+                              />
+                              <input
+                                value={shipmentDraft.tracking_number}
+                                onChange={(e) =>
+                                  setShipmentDraft((current) => ({
+                                    ...current,
+                                    tracking_number: e.target.value,
+                                  }))
+                                }
+                                placeholder="Tracking number"
+                                className="rounded border px-2 py-1.5"
+                              />
+                              <input
+                                value={shipmentDraft.tracking_url}
+                                onChange={(e) =>
+                                  setShipmentDraft((current) => ({
+                                    ...current,
+                                    tracking_url: e.target.value,
+                                  }))
+                                }
+                                placeholder="Tracking URL"
+                                className="rounded border px-2 py-1.5 md:col-span-2"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={submitShipmentCreate}
+                              disabled={Boolean(shipmentBusyKey)}
+                              className="rounded bg-blue-600 px-3 py-1.5 text-white disabled:opacity-50"
+                            >
+                              {shipmentBusyKey === "new" ? "Creating..." : "Create shipment"}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </>

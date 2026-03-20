@@ -19,6 +19,7 @@ import {
 } from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { RetryService } from '../../common/retry.service';
+import { OrderTrackingEventsService } from '../../order-tracking/order-tracking-events.service';
 
 export interface CreatePaymentDto {
   orderId: string;
@@ -56,6 +57,7 @@ export class PaymentService {
     private redsysService: RedsysService,
     private readonly logger: AppLogger,
     private readonly retryService: RetryService,
+    private readonly orderTrackingEvents: OrderTrackingEventsService,
   ) {}
 
   async createPayment(dto: CreatePaymentDto): Promise<PaymentResult> {
@@ -415,6 +417,10 @@ export class PaymentService {
         'PaymentService',
         { orderId: payment.order_id, authCode: result.authCode },
       );
+      await this.orderTrackingEvents.notifyByOrderId(
+        payment.order_id,
+        'payment_captured',
+      );
     } else {
       await this.prisma.$transaction(async (tx) => {
         await tx.payment.update({
@@ -442,6 +448,10 @@ export class PaymentService {
       this.logger.warn('REDSYS notification failed', 'PaymentService', {
         orderId: payment.order_id,
       });
+      await this.orderTrackingEvents.notifyByOrderId(
+        payment.order_id,
+        'payment_failed',
+      );
     }
   }
 
@@ -474,6 +484,8 @@ export class PaymentService {
         },
       });
     });
+
+    await this.orderTrackingEvents.notifyByOrderId(orderId, 'payment_captured');
   }
 
   async getPaymentStatus(orderId: string): Promise<{

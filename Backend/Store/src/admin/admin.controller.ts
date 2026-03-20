@@ -19,6 +19,8 @@ import {
   BulkUpdateOrderStatusDto,
   CreateBrandDto,
   CreateCategoryDto,
+  CreateOrderShipmentDto,
+  UpdateOrderShipmentDto,
 } from './admin.dto';
 import { AuditLogService } from './audit-log.service';
 import { Request } from 'express';
@@ -129,6 +131,79 @@ export class AdminController {
     return {
       success: true,
       data,
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('orders/:id/shipments')
+  async createOrderShipment(
+    @Param('id') id: string,
+    @Body() body: CreateOrderShipmentDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.adminService.createOrderShipment(id, body);
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'ORDER_SHIPMENT_CREATED',
+      resource: 'ORDER',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
+      metadata: {
+        shipmentId: data.id,
+        carrier: data.carrier,
+        status: data.status,
+        tracking_number: data.tracking_number,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Shipment created successfully',
+    };
+  }
+
+  @UseGuards(AdminGuard)
+  @Put('orders/:id/shipments/:shipmentId')
+  async updateOrderShipment(
+    @Param('id') id: string,
+    @Param('shipmentId') shipmentId: string,
+    @Body() body: UpdateOrderShipmentDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.adminService.updateOrderShipment(
+      id,
+      shipmentId,
+      body,
+    );
+
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'ORDER_SHIPMENT_UPDATED',
+      resource: 'ORDER',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
+      metadata: {
+        shipmentId: data.id,
+        carrier: data.carrier,
+        status: data.status,
+        tracking_number: data.tracking_number,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Shipment updated successfully',
     };
   }
 

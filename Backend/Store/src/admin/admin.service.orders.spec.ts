@@ -18,12 +18,21 @@ describe('AdminService orders behavior', () => {
 
   const jwt = { sign: jest.fn() } as any;
   const categoriesService = {} as any;
+  const orderTrackingEvents = {
+    notifyByOrderIds: jest.fn(),
+    notifyByOrderId: jest.fn(),
+  } as any;
 
   let service: AdminService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new AdminService(jwt, prisma, categoriesService);
+    service = new AdminService(
+      jwt,
+      prisma,
+      categoriesService,
+      orderTrackingEvents,
+    );
   });
 
   it('throws NotFoundException when adding note to missing order', async () => {

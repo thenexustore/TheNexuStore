@@ -9,9 +9,10 @@ import {
   IsArray,
   ArrayNotEmpty,
   IsEnum,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, ShipmentStatus } from '@prisma/client';
 
 export class CreateBrandDto {
   @IsString()
@@ -71,4 +72,58 @@ export class BulkUpdateOrderStatusDto {
 
   @IsEnum(OrderStatus)
   status!: OrderStatus;
+}
+
+export class CreateOrderShipmentDto {
+  @IsString()
+  @MaxLength(120)
+  carrier!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  service_level?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  tracking_number?: string;
+
+  @IsOptional()
+  @IsUrl()
+  tracking_url?: string;
+
+  @IsOptional()
+  @IsEnum(ShipmentStatus)
+  status?: ShipmentStatus;
+}
+
+export class UpdateOrderShipmentDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  carrier?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  service_level?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  tracking_number?: string;
+
+  @IsOptional()
+  @IsUrl()
+  tracking_url?: string;
+
+  @IsOptional()
+  @IsEnum(ShipmentStatus)
+  status?: ShipmentStatus;
+}
+
+export class SyncOrderTrackingDto {
+  @IsUUID()
+  order_id!: string;
 }

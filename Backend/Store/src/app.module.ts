@@ -15,6 +15,7 @@ import { HomeLayoutModule } from './homepage/home-layout.module';
 import { JwtAuthModule } from './auth/jwt-auth.module';
 import { PricingModule } from './pricing/pricing.module';
 import { BrandingModule } from './branding/branding.module';
+import { OrderTrackingModule } from './order-tracking/order-tracking.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { BrandingModule } from './branding/branding.module';
     ScheduleModule.forRoot(),
     JwtAuthModule,
     PricingModule,
+    OrderTrackingModule,
     AuthModule,
     AdminModule,
     StaffAuthModule,

@@ -6,11 +6,12 @@ import {
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma, StaffRole } from '@prisma/client';
+import { OrderStatus, Prisma, ShipmentStatus, StaffRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
 import * as bcrypt from 'bcrypt';
+import { OrderTrackingEventsService } from '../order-tracking/order-tracking-events.service';
 
 @Injectable()
 export class AdminService {
@@ -33,6 +34,7 @@ export class AdminService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private readonly categoriesService: CategoriesService,
+    private readonly orderTrackingEvents: OrderTrackingEventsService,
   ) {}
 
   async onModuleInit() {
@@ -354,6 +356,14 @@ export class AdminService {
           payments: {
             orderBy: { created_at: 'desc' },
           },
+          shipments: {
+            orderBy: { created_at: 'desc' },
+            include: {
+              tracking_events: {
+                orderBy: { event_time: 'desc' },
+              },
+            },
+          },
         },
       });
 
@@ -382,6 +392,9 @@ export class AdminService {
         ...order,
         customer,
         items,
+        shipments: order.shipments.map((shipment) =>
+          this.serializeShipment(shipment),
+        ),
         payments: order.payments.map((payment) => {
           const redsys = this.extractRedsysPayload(payment.raw_response);
           return {
@@ -426,11 +439,302 @@ export class AdminService {
       data: { status },
     });
 
+    await this.orderTrackingEvents.notifyByOrderIds(
+      uniqueIds,
+      'order_status_updated',
+    );
+
     return {
       affected: result.count,
       ids: uniqueIds,
       status,
     };
+  }
+
+  async createOrderShipment(
+    orderId: string,
+    input: {
+      carrier: string;
+      service_level?: string;
+      tracking_number?: string;
+      tracking_url?: string;
+      status?: ShipmentStatus;
+    },
+  ) {
+    const status = input.status ?? ShipmentStatus.PENDING;
+
+    const shipment = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      const created = await tx.shipment.create({
+        data: {
+          order_id: orderId,
+          carrier: input.carrier.trim(),
+          service_level: input.service_level?.trim() || null,
+          tracking_number: input.tracking_number?.trim() || null,
+          tracking_url: input.tracking_url?.trim() || null,
+          status,
+          shipped_at: this.resolveShippedAt(status),
+          delivered_at: this.resolveDeliveredAt(status),
+        },
+      });
+
+      if (order.items.length > 0) {
+        await tx.shipmentItem.createMany({
+          data: order.items.map((item) => ({
+            shipment_id: created.id,
+            order_item_id: item.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      await tx.trackingEvent.create({
+        data: {
+          shipment_id: created.id,
+          event_time: new Date(),
+          status,
+          details: this.buildTrackingEventDetails(
+            'Shipment created',
+            input.tracking_number,
+            input.tracking_url,
+          ),
+        },
+      });
+
+      const nextOrderStatus = this.resolveOrderStatusFromShipmentStatus(
+        status,
+        order.status,
+      );
+      if (nextOrderStatus !== order.status) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: nextOrderStatus },
+        });
+      }
+
+      return tx.shipment.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          tracking_events: {
+            orderBy: { event_time: 'desc' },
+          },
+        },
+      });
+    });
+
+    await this.orderTrackingEvents.notifyByOrderId(orderId, 'shipment_created', {
+      shipmentId: shipment.id,
+    });
+
+    return this.serializeShipment(shipment);
+  }
+
+  async updateOrderShipment(
+    orderId: string,
+    shipmentId: string,
+    input: {
+      carrier?: string;
+      service_level?: string;
+      tracking_number?: string;
+      tracking_url?: string;
+      status?: ShipmentStatus;
+    },
+  ) {
+    const shipment = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.shipment.findUnique({
+        where: { id: shipmentId },
+        include: {
+          order: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (!existing || existing.order_id !== orderId) {
+        throw new NotFoundException('Shipment not found');
+      }
+
+      const status = input.status ?? existing.status;
+      const updated = await tx.shipment.update({
+        where: { id: shipmentId },
+        data: {
+          ...(input.carrier !== undefined
+            ? { carrier: input.carrier.trim() }
+            : {}),
+          ...(input.service_level !== undefined
+            ? { service_level: input.service_level.trim() || null }
+            : {}),
+          ...(input.tracking_number !== undefined
+            ? { tracking_number: input.tracking_number.trim() || null }
+            : {}),
+          ...(input.tracking_url !== undefined
+            ? { tracking_url: input.tracking_url.trim() || null }
+            : {}),
+          ...(input.status !== undefined
+            ? {
+                status,
+                shipped_at:
+                  status === ShipmentStatus.SHIPPED ||
+                  status === ShipmentStatus.IN_TRANSIT ||
+                  status === ShipmentStatus.DELIVERED
+                    ? existing.shipped_at ?? new Date()
+                    : null,
+                delivered_at:
+                  status === ShipmentStatus.DELIVERED ? new Date() : null,
+              }
+            : {}),
+        },
+      });
+
+      if (
+        input.status !== undefined &&
+        input.status !== existing.status
+      ) {
+        await tx.trackingEvent.create({
+          data: {
+            shipment_id: shipmentId,
+            event_time: new Date(),
+            status,
+            details: this.buildTrackingEventDetails(
+              'Shipment status updated',
+              input.tracking_number ?? existing.tracking_number ?? undefined,
+              input.tracking_url ?? existing.tracking_url ?? undefined,
+            ),
+          },
+        });
+      } else if (
+        input.tracking_number !== undefined ||
+        input.tracking_url !== undefined
+      ) {
+        await tx.trackingEvent.create({
+          data: {
+            shipment_id: shipmentId,
+            event_time: new Date(),
+            status,
+            details: this.buildTrackingEventDetails(
+              'Tracking information updated',
+              input.tracking_number ?? existing.tracking_number ?? undefined,
+              input.tracking_url ?? existing.tracking_url ?? undefined,
+            ),
+          },
+        });
+      }
+
+      const nextOrderStatus = this.resolveOrderStatusFromShipmentStatus(
+        status,
+        existing.order.status,
+      );
+      if (nextOrderStatus !== existing.order.status) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: nextOrderStatus },
+        });
+      }
+
+      return tx.shipment.findUniqueOrThrow({
+        where: { id: shipmentId },
+        include: {
+          tracking_events: {
+            orderBy: { event_time: 'desc' },
+          },
+        },
+      });
+    });
+
+    await this.orderTrackingEvents.notifyByOrderId(orderId, 'shipment_updated', {
+      shipmentId: shipment.id,
+    });
+
+    return this.serializeShipment(shipment);
+  }
+
+  private serializeShipment(shipment: any) {
+    return {
+      id: shipment.id,
+      carrier: shipment.carrier,
+      service_level: shipment.service_level,
+      tracking_number: shipment.tracking_number,
+      tracking_url: shipment.tracking_url,
+      status: shipment.status,
+      shipped_at: shipment.shipped_at,
+      delivered_at: shipment.delivered_at,
+      created_at: shipment.created_at,
+      updated_at: shipment.updated_at,
+      tracking_events: shipment.tracking_events?.map((event: any) => ({
+        id: event.id,
+        event_time: event.event_time,
+        status: event.status,
+        location: event.location,
+        details: event.details,
+      })),
+    };
+  }
+
+  private buildTrackingEventDetails(
+    prefix: string,
+    trackingNumber?: string | null,
+    trackingUrl?: string | null,
+  ) {
+    const parts = [prefix];
+    if (trackingNumber) {
+      parts.push(`tracking #${trackingNumber}`);
+    }
+    if (trackingUrl) {
+      parts.push(trackingUrl);
+    }
+    return parts.join(' · ');
+  }
+
+  private resolveOrderStatusFromShipmentStatus(
+    shipmentStatus: ShipmentStatus,
+    currentStatus: OrderStatus,
+  ): OrderStatus {
+    switch (shipmentStatus) {
+      case ShipmentStatus.DELIVERED:
+        return OrderStatus.DELIVERED;
+      case ShipmentStatus.SHIPPED:
+      case ShipmentStatus.IN_TRANSIT:
+      case ShipmentStatus.EXCEPTION:
+        return OrderStatus.SHIPPED;
+      case ShipmentStatus.PENDING:
+      default:
+        if (
+          currentStatus === OrderStatus.PENDING_PAYMENT ||
+          currentStatus === OrderStatus.FAILED ||
+          currentStatus === OrderStatus.CANCELLED ||
+          currentStatus === OrderStatus.REFUNDED
+        ) {
+          return currentStatus;
+        }
+        return OrderStatus.PROCESSING;
+    }
+  }
+
+  private resolveShippedAt(status: ShipmentStatus) {
+    return status === ShipmentStatus.SHIPPED ||
+      status === ShipmentStatus.IN_TRANSIT ||
+      status === ShipmentStatus.DELIVERED
+      ? new Date()
+      : null;
+  }
+
+  private resolveDeliveredAt(status: ShipmentStatus) {
+    return status === ShipmentStatus.DELIVERED ? new Date() : null;
   }
 
   private extractRedsysPayload(rawResponse: Prisma.JsonValue | null): {

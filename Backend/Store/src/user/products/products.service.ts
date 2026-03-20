@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../common/prisma.service';
 import {
   GetProductsDto,
@@ -42,6 +43,83 @@ export class ProductsService {
     private prisma: PrismaService,
     private readonly pricingService: PricingService,
   ) {}
+
+  private async ensureInfortisaSupplierLink(params: {
+    skuId: string;
+    skuCode: string;
+    costPrice: number;
+    qtyAvailable: number;
+    rawProduct: unknown;
+  }) {
+    let supplier = await this.prisma.supplier.findUnique({
+      where: { code: 'INFORTISA' },
+    });
+
+    if (!supplier) {
+      supplier = await this.prisma.supplier.create({
+        data: {
+          code: 'INFORTISA',
+          name: 'Infortisa',
+          config: {
+            provider: 'INFORTISA',
+          },
+        },
+      });
+    }
+
+    const supplierPayloadHash = createHash('sha256')
+      .update(JSON.stringify(params.rawProduct ?? {}))
+      .digest('hex');
+
+    const supplierProduct = await this.prisma.supplierProduct.upsert({
+      where: {
+        supplier_id_supplier_sku: {
+          supplier_id: supplier.id,
+          supplier_sku: params.skuCode,
+        },
+      },
+      update: {
+        sku_id: params.skuId,
+        supplier_payload_hash: supplierPayloadHash,
+        last_seen_at: new Date(),
+        is_active: true,
+      },
+      create: {
+        supplier_id: supplier.id,
+        supplier_sku: params.skuCode,
+        sku_id: params.skuId,
+        supplier_payload_hash: supplierPayloadHash,
+        last_seen_at: new Date(),
+        is_active: true,
+      },
+    });
+
+    await this.prisma.supplierStock.upsert({
+      where: { supplier_product_id: supplierProduct.id },
+      update: {
+        qty_available: params.qtyAvailable,
+        updated_at: new Date(),
+      },
+      create: {
+        supplier_product_id: supplierProduct.id,
+        qty_available: params.qtyAvailable,
+      },
+    });
+
+    await this.prisma.supplierPrice.upsert({
+      where: { supplier_product_id: supplierProduct.id },
+      update: {
+        cost_price: params.costPrice,
+        currency: 'EUR',
+        updated_at: new Date(),
+      },
+      create: {
+        supplier_product_id: supplierProduct.id,
+        cost_price: params.costPrice,
+        currency: 'EUR',
+      },
+    });
+  }
 
   async getMenuTree() {
     const rows = normalizeCategoryTaxonomyRows(
@@ -1542,6 +1620,14 @@ export class ProductsService {
         });
       }
 
+      await this.ensureInfortisaSupplierLink({
+        skuId: newSku.id,
+        skuCode,
+        costPrice: price,
+        qtyAvailable: totalStock,
+        rawProduct: p,
+      });
+
       return 'created';
     } else {
       await this.prisma.product.update({
@@ -1611,6 +1697,14 @@ export class ProductsService {
           },
         });
       }
+
+      await this.ensureInfortisaSupplierLink({
+        skuId: existingSku.id,
+        skuCode,
+        costPrice: price,
+        qtyAvailable: totalStock,
+        rawProduct: p,
+      });
 
       return 'updated';
     }

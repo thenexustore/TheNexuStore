@@ -24,6 +24,26 @@ export interface OrderTimelineEntry {
   createdAt: string;
 }
 
+export interface OrderShipment {
+  id: string;
+  carrier: string;
+  service_level?: string | null;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  status: string;
+  shipped_at?: string | null;
+  delivered_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  tracking_events?: Array<{
+    id: string;
+    event_time: string;
+    status: string;
+    location?: string | null;
+    details?: string | null;
+  }>;
+}
+
 export interface OrderDetail {
   id: string;
   order_number: string;
@@ -60,6 +80,7 @@ export interface OrderDetail {
     redsys_authorization_code?: string | null;
     redsys_payment_method?: string | null;
   }>;
+  shipments?: OrderShipment[];
 }
 
 export interface OrdersResponse {
@@ -99,5 +120,38 @@ export async function addOrderNote(orderId: string, note: string): Promise<{ suc
   return fetchWithAuth(`/admin/orders/${orderId}/notes`, {
     method: "POST",
     body: JSON.stringify({ note }),
+  });
+}
+
+export async function createOrderShipment(
+  orderId: string,
+  payload: {
+    carrier: string;
+    service_level?: string;
+    tracking_number?: string;
+    tracking_url?: string;
+    status?: string;
+  }
+): Promise<OrderShipment> {
+  return fetchWithAuth(`/admin/orders/${orderId}/shipments`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateOrderShipment(
+  orderId: string,
+  shipmentId: string,
+  payload: {
+    carrier?: string;
+    service_level?: string;
+    tracking_number?: string;
+    tracking_url?: string;
+    status?: string;
+  }
+): Promise<OrderShipment> {
+  return fetchWithAuth(`/admin/orders/${orderId}/shipments/${shipmentId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }

@@ -20,8 +20,11 @@ export {
   fetchOrderById,
   fetchOrderTimeline,
   addOrderNote,
+  createOrderShipment,
+  updateOrderShipment,
   type Order,
   type OrderDetail,
+  type OrderShipment,
   type OrderTimelineEntry,
   type OrdersResponse,
 } from "./orders";

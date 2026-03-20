@@ -45,12 +45,21 @@ describe('AdminService auth', () => {
 
   const jwt = { sign: jest.fn().mockReturnValue('token') } as any;
   const categoriesService = {} as any;
+  const orderTrackingEvents = {
+    notifyByOrderId: jest.fn(),
+    notifyByOrderIds: jest.fn(),
+  } as any;
 
   let service: AdminService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new AdminService(jwt, prisma, categoriesService);
+    service = new AdminService(
+      jwt,
+      prisma,
+      categoriesService,
+      orderTrackingEvents,
+    );
   });
 
   it('returns staff token payload on valid credentials', async () => {

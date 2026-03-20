@@ -122,6 +122,42 @@ export class CheckoutService {
     }
   }
 
+  private async resolveFulfillmentData(
+    skuId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<{
+    fulfillment_type: 'INTERNAL' | 'SUPPLIER';
+    supplier_id?: string;
+    supplier_product_id?: string;
+  }> {
+    const supplierProduct = await tx.supplierProduct.findFirst({
+      where: {
+        sku_id: skuId,
+        is_active: true,
+        supplier: {
+          status: 'ACTIVE',
+        },
+      },
+      orderBy: { last_seen_at: 'desc' },
+      select: {
+        id: true,
+        supplier_id: true,
+      },
+    });
+
+    if (!supplierProduct) {
+      return {
+        fulfillment_type: 'INTERNAL',
+      };
+    }
+
+    return {
+      fulfillment_type: 'SUPPLIER',
+      supplier_id: supplierProduct.supplier_id,
+      supplier_product_id: supplierProduct.id,
+    };
+  }
+
   async createOrder(
     customerId: string | undefined,
     sessionId: string | undefined,
@@ -204,6 +240,7 @@ export class CheckoutService {
 
       for (const cartItem of cartItemsForStock) {
         const price = cartItem.sku.prices[0];
+        const fulfillment = await this.resolveFulfillmentData(cartItem.sku_id, tx);
 
         await tx.orderItem.create({
           data: {
@@ -217,7 +254,9 @@ export class CheckoutService {
               Number(price.sale_price) * cartItem.qty * totals.tax_rate,
             line_total:
               Number(price.sale_price) * cartItem.qty * (1 + totals.tax_rate),
-            fulfillment_type: 'INTERNAL',
+            fulfillment_type: fulfillment.fulfillment_type,
+            supplier_id: fulfillment.supplier_id,
+            supplier_product_id: fulfillment.supplier_product_id,
           },
         });
       }
@@ -479,11 +518,19 @@ export class CheckoutService {
       shipments: order.shipments?.map((s: any) => ({
         id: s.id,
         carrier: s.carrier,
+        service_level: s.service_level,
         tracking_number: s.tracking_number,
         tracking_url: s.tracking_url,
         status: s.status,
         shipped_at: s.shipped_at,
         delivered_at: s.delivered_at,
+        tracking_events: s.tracking_events?.map((event: any) => ({
+          id: event.id,
+          event_time: event.event_time,
+          status: event.status,
+          location: event.location,
+          details: event.details,
+        })),
       })),
     };
   }
@@ -502,7 +549,14 @@ export class CheckoutService {
           },
         },
         payments: true,
-        shipments: true,
+        shipments: {
+          orderBy: { created_at: 'desc' },
+          include: {
+            tracking_events: {
+              orderBy: { event_time: 'desc' },
+            },
+          },
+        },
       },
     });
 
@@ -532,7 +586,14 @@ export class CheckoutService {
           },
         },
         payments: true,
-        shipments: true,
+        shipments: {
+          orderBy: { created_at: 'desc' },
+          include: {
+            tracking_events: {
+              orderBy: { event_time: 'desc' },
+            },
+          },
+        },
       },
     });
 
@@ -553,7 +614,14 @@ export class CheckoutService {
           },
         },
         payments: true,
-        shipments: true,
+        shipments: {
+          orderBy: { created_at: 'desc' },
+          include: {
+            tracking_events: {
+              orderBy: { event_time: 'desc' },
+            },
+          },
+        },
       },
     });
 

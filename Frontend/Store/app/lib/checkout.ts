@@ -46,11 +46,19 @@ export interface OrderPayment {
 export interface Shipment {
   id: string;
   carrier: string;
+  service_level?: string | null;
   status: string;
   tracking_number?: string | null;
   tracking_url?: string | null;
   shipped_at?: string | null;
   delivered_at?: string | null;
+  tracking_events?: Array<{
+    id: string;
+    event_time: string;
+    status: string;
+    location?: string | null;
+    details?: string | null;
+  }>;
 }
 
 export interface Order {

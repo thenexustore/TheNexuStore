@@ -74,6 +74,30 @@ describe('InfortisaService catalog contract handling', () => {
     );
   });
 
+  it('preserves stock from getProductBySku responses that expose Stock instead of StockCentral', async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        SKU: 'SKU-STOCK-001',
+        Name: 'Fixture product',
+        Stock: 15,
+        StockPalma: 0,
+      },
+    });
+
+    const result = await service.getProductBySku('SKU-STOCK-001');
+
+    expect(result).toMatchObject({
+      SKU: 'SKU-STOCK-001',
+      Stock: 15,
+      StockPalma: 0,
+      STOCKCENTRAL: 15,
+      STOCKPALMA: 0,
+    });
+    expect(getMock).toHaveBeenCalledWith('/api/Product/GetProductBySku', {
+      params: { sku: 'SKU-STOCK-001' },
+    });
+  });
+
   it('throws when non-paginated metadata shows fewer items than total', async () => {
     getMock.mockResolvedValueOnce({
       data: {

@@ -221,11 +221,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const addItem = async (skuCode: string, quantity: number) => {
     try {
       const sessionId = getSessionId();
-      if (!sessionId) return;
+      if (!sessionId) {
+        throw new Error("Session not ready");
+      }
 
       await addToCart(skuCode, quantity, sessionId);
       await fetchCart();
-    } catch {}
+    } catch (error) {
+      throw error;
+    }
   };
 
   const updateItem = async (itemId: string, quantity: number) => {

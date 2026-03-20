@@ -64,6 +64,7 @@ export class ImportsController {
       full: () => this.infortisaSync.fullSync(),
       incremental: () => this.infortisaSync.syncProductsIncremental(),
       stock: () => this.infortisaSync.syncStockRealTime(),
+      stock_snapshot: () => this.infortisaSync.syncStockSnapshot(),
       images: () => this.infortisaSync.syncImages(),
     };
 

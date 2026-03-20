@@ -27,7 +27,8 @@ export default function ProductPage() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [addToCartMessage, setAddToCartMessage] = useState<string | null>(null);
   const [addToCartError, setAddToCartError] = useState(false);
-  const { addItem, updateItem, removeItem, cart } = useCart();
+  const { addItem, updateItem, removeItem, cart, isLoading: cartLoading } =
+    useCart();
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -347,7 +348,7 @@ export default function ProductPage() {
                     }
                   }}
                   className="px-3 py-2 hover:bg-gray-100"
-                  disabled={isOutOfStock}
+                  disabled={isOutOfStock || cartLoading}
                 >
                   -
                 </button>
@@ -366,7 +367,7 @@ export default function ProductPage() {
                     )
                   }
                   className="w-14 bg-transparent text-center sm:w-16"
-                  disabled={isOutOfStock}
+                  disabled={isOutOfStock || cartLoading}
                 />
                 <button
                   onClick={async () => {
@@ -380,7 +381,9 @@ export default function ProductPage() {
                   }}
                   className="px-3 py-2 hover:bg-gray-100"
                   disabled={
-                    isOutOfStock || quantity >= currentVariant.stock_quantity
+                    isOutOfStock ||
+                    cartLoading ||
+                    quantity >= currentVariant.stock_quantity
                   }
                 >
                   +
@@ -389,9 +392,9 @@ export default function ProductPage() {
 
               <button
                 onClick={handleAddToCart}
-                disabled={isOutOfStock || addingToCart}
+                disabled={isOutOfStock || addingToCart || cartLoading}
                 className={`hidden w-full rounded-xl px-6 py-3 font-semibold transition-all md:block md:flex-1 ${
-                  isOutOfStock || addingToCart
+                  isOutOfStock || addingToCart || cartLoading
                     ? "cursor-not-allowed bg-gray-300 text-gray-500"
                     : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
                 }`}
@@ -457,9 +460,9 @@ export default function ProductPage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 fixed-bottom-bar backdrop-blur md:hidden">
         <button
           onClick={handleAddToCart}
-          disabled={isOutOfStock || addingToCart}
+          disabled={isOutOfStock || addingToCart || cartLoading}
           className={`w-full rounded-xl px-6 py-3 text-sm font-semibold transition-all ${
-            isOutOfStock || addingToCart
+            isOutOfStock || addingToCart || cartLoading
               ? "cursor-not-allowed bg-gray-300 text-gray-500"
               : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
           }`}

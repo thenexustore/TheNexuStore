@@ -30,8 +30,8 @@ export class ImportHistoryQueryDto {
 }
 
 export class TriggerImportDto {
-  @IsIn(['full', 'incremental', 'stock', 'images'])
-  mode!: 'full' | 'incremental' | 'stock' | 'images';
+  @IsIn(['full', 'incremental', 'stock', 'stock_snapshot', 'images'])
+  mode!: 'full' | 'incremental' | 'stock' | 'stock_snapshot' | 'images';
 }
 
 export class RetryImportDto extends TriggerImportDto {

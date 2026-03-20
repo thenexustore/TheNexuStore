@@ -48,6 +48,10 @@ export class UpdateImportIntegrationConfigDto {
 
   @IsOptional()
   @IsBoolean()
+  stock_snapshot_enabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   incremental_sync_enabled?: boolean;
 
   @IsOptional()
@@ -63,6 +67,12 @@ export class UpdateImportIntegrationConfigDto {
   @MaxLength(120)
   @Transform(trimString)
   stock_sync_cron?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(trimString)
+  stock_snapshot_cron?: string;
 
   @IsOptional()
   @IsString()

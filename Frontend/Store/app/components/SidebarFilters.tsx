@@ -172,7 +172,7 @@ export function SidebarFilters({
   const [attributes, setAttributes] = useState<string[]>(
     filters.attributes ?? []
   );
-  const [inStock, setInStock] = useState(!!filters.in_stock_only);
+  const inStock = true;
   const [featured, setFeatured] = useState(!!filters.featured_only);
 
   useEffect(() => {
@@ -190,7 +190,7 @@ export function SidebarFilters({
       });
     }, 300);
     return () => clearTimeout(t);
-  }, [price, categories, brands, attributes, inStock, featured]);
+  }, [price, categories, brands, attributes, featured]);
 
   const toggleArrayValue = (
     value: string,
@@ -207,12 +207,12 @@ export function SidebarFilters({
     setCategories([]);
     setBrands([]);
     setAttributes([]);
-    setInStock(false);
     setFeatured(false);
     onFilterChange({
       page: 1,
       limit: filters.limit,
       sort_by: filters.sort_by,
+      in_stock_only: true,
     });
   };
 
@@ -220,7 +220,6 @@ export function SidebarFilters({
     categories.length ||
     brands.length ||
     attributes.length ||
-    inStock ||
     featured ||
     price[0] !== minPrice ||
     price[1] !== maxPrice;

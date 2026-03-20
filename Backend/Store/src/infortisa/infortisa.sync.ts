@@ -18,7 +18,7 @@ import {
   type ImportRuntimeSettings,
 } from './import-runtime-settings';
 
-type SyncMode = 'full' | 'incremental' | 'stock' | 'images';
+type SyncMode = 'full' | 'incremental' | 'stock' | 'stock_snapshot' | 'images';
 
 type RunErrorInput = {
   sku?: string | null;
@@ -83,6 +83,7 @@ export class InfortisaSyncService implements OnModuleInit {
   private readonly MAX_INCIDENTS = 10;
   private readonly DEFAULT_LAST_SYNC = '01/01/2024 00:00:00';
   private readonly STOCK_SYNC_JOB = 'infortisa-stock-sync';
+  private readonly STOCK_SNAPSHOT_JOB = 'infortisa-stock-snapshot';
   private readonly INCREMENTAL_SYNC_JOB = 'infortisa-incremental-sync';
   private readonly FULL_SYNC_JOB = 'infortisa-full-sync';
   private readonly IMAGES_SYNC_JOB = 'infortisa-images-sync';
@@ -119,6 +120,12 @@ export class InfortisaSyncService implements OnModuleInit {
       this.runtimeSettings.stock_sync_cron,
       () => void this.syncStockRealTime(),
       integrationEnabled && this.runtimeSettings.stock_sync_enabled,
+    );
+    this.configureCronJob(
+      this.STOCK_SNAPSHOT_JOB,
+      this.runtimeSettings.stock_snapshot_cron,
+      () => void this.syncStockSnapshot(),
+      integrationEnabled && this.runtimeSettings.stock_snapshot_enabled,
     );
     this.configureCronJob(
       this.INCREMENTAL_SYNC_JOB,
@@ -203,6 +210,12 @@ export class InfortisaSyncService implements OnModuleInit {
         job_name: this.STOCK_SYNC_JOB,
         cron: settings.stock_sync_cron,
         enabled_in_settings: settings.stock_sync_enabled,
+      },
+      {
+        key: 'stock_snapshot',
+        job_name: this.STOCK_SNAPSHOT_JOB,
+        cron: settings.stock_snapshot_cron,
+        enabled_in_settings: settings.stock_snapshot_enabled,
       },
       {
         key: 'incremental',
@@ -304,6 +317,7 @@ export class InfortisaSyncService implements OnModuleInit {
       const batches = this.chunkArray(items, this.stockBatchSize);
       let processed = 0;
       let errors = 0;
+      let retryableErrors = 0;
       const incidents: RunErrorInput[] = [];
 
       await this.updateImportRunProgress(run.id, {
@@ -324,8 +338,12 @@ export class InfortisaSyncService implements OnModuleInit {
           processed += 1;
           if (result.status === 'rejected') {
             errors += 1;
+            const sku = this.normalizeSku(batch[index]?.SKU);
+            if (sku) {
+              retryableErrors += 1;
+            }
             this.pushIncident(incidents, {
-              sku: this.normalizeSku(batch[index]?.SKU),
+              sku,
               stage: 'stock_update',
               message: this.extractErrorMessage(result.reason),
               rawPayload: this.safeJson(batch[index]),
@@ -336,7 +354,14 @@ export class InfortisaSyncService implements OnModuleInit {
         this.logger.debug(`Processed batch ${i + 1}/${batches.length}`);
       }
 
-      await this.setLastSync('stock_realtime');
+      const cursorAdvanced = retryableErrors === 0;
+      if (cursorAdvanced) {
+        await this.setLastSync('stock_realtime');
+      } else {
+        this.logger.warn(
+          `Real-time stock sync retained cursor because ${retryableErrors} retryable SKU updates failed`,
+        );
+      }
       const finishedAt = new Date();
       const duration = finishedAt.getTime() - startedAt.getTime();
       const status: ImportRunSummary['status'] =
@@ -355,8 +380,10 @@ export class InfortisaSyncService implements OnModuleInit {
         resultMeta: {
           last_sync_cursor: lastSync,
           duration_ms: duration,
+          cursor_advanced: cursorAdvanced,
           items_received_from_provider: items.length,
           items_persisted_in_catalog: processed - errors,
+          retryable_error_count: retryableErrors,
           provider_vs_catalog_label:
             items.length === processed - errors
               ? `La API devolvió ${items.length} y se guardaron ${processed - errors}`
@@ -374,6 +401,164 @@ export class InfortisaSyncService implements OnModuleInit {
     } catch (error: any) {
       await this.failImportRun(run.id, error, { job: 'stock_realtime' });
       this.logger.error('Real-time stock sync failed', error.stack);
+      throw error;
+    }
+  }
+
+  async syncStockSnapshot() {
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'stock_snapshot',
+      startedAt,
+      requestMeta: { job: 'stock_snapshot' },
+    });
+
+    try {
+      this.logger.log('Starting full stock snapshot sync');
+      const items = await this.infortisa.getStockAndPrice();
+      const batches = this.chunkArray(items, this.stockBatchSize);
+      let processed = 0;
+      let errors = 0;
+      const incidents: RunErrorInput[] = [];
+
+      await this.updateImportRunProgress(run.id, {
+        source_items_received: items.length,
+        result_meta_json: {
+          batches: batches.length,
+        },
+      });
+
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const results = await Promise.allSettled(
+          batch.map((product) => this.processStockUpdate(product)),
+        );
+
+        results.forEach((result, index) => {
+          processed += 1;
+          if (result.status === 'rejected') {
+            errors += 1;
+            this.pushIncident(incidents, {
+              sku: this.normalizeSku(batch[index]?.SKU),
+              stage: 'stock_snapshot',
+              message: this.extractErrorMessage(result.reason),
+              rawPayload: this.safeJson(batch[index]),
+            });
+          }
+        });
+
+        this.logger.debug(
+          `Processed stock snapshot batch ${i + 1}/${batches.length}`,
+        );
+      }
+
+      const finishedAt = new Date();
+      const duration = finishedAt.getTime() - startedAt.getTime();
+      const status: ImportRunSummary['status'] =
+        errors > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
+
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status,
+        processed_count: processed,
+        persisted_count: processed - errors,
+        validation_skipped_count: 0,
+        created_count: 0,
+        updated_count: processed - errors,
+        skipped_count: 0,
+        error_count: errors,
+        resultMeta: {
+          duration_ms: duration,
+          items_received_from_provider: items.length,
+          items_persisted_in_catalog: processed - errors,
+          provider_vs_catalog_label:
+            items.length === processed - errors
+              ? `La API devolvió ${items.length} y se guardaron ${processed - errors}`
+              : `La API devolvió ${items.length} pero solo se guardaron ${processed - errors}`,
+          sample_incidents: incidents,
+        },
+        incidents,
+      });
+
+      return this.getImportRunSummary(run.id);
+    } catch (error: any) {
+      await this.failImportRun(run.id, error, { job: 'stock_snapshot' });
+      this.logger.error('Full stock snapshot sync failed', error.stack);
+      throw error;
+    }
+  }
+
+  async syncStockForSku(rawSku: string) {
+    const sku = this.normalizeSku(rawSku);
+
+    if (!sku) {
+      throw new Error('SKU is required for targeted stock sync');
+    }
+
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'stock',
+      startedAt,
+      requestMeta: {
+        job: 'stock_single_sku',
+        sku,
+      },
+    });
+
+    try {
+      const { supplierProduct, result } =
+        await this.refreshCatalogSkuFromSupplier(sku);
+      const catalog = await this.products.getBySku(sku);
+      const {
+        stockCentral,
+        stockPalma,
+        stockExterno,
+        qtyOnHandForCatalog,
+      } = extractInfortisaStock(supplierProduct);
+      const finishedAt = new Date();
+
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status: 'SUCCESS',
+        processed_count: 1,
+        persisted_count: 1,
+        validation_skipped_count: 0,
+        created_count: result === 'created' ? 1 : 0,
+        updated_count: result === 'updated' ? 1 : 0,
+        skipped_count: 0,
+        error_count: 0,
+        resultMeta: {
+          job: 'stock_single_sku',
+          sku,
+          supplier_stock_central: stockCentral,
+          supplier_stock_palma: stockPalma,
+          supplier_stock_external: stockExterno,
+          supplier_qty_for_catalog: qtyOnHandForCatalog,
+          catalog_stock_quantity: catalog.stock_quantity,
+          catalog_in_stock: catalog.in_stock,
+        },
+        incidents: [],
+      });
+
+      return {
+        run_id: run.id,
+        sku,
+        result,
+        supplier: {
+          stock_central: stockCentral,
+          stock_palma: stockPalma,
+          stock_external: stockExterno,
+          qty_on_hand_for_catalog: qtyOnHandForCatalog,
+        },
+        catalog,
+      };
+    } catch (error: any) {
+      await this.failImportRun(run.id, error, {
+        job: 'stock_single_sku',
+        sku,
+      });
       throw error;
     }
   }
@@ -608,12 +793,28 @@ export class InfortisaSyncService implements OnModuleInit {
   }
 
   private async processStockUpdate(product: any) {
-    const sku = await this.prisma.sku.findUnique({
-      where: { sku_code: product.SKU },
+    const normalizedSku = this.normalizeSku(product?.SKU);
+
+    if (!normalizedSku) {
+      throw new Error('Stock payload missing SKU');
+    }
+
+    let sku = await this.prisma.sku.findUnique({
+      where: { sku_code: normalizedSku },
     });
 
+    let stockSource = product;
+
     if (!sku) {
-      throw new Error(`SKU ${product.SKU} not found in catalog`);
+      const refreshed = await this.refreshCatalogSkuFromSupplier(normalizedSku);
+      sku = await this.prisma.sku.findUnique({
+        where: { sku_code: normalizedSku },
+      });
+      stockSource = refreshed.supplierProduct;
+    }
+
+    if (!sku) {
+      throw new Error(`SKU ${normalizedSku} not found in catalog`);
     }
 
     const warehouse = await this.prisma.warehouse.findFirst({
@@ -624,7 +825,7 @@ export class InfortisaSyncService implements OnModuleInit {
       throw new Error('INFORTISA warehouse not found');
     }
 
-    const { qtyOnHandForCatalog } = extractInfortisaStock(product);
+    const { qtyOnHandForCatalog } = extractInfortisaStock(stockSource);
 
     await this.prisma.inventoryLevel.upsert({
       where: {
@@ -644,6 +845,20 @@ export class InfortisaSyncService implements OnModuleInit {
         qty_reserved: 0,
       },
     });
+  }
+
+  private async refreshCatalogSkuFromSupplier(sku: string) {
+    const supplierProduct = await this.infortisa.getProductBySku(sku);
+    const result = await this.products.upsertFromInfortisa(supplierProduct);
+
+    if (result === 'skipped') {
+      throw new Error(`SKU ${sku} was discarded during supplier refresh`);
+    }
+
+    return {
+      supplierProduct,
+      result,
+    };
   }
 
   private async processProductsBatch(products: any[], stage: string) {

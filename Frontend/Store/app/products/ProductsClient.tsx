@@ -28,7 +28,7 @@ function buildFiltersFromSearchParams(
     max_price: searchParams.get("max_price")
       ? parseInt(searchParams.get("max_price")!)
       : undefined,
-    in_stock_only: searchParams.get("in_stock_only") === "true",
+    in_stock_only: true,
     featured_only: searchParams.get("featured_only") === "true",
     attributes: searchParams.get("attributes")?.split(","),
   };

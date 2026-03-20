@@ -89,6 +89,18 @@ describe('ProductsService category filtering', () => {
     );
   };
 
+  const expectSkuFilter = (matcher: Record<string, unknown>) => {
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          skus: {
+            some: matcher,
+          },
+        }),
+      }),
+    );
+  };
+
   const mockResolvedCategoryBranch = (
     taxonomyRows: Array<{
       id: string;
@@ -114,6 +126,7 @@ describe('ProductsService category filtering', () => {
     jest.clearAllMocks();
     service = new ProductsService(prisma, pricingService);
 
+    prisma.category.findMany.mockResolvedValue([]);
     prisma.product.findMany.mockResolvedValue([]);
     prisma.product.count.mockResolvedValue(0);
     prisma.brand.findMany.mockResolvedValue([]);
@@ -150,6 +163,26 @@ describe('ProductsService category filtering', () => {
     });
 
     expectCategoryScope(['parent-1', 'child-1', 'grandchild-1']);
+  });
+
+  it('does not force stock filtering when in_stock_only is not enabled', async () => {
+    await requestProducts();
+
+    expectSkuFilter({});
+  });
+
+  it('applies stock filtering only when in_stock_only is enabled', async () => {
+    await requestProducts({
+      in_stock_only: true,
+    });
+
+    expectSkuFilter({
+      inventory: {
+        some: {
+          qty_on_hand: { gt: 0 },
+        },
+      },
+    });
   });
 
   it('accepts category ids as filter values and expands their descendants', async () => {

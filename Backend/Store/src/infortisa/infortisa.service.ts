@@ -164,6 +164,15 @@ export class InfortisaService implements OnModuleInit {
 
     const title =
       product.ProductDescription || product.TITULO || product.Name || '';
+    const stockCentral =
+      product.StockCentral ??
+      product.STOCKCENTRAL ??
+      product.Stock ??
+      product.STOCK ??
+      0;
+    const stockPalma = product.StockPalma ?? product.STOCKPALMA ?? 0;
+    const stockExterno =
+      product.StockExterno ?? product.STOCKEXTERNO ?? product.StockExternal ?? 0;
 
     return {
       SKU: sku,
@@ -176,9 +185,9 @@ export class InfortisaService implements OnModuleInit {
         product.PRECIOSINCANON ||
         0,
 
-      Stock: product.StockCentral || product.STOCKCENTRAL || 0,
-      StockPalma: product.StockPalma || product.STOCKPALMA || 0,
-      StockExterno: product.StockExterno || product.STOCKEXTERNO || 0,
+      Stock: stockCentral,
+      StockPalma: stockPalma,
+      StockExterno: stockExterno,
 
       PictureUrl: product.IMAGEN || product.PictureUrl || null,
 
@@ -220,9 +229,9 @@ export class InfortisaService implements OnModuleInit {
 
       IMAGEN: product.IMAGEN || product.PictureUrl || null,
 
-      STOCKCENTRAL: product.StockCentral || product.STOCKCENTRAL || 0,
-      STOCKPALMA: product.StockPalma || product.STOCKPALMA || 0,
-      STOCKEXTERNO: product.StockExterno || product.STOCKEXTERNO || 0,
+      STOCKCENTRAL: stockCentral,
+      STOCKPALMA: stockPalma,
+      STOCKEXTERNO: stockExterno,
 
       PRECIO:
         product.Price ||

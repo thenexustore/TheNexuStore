@@ -158,10 +158,12 @@ export class ImportsConfigService {
     const settings = normalizeImportRuntimeSettings({
       ...this.readRuntimeSettings(record?.settings_json),
       stock_sync_enabled: input.stock_sync_enabled,
+      stock_snapshot_enabled: input.stock_snapshot_enabled,
       incremental_sync_enabled: input.incremental_sync_enabled,
       full_sync_enabled: input.full_sync_enabled,
       images_sync_enabled: input.images_sync_enabled,
       stock_sync_cron: input.stock_sync_cron,
+      stock_snapshot_cron: input.stock_snapshot_cron,
       incremental_sync_cron: input.incremental_sync_cron,
       full_sync_cron: input.full_sync_cron,
       images_sync_cron: input.images_sync_cron,

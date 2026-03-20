@@ -224,9 +224,13 @@ export interface ReviewData {
 
 class ProductAPI {
   async getProducts(filters: ProductFilters = {}): Promise<ProductResponse> {
+    const normalizedFilters: ProductFilters = {
+      ...filters,
+      in_stock_only: filters.in_stock_only ?? true,
+    };
     const params = new URLSearchParams();
 
-    Object.entries(filters).forEach(([key, value]) => {
+    Object.entries(normalizedFilters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         if (Array.isArray(value)) {
           params.append(key, value.join(","));
@@ -288,9 +292,13 @@ class ProductAPI {
     slug: string,
     filters: ProductFilters = {},
   ): Promise<ProductResponse> {
+    const normalizedFilters: ProductFilters = {
+      ...filters,
+      in_stock_only: filters.in_stock_only ?? true,
+    };
     const params = new URLSearchParams();
 
-    Object.entries(filters).forEach(([key, value]) => {
+    Object.entries(normalizedFilters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         if (Array.isArray(value)) {
           params.append(key, value.join(","));
@@ -312,9 +320,13 @@ class ProductAPI {
     slug: string,
     filters: ProductFilters = {},
   ): Promise<ProductResponse> {
+    const normalizedFilters: ProductFilters = {
+      ...filters,
+      in_stock_only: filters.in_stock_only ?? true,
+    };
     const params = new URLSearchParams();
 
-    Object.entries(filters).forEach(([key, value]) => {
+    Object.entries(normalizedFilters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         if (Array.isArray(value)) {
           params.append(key, value.join(","));

@@ -218,8 +218,10 @@ export class DeployService {
     this.pushLog(
       `[deploy] Repo URL: ${settings.repoUrl ? '(configured)' : '(using existing local repo)'}`,
     );
-    if (settings.sshPrivateKey) this.pushLog('[deploy] Auth: SSH key configured');
-    else if (settings.gitToken) this.pushLog('[deploy] Auth: Git token configured');
+    if (settings.sshPrivateKey)
+      this.pushLog('[deploy] Auth: SSH key configured');
+    else if (settings.gitToken)
+      this.pushLog('[deploy] Auth: Git token configured');
     else this.pushLog('[deploy] Auth: none (public or existing credentials)');
 
     // Fire off the deployment asynchronously
@@ -241,9 +243,7 @@ export class DeployService {
     try {
       await fs.access(scriptPath);
     } catch {
-      this.pushLog(
-        `[deploy] ERROR: Deploy script not found at: ${scriptPath}`,
-      );
+      this.pushLog(`[deploy] ERROR: Deploy script not found at: ${scriptPath}`);
       this.pushLog(
         `[deploy] Hint: Make sure ops/nexus_deploy.sh exists in the repository root.`,
       );
@@ -322,7 +322,9 @@ export class DeployService {
     if (tmpSshKeyPath) {
       fs.unlink(tmpSshKeyPath).catch((err) => {
         // Best-effort cleanup — log so ops can manually remove the file if needed
-        console.warn(`[deploy] Could not delete temp SSH key ${tmpSshKeyPath}: ${String(err)}`);
+        console.warn(
+          `[deploy] Could not delete temp SSH key ${tmpSshKeyPath}: ${String(err)}`,
+        );
       });
     }
   }
@@ -394,7 +396,7 @@ export class DeployService {
     const env: Record<string, string> = {};
     for (const key of keep) {
       if (process.env[key]) {
-        env[key] = process.env[key] as string;
+        env[key] = process.env[key];
       }
     }
     return env;

@@ -534,9 +534,13 @@ export class AdminService {
       });
     });
 
-    await this.orderTrackingEvents.notifyByOrderId(orderId, 'shipment_created', {
-      shipmentId: shipment.id,
-    });
+    await this.orderTrackingEvents.notifyByOrderId(
+      orderId,
+      'shipment_created',
+      {
+        shipmentId: shipment.id,
+      },
+    );
 
     return this.serializeShipment(shipment);
   }
@@ -592,7 +596,7 @@ export class AdminService {
                   status === ShipmentStatus.SHIPPED ||
                   status === ShipmentStatus.IN_TRANSIT ||
                   status === ShipmentStatus.DELIVERED
-                    ? existing.shipped_at ?? new Date()
+                    ? (existing.shipped_at ?? new Date())
                     : null,
                 delivered_at:
                   status === ShipmentStatus.DELIVERED ? new Date() : null,
@@ -601,10 +605,7 @@ export class AdminService {
         },
       });
 
-      if (
-        input.status !== undefined &&
-        input.status !== existing.status
-      ) {
+      if (input.status !== undefined && input.status !== existing.status) {
         await tx.trackingEvent.create({
           data: {
             shipment_id: shipmentId,
@@ -656,9 +657,13 @@ export class AdminService {
       });
     });
 
-    await this.orderTrackingEvents.notifyByOrderId(orderId, 'shipment_updated', {
-      shipmentId: shipment.id,
-    });
+    await this.orderTrackingEvents.notifyByOrderId(
+      orderId,
+      'shipment_updated',
+      {
+        shipmentId: shipment.id,
+      },
+    );
 
     return this.serializeShipment(shipment);
   }

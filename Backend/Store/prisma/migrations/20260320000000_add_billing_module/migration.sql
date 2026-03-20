@@ -191,9 +191,6 @@ CREATE INDEX "billing_document_items_document_id_position_idx" ON "billing_docum
 CREATE INDEX "billing_number_audits_document_id_idx" ON "billing_number_audits"("document_id");
 
 -- AddForeignKey
-ALTER TABLE "billing_series" ADD CONSTRAINT "billing_series_id_fkey" FOREIGN KEY ("id") REFERENCES "billing_documents"("series_id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "customer_fiscal_profiles" ADD CONSTRAINT "customer_fiscal_profiles_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey

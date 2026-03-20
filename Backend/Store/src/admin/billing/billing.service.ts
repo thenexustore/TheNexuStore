@@ -434,7 +434,7 @@ export class BillingService {
         tax_amount: quote.tax_amount,
         discount_amount: quote.discount_amount,
         total_amount: quote.total_amount,
-        pdf_url: `/billing/pdf/${quoteId}-invoice`,
+        pdf_url: null,
         items: {
           create: quote.items.map((item) => ({
             description: item.description,
@@ -449,6 +449,11 @@ export class BillingService {
         },
       },
       include: { items: true },
+    });
+
+    await this.prisma.billingDocument.update({
+      where: { id: invoice.id },
+      data: { pdf_url: `/billing/pdf/${invoice.id}` },
     });
 
     await this.prisma.billingNumberAudit.create({

@@ -38,7 +38,6 @@ type ProductBatchStats = {
   incidents: RunErrorInput[];
 };
 
-
 type RuntimeJobOverview = {
   key: SyncMode;
   job_name: string;
@@ -147,7 +146,6 @@ export class InfortisaSyncService implements OnModuleInit {
     );
   }
 
-
   private tryGetCronJob(jobName: string) {
     try {
       return this.schedulerRegistry.getCronJob(jobName);
@@ -204,7 +202,12 @@ export class InfortisaSyncService implements OnModuleInit {
         : undefined,
     );
     const integrationEnabled = record?.is_active ?? true;
-    const jobs: Array<Pick<RuntimeJobOverview, 'key' | 'job_name' | 'cron' | 'enabled_in_settings'>> = [
+    const jobs: Array<
+      Pick<
+        RuntimeJobOverview,
+        'key' | 'job_name' | 'cron' | 'enabled_in_settings'
+      >
+    > = [
       {
         key: 'stock',
         job_name: this.STOCK_SYNC_JOB,
@@ -511,12 +514,8 @@ export class InfortisaSyncService implements OnModuleInit {
       const { supplierProduct, result } =
         await this.refreshCatalogSkuFromSupplier(sku);
       const catalog = await this.products.getBySku(sku);
-      const {
-        stockCentral,
-        stockPalma,
-        stockExterno,
-        qtyOnHandForCatalog,
-      } = extractInfortisaStock(supplierProduct);
+      const { stockCentral, stockPalma, stockExterno, qtyOnHandForCatalog } =
+        extractInfortisaStock(supplierProduct);
       const finishedAt = new Date();
 
       await this.finalizeImportRun(run.id, {

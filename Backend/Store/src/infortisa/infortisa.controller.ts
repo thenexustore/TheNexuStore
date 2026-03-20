@@ -195,6 +195,24 @@ export class InfortisaController {
   }
 
   @UseGuards(AdminGuard)
+  @Post('sync/stock/full')
+  async triggerFullStockSync() {
+    try {
+      const result = await this.syncService.syncStockSnapshot();
+      return {
+        success: true,
+        message: 'Full stock snapshot sync completed',
+        data: result,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  @UseGuards(AdminGuard)
   @Post('sync/stock/:sku')
   async triggerStockSyncForSku(@Param('sku') sku: string) {
     try {

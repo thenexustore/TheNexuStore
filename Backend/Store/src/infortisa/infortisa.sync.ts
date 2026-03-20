@@ -304,6 +304,7 @@ export class InfortisaSyncService implements OnModuleInit {
       const batches = this.chunkArray(items, this.stockBatchSize);
       let processed = 0;
       let errors = 0;
+      let retryableErrors = 0;
       const incidents: RunErrorInput[] = [];
 
       await this.updateImportRunProgress(run.id, {
@@ -324,8 +325,12 @@ export class InfortisaSyncService implements OnModuleInit {
           processed += 1;
           if (result.status === 'rejected') {
             errors += 1;
+            const sku = this.normalizeSku(batch[index]?.SKU);
+            if (sku) {
+              retryableErrors += 1;
+            }
             this.pushIncident(incidents, {
-              sku: this.normalizeSku(batch[index]?.SKU),
+              sku,
               stage: 'stock_update',
               message: this.extractErrorMessage(result.reason),
               rawPayload: this.safeJson(batch[index]),
@@ -336,7 +341,14 @@ export class InfortisaSyncService implements OnModuleInit {
         this.logger.debug(`Processed batch ${i + 1}/${batches.length}`);
       }
 
-      await this.setLastSync('stock_realtime');
+      const cursorAdvanced = retryableErrors === 0;
+      if (cursorAdvanced) {
+        await this.setLastSync('stock_realtime');
+      } else {
+        this.logger.warn(
+          `Real-time stock sync retained cursor because ${retryableErrors} retryable SKU updates failed`,
+        );
+      }
       const finishedAt = new Date();
       const duration = finishedAt.getTime() - startedAt.getTime();
       const status: ImportRunSummary['status'] =
@@ -355,8 +367,10 @@ export class InfortisaSyncService implements OnModuleInit {
         resultMeta: {
           last_sync_cursor: lastSync,
           duration_ms: duration,
+          cursor_advanced: cursorAdvanced,
           items_received_from_provider: items.length,
           items_persisted_in_catalog: processed - errors,
+          retryable_error_count: retryableErrors,
           provider_vs_catalog_label:
             items.length === processed - errors
               ? `La API devolvió ${items.length} y se guardaron ${processed - errors}`
@@ -374,6 +388,90 @@ export class InfortisaSyncService implements OnModuleInit {
     } catch (error: any) {
       await this.failImportRun(run.id, error, { job: 'stock_realtime' });
       this.logger.error('Real-time stock sync failed', error.stack);
+      throw error;
+    }
+  }
+
+  async syncStockSnapshot() {
+    const startedAt = new Date();
+    const run = await this.createImportRun({
+      provider: this.PROVIDER,
+      mode: 'stock',
+      startedAt,
+      requestMeta: { job: 'stock_snapshot' },
+    });
+
+    try {
+      this.logger.log('Starting full stock snapshot sync');
+      const items = await this.infortisa.getStockAndPrice();
+      const batches = this.chunkArray(items, this.stockBatchSize);
+      let processed = 0;
+      let errors = 0;
+      const incidents: RunErrorInput[] = [];
+
+      await this.updateImportRunProgress(run.id, {
+        source_items_received: items.length,
+        result_meta_json: {
+          batches: batches.length,
+        },
+      });
+
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const results = await Promise.allSettled(
+          batch.map((product) => this.processStockUpdate(product)),
+        );
+
+        results.forEach((result, index) => {
+          processed += 1;
+          if (result.status === 'rejected') {
+            errors += 1;
+            this.pushIncident(incidents, {
+              sku: this.normalizeSku(batch[index]?.SKU),
+              stage: 'stock_snapshot',
+              message: this.extractErrorMessage(result.reason),
+              rawPayload: this.safeJson(batch[index]),
+            });
+          }
+        });
+
+        this.logger.debug(
+          `Processed stock snapshot batch ${i + 1}/${batches.length}`,
+        );
+      }
+
+      const finishedAt = new Date();
+      const duration = finishedAt.getTime() - startedAt.getTime();
+      const status: ImportRunSummary['status'] =
+        errors > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
+
+      await this.finalizeImportRun(run.id, {
+        finishedAt,
+        status,
+        processed_count: processed,
+        persisted_count: processed - errors,
+        validation_skipped_count: 0,
+        created_count: 0,
+        updated_count: processed - errors,
+        skipped_count: 0,
+        error_count: errors,
+        resultMeta: {
+          duration_ms: duration,
+          items_received_from_provider: items.length,
+          items_persisted_in_catalog: processed - errors,
+          provider_vs_catalog_label:
+            items.length === processed - errors
+              ? `La API devolvió ${items.length} y se guardaron ${processed - errors}`
+              : `La API devolvió ${items.length} pero solo se guardaron ${processed - errors}`,
+          sample_incidents: incidents,
+        },
+        incidents,
+      });
+
+      return this.getImportRunSummary(run.id);
+    } catch (error: any) {
+      await this.failImportRun(run.id, error, { job: 'stock_snapshot' });
+      this.logger.error('Full stock snapshot sync failed', error.stack);
       throw error;
     }
   }

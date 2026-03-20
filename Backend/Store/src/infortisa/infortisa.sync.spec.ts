@@ -81,6 +81,7 @@ describe('InfortisaSyncService', () => {
       getModifiedStock: jest.fn(),
       getModifiedProducts: jest.fn(),
       getProductBySku: jest.fn(),
+      getStockAndPrice: jest.fn(),
     };
     products = {
       upsertFromInfortisa: jest.fn().mockResolvedValue('created'),
@@ -316,5 +317,57 @@ describe('InfortisaSyncService', () => {
         update: expect.objectContaining({ qty_on_hand: 15 }),
       }),
     );
+  });
+
+  it('keeps the real-time stock cursor when retryable sku updates fail', async () => {
+    infortisa.getModifiedStock.mockResolvedValue([
+      { SKU: 'NTETMM0078', Stock: 15 },
+    ]);
+    prisma.syncLog.findUnique.mockResolvedValue(null);
+    prisma.sku.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where.sku_code === 'NTETMM0078') {
+        return { id: 'sku-1', sku_code: 'NTETMM0078' };
+      }
+      return null;
+    });
+    prisma.warehouse.findFirst.mockResolvedValue(null);
+    const setLastSyncSpy = jest.spyOn(service as any, 'setLastSync');
+    const finalizeImportRunSpy = jest.spyOn(service as any, 'finalizeImportRun');
+
+    await service.syncStockRealTime();
+
+    expect(setLastSyncSpy).not.toHaveBeenCalled();
+    expect(finalizeImportRunSpy).toHaveBeenCalledWith(
+      'run-1',
+      expect.objectContaining({
+        error_count: 1,
+        resultMeta: expect.objectContaining({
+          cursor_advanced: false,
+          retryable_error_count: 1,
+        }),
+      }),
+    );
+  });
+
+  it('runs a full stock snapshot reconciliation for all supplier items', async () => {
+    infortisa.getStockAndPrice.mockResolvedValue([
+      { SKU: 'NTETMM0078', Stock: 15, StockPalma: 0 },
+      { SKU: 'SKU-2', Stock: 4, StockPalma: 1 },
+    ]);
+    prisma.sku.findUnique.mockImplementation(async ({ where }: any) => ({
+      id: where.sku_code,
+      sku_code: where.sku_code,
+    }));
+    prisma.warehouse.findFirst.mockResolvedValue({ id: 'warehouse-1' });
+    prisma.inventoryLevel.upsert.mockResolvedValue(undefined);
+
+    const result = await service.syncStockSnapshot();
+
+    expect(infortisa.getStockAndPrice).toHaveBeenCalledTimes(1);
+    expect(prisma.inventoryLevel.upsert).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      id: 'run-1',
+      status: 'SUCCESS',
+    });
   });
 });

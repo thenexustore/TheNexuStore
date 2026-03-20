@@ -68,56 +68,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
     setIsLoading(true);
     try {
-      // Use sku_id instead of sku_code
       await addItem(product.sku_code, 1);
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        legacyCart[index].quantity += 1;
-      } else {
-        legacyCart.push({
-          id: product.id,
-          sku_id: product.sku_id,
-          sku_code: product.sku_code,
-          name: product.title,
-          price: product.price,
-          quantity: 1,
-          image: product.thumbnail,
-          slug: product.slug,
-          brand: product.brand_name,
-          stock_status: product.stock_status,
-        });
-      }
-
-      localStorage.setItem("cart", JSON.stringify(legacyCart));
-      window.dispatchEvent(new CustomEvent("cart-update"));
     } catch (error) {
       console.error("Failed to add to cart:", error);
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        legacyCart[index].quantity += 1;
-      } else {
-        legacyCart.push({
-          id: product.id,
-          sku_id: product.sku_id,
-          sku_code: product.sku_code,
-          name: product.title,
-          price: product.price,
-          quantity: 1,
-          image: product.thumbnail,
-          slug: product.slug,
-          brand: product.brand_name,
-          stock_status: product.stock_status,
-        });
-      }
-
-      localStorage.setItem("cart", JSON.stringify(legacyCart));
-      window.dispatchEvent(new CustomEvent("cart-update"));
     } finally {
       setIsLoading(false);
     }
@@ -131,42 +84,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
     setIsLoading(true);
     try {
-      // Use sku_id
-      await addItem(product.sku_id || product.sku_code, 1);
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        legacyCart[index].quantity += 1;
-      } else {
-        legacyCart.push({
-          id: product.id,
-          sku_id: product.sku_id,
-          sku_code: product.sku_code,
-          name: product.title,
-          price: product.price,
-          quantity: 1,
-          image: product.thumbnail,
-          slug: product.slug,
-          brand: product.brand_name,
-          stock_status: product.stock_status,
-        });
-      }
-
-      localStorage.setItem("cart", JSON.stringify(legacyCart));
-      window.dispatchEvent(new CustomEvent("cart-update"));
+      await addItem(product.sku_code, 1);
     } catch (error) {
       console.error("Failed to increase quantity:", error);
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        legacyCart[index].quantity += 1;
-        localStorage.setItem("cart", JSON.stringify(legacyCart));
-        window.dispatchEvent(new CustomEvent("cart-update"));
-      }
     } finally {
       setIsLoading(false);
     }
@@ -187,19 +107,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
           await updateItem(cartItem.id, quantity - 1);
         }
       }
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        if (legacyCart[index].quantity > 1) {
-          legacyCart[index].quantity -= 1;
-        } else {
-          legacyCart = legacyCart.filter((i: any) => i.id !== product.id);
-        }
-        localStorage.setItem("cart", JSON.stringify(legacyCart));
-        window.dispatchEvent(new CustomEvent("cart-update"));
-      }
     } catch (error) {
       console.error("Failed to decrease quantity:", error);
     } finally {
@@ -217,31 +124,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     setIsLoading(true);
 
     try {
-      // Use sku_id
-      await addItem(product.sku_id || product.sku_code, 1);
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        legacyCart[index].quantity += 1;
-      } else {
-        legacyCart.push({
-          id: product.id,
-          sku_id: product.sku_id,
-          sku_code: product.sku_code,
-          name: product.title,
-          price: product.price,
-          quantity: 1,
-          image: product.thumbnail,
-          slug: product.slug,
-          brand: product.brand_name,
-          stock_status: product.stock_status,
-        });
-      }
-
-      localStorage.setItem("cart", JSON.stringify(legacyCart));
-      window.dispatchEvent(new CustomEvent("cart-update"));
+      await addItem(product.sku_code, 1);
 
       setTimeout(() => {
         router.push("/cart");
@@ -250,33 +133,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
       console.error("Failed to buy now:", error);
       setBuyNowLoading(false);
       setIsLoading(false);
-
-      let legacyCart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-      const index = legacyCart.findIndex((i: any) => i.id === product.id);
-
-      if (index >= 0) {
-        legacyCart[index].quantity += 1;
-      } else {
-        legacyCart.push({
-          id: product.id,
-          sku_id: product.sku_id,
-          sku_code: product.sku_code,
-          name: product.title,
-          price: product.price,
-          quantity: 1,
-          image: product.thumbnail,
-          slug: product.slug,
-          brand: product.brand_name,
-          stock_status: product.stock_status,
-        });
-      }
-
-      localStorage.setItem("cart", JSON.stringify(legacyCart));
-      window.dispatchEvent(new CustomEvent("cart-update"));
-
-      setTimeout(() => {
-        router.push("/cart");
-      }, 500);
     }
   };
 

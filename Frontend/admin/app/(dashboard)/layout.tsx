@@ -17,6 +17,7 @@ import {
   Tags,
   Truck,
   Settings,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,6 +57,7 @@ const navigation: NavItem[] = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard },
   { key: "products", href: "/products", icon: Package, requiredPermissions: ["inventory:read"] },
   { key: "orders", href: "/orders", icon: ShoppingCart, requiredPermissions: ["orders:read"] },
+  { key: "billing", href: "/billing", icon: FileText, requiredPermissions: ["full_access"] },
   { key: "imports", href: "/imports", icon: Truck, requiredPermissions: ["imports:run", "imports:retry"] },
   { key: "rmas", href: "/rmas", icon: Package, requiredPermissions: ["orders:read", "orders:update"] },
   { key: "coupons", href: "/coupons", icon: Ticket, requiredPermissions: ["full_access"] },

@@ -16,6 +16,7 @@ import {
   fetchOrderById,
   fetchOrders,
   fetchOrderTimeline,
+  markOrderDelivered,
   updateOrderShipment,
   type Order,
   type OrderDetail,
@@ -95,6 +96,8 @@ export default function OrdersPage() {
     Record<string, ShipmentDraft>
   >({});
   const [shipmentBusyKey, setShipmentBusyKey] = useState<string | null>(null);
+  const [deliverTrackingUrl, setDeliverTrackingUrl] = useState("");
+  const [markingDelivered, setMarkingDelivered] = useState(false);
   const [adminSettings, setAdminSettings] = useState(() => loadAdminSettings());
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
@@ -217,6 +220,24 @@ export default function OrdersPage() {
       toast.error(error.message || "Failed to update shipment");
     } finally {
       setShipmentBusyKey(null);
+    }
+  };
+
+  const handleMarkDelivered = async () => {
+    if (!selectedOrderId) return;
+    setMarkingDelivered(true);
+    try {
+      await markOrderDelivered(selectedOrderId, deliverTrackingUrl || undefined);
+      toast.success("Pedido marcado como entregado. Factura en borrador creada.");
+      setDeliverTrackingUrl("");
+      const updated = await fetchOrderById(selectedOrderId);
+      setOrderDetail(updated);
+      const tl = await fetchOrderTimeline(selectedOrderId);
+      setTimeline(tl);
+    } catch (err: any) {
+      toast.error(err.message || "Error al marcar como entregado");
+    } finally {
+      setMarkingDelivered(false);
     }
   };
 
@@ -661,6 +682,29 @@ export default function OrdersPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Mark as delivered */}
+                      {orderDetail.status !== "DELIVERED" && orderDetail.status !== "CANCELLED" && (
+                        <div className="pt-2">
+                          <h4 className="text-sm font-semibold mb-2 text-emerald-700">Marcar como entregado</h4>
+                          <div className="rounded border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                            <input
+                              value={deliverTrackingUrl}
+                              onChange={(e) => setDeliverTrackingUrl(e.target.value)}
+                              placeholder="URL de seguimiento (opcional, Infortisa)"
+                              className="w-full rounded border px-2 py-1.5 text-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleMarkDelivered}
+                              disabled={markingDelivered}
+                              className="w-full rounded bg-emerald-600 px-3 py-2 text-white text-xs font-medium disabled:opacity-50 hover:bg-emerald-700"
+                            >
+                              {markingDelivered ? "Procesando..." : "✓ Marcar como entregado y crear factura borrador"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

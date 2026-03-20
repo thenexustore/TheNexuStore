@@ -23,6 +23,7 @@
     "imports": "Importaciones",
     "rmas": "Devoluciones (RMA)",
     "settings": "Ajustes",
-    "homeComposer": "Página Principal"
+    "homeComposer": "Página Principal",
+    "billing": "Facturación y Presupuestos"
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   fetchImportConfig,
   fetchImportHistory,
@@ -33,6 +33,7 @@ import {
   Globe,
   Image as ImageIcon,
   KeyRound,
+  Loader2,
   PlugZap,
   RefreshCw,
   Save,
@@ -40,6 +41,7 @@ import {
 } from "lucide-react";
 
 type ImportMode = "full" | "incremental" | "stock" | "images";
+type RunningState = { mode: ImportMode; action: "trigger" | "retry" } | null;
 
 type ImportConfigForm = {
   display_name: string;
@@ -164,6 +166,45 @@ const CRON_PRESETS_DAILY = [
   { label: "Cada día medianoche", value: "0 0 * * *" },
 ];
 
+const MODE_LABELS: Record<ImportMode, string> = {
+  full: "catálogo completo",
+  incremental: "incremental",
+  stock: "stock",
+  images: "imágenes",
+};
+
+const ACTION_MODES: {
+  mode: ImportMode;
+  Icon: React.ElementType;
+  title: string;
+  description: string;
+}[] = [
+  {
+    mode: "full",
+    Icon: Database,
+    title: "Catálogo completo",
+    description: "Sincroniza todo el catálogo, stock y cambios de producto desde el proveedor.",
+  },
+  {
+    mode: "incremental",
+    Icon: RefreshCw,
+    title: "Incremental de productos",
+    description: "Obtiene solo los productos modificados desde la última sincronización.",
+  },
+  {
+    mode: "stock",
+    Icon: Box,
+    title: "Sincronización de stock",
+    description: "Actualiza los niveles de inventario desde el feed del proveedor.",
+  },
+  {
+    mode: "images",
+    Icon: ImageIcon,
+    title: "Sincronización de imágenes",
+    description: "Rellena las imágenes de productos que faltan en el catálogo.",
+  },
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -236,10 +277,10 @@ function getSuspiciousImportAlert(
         pageSize: Number.isFinite(pageSize) ? pageSize : null,
         total: Number.isFinite(total) ? total : null,
         reason: totalMismatch
-          ? "Supplier metadata indicates more catalog items than were received."
+          ? "Los metadatos del proveedor indican más productos en el catálogo de los que se han recibido."
           : matchesTechnicalLimit || pageSizeLimitReached
-            ? "The supplier response matched a known technical limit exactly."
-            : "The supplier returned an unusually round item count.",
+            ? "La respuesta del proveedor coincide exactamente con un límite técnico conocido."
+            : "El proveedor devolvió un número de elementos sospechosamente redondo.",
       };
     }
   }
@@ -284,7 +325,7 @@ export default function ImportsPage() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
   const [connectionTesting, setConnectionTesting] = useState(false);
-  const [running, setRunning] = useState<ImportMode | null>(null);
+  const [running, setRunning] = useState<RunningState>(null);
   const [retryReason, setRetryReason] = useState("");
   const [items, setItems] = useState<ImportHistoryItem[]>([]);
   const [runs, setRuns] = useState<ImportRun[]>([]);
@@ -347,7 +388,7 @@ export default function ImportsPage() {
       const data = await fetchImportHistory(1, 30);
       setItems(data.items);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load import history"));
+      toast.error(getErrorMessage(error, "Error al cargar el historial de importaciones"));
     } finally {
       setLoading(false);
     }
@@ -365,7 +406,7 @@ export default function ImportsPage() {
       setRuntimeOverview(runtimeOverviewData);
     } catch (error) {
       toast.error(
-        getErrorMessage(error, "Failed to load import observability"),
+        getErrorMessage(error, "Error al cargar la observabilidad de importaciones"),
       );
     }
   }
@@ -408,7 +449,7 @@ export default function ImportsPage() {
       setShowingSecret(includeSecret && Boolean(data.api_key));
     } catch (error) {
       toast.error(
-        getErrorMessage(error, "Failed to load API configuration"),
+        getErrorMessage(error, "Error al cargar la configuración de la API"),
       );
     } finally {
       setConfigLoading(false);
@@ -433,7 +474,7 @@ export default function ImportsPage() {
       setRunDetails((current) => ({ ...current, [runId]: detail }));
       setRunErrors((current) => ({ ...current, [runId]: errors }));
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to load run detail"));
+      toast.error(getErrorMessage(error, "Error al cargar el detalle de la ejecución"));
     } finally {
       setDetailLoadingId(null);
     }
@@ -465,11 +506,11 @@ export default function ImportsPage() {
           ? Number(form.catalog_page_size)
           : null,
       });
-      toast.success("API configuration updated");
+      toast.success("Configuración de API actualizada");
       await loadConfig(showingSecret && canReadSecret);
     } catch (error) {
       toast.error(
-        getErrorMessage(error, "Failed to update API configuration"),
+        getErrorMessage(error, "Error al actualizar la configuración de la API"),
       );
     } finally {
       setConfigSaving(false);
@@ -484,12 +525,12 @@ export default function ImportsPage() {
       setLastHealthcheckAt(result.checked_at || new Date().toISOString());
       toast.success(
         result.ok
-          ? "Connection to supplier API is healthy"
-          : "Supplier API responded as unhealthy",
+          ? "La conexión con la API del proveedor es correcta"
+          : "La API del proveedor respondió como no disponible",
       );
       await loadConfig(showingSecret && canReadSecret);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to test API connection"));
+      toast.error(getErrorMessage(error, "Error al probar la conexión con la API"));
     } finally {
       setConnectionTesting(false);
     }
@@ -497,7 +538,7 @@ export default function ImportsPage() {
 
   async function handleToggleSecret() {
     if (!canReadSecret) {
-      toast.error("You do not have permission to read the API key");
+      toast.error("No tienes permiso para ver la clave de API");
       return;
     }
 
@@ -505,15 +546,15 @@ export default function ImportsPage() {
   }
 
   async function runImport(mode: ImportMode) {
-    setRunning(mode);
+    setRunning({ mode, action: "trigger" });
 
     try {
       await triggerImport(mode);
-      toast.success(`Import ${mode} executed successfully`);
+      toast.success(`Importación de ${MODE_LABELS[mode]} ejecutada correctamente`);
       await Promise.all([loadHistory(), loadRuns()]);
     } catch (error) {
       toast.error(
-        getErrorMessage(error, `Failed to execute ${mode} import`),
+        getErrorMessage(error, `Error al ejecutar la importación de ${MODE_LABELS[mode]}`),
       );
     } finally {
       setRunning(null);
@@ -523,18 +564,18 @@ export default function ImportsPage() {
   async function runRetry(mode: ImportMode) {
     const reason = retryReason.trim();
     if (!reason) {
-      toast.error("Retry reason is required");
+      toast.error("El motivo del reintento es obligatorio");
       return;
     }
 
-    setRunning(mode);
+    setRunning({ mode, action: "retry" });
 
     try {
       await retryImport(mode, reason);
-      toast.success(`Retry ${mode} executed successfully`);
+      toast.success(`Reintento de ${MODE_LABELS[mode]} ejecutado correctamente`);
       await Promise.all([loadHistory(), loadRuns()]);
     } catch (error) {
-      toast.error(getErrorMessage(error, `Failed to retry ${mode} import`));
+      toast.error(getErrorMessage(error, `Error al reintentar la importación de ${MODE_LABELS[mode]}`));
     } finally {
       setRunning(null);
     }
@@ -546,7 +587,7 @@ export default function ImportsPage() {
       const result = await fetchCatalogProbe();
       setCatalogProbe(result);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to run catalog probe"));
+      toast.error(getErrorMessage(error, "Error al analizar el catálogo"));
     } finally {
       setCatalogProbeLoading(false);
     }
@@ -568,11 +609,10 @@ export default function ImportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Imports</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Importaciones</h1>
         <p className="mt-2 text-slate-500">
-          Total control of the supplier API from a single tab: configuration,
-          key visibility, health checks, structured runs, and what actually
-          reached the catalog.
+          Control total de la integración con el proveedor: configuración de la API, crons,
+          ejecuciones manuales, historial y diagnóstico del catálogo, todo desde aquí.
         </p>
       </div>
 
@@ -581,13 +621,13 @@ export default function ImportsPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="font-semibold">Potential supplier truncation detected</p>
+              <p className="font-semibold">Posible truncación del proveedor detectada</p>
               <p className="mt-1 text-sm">
-                {suspiciousAlert.reason} Latest run:
+                {suspiciousAlert.reason} Última ejecución:
                 <strong> {suspiciousAlert.item.type}</strong>
-                {` · received=${suspiciousAlert.received}`}
+                {` · recibidos=${suspiciousAlert.received}`}
                 {suspiciousAlert.pageSize
-                  ? ` · pageSize=${suspiciousAlert.pageSize}`
+                  ? ` · tamañoPágina=${suspiciousAlert.pageSize}`
                   : ""}
                 {suspiciousAlert.total
                   ? ` · total=${suspiciousAlert.total}`
@@ -602,11 +642,11 @@ export default function ImportsPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              API control center
+              Centro de control de la API
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Manage the API name, base URL, active status, current key, and
-              connection checks from the Imports tab.
+              Gestiona el nombre de la API, la URL base, el estado activo, la clave actual
+              y las comprobaciones de conexión desde la pestaña de importaciones.
             </p>
           </div>
 
@@ -617,7 +657,7 @@ export default function ImportsPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
               <PlugZap className="h-4 w-4" />
-              {connectionTesting ? "Testing..." : "Test connection"}
+              {connectionTesting ? "Probando..." : "Probar conexión"}
             </button>
 
             {canUpdateConfig ? (
@@ -627,7 +667,7 @@ export default function ImportsPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
-                {configSaving ? "Saving..." : "Save API config"}
+                {configSaving ? "Guardando..." : "Guardar configuración"}
               </button>
             ) : null}
           </div>
@@ -635,11 +675,11 @@ export default function ImportsPage() {
 
         {!canReadConfig ? (
           <p className="mt-4 text-sm text-slate-500">
-            Your account cannot read supplier API configuration.
+            Tu cuenta no puede leer la configuración de la API del proveedor.
           </p>
         ) : configLoading ? (
           <p className="mt-4 text-sm text-slate-500">
-            Loading API configuration...
+            Cargando configuración de API...
           </p>
         ) : (
           <>
@@ -647,7 +687,7 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <Database className="h-4 w-4" />
-                  API name
+                  Nombre de API
                 </div>
                 <p className="mt-2 text-lg font-semibold text-slate-900">
                   {form.display_name || "—"}
@@ -657,7 +697,7 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <Globe className="h-4 w-4" />
-                  Config source
+                  Fuente de configuración
                 </div>
                 <p className="mt-2 text-lg font-semibold text-slate-900">
                   {configSource || "—"}
@@ -667,7 +707,7 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <PlugZap className="h-4 w-4" />
-                  Last healthcheck
+                  Último healthcheck
                 </div>
                 <p className="mt-2 text-lg font-semibold text-slate-900">
                   {formatDate(lastHealthcheckAt)}
@@ -677,12 +717,12 @@ export default function ImportsPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <KeyRound className="h-4 w-4" />
-                  Stored key
+                  Clave almacenada
                 </div>
                 <p className="mt-2 break-all text-lg font-semibold text-slate-900">
                   {showingSecret
                     ? form.api_key || "—"
-                    : storedMaskedKey || "No key stored"}
+                    : storedMaskedKey || "Sin clave almacenada"}
                 </p>
               </div>
             </div>
@@ -691,7 +731,7 @@ export default function ImportsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    API display name
+                    Nombre de la API
                   </label>
                   <input
                     value={form.display_name}
@@ -708,7 +748,7 @@ export default function ImportsPage() {
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Base URL
+                    URL base
                   </label>
                   <input
                     value={form.base_url}
@@ -736,7 +776,7 @@ export default function ImportsPage() {
                     disabled={!canUpdateConfig}
                     className="h-4 w-4 rounded border-slate-300"
                   />
-                  Integration active
+                  Integración activa
                 </label>
               </div>
 
@@ -744,7 +784,7 @@ export default function ImportsPage() {
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <label className="block text-sm font-medium text-slate-700">
-                      API key
+                      Clave de API
                     </label>
                     <button
                       type="button"
@@ -757,8 +797,8 @@ export default function ImportsPage() {
                         <Eye className="h-4 w-4" />
                       )}
                       {showingSecret
-                        ? "Hide current key"
-                        : "Show current key"}
+                        ? "Ocultar clave"
+                        : "Ver clave actual"}
                     </button>
                   </div>
                   <textarea
@@ -775,14 +815,14 @@ export default function ImportsPage() {
                   />
                   <p className="mt-2 text-xs text-slate-500">
                     {showingSecret
-                      ? "You are viewing the current stored key."
-                      : "The current key is masked by default. Use ‘Show current key’ if your permissions allow it."}
+                      ? "Estás viendo la clave almacenada actual."
+                      : "La clave se muestra enmascarada por defecto. Usa ‘Ver clave actual’ si tus permisos lo permiten."}
                   </p>
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Internal notes
+                    Notas internas
                   </label>
                   <textarea
                     value={form.notes}
@@ -803,20 +843,20 @@ export default function ImportsPage() {
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">
-                  Runtime scheduling and fetch tuning
+                  Programación de tareas y ajustes de obtención
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Turn individual jobs on or off, define cron cadence, and tune
-                  how aggressively the supplier API is consumed.
+                  Activa o desactiva cada tarea, define la cadencia del cron y ajusta
+                  la agresividad con la que se consume la API del proveedor.
                 </p>
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  ["Stock sync", "Keeps inventory levels fresh.", "stock_sync_enabled"],
-                  ["Incremental products", "Applies product deltas between full syncs.", "incremental_sync_enabled"],
-                  ["Full catalog", "Runs the heavy catalog refresh.", "full_sync_enabled"],
-                  ["Image sync", "Backfills product media automatically.", "images_sync_enabled"],
+                  ["Sincronización de stock", "Mantiene el inventario actualizado.", "stock_sync_enabled"],
+                  ["Productos incrementales", "Aplica cambios de producto entre sincronizaciones completas.", "incremental_sync_enabled"],
+                  ["Catálogo completo", "Ejecuta la actualización completa del catálogo.", "full_sync_enabled"],
+                  ["Sincronización de imágenes", "Rellena automáticamente las imágenes de los productos.", "images_sync_enabled"],
                 ].map(([label, description, key]) => (
                   <label
                     key={key}
@@ -974,8 +1014,17 @@ export default function ImportsPage() {
                 aplicado y la próxima ejecución calculada.
               </p>
             </div>
-            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${runtimeOverview.integration_enabled ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-              {runtimeOverview.integration_enabled ? "Integración global activa" : "Integración global desactivada"}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void loadRuns()}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </button>
+              <div className={`rounded-full px-3 py-1 text-xs font-semibold ${runtimeOverview.integration_enabled ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                {runtimeOverview.integration_enabled ? "Integración global activa" : "Integración global desactivada"}
+              </div>
             </div>
           </div>
 
@@ -984,7 +1033,15 @@ export default function ImportsPage() {
               <div key={job.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold capitalize text-slate-900">{job.key}</p>
+                    <p className="font-semibold capitalize text-slate-900">
+                      {job.key === "full"
+                        ? "Catálogo completo"
+                        : job.key === "incremental"
+                          ? "Incremental"
+                          : job.key === "stock"
+                            ? "Stock"
+                            : "Imágenes"}
+                    </p>
                     <p className="mt-1 text-xs text-slate-500">{job.job_name}</p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${job.effective_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
@@ -1019,132 +1076,94 @@ export default function ImportsPage() {
         </section>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <button
-          onClick={() => void runImport("full")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Database className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run full catalog import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Sync complete catalog, stock and product changes.
-          </p>
-        </button>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Acciones de importación</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Lanza una importación manual o reintenta una importación anterior con un motivo explícito.
+            </p>
+          </div>
+          {running !== null && (
+            <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-sm font-medium text-sky-800">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Ejecutando {MODE_LABELS[running.mode]}...
+            </div>
+          )}
+        </div>
 
-        <button
-          onClick={() => void runRetry("full")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Database className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry full import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run full sync with an explicit retry reason.
-          </p>
-        </button>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            Motivo del reintento{" "}
+            <span className="font-normal text-slate-400">(obligatorio para los reintentos)</span>
+          </label>
+          <input
+            value={retryReason}
+            onChange={(event) => setRetryReason(event.target.value)}
+            placeholder="Ej: Timeout del proveedor / desajuste de stock anterior"
+            maxLength={250}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+          />
+        </div>
 
-        <button
-          onClick={() => void runImport("incremental")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <RefreshCw className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run incremental import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Pull only changed products from the supplier API.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runRetry("incremental")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <RefreshCw className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry incremental import</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run the product delta sync with a retry reason.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runImport("stock")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Box className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run stock sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Refresh inventory levels from supplier feed.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runRetry("stock")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <Box className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry stock sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run stock synchronization with retry reason.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runImport("images")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <ImageIcon className="mb-3 h-5 w-5 text-slate-700" />
-          <p className="font-semibold text-slate-900">Run image sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Backfill missing product images.
-          </p>
-        </button>
-
-        <button
-          onClick={() => void runRetry("images")}
-          disabled={running !== null}
-          className="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 disabled:opacity-60"
-        >
-          <ImageIcon className="mb-3 h-5 w-5 text-amber-700" />
-          <p className="font-semibold text-slate-900">Retry image sync</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Re-run image synchronization with retry reason.
-          </p>
-        </button>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <label className="mb-2 block text-sm font-medium text-slate-700">
-          Retry reason (required for retry actions)
-        </label>
-        <input
-          value={retryReason}
-          onChange={(event) => setRetryReason(event.target.value)}
-          placeholder="e.g. Previous supplier timeout / stock mismatch"
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        />
-      </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {ACTION_MODES.map(({ mode, Icon, title, description }) => (
+            <div
+              key={mode}
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                  <Icon className="h-5 w-5 text-slate-700" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-slate-900">{title}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => void runImport(mode)}
+                  disabled={running !== null}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {running?.mode === mode && running?.action === "trigger" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Ejecutar
+                </button>
+                <button
+                  onClick={() => void runRetry(mode)}
+                  disabled={running !== null}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {running?.mode === mode && running?.action === "retry" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Reintentar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">Import history</h2>
+          <h2 className="text-lg font-bold text-slate-900">Historial de importaciones</h2>
           <button
             onClick={() => void loadHistory()}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh
+            Actualizar
           </button>
         </div>
 
         {loading ? (
-          <p className="text-slate-500">Loading history...</p>
+          <p className="text-slate-500">Cargando historial...</p>
         ) : items.length === 0 ? (
-          <p className="text-slate-500">No import history yet.</p>
+          <p className="text-slate-500">Sin historial de importaciones.</p>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
@@ -1159,7 +1178,15 @@ export default function ImportsPage() {
                   </p>
                 </div>
                 {item.details ? (
-                  <p className="mt-2 text-sm text-slate-600">{item.details}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                    {Object.entries(parseDetails(item.details)).map(([k, v]) => (
+                      <span key={k} className="text-xs text-slate-500">
+                        <span className="font-medium text-slate-700">{k}</span>
+                        {" = "}
+                        <span>{v}</span>
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
               </div>
             ))}
@@ -1171,11 +1198,11 @@ export default function ImportsPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Structured import runs
+              Ejecuciones de importación
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Inspect what the provider returned, what persisted, and the most
-              recent SKU-level incidents.
+              Inspecciona lo que devolvió el proveedor, lo que se persistió y los
+              últimos incidentes a nivel de SKU.
             </p>
           </div>
           <button
@@ -1183,29 +1210,29 @@ export default function ImportsPage() {
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh runs
+            Actualizar ejecuciones
           </button>
         </div>
 
         {providerStats ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard
-              label="Provider received"
+              label="Recibido del proveedor"
               value={providerStats.aggregates.source_items_received}
               tone="sky"
             />
             <MetricCard
-              label="Catalog persisted"
+              label="Persistido en catálogo"
               value={providerStats.aggregates.persisted_count}
               tone="emerald"
             />
             <MetricCard
-              label="Validation skipped"
+              label="Omitidos por validación"
               value={providerStats.aggregates.validation_skipped_count}
               tone="amber"
             />
             <MetricCard
-              label="Difference"
+              label="Diferencia"
               value={providerStats.difference_received_vs_persisted}
               tone="rose"
             />
@@ -1224,7 +1251,7 @@ export default function ImportsPage() {
               <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
               <div>
                 <p className="font-semibold text-slate-900">
-                  Latest run interpretation
+                  Interpretación de la última ejecución
                 </p>
                 <p className="mt-1 text-sm text-slate-700">
                   {formatDelta(
@@ -1239,7 +1266,7 @@ export default function ImportsPage() {
 
         {runs.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No structured runs recorded yet.
+            Sin ejecuciones registradas.
           </p>
         ) : (
           <div className="space-y-3">
@@ -1269,7 +1296,7 @@ export default function ImportsPage() {
                         </span>
                       </div>
                       <p className="text-sm text-slate-500">
-                        Started {formatDate(run.started_at)} · Finished{" "}
+                        Iniciado {formatDate(run.started_at)} · Finalizado{" "}
                         {formatDate(run.finished_at)}
                       </p>
                       <p className="text-sm text-slate-700">
@@ -1290,13 +1317,13 @@ export default function ImportsPage() {
                   {isExpanded ? (
                     <div className="border-t border-slate-200 bg-white p-4">
                       {detailLoadingId === run.id ? (
-                        <p className="text-sm text-slate-500">Loading detail...</p>
+                        <p className="text-sm text-slate-500">Cargando detalle...</p>
                       ) : (
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Provider
+                                Proveedor
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.source_items_received}
@@ -1304,7 +1331,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Processed
+                                Procesados
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.processed_count}
@@ -1312,7 +1339,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Persisted
+                                Persistidos
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.persisted_count}
@@ -1320,7 +1347,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Created
+                                Creados
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.created_count}
@@ -1328,7 +1355,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Updated
+                                Actualizados
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.updated_count}
@@ -1336,7 +1363,7 @@ export default function ImportsPage() {
                             </div>
                             <div className="rounded-xl border border-slate-200 p-3">
                               <p className="text-xs uppercase tracking-wide text-slate-500">
-                                Errors
+                                Errores
                               </p>
                               <p className="mt-2 font-semibold text-slate-900">
                                 {detail.error_count}
@@ -1347,7 +1374,7 @@ export default function ImportsPage() {
                           <div className="grid gap-4 lg:grid-cols-2">
                             <div className="rounded-2xl border border-slate-200 p-4">
                               <h3 className="font-semibold text-slate-900">
-                                Run metadata
+                                Metadatos de la ejecución
                               </h3>
                               <pre className="mt-3 max-h-56 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-slate-100">
                                 {JSON.stringify(
@@ -1362,11 +1389,11 @@ export default function ImportsPage() {
 
                             <div className="rounded-2xl border border-slate-200 p-4">
                               <h3 className="font-semibold text-slate-900">
-                                Latest SKU incidents
+                                Últimos incidentes por SKU
                               </h3>
                               {errors.length === 0 ? (
                                 <p className="mt-3 text-sm text-slate-500">
-                                  No SKU incidents recorded for this run.
+                                  Sin incidentes SKU en esta ejecución.
                                 </p>
                               ) : (
                                 <div className="mt-3 space-y-3">
@@ -1376,7 +1403,7 @@ export default function ImportsPage() {
                                       className="rounded-xl border border-amber-200 bg-amber-50 p-3"
                                     >
                                       <p className="text-sm font-semibold text-slate-900">
-                                        {error.sku || "SKU unavailable"}
+                                        {error.sku || "SKU no disponible"}
                                       </p>
                                       <p className="mt-1 text-sm text-slate-700">
                                         {error.message}
@@ -1404,7 +1431,7 @@ export default function ImportsPage() {
         {latestIncidents.length > 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <h3 className="font-semibold text-slate-900">
-              Latest run incidents
+              Incidentes de la última ejecución
             </h3>
             <div className="mt-3 space-y-3">
               {latestIncidents.map((error) => (
@@ -1413,7 +1440,7 @@ export default function ImportsPage() {
                   className="rounded-xl border border-amber-200 bg-amber-50 p-3"
                 >
                   <p className="text-sm font-semibold text-slate-900">
-                    {error.sku || "SKU unavailable"}
+                    {error.sku || "SKU no disponible"}
                   </p>
                   <p className="mt-1 text-sm text-slate-700">{error.message}</p>
                   <p className="mt-1 text-xs text-slate-500">

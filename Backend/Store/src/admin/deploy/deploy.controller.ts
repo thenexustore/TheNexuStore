@@ -52,4 +52,24 @@ export class DeployController {
     const data = this.deployService.getStatus();
     return { success: true, data };
   }
+
+  @Delete('logs')
+  @HttpCode(200)
+  clearLogs() {
+    this.deployService.clearLogs();
+    return { success: true, message: 'Logs cleared' };
+  }
+
+  @Get('history')
+  getHistory() {
+    const data = this.deployService.getHistory();
+    return { success: true, data };
+  }
+
+  @Delete('history')
+  @HttpCode(200)
+  clearHistory() {
+    this.deployService.clearHistory();
+    return { success: true, message: 'History cleared' };
+  }
 }

@@ -2,14 +2,19 @@
 
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
   Building2,
   CheckCircle2,
+  ChevronDown,
   CircleDot,
+  Clock,
   Clock3,
+  ClipboardCopy,
   Gauge,
   GitBranch,
   Globe,
+  History,
   ImageIcon,
   KeyRound,
   Loader2,
@@ -22,6 +27,7 @@ import {
   Settings2,
   Sparkles,
   Terminal,
+  Trash2,
   Undo2,
   XCircle,
 } from "lucide-react";
@@ -31,11 +37,15 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { updateAdminCredentials } from "@/lib/api";
 import { fetchRemoteBrandingSettings, saveRemoteBrandingSettings, uploadBrandingLogo } from "@/lib/api/branding";
 import {
+  clearDeployHistory,
+  clearDeployLogs,
   clearDeploySecret,
+  fetchDeployHistory,
   fetchDeploySettings,
   fetchDeployStatus,
   saveDeploySettings,
   triggerDeploy,
+  type DeployHistoryEntry,
   type DeploySettingsInput,
   type DeploySettingsPublic,
   type DeployStatus,
@@ -50,9 +60,6 @@ import {
   type AdminLogoFit,
   type AdminSettings,
 } from "@/lib/admin-settings";
-
-/** Delay (ms) before auto-scrolling deploy logs — allows React to flush DOM updates first */
-const LOG_SCROLL_DELAY_MS = 50;
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -78,10 +85,15 @@ export default function SettingsPage() {
   const [deployPublic, setDeployPublic] = useState<DeploySettingsPublic | null>(null);
   const [deployConfigSaving, setDeployConfigSaving] = useState(false);
   const [deployStatus, setDeployStatus] = useState<DeployStatus | null>(null);
-  const [deploying, setDeploying] = useState(false);
+  const [deployHistory, setDeployHistory] = useState<DeployHistoryEntry[]>([]);
+  const [deployAuthMethod, setDeployAuthMethod] = useState<"token" | "ssh">("token");
+  const [deployConfirmStep, setDeployConfirmStep] = useState(false);
   const [showSshInput, setShowSshInput] = useState(false);
   const [showTokenInput, setShowTokenInput] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const deployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const logsEndRef = useRef<HTMLDivElement | null>(null);
 
   const hasChanges = useMemo(
@@ -156,8 +168,28 @@ export default function SettingsPage() {
       .catch((err) => { console.error("[deploy] Could not load deploy settings:", err); });
 
     fetchDeployStatus()
-      .then((data) => setDeployStatus(data))
-      .catch((err) => { console.error("[deploy] Could not load deploy status:", err); });
+      .then((data) => {
+        setDeployStatus(data);
+        // Auto-start polling if a deploy is already running (e.g. page reload mid-deploy)
+        if (data.running) {
+          startDeployPolling();
+          startElapsedTimer(data.startedAt ? new Date(data.startedAt).getTime() : Date.now());
+        }
+      })
+      .catch((err) => {
+        console.error("[deploy] Could not load deploy status:", err);
+        toast.warning(isEn ? "Could not load deploy status — check API connection" : "No se pudo cargar el estado del deploy — revisa la conexión con el API");
+      });
+
+    fetchDeployHistory()
+      .then((data) => setDeployHistory(data))
+      .catch(() => {/* noop: history is not critical */});
+
+    return () => {
+      if (deployPollRef.current) clearInterval(deployPollRef.current);
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onSaveCredentials() {
@@ -408,6 +440,21 @@ export default function SettingsPage() {
     }
   }
 
+  function startElapsedTimer(startTimeMs: number) {
+    if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    setElapsedMs(Date.now() - startTimeMs);
+    elapsedTimerRef.current = setInterval(() => {
+      setElapsedMs(Date.now() - startTimeMs);
+    }, 1000);
+  }
+
+  function stopElapsedTimer() {
+    if (elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
+    }
+  }
+
   function startDeployPolling() {
     if (deployPollRef.current) clearInterval(deployPollRef.current);
     deployPollRef.current = setInterval(async () => {
@@ -416,33 +463,85 @@ export default function SettingsPage() {
         setDeployStatus(data);
         if (!data.running) {
           if (deployPollRef.current) clearInterval(deployPollRef.current);
-          setDeploying(false);
+          stopElapsedTimer();
           if (data.success === true) {
-            toast.success(isEn ? "Deployment completed successfully" : "Deploy completado con éxito");
+            toast.success(isEn ? "Deployment completed successfully ✓" : "Deploy completado con éxito ✓");
           } else if (data.success === false) {
-            toast.error(isEn ? "Deployment failed — check logs" : "El deploy falló — revisa los logs");
+            toast.error(isEn ? "Deployment failed — check logs below" : "El deploy falló — revisa los logs");
           }
+          // Refresh history after completion
+          fetchDeployHistory().then((h) => setDeployHistory(h)).catch(() => {});
         }
-        setTimeout(() => logsEndRef.current?.scrollIntoView({ behavior: "smooth" }), LOG_SCROLL_DELAY_MS);
+        requestAnimationFrame(() => logsEndRef.current?.scrollIntoView({ behavior: "smooth" }));
       } catch {
-        // noop
+        // noop: transient error, continue polling
       }
     }, 2000);
   }
 
   async function onTriggerDeploy() {
-    if (deploying) return;
-    setDeploying(true);
+    if (deployStatus?.running) return;
+    setDeployConfirmStep(false);
     try {
       const data = await triggerDeploy();
       setDeployStatus(data);
+      const startMs = data.startedAt ? new Date(data.startedAt).getTime() : Date.now();
       startDeployPolling();
+      startElapsedTimer(startMs);
       toast.info(isEn ? "Deployment started…" : "Deploy iniciado…");
     } catch (err: unknown) {
-      setDeploying(false);
       const message = err instanceof Error ? err.message : (isEn ? "Could not start deployment" : "No se pudo iniciar el deploy");
       toast.error(message);
     }
+  }
+
+  async function onRefreshDeployStatus() {
+    try {
+      const data = await fetchDeployStatus();
+      setDeployStatus(data);
+      toast.info(isEn ? "Status refreshed" : "Estado actualizado");
+    } catch {
+      toast.error(isEn ? "Could not refresh status" : "No se pudo actualizar el estado");
+    }
+  }
+
+  async function onClearDeployLogs() {
+    try {
+      await clearDeployLogs();
+      setDeployStatus((prev) => prev ? { ...prev, logs: [] } : prev);
+      toast.success(isEn ? "Logs cleared" : "Logs eliminados");
+    } catch {
+      toast.error(isEn ? "Could not clear logs" : "No se pudieron eliminar los logs");
+    }
+  }
+
+  function onCopyLogs() {
+    const text = deployStatus?.logs.join("\n") ?? "";
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(isEn ? "Logs copied to clipboard" : "Logs copiados al portapapeles");
+    }).catch(() => {
+      toast.error(isEn ? "Could not copy logs" : "No se pudieron copiar los logs");
+    });
+  }
+
+  async function onClearDeployHistory() {
+    try {
+      await clearDeployHistory();
+      setDeployHistory([]);
+      toast.success(isEn ? "History cleared" : "Historial eliminado");
+    } catch {
+      toast.error(isEn ? "Could not clear history" : "No se pudo eliminar el historial");
+    }
+  }
+
+  function formatDeployDuration(ms: number | null): string {
+    if (ms === null) return "—";
+    if (ms < 1000) return `${ms}ms`;
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}m ${r}s`;
   }
 
   return (
@@ -658,67 +757,84 @@ export default function SettingsPage() {
 
       {/* ── Deploy section ─────────────────────────────────────────── */}
       <section id="deploy-section">
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm space-y-6">
+        {/* Dark ops-style header */}
+        <div className="rounded-t-2xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-5 border border-zinc-700">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
-                <Terminal className="h-5 w-5" />
-                {isEn ? "Deploy" : "Deploy"}
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+                <Terminal className="h-5 w-5 text-emerald-400" />
+                {isEn ? "Production Deploy" : "Deploy a Producción"}
               </h2>
-              <p className="mt-1 text-sm text-zinc-600">
+              <p className="mt-1 text-sm text-zinc-400">
                 {isEn
                   ? "Configure repository credentials and trigger a production deployment via the deploy script."
                   : "Configura las credenciales del repositorio y lanza un deploy a producción mediante el script de despliegue."}
               </p>
             </div>
-            {deployStatus && (
-              <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                deployStatus.running
-                  ? "bg-amber-50 text-amber-700 border border-amber-200"
-                  : deployStatus.success === true
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : deployStatus.success === false
-                  ? "bg-red-50 text-red-700 border border-red-200"
-                  : "bg-zinc-100 text-zinc-600 border border-zinc-200"
-              }`}>
-                {deployStatus.running ? (
-                  <><Loader2 className="h-3 w-3 animate-spin" />{isEn ? "Deploying…" : "Desplegando…"}</>
-                ) : deployStatus.success === true ? (
-                  <><CheckCircle2 className="h-3 w-3" />{isEn ? "Last deploy: OK" : "Último deploy: OK"}</>
-                ) : deployStatus.success === false ? (
-                  <><XCircle className="h-3 w-3" />{isEn ? "Last deploy: Failed" : "Último deploy: Fallido"}</>
-                ) : (
-                  <><RefreshCw className="h-3 w-3" />{isEn ? "No deploys yet" : "Sin deploys aún"}</>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Live status pill */}
+              {deployStatus ? (
+                <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border ${
+                  deployStatus.running
+                    ? "bg-amber-900/50 text-amber-300 border-amber-700 animate-pulse"
+                    : deployStatus.success === true
+                    ? "bg-emerald-900/50 text-emerald-300 border-emerald-700"
+                    : deployStatus.success === false
+                    ? "bg-red-900/50 text-red-300 border-red-700"
+                    : "bg-zinc-700/50 text-zinc-400 border-zinc-600"
+                }`}>
+                  {deployStatus.running ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" />{isEn ? "Deploying" : "Desplegando"} {formatDeployDuration(elapsedMs)}</>
+                  ) : deployStatus.success === true ? (
+                    <><CheckCircle2 className="h-3 w-3" />{isEn ? "Last: OK" : "Último: OK"} · {formatDeployDuration(deployStatus.durationMs)}</>
+                  ) : deployStatus.success === false ? (
+                    <><XCircle className="h-3 w-3" />{isEn ? "Last: Failed" : "Último: Fallido"}</>
+                  ) : (
+                    <><Clock className="h-3 w-3" />{isEn ? "No deploys yet" : "Sin deploys aún"}</>
+                  )}
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs text-zinc-500 border border-zinc-700 bg-zinc-800">
+                  <Loader2 className="h-3 w-3 animate-spin" />{isEn ? "Loading…" : "Cargando…"}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onRefreshDeployStatus}
+                title={isEn ? "Refresh status" : "Actualizar estado"}
+                className="rounded-lg border border-zinc-600 bg-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-600 hover:text-white transition"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Body */}
+        <div className="rounded-b-2xl border border-t-0 border-zinc-200/80 bg-white p-6 shadow-sm space-y-6">
 
           {/* Git configuration */}
           <div className="rounded-xl border border-zinc-200/80 bg-zinc-50 p-4 space-y-4">
-            <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+            <p className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
               <GitBranch className="h-4 w-4" />
-              {isEn ? "Repository configuration" : "Configuración del repositorio"}
-            </p>
-            <p className="text-xs text-zinc-500">
-              {isEn
-                ? "Leave blank to use the existing values from the deploy script. Only fill fields you want to change or set."
-                : "Deja en blanco para usar los valores existentes del script de deploy. Solo rellena los campos que quieras cambiar o configurar."}
+              {isEn ? "Repository" : "Repositorio"}
             </p>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-zinc-700">
-                {isEn ? "Repository URL (HTTPS or SSH)" : "URL del repositorio (HTTPS o SSH)"}
+                {isEn ? "Repository URL" : "URL del repositorio"}
+                <span className="ml-1 text-xs text-zinc-400">(HTTPS / SSH)</span>
                 <input
                   type="text"
                   value={deployConfig.repoUrl ?? ""}
                   onChange={(e) => setDeployConfig((p) => ({ ...p, repoUrl: e.target.value }))}
-                  placeholder={deployPublic?.repoUrl || (isEn ? "https://github.com/org/repo.git" : "https://github.com/org/repo.git")}
+                  placeholder={deployPublic?.repoUrl || "https://github.com/org/repo.git"}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </label>
               <label className="block text-sm text-zinc-700">
-                {isEn ? "Branch (leave blank for auto-detect)" : "Rama (en blanco para auto-detectar)"}
+                {isEn ? "Branch" : "Rama"}
+                <span className="ml-1 text-xs text-zinc-400">({isEn ? "blank = auto" : "vacío = auto"})</span>
                 <input
                   type="text"
                   value={deployConfig.branch ?? ""}
@@ -729,173 +845,364 @@ export default function SettingsPage() {
               </label>
             </div>
 
-            {/* HTTPS Token */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-1.5 text-sm text-zinc-700">
-                  <KeyRound className="h-4 w-4" />
-                  {isEn ? "Git token (for private HTTPS repos)" : "Token git (para repos HTTPS privados)"}
+            {/* Auth method tabs */}
+            <div>
+              <p className="flex items-center gap-1.5 text-sm font-medium text-zinc-700 mb-2">
+                <KeyRound className="h-4 w-4" />
+                {isEn ? "Authentication method" : "Método de autenticación"}
+              </p>
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setDeployAuthMethod("token")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    deployAuthMethod === "token"
+                      ? "border-zinc-800 bg-zinc-900 text-white"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                  }`}
+                >
+                  🔑 {isEn ? "HTTPS Token" : "Token HTTPS"}
                   {deployPublic?.hasGitToken && (
-                    <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                      {isEn ? "configured" : "configurado"}
+                    <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-emerald-600 text-[10px]">
+                      ✓
                     </span>
                   )}
-                </p>
-                <div className="flex items-center gap-2">
-                  {deployPublic?.hasGitToken && (
-                    <button
-                      type="button"
-                      onClick={() => onClearDeploySecret("gitToken")}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      {isEn ? "Clear" : "Eliminar"}
-                    </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeployAuthMethod("ssh")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    deployAuthMethod === "ssh"
+                      ? "border-zinc-800 bg-zinc-900 text-white"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                  }`}
+                >
+                  🔐 {isEn ? "SSH Key" : "Clave SSH"}
+                  {deployPublic?.hasSshKey && (
+                    <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-emerald-600 text-[10px]">
+                      ✓
+                    </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setShowTokenInput((p) => !p)}
-                    className="text-xs text-zinc-500 hover:text-zinc-800"
-                  >
-                    {showTokenInput ? (isEn ? "Hide" : "Ocultar") : (isEn ? "Set new token" : "Configurar nuevo token")}
-                  </button>
-                </div>
+                </button>
               </div>
-              {showTokenInput && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block text-sm text-zinc-700">
-                    {isEn ? "Git username" : "Usuario git"}
-                    <input
-                      type="text"
-                      value={deployConfig.gitUsername ?? ""}
-                      onChange={(e) => setDeployConfig((p) => ({ ...p, gitUsername: e.target.value }))}
-                      placeholder={deployPublic?.gitUsername || "oauth2"}
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                    />
-                  </label>
-                  <label className="block text-sm text-zinc-700">
-                    {isEn ? "Token / Password" : "Token / Contraseña"}
-                    <input
-                      type="password"
-                      value={deployConfig.gitToken ?? ""}
-                      onChange={(e) => setDeployConfig((p) => ({ ...p, gitToken: e.target.value }))}
-                      placeholder={isEn ? "ghp_xxxxxxxxxxxx" : "ghp_xxxxxxxxxxxx"}
-                      autoComplete="new-password"
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                    />
-                  </label>
+
+              {deployAuthMethod === "token" && (
+                <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500">
+                      {isEn
+                        ? "Used for private HTTPS repos. The token is injected into the git URL at deploy time."
+                        : "Para repos HTTPS privados. El token se inyecta en la URL de git en el momento del deploy."}
+                    </p>
+                    {deployPublic?.hasGitToken && (
+                      <button
+                        type="button"
+                        onClick={() => onClearDeploySecret("gitToken")}
+                        className="text-xs text-red-500 hover:text-red-700 hover:underline ml-2 whitespace-nowrap"
+                      >
+                        {isEn ? "Remove token" : "Quitar token"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setShowTokenInput((p) => !p)}
+                        className="text-xs text-zinc-500 hover:text-zinc-800 underline"
+                      >
+                        {showTokenInput
+                          ? (isEn ? "▲ Hide fields" : "▲ Ocultar campos")
+                          : (deployPublic?.hasGitToken
+                              ? (isEn ? "▼ Change token" : "▼ Cambiar token")
+                              : (isEn ? "▼ Set token" : "▼ Configurar token"))}
+                      </button>
+                    </div>
+                  </div>
+                  {showTokenInput && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block text-sm text-zinc-700">
+                        {isEn ? "Git username" : "Usuario git"}
+                        <input
+                          type="text"
+                          value={deployConfig.gitUsername ?? ""}
+                          onChange={(e) => setDeployConfig((p) => ({ ...p, gitUsername: e.target.value }))}
+                          placeholder={deployPublic?.gitUsername || "oauth2"}
+                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                        />
+                      </label>
+                      <label className="block text-sm text-zinc-700">
+                        {isEn ? "Token / PAT" : "Token / PAT"}
+                        <input
+                          type="password"
+                          value={deployConfig.gitToken ?? ""}
+                          onChange={(e) => setDeployConfig((p) => ({ ...p, gitToken: e.target.value }))}
+                          placeholder="ghp_xxxxxxxxxxxx"
+                          autoComplete="new-password"
+                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
 
-            {/* SSH Key */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-1.5 text-sm text-zinc-700">
-                  <KeyRound className="h-4 w-4" />
-                  {isEn ? "SSH private key (for private SSH repos)" : "Clave privada SSH (para repos SSH privados)"}
-                  {deployPublic?.hasSshKey && (
-                    <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                      {isEn ? "configured" : "configurada"}
-                    </span>
-                  )}
-                </p>
-                <div className="flex items-center gap-2">
-                  {deployPublic?.hasSshKey && (
-                    <button
-                      type="button"
-                      onClick={() => onClearDeploySecret("sshPrivateKey")}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      {isEn ? "Clear" : "Eliminar"}
-                    </button>
-                  )}
+              {deployAuthMethod === "ssh" && (
+                <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500">
+                      {isEn
+                        ? "Paste the private key for SSH-based private repos (stored encrypted server-side)."
+                        : "Pega la clave privada para repos SSH privados (almacenada de forma segura en el servidor)."}
+                    </p>
+                    {deployPublic?.hasSshKey && (
+                      <button
+                        type="button"
+                        onClick={() => onClearDeploySecret("sshPrivateKey")}
+                        className="text-xs text-red-500 hover:text-red-700 hover:underline ml-2 whitespace-nowrap"
+                      >
+                        {isEn ? "Remove key" : "Quitar clave"}
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowSshInput((p) => !p)}
-                    className="text-xs text-zinc-500 hover:text-zinc-800"
+                    className="text-xs text-zinc-500 hover:text-zinc-800 underline"
                   >
-                    {showSshInput ? (isEn ? "Hide" : "Ocultar") : (isEn ? "Set new key" : "Configurar nueva clave")}
+                    {showSshInput
+                      ? (isEn ? "▲ Hide key" : "▲ Ocultar clave")
+                      : (deployPublic?.hasSshKey
+                          ? (isEn ? "▼ Replace key" : "▼ Reemplazar clave")
+                          : (isEn ? "▼ Paste key" : "▼ Pegar clave"))}
                   </button>
+                  {showSshInput && (
+                    <textarea
+                      value={deployConfig.sshPrivateKey ?? ""}
+                      onChange={(e) => setDeployConfig((p) => ({ ...p, sshPrivateKey: e.target.value }))}
+                      rows={7}
+                      placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"}
+                      spellCheck={false}
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-zinc-200 bg-zinc-950 px-3 py-2 font-mono text-xs text-emerald-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                    />
+                  )}
                 </div>
-              </div>
-              {showSshInput && (
-                <textarea
-                  value={deployConfig.sshPrivateKey ?? ""}
-                  onChange={(e) => setDeployConfig((p) => ({ ...p, sshPrivateKey: e.target.value }))}
-                  rows={6}
-                  placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"}
-                  spellCheck={false}
-                  autoComplete="off"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                />
               )}
             </div>
 
-            <button
-              type="button"
-              disabled={deployConfigSaving}
-              onClick={onSaveDeployConfig}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-            >
-              {deployConfigSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {deployConfigSaving ? (isEn ? "Saving…" : "Guardando…") : (isEn ? "Save deploy config" : "Guardar configuración de deploy")}
-            </button>
+            <div className="pt-1 flex justify-end">
+              <button
+                type="button"
+                disabled={deployConfigSaving}
+                onClick={onSaveDeployConfig}
+                className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 transition"
+              >
+                {deployConfigSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {deployConfigSaving ? (isEn ? "Saving…" : "Guardando…") : (isEn ? "Save config" : "Guardar config")}
+              </button>
+            </div>
           </div>
 
-          {/* Trigger */}
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={deploying}
-              onClick={onTriggerDeploy}
-              className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-                deploying
-                  ? "bg-amber-500 text-white cursor-not-allowed opacity-80"
-                  : "bg-zinc-900 text-white hover:bg-zinc-700"
-              }`}
-            >
-              {deploying ? (
-                <><Loader2 className="h-4 w-4 animate-spin" />{isEn ? "Deploying…" : "Desplegando…"}</>
-              ) : (
-                <><Play className="h-4 w-4" />{isEn ? "Start deployment" : "Iniciar deploy"}</>
-              )}
-            </button>
-            {deployStatus?.startedAt && (
-              <p className="text-xs text-zinc-500">
-                {isEn ? "Last started:" : "Último inicio:"}{" "}
-                {new Date(deployStatus.startedAt).toLocaleString()}
-                {deployStatus.finishedAt && (
-                  <> · {isEn ? "Finished:" : "Fin:"} {new Date(deployStatus.finishedAt).toLocaleString()}</>
-                )}
-                {deployStatus.exitCode !== null && (
-                  <> · {isEn ? "Exit code:" : "Código:"} {deployStatus.exitCode}</>
-                )}
-              </p>
-            )}
-          </div>
-
-          {/* Logs */}
-          {deployStatus && deployStatus.logs.length > 0 && (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-950 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-medium text-zinc-400">
-                  {isEn ? "Deploy log" : "Log de deploy"} ({deployStatus.logs.length} {isEn ? "lines" : "líneas"})
+          {/* Trigger deploy */}
+          <div className="rounded-xl border border-zinc-200 bg-gradient-to-r from-zinc-50 to-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                  <Play className="h-4 w-4 text-emerald-600" />
+                  {isEn ? "Trigger deployment" : "Lanzar deploy"}
                 </p>
-                {deploying && <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />}
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {isEn
+                    ? "Runs ops/nexus_deploy.sh: git pull → install → migrate → build → PM2 restart"
+                    : "Ejecuta ops/nexus_deploy.sh: git pull → install → migrar → build → reiniciar PM2"}
+                </p>
               </div>
-              <div className="max-h-80 overflow-y-auto space-y-0.5">
-                {deployStatus.logs.map((line, i) => (
-                  <p key={i} className={`font-mono text-xs leading-snug whitespace-pre-wrap break-all ${
-                    line.includes("ERROR") || line.includes("FAILED") || line.includes("error")
-                      ? "text-red-400"
-                      : line.includes("SUCCESS") || line.includes("OK")
-                      ? "text-emerald-400"
-                      : "text-zinc-300"
-                  }`}>
-                    {line}
+              <div className="flex items-center gap-3">
+                {deployStatus?.startedAt && (
+                  <p className="text-xs text-zinc-400">
+                    {isEn ? "Started:" : "Inicio:"}{" "}
+                    {new Date(deployStatus.startedAt).toLocaleTimeString()}
+                    {deployStatus.durationMs !== null && (
+                      <> · {formatDeployDuration(deployStatus.durationMs)}</>
+                    )}
                   </p>
+                )}
+                {!deployConfirmStep ? (
+                  <button
+                    type="button"
+                    disabled={!!deployStatus?.running}
+                    onClick={() => setDeployConfirmStep(true)}
+                    className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition shadow-sm ${
+                      deployStatus?.running
+                        ? "bg-amber-100 text-amber-700 border border-amber-300 cursor-not-allowed"
+                        : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+                    }`}
+                  >
+                    {deployStatus?.running ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" />{isEn ? "Deploying…" : "Desplegando…"}</>
+                    ) : (
+                      <><Play className="h-4 w-4" />{isEn ? "Deploy now" : "Deploy ahora"}</>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span className="text-xs font-medium text-amber-800">{isEn ? "Deploy to production?" : "¿Deploy a producción?"}</span>
+                    <button
+                      type="button"
+                      onClick={onTriggerDeploy}
+                      className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 active:scale-95 transition"
+                    >
+                      {isEn ? "Yes, deploy" : "Sí, deployar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeployConfirmStep(false)}
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1 text-xs text-zinc-600 hover:bg-zinc-50 transition"
+                    >
+                      {isEn ? "Cancel" : "Cancelar"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Log terminal */}
+          {deployStatus && deployStatus.logs.length > 0 && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden">
+              {/* Terminal toolbar */}
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1.5">
+                    <span className="h-3 w-3 rounded-full bg-red-500/80" />
+                    <span className="h-3 w-3 rounded-full bg-amber-500/80" />
+                    <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
+                  </div>
+                  <span className="text-xs text-zinc-400 font-mono">
+                    nexus_deploy.sh
+                    {deployStatus.running && <span className="ml-2 text-amber-400 animate-pulse">● running</span>}
+                    {deployStatus.success === true && <span className="ml-2 text-emerald-400">● exited 0</span>}
+                    {deployStatus.success === false && <span className="ml-2 text-red-400">● exited {deployStatus.exitCode}</span>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-zinc-600">{deployStatus.logs.length} {isEn ? "lines" : "líneas"}</span>
+                  <button
+                    type="button"
+                    onClick={onCopyLogs}
+                    title={isEn ? "Copy logs" : "Copiar logs"}
+                    className="ml-2 rounded p-1 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition"
+                  >
+                    <ClipboardCopy className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClearDeployLogs}
+                    disabled={!!deployStatus.running}
+                    title={isEn ? "Clear logs" : "Limpiar logs"}
+                    className="rounded p-1 text-zinc-500 hover:bg-zinc-700 hover:text-red-400 transition disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {/* Log lines */}
+              <div className="max-h-96 overflow-y-auto p-3 space-y-0">
+                {deployStatus.logs.map((line, i) => (
+                  <div key={i} className="flex gap-3 font-mono text-xs leading-relaxed">
+                    <span className="select-none text-zinc-700 w-10 shrink-0 text-right tabular-nums">
+                      {i + 1}
+                    </span>
+                    <span className={
+                      line.includes("ERROR") || line.includes("FAILED") || line.includes("error") || line.includes("[stderr]")
+                        ? "text-red-400"
+                        : line.includes("SUCCESS") || line.includes("✓") || line.includes("OK")
+                        ? "text-emerald-400"
+                        : line.startsWith("[deploy]")
+                        ? "text-sky-400"
+                        : "text-zinc-300"
+                    }>
+                      {line}
+                    </span>
+                  </div>
                 ))}
                 <div ref={logsEndRef} />
+              </div>
+            </div>
+          )}
+
+          {/* Deploy history */}
+          {deployHistory.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                  <History className="h-4 w-4" />
+                  {isEn ? "Deploy history" : "Historial de deploys"}
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">{deployHistory.length}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={onClearDeployHistory}
+                  className="text-xs text-zinc-400 hover:text-red-500 hover:underline"
+                >
+                  {isEn ? "Clear history" : "Limpiar historial"}
+                </button>
+              </div>
+              <div className="rounded-xl border border-zinc-200 overflow-hidden divide-y divide-zinc-100">
+                {deployHistory.map((entry) => (
+                  <div key={entry.id} className="bg-white">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedHistoryId(expandedHistoryId === entry.id ? null : entry.id)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-zinc-50 transition text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`h-2 w-2 rounded-full shrink-0 ${entry.success ? "bg-emerald-500" : "bg-red-500"}`} />
+                        <div>
+                          <p className="text-xs font-medium text-zinc-900">
+                            {new Date(entry.startedAt).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            {isEn ? "Duration:" : "Duración:"} {formatDeployDuration(entry.durationMs)}
+                            {" · "}
+                            {isEn ? "Exit:" : "Código:"} {entry.exitCode}
+                            {" · "}
+                            {entry.logLines} {isEn ? "lines" : "líneas"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          entry.success
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-red-50 text-red-700"
+                        }`}>
+                          {entry.success ? (isEn ? "Success" : "Éxito") : (isEn ? "Failed" : "Fallido")}
+                        </span>
+                        <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${expandedHistoryId === entry.id ? "rotate-180" : ""}`} />
+                      </div>
+                    </button>
+                    {expandedHistoryId === entry.id && entry.tailLogs.length > 0 && (
+                      <div className="border-t border-zinc-100 bg-zinc-950 px-3 py-2 max-h-48 overflow-y-auto">
+                        {entry.tailLogs.map((line, i) => (
+                          <p key={i} className={`font-mono text-xs leading-relaxed ${
+                            line.includes("ERROR") || line.includes("FAILED")
+                              ? "text-red-400"
+                              : line.includes("SUCCESS") || line.includes("✓")
+                              ? "text-emerald-400"
+                              : line.startsWith("[deploy]")
+                              ? "text-sky-400"
+                              : "text-zinc-400"
+                          }`}>
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

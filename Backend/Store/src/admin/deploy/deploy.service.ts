@@ -27,10 +27,24 @@ export interface DeployStatus {
   finishedAt: string | null;
   exitCode: number | null;
   success: boolean | null;
+  durationMs: number | null;
   logs: string[];
 }
 
+export interface DeployHistoryEntry {
+  id: string;
+  startedAt: string;
+  finishedAt: string;
+  exitCode: number;
+  success: boolean;
+  durationMs: number;
+  logLines: number;
+  tailLogs: string[];
+}
+
 const MAX_LOG_LINES = 2000;
+const MAX_HISTORY = 20;
+const HISTORY_TAIL_LINES = 50;
 
 @Injectable()
 export class DeployService {
@@ -43,8 +57,11 @@ export class DeployService {
     finishedAt: null,
     exitCode: null,
     success: null,
+    durationMs: null,
     logs: [],
   };
+
+  private history: DeployHistoryEntry[] = [];
 
   constructor() {
     const base = process.env.BRANDING_STORAGE_DIR?.trim()
@@ -120,6 +137,20 @@ export class DeployService {
     return { ...this.status, logs: [...this.status.logs] };
   }
 
+  clearLogs(): void {
+    if (!this.status.running) {
+      this.status.logs = [];
+    }
+  }
+
+  getHistory(): DeployHistoryEntry[] {
+    return [...this.history];
+  }
+
+  clearHistory(): void {
+    this.history = [];
+  }
+
   async triggerDeploy(): Promise<DeployStatus> {
     if (this.status.running) {
       throw new ConflictException('A deployment is already in progress');
@@ -129,12 +160,14 @@ export class DeployService {
     const repoDir = resolve(process.cwd(), '..', '..'); // Backend/Store → project root
     const scriptPath = join(repoDir, 'ops', 'nexus_deploy.sh');
 
+    const startTime = Date.now();
     this.status = {
       running: true,
       startedAt: new Date().toISOString(),
       finishedAt: null,
       exitCode: null,
       success: null,
+      durationMs: null,
       logs: [`[deploy] Starting deployment at ${new Date().toISOString()}`],
     };
 
@@ -183,15 +216,18 @@ export class DeployService {
     this.pushLog(`[deploy] Script: ${scriptPath}`);
     this.pushLog(`[deploy] Branch: ${childEnv['BRANCH'] || '(auto-detect)'}`);
     this.pushLog(
-      `[deploy] Repo URL: ${settings.repoUrl ? '(configured)' : '(using existing)'}`,
+      `[deploy] Repo URL: ${settings.repoUrl ? '(configured)' : '(using existing local repo)'}`,
     );
-    if (settings.sshPrivateKey) this.pushLog('[deploy] SSH key: configured');
-    else if (settings.gitToken) this.pushLog('[deploy] Git token: configured');
+    if (settings.sshPrivateKey) this.pushLog('[deploy] Auth: SSH key configured');
+    else if (settings.gitToken) this.pushLog('[deploy] Auth: Git token configured');
+    else this.pushLog('[deploy] Auth: none (public or existing credentials)');
 
     // Fire off the deployment asynchronously
-    this.runScript(scriptPath, childEnv, tmpSshKeyPath).catch((err) => {
-      this.pushLog(`[deploy] Unexpected error: ${String(err)}`);
-    });
+    this.runScript(scriptPath, childEnv, tmpSshKeyPath, startTime).catch(
+      (err) => {
+        this.pushLog(`[deploy] Unexpected error: ${String(err)}`);
+      },
+    );
 
     return this.getStatus();
   }
@@ -200,12 +236,18 @@ export class DeployService {
     scriptPath: string,
     childEnv: Record<string, string>,
     tmpSshKeyPath: string | null,
+    startTime: number,
   ): Promise<void> {
     try {
       await fs.access(scriptPath);
     } catch {
-      this.pushLog(`[deploy] ERROR: Script not found at ${scriptPath}`);
-      this.finalize(127, tmpSshKeyPath);
+      this.pushLog(
+        `[deploy] ERROR: Deploy script not found at: ${scriptPath}`,
+      );
+      this.pushLog(
+        `[deploy] Hint: Make sure ops/nexus_deploy.sh exists in the repository root.`,
+      );
+      this.finalize(127, tmpSshKeyPath, startTime);
       return;
     }
 
@@ -229,32 +271,69 @@ export class DeployService {
       }
     });
 
-    await new Promise<void>((resolveP) => {
+    await new Promise<void>((resolve) => {
       child.on('close', (code) => {
-        this.finalize(code ?? 1, tmpSshKeyPath);
-        resolveP();
+        this.finalize(code ?? 1, tmpSshKeyPath, startTime);
+        resolve();
       });
       child.on('error', (err) => {
         this.pushLog(`[deploy] Process error: ${err.message}`);
-        this.finalize(1, tmpSshKeyPath);
-        resolveP();
+        this.finalize(1, tmpSshKeyPath, startTime);
+        resolve();
       });
     });
   }
 
-  private finalize(exitCode: number, tmpSshKeyPath: string | null): void {
+  private finalize(
+    exitCode: number,
+    tmpSshKeyPath: string | null,
+    startTime: number,
+  ): void {
     const success = exitCode === 0;
+    const finishedAt = new Date().toISOString();
+    const durationMs = Date.now() - startTime;
+
     this.status.running = false;
-    this.status.finishedAt = new Date().toISOString();
+    this.status.finishedAt = finishedAt;
     this.status.exitCode = exitCode;
     this.status.success = success;
+    this.status.durationMs = durationMs;
+
     this.pushLog(
-      `[deploy] Finished at ${this.status.finishedAt} — exit code ${exitCode} (${success ? 'SUCCESS' : 'FAILED'})`,
+      `[deploy] Finished at ${finishedAt} — exit ${exitCode} — duration ${this.formatDuration(durationMs)} — ${success ? 'SUCCESS ✓' : 'FAILED ✗'}`,
     );
 
-    if (tmpSshKeyPath) {
-      fs.unlink(tmpSshKeyPath).catch(() => {/* best-effort cleanup */});
+    // Record in history
+    const entry: DeployHistoryEntry = {
+      id: crypto.randomBytes(6).toString('hex'),
+      startedAt: this.status.startedAt!,
+      finishedAt,
+      exitCode,
+      success,
+      durationMs,
+      logLines: this.status.logs.length,
+      tailLogs: this.status.logs.slice(-HISTORY_TAIL_LINES),
+    };
+    this.history.unshift(entry);
+    if (this.history.length > MAX_HISTORY) {
+      this.history = this.history.slice(0, MAX_HISTORY);
     }
+
+    if (tmpSshKeyPath) {
+      fs.unlink(tmpSshKeyPath).catch((err) => {
+        // Best-effort cleanup — log so ops can manually remove the file if needed
+        console.warn(`[deploy] Could not delete temp SSH key ${tmpSshKeyPath}: ${String(err)}`);
+      });
+    }
+  }
+
+  private formatDuration(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m}m ${rem}s`;
   }
 
   private pushLog(line: string): void {
@@ -275,7 +354,10 @@ export class DeployService {
 
   private async writeTempSshKey(privateKey: string): Promise<string> {
     const tmpDir = os.tmpdir();
-    const tmpFile = join(tmpDir, `nexus_deploy_key_${crypto.randomBytes(16).toString('hex')}`);
+    const tmpFile = join(
+      tmpDir,
+      `nexus_deploy_key_${crypto.randomBytes(16).toString('hex')}`,
+    );
     const key = privateKey.endsWith('\n') ? privateKey : `${privateKey}\n`;
     await fs.writeFile(tmpFile, key, { encoding: 'utf8', mode: 0o600 });
     return tmpFile;

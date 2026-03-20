@@ -122,7 +122,11 @@ export {
   clearDeploySecret,
   triggerDeploy,
   fetchDeployStatus,
+  clearDeployLogs,
+  fetchDeployHistory,
+  clearDeployHistory,
   type DeploySettingsPublic,
   type DeploySettingsInput,
   type DeployStatus,
+  type DeployHistoryEntry,
 } from "./deploy";

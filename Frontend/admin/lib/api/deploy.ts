@@ -22,7 +22,19 @@ export interface DeployStatus {
   finishedAt: string | null;
   exitCode: number | null;
   success: boolean | null;
+  durationMs: number | null;
   logs: string[];
+}
+
+export interface DeployHistoryEntry {
+  id: string;
+  startedAt: string;
+  finishedAt: string;
+  exitCode: number;
+  success: boolean;
+  durationMs: number;
+  logLines: number;
+  tailLogs: string[];
 }
 
 export async function fetchDeploySettings(): Promise<DeploySettingsPublic> {
@@ -52,4 +64,16 @@ export async function triggerDeploy(): Promise<DeployStatus> {
 
 export async function fetchDeployStatus(): Promise<DeployStatus> {
   return fetchWithAuth<DeployStatus>("/admin/deploy/status");
+}
+
+export async function clearDeployLogs(): Promise<void> {
+  await fetchWithAuth("/admin/deploy/logs", { method: "DELETE" });
+}
+
+export async function fetchDeployHistory(): Promise<DeployHistoryEntry[]> {
+  return fetchWithAuth<DeployHistoryEntry[]>("/admin/deploy/history");
+}
+
+export async function clearDeployHistory(): Promise<void> {
+  await fetchWithAuth("/admin/deploy/history", { method: "DELETE" });
 }

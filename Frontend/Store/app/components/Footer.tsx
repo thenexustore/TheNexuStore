@@ -9,17 +9,16 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import XIcon from "@mui/icons-material/X";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from "@/app/lib/admin-branding";
-import StoreBrandLogo from "./StoreBrandLogo";
 import { ArrowUp } from "lucide-react";
+
+const FOOTER_LOGO_SRC = "/logo1.jpeg";
+const FOOTER_LOGO_FALLBACK_SRC = "/logo.png";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const t = useTranslations("footer");
-  const [storeBranding, setStoreBranding] = useState<StoreBranding>(() => loadStoreBranding());
+  const [footerLogoSrc, setFooterLogoSrc] = useState(FOOTER_LOGO_SRC);
   const [showBackToTop, setShowBackToTop] = useState(false);
-
-  useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
   useEffect(() => {
     const handleScroll = () => setShowBackToTop(window.scrollY > 400);
@@ -66,7 +65,16 @@ export default function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 items-start">
             {/* Brand + Newsletter */}
             <div className="lg:col-span-2">
-              <StoreBrandLogo branding={storeBranding} alt="Logo" className="w-auto mb-5" height={36} />
+              <img
+                src={footerLogoSrc}
+                alt="Footer logo"
+                className="mb-5 block h-9 w-auto max-w-full"
+                onError={() => {
+                  if (footerLogoSrc !== FOOTER_LOGO_FALLBACK_SRC) {
+                    setFooterLogoSrc(FOOTER_LOGO_FALLBACK_SRC);
+                  }
+                }}
+              />
               <h3 className="text-base font-semibold mb-3">{t("title")}</h3>
               <form
                 onSubmit={handleSubscribe}

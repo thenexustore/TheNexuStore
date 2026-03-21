@@ -40,10 +40,18 @@ validate_infortisa_health() {
 
   HEALTH_PAYLOAD="$payload" node <<'NODE'
 const raw = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
-const payload = (raw && typeof raw.data === 'object' && raw.data !== null) ? raw.data : raw;
+const unwrapPayload = (value) => {
+  let current = value;
+  while (current && typeof current === 'object' && current.data && typeof current.data === 'object') {
+    current = current.data;
+  }
+  return current;
+};
+const payload = unwrapPayload(raw);
 const valid =
   payload &&
   typeof payload === 'object' &&
+  typeof payload.healthy === 'boolean' &&
   payload.provider === 'infortisa' &&
   typeof payload.base_url === 'string' &&
   typeof payload.checked_at === 'string' &&
@@ -51,7 +59,7 @@ const valid =
   typeof payload.latency_ms === 'number';
 
 if (!valid) {
-  console.error('Invalid Infortisa health payload shape');
+  console.error(`Invalid Infortisa health payload shape: ${JSON.stringify(raw)}`);
   process.exit(1);
 }
 
@@ -205,7 +213,7 @@ fi
 log "Installing/building Store frontend"
 cd "$REPO_DIR/Frontend/Store"
 fix_next_proxy_conflict "$REPO_DIR/Frontend/Store"
-npm ci
+npm ci --include=dev
 cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN
@@ -218,7 +226,7 @@ pm2 start npm --name nexus-store --cwd "$REPO_DIR/Frontend/Store" -- start -- -p
 log "Installing/building Admin frontend"
 cd "$REPO_DIR/Frontend/admin"
 fix_next_proxy_conflict "$REPO_DIR/Frontend/admin"
-npm ci
+npm ci --include=dev
 cat > .env.production <<ENV
 NEXT_PUBLIC_API_URL=$API_DOMAIN
 NEXT_PUBLIC_SITE_URL=$SITE_DOMAIN

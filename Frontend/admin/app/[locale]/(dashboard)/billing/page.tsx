@@ -79,6 +79,39 @@ type CreateFormState = {
 
 type InputEv = { target: { value: string } };
 
+// ─── Preview data interface ───────────────────────────────────────────────────
+
+interface BillingPreviewData {
+  type: BillingDocumentType;
+  document_number?: string | null;
+  issue_date?: string | null;
+  due_date?: string | null;
+  payment_method?: BillingPaymentMethod | null;
+  currency?: string | null;
+  company_legal_name?: string | null;
+  company_trade_name?: string | null;
+  company_nif?: string | null;
+  company_address?: string | null;
+  company_iban_1?: string | null;
+  company_iban_2?: string | null;
+  customer_name?: string | null;
+  customer_tax_id?: string | null;
+  customer_email?: string | null;
+  customer_address?: string | null;
+  subtotal_amount?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount?: number;
+  notes?: string | null;
+  items: Array<{
+    description?: string | null;
+    qty: number;
+    unit_price: number;
+    tax_rate: number;
+    line_total?: number | null;
+  }>;
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<BillingDocumentType, string> = {
@@ -167,6 +200,206 @@ function formatDate(val: string | null | undefined): string {
   return new Date(val).toLocaleDateString("es-ES");
 }
 
+// ─── BillingPreview ───────────────────────────────────────────────────────────
+
+function BillingPreview({ data }: { data: BillingPreviewData }) {
+  const cur = data.currency ?? "EUR";
+  const fmt = (v: number) =>
+    new Intl.NumberFormat("es-ES", { style: "currency", currency: cur }).format(v);
+  const fmtDate = (v: string | null | undefined) =>
+    v ? new Date(v).toLocaleDateString("es-ES") : "—";
+
+  const typeLabel =
+    data.type === "INVOICE" ? "FACTURA" :
+    data.type === "QUOTE" ? "PRESUPUESTO" : "NOTA DE CRÉDITO";
+  const typeColor =
+    data.type === "INVOICE" ? "#1d4ed8" :
+    data.type === "QUOTE" ? "#b45309" : "#c2410c";
+
+  // Recompute totals from items when doc doesn't have them (create form)
+  const computedSubtotal = data.items.reduce(
+    (s, i) => s + i.qty * i.unit_price, 0,
+  );
+  const computedTax = data.items.reduce(
+    (s, i) => s + i.qty * i.unit_price * i.tax_rate, 0,
+  );
+  const subtotal = data.subtotal_amount ?? computedSubtotal;
+  const tax = data.tax_amount ?? computedTax;
+  const discount = data.discount_amount ?? 0;
+  const total = data.total_amount ?? subtotal + tax - discount;
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        fontSize: "11px",
+        color: "#18181b",
+        width: "210mm",
+        minHeight: "297mm",
+        margin: "0 auto",
+        padding: "14mm 16mm 14mm 16mm",
+        boxSizing: "border-box",
+        boxShadow: "0 4px 32px rgba(0,0,0,0.13)",
+        position: "relative",
+      }}
+    >
+      {/* ── Top header bar ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `3px solid ${typeColor}`, paddingBottom: "10px", marginBottom: "14px" }}>
+        {/* Company block */}
+        <div style={{ maxWidth: "55%" }}>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: "#18181b", lineHeight: 1.2 }}>
+            {data.company_legal_name || <span style={{ color: "#a1a1aa" }}>Nombre empresa</span>}
+          </div>
+          {data.company_trade_name && (
+            <div style={{ fontSize: "11px", color: "#71717a", marginTop: "2px" }}>{data.company_trade_name}</div>
+          )}
+          {data.company_nif && (
+            <div style={{ fontSize: "10.5px", color: "#52525b", marginTop: "3px" }}>NIF: {data.company_nif}</div>
+          )}
+          {data.company_address && (
+            <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px", whiteSpace: "pre-line" }}>{data.company_address}</div>
+          )}
+        </div>
+
+        {/* Doc type + number block */}
+        <div style={{ textAlign: "right", minWidth: "40%" }}>
+          <div style={{ fontSize: "18px", fontWeight: 800, color: typeColor, letterSpacing: "0.03em" }}>
+            {typeLabel}
+          </div>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: "#3f3f46", marginTop: "3px", fontFamily: "monospace" }}>
+            {data.document_number || <span style={{ color: "#a1a1aa" }}>Número pendiente de asignar</span>}
+          </div>
+          <div style={{ fontSize: "10px", color: "#71717a", marginTop: "4px" }}>
+            <span>Fecha: </span>
+            <span style={{ fontWeight: 600, color: "#18181b" }}>{fmtDate(data.issue_date)}</span>
+          </div>
+          {data.due_date && (
+            <div style={{ fontSize: "10px", color: "#71717a", marginTop: "1px" }}>
+              <span>Vencimiento: </span>
+              <span style={{ fontWeight: 600, color: "#18181b" }}>{fmtDate(data.due_date)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Two-column: Emisor / Cliente ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+        <div style={{ background: "#f4f4f5", borderRadius: "6px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>DATOS DEL EMISOR</div>
+          <div style={{ fontWeight: 700, fontSize: "11px" }}>{data.company_legal_name || "—"}</div>
+          {data.company_nif && <div style={{ fontSize: "10px", color: "#52525b", marginTop: "2px" }}>NIF: {data.company_nif}</div>}
+          {data.company_address && <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>{data.company_address}</div>}
+          {data.company_iban_1 && (
+            <div style={{ fontSize: "9.5px", fontFamily: "monospace", color: "#52525b", marginTop: "5px", background: "#e4e4e7", borderRadius: "4px", padding: "2px 6px" }}>
+              {data.company_iban_1}
+            </div>
+          )}
+          {data.company_iban_2 && (
+            <div style={{ fontSize: "9.5px", fontFamily: "monospace", color: "#52525b", marginTop: "2px", background: "#e4e4e7", borderRadius: "4px", padding: "2px 6px" }}>
+              {data.company_iban_2}
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: "#f4f4f5", borderRadius: "6px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>DATOS DEL CLIENTE</div>
+          <div style={{ fontWeight: 700, fontSize: "11px" }}>{data.customer_name || <span style={{ color: "#a1a1aa" }}>Nombre del cliente</span>}</div>
+          {data.customer_tax_id && <div style={{ fontSize: "10px", color: "#52525b", marginTop: "2px" }}>NIF/CIF: {data.customer_tax_id}</div>}
+          {data.customer_address && <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>{data.customer_address}</div>}
+          {data.customer_email && <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>{data.customer_email}</div>}
+        </div>
+      </div>
+
+      {/* ── Payment method strip ── */}
+      {data.payment_method && (
+        <div style={{ display: "flex", gap: "12px", marginBottom: "14px", fontSize: "10px", color: "#52525b" }}>
+          <span style={{ fontWeight: 600 }}>Forma de pago:</span>
+          <span style={{ color: "#18181b" }}>
+            {data.payment_method === "BANK_TRANSFER" ? "Transferencia bancaria" :
+             data.payment_method === "CASH" ? "Efectivo" :
+             data.payment_method === "COD" ? "Contra reembolso" :
+             data.payment_method}
+          </span>
+        </div>
+      )}
+
+      {/* ── Line items table ── */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "16px", fontSize: "10.5px" }}>
+        <thead>
+          <tr style={{ background: typeColor }}>
+            <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 700, color: "#fff", borderRadius: "3px 0 0 0" }}>Descripción</th>
+            <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "50px" }}>Cant.</th>
+            <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "70px" }}>P. unitario</th>
+            <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "50px" }}>IVA %</th>
+            <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "80px", borderRadius: "0 3px 0 0" }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.items.length === 0 && (
+            <tr>
+              <td colSpan={5} style={{ textAlign: "center", padding: "18px 8px", color: "#a1a1aa" }}>Sin líneas</td>
+            </tr>
+          )}
+          {data.items.map((item, idx) => {
+            const lineBase = item.qty * item.unit_price;
+            const lineTotal = item.line_total ?? lineBase + lineBase * item.tax_rate;
+            return (
+              <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                <td style={{ padding: "6px 8px", color: "#18181b" }}>{item.description || <span style={{ color: "#a1a1aa" }}>—</span>}</td>
+                <td style={{ padding: "6px 8px", textAlign: "center", color: "#3f3f46" }}>{item.qty}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", color: "#3f3f46" }}>{fmt(item.unit_price)}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", color: "#71717a" }}>{(item.tax_rate * 100).toFixed(0)}%</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600, color: "#18181b" }}>{fmt(lineTotal)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* ── Totals block ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
+        <div style={{ width: "210px", border: `1px solid ${typeColor}30`, borderRadius: "7px", overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 12px", fontSize: "10.5px", color: "#3f3f46", borderBottom: "1px solid #f0f0f0" }}>
+            <span>Base imponible</span>
+            <span>{fmt(subtotal)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 12px", fontSize: "10.5px", color: "#3f3f46", borderBottom: "1px solid #f0f0f0" }}>
+            <span>IVA</span>
+            <span>{fmt(tax)}</span>
+          </div>
+          {discount > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 12px", fontSize: "10.5px", color: "#dc2626", borderBottom: "1px solid #f0f0f0" }}>
+              <span>Descuento</span>
+              <span>-{fmt(discount)}</span>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 12px", fontSize: "13px", fontWeight: 800, color: "#fff", background: typeColor }}>
+            <span>TOTAL</span>
+            <span>{fmt(total)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Notes ── */}
+      {data.notes && (
+        <div style={{ background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: "6px", padding: "8px 12px", marginBottom: "12px" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>NOTAS</div>
+          <div style={{ fontSize: "10.5px", color: "#3f3f46", lineHeight: 1.5 }}>{data.notes}</div>
+        </div>
+      )}
+
+      {/* ── IBAN footer ── */}
+      {(data.company_iban_1 || data.company_iban_2) && (
+        <div style={{ position: "absolute", bottom: "14mm", left: "16mm", right: "16mm", borderTop: "1px solid #e4e4e7", paddingTop: "6px", fontSize: "9px", color: "#71717a", display: "flex", gap: "16px" }}>
+          {data.company_iban_1 && <span>IBAN: <span style={{ fontFamily: "monospace", color: "#52525b" }}>{data.company_iban_1}</span></span>}
+          {data.company_iban_2 && <span>IBAN: <span style={{ fontFamily: "monospace", color: "#52525b" }}>{data.company_iban_2}</span></span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
@@ -231,12 +464,14 @@ export default function BillingPage() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showCreatePreview, setShowCreatePreview] = useState(false);
 
   // Escape key to close panels
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (showCreate) { setShowCreate(false); return; }
+      if (showCreate) { setShowCreate(false); setShowCreatePreview(false); return; }
       if (editNumberDoc) { setEditNumberDoc(null); return; }
       if (showSettings) { setShowSettings(false); return; }
       if (showDetail) { setShowDetail(false); setSelectedDoc(null); return; }
@@ -302,6 +537,7 @@ export default function BillingPage() {
   const closeDetail = () => {
     setShowDetail(false);
     setSelectedDoc(null);
+    setShowPreview(false);
   };
 
   // ─── Issue document ────────────────────────────────────────────────────────
@@ -445,6 +681,7 @@ export default function BillingPage() {
           : "Nota de crédito creada",
       );
       setShowCreate(false);
+      setShowCreatePreview(false);
       await loadDocs(1);
     } catch (err: unknown) {
       toast.error(
@@ -1401,6 +1638,14 @@ export default function BillingPage() {
             {/* Footer actions */}
             {selectedDoc && (
               <div className="shrink-0 flex flex-wrap gap-2 px-6 py-4 border-t border-zinc-100 bg-white">
+                {/* Vista previa */}
+                <button
+                  onClick={() => setShowPreview(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
+                >
+                  <Eye className="w-4 h-4" />
+                  Vista previa
+                </button>
                 {selectedDoc.status === "DRAFT" && (
                   <button
                     onClick={() => handleIssue(selectedDoc.id)}
@@ -1564,6 +1809,55 @@ export default function BillingPage() {
         </>
       )}
 
+      {/* ─── Preview overlay ──────────────────────────────────────────────── */}
+      {showPreview && selectedDoc && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-start justify-center py-6 px-4 overflow-y-auto">
+          <div className="w-full" style={{ maxWidth: "230mm" }}>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-white text-sm font-semibold">Vista previa del documento</span>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20 transition"
+              >
+                <X className="w-4 h-4" />
+                Cerrar
+              </button>
+            </div>
+            <BillingPreview data={{
+              type: selectedDoc.type as BillingDocumentType,
+              document_number: selectedDoc.document_number,
+              issue_date: selectedDoc.issue_date,
+              due_date: selectedDoc.due_date,
+              payment_method: selectedDoc.payment_method as BillingPaymentMethod | null,
+              currency: selectedDoc.currency,
+              company_legal_name: selectedDoc.company_legal_name,
+              company_trade_name: selectedDoc.company_trade_name,
+              company_nif: selectedDoc.company_nif,
+              company_address: selectedDoc.company_address,
+              company_iban_1: selectedDoc.company_iban_1,
+              company_iban_2: selectedDoc.company_iban_2,
+              customer_name: selectedDoc.customer_name,
+              customer_tax_id: selectedDoc.customer_tax_id,
+              customer_email: selectedDoc.customer_email,
+              customer_address: selectedDoc.customer_address,
+              subtotal_amount: Number(selectedDoc.subtotal_amount),
+              tax_amount: Number(selectedDoc.tax_amount),
+              discount_amount: Number(selectedDoc.discount_amount),
+              total_amount: Number(selectedDoc.total_amount),
+              notes: selectedDoc.notes,
+              items: (selectedDoc.items ?? []).map((it: BillingDocumentItem) => ({
+                description: it.description,
+                qty: Number(it.qty),
+                unit_price: Number(it.unit_price),
+                tax_rate: Number(it.tax_rate),
+                line_total: Number(it.line_total),
+              })),
+            }} />
+          </div>
+        </div>
+      )}
+
       {/* ─── Edit number modal ────────────────────────────────────────────── */}
       {editNumberDoc && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -1668,16 +1962,68 @@ export default function BillingPage() {
                 </h3>
               </div>
               <button
-                onClick={() => setShowCreate(false)}
+                onClick={() => { setShowCreate(false); setShowCreatePreview(false); }}
                 className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Preview / Form tabs */}
+            <div className="flex gap-1 px-6 pt-3 pb-0 border-b border-zinc-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCreatePreview(false)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-t-lg border-b-2 transition ${!showCreatePreview ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-400 hover:text-zinc-600"}`}
+              >
+                Formulario
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreatePreview(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t-lg border-b-2 transition ${showCreatePreview ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-400 hover:text-zinc-600"}`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Vista previa
+              </button>
+            </div>
+
+            {/* Live preview tab */}
+            {showCreatePreview && (
+              <div className="flex-1 overflow-y-auto bg-zinc-100 p-4">
+                <BillingPreview data={{
+                  type: createType,
+                  document_number: null,
+                  issue_date: new Date().toISOString(),
+                  due_date: null,
+                  payment_method: createForm.payment_method as BillingPaymentMethod | null || null,
+                  currency: settings?.default_currency ?? "EUR",
+                  company_legal_name: settings?.legal_name ?? null,
+                  company_trade_name: settings?.trade_name ?? null,
+                  company_nif: settings?.nif ?? null,
+                  company_address: settings?.address_real ?? null,
+                  company_iban_1: settings?.iban_caixabank ?? null,
+                  company_iban_2: settings?.iban_bbva ?? null,
+                  customer_name: createForm.customer_name || null,
+                  customer_tax_id: createForm.customer_tax_id || null,
+                  customer_email: createForm.customer_email || null,
+                  customer_address: createForm.customer_address || null,
+                  notes: createForm.notes || null,
+                  items: createForm.items
+                    .filter((i: CreateItemState) => i.description || Number(i.unit_price) > 0)
+                    .map((i: CreateItemState) => ({
+                      description: i.description,
+                      qty: Number(i.qty) || 1,
+                      unit_price: Number(i.unit_price) || 0,
+                      tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
+                    })),
+                }} />
+              </div>
+            )}
+
             <form
               onSubmit={handleCreate}
-              className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
+              className={`flex-1 overflow-y-auto px-6 py-5 space-y-5${showCreatePreview ? " hidden" : ""}`}
             >
               {/* Type + Language */}
               <div className="grid grid-cols-2 gap-4">
@@ -1939,7 +2285,7 @@ export default function BillingPage() {
               <div className="flex justify-end gap-2 pt-1 border-t border-zinc-100">
                 <button
                   type="button"
-                  onClick={() => setShowCreate(false)}
+                  onClick={() => { setShowCreate(false); setShowCreatePreview(false); }}
                   className="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >
                   Cancelar

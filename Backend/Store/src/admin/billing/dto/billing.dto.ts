@@ -6,8 +6,10 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -149,6 +151,7 @@ export class BillingDocumentsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit: number = 20;
 
   @IsOptional()
@@ -211,6 +214,8 @@ export class CreateBillingTemplateDto {
   @IsString()
   background_url?: string;
 
+  @IsObject()
+  @IsOptional()
   config_json: Record<string, unknown> = {};
 
   @IsOptional()

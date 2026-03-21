@@ -334,6 +334,9 @@ export async function downloadBillingExport(params: {
   const a = document.createElement("a");
   a.href = url;
   a.download = "billing-export.csv";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  // Brief delay so the browser can initiate the download before the URL is revoked
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }

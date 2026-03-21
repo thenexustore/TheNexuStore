@@ -127,23 +127,42 @@ export class BillingService {
     };
   }
 
+  // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns end-of-day (23:59:59.999 UTC) for a date string, making range
+   * filters using `lte` inclusive of the full calendar day.
+   */
+  private toEndOfDay(d: string): Date {
+    const dt = new Date(d);
+    dt.setUTCHours(23, 59, 59, 999);
+    return dt;
+  }
+
   // ─── Documents ────────────────────────────────────────────────────────────────
 
   async listDocuments(query: BillingDocumentsQueryDto) {
     const { page, limit, type, status, search, from, to } = query;
     const skip = (page - 1) * limit;
 
+    const dateRange = from || to
+      ? {
+          gte: from ? new Date(from) : undefined,
+          lte: to ? this.toEndOfDay(to) : undefined,
+        }
+      : null;
+
     const where: Prisma.BillingDocumentWhereInput = {
       ...(type && { type }),
       ...(status && { status }),
-      ...(from || to
-        ? {
-            created_at: {
-              ...(from && { gte: new Date(from) }),
-              ...(to && { lte: new Date(to) }),
-            },
-          }
-        : {}),
+      // Filter issued docs by issue_date; DRAFT documents have no issue_date
+      // yet so fall back to created_at to keep them visible in date searches.
+      ...(dateRange && {
+        OR: [
+          { issue_date: dateRange },
+          { issue_date: null, created_at: dateRange },
+        ],
+      }),
       ...(search && {
         OR: [
           { document_number: { contains: search, mode: 'insensitive' } },
@@ -261,32 +280,36 @@ export class BillingService {
     let total = 0;
 
     if (items !== undefined) {
-      await this.prisma.billingDocumentItem.deleteMany({
-        where: { document_id: id },
-      });
+      // Wrap delete + recreate in a transaction to avoid leaving the document
+      // without items if the createMany call fails.
+      await this.prisma.$transaction(async (tx) => {
+        await tx.billingDocumentItem.deleteMany({
+          where: { document_id: id },
+        });
 
-      const lineItems = items.map((item, i) => {
-        const taxRate = item.tax_rate ?? 0.21;
-        const lineSubtotal = Number(item.qty) * Number(item.unit_price);
-        const taxAmountLine = lineSubtotal * taxRate;
-        const lineTotal = lineSubtotal + taxAmountLine;
-        subtotal += lineSubtotal;
-        taxAmount += taxAmountLine;
-        total += lineTotal;
-        return {
-          document_id: id,
-          description: item.description,
-          qty: item.qty,
-          unit_price: item.unit_price,
-          tax_rate: taxRate,
-          line_subtotal: lineSubtotal,
-          tax_amount: taxAmountLine,
-          line_total: lineTotal,
-          position: item.position ?? i,
-        };
-      });
+        const lineItems = items.map((item, i) => {
+          const taxRate = item.tax_rate ?? 0.21;
+          const lineSubtotal = Number(item.qty) * Number(item.unit_price);
+          const taxAmountLine = lineSubtotal * taxRate;
+          const lineTotal = lineSubtotal + taxAmountLine;
+          subtotal += lineSubtotal;
+          taxAmount += taxAmountLine;
+          total += lineTotal;
+          return {
+            document_id: id,
+            description: item.description,
+            qty: item.qty,
+            unit_price: item.unit_price,
+            tax_rate: taxRate,
+            line_subtotal: lineSubtotal,
+            tax_amount: taxAmountLine,
+            line_total: lineTotal,
+            position: item.position ?? i,
+          };
+        });
 
-      await this.prisma.billingDocumentItem.createMany({ data: lineItems });
+        await tx.billingDocumentItem.createMany({ data: lineItems });
+      });
     }
 
     return this.prisma.billingDocument.update({
@@ -599,7 +622,7 @@ export class BillingService {
         ? {
             issue_date: {
               ...(query.from && { gte: new Date(query.from) }),
-              ...(query.to && { lte: new Date(query.to) }),
+              ...(query.to && { lte: this.toEndOfDay(query.to) }),
             },
           }
         : {}),
@@ -610,6 +633,15 @@ export class BillingService {
       orderBy: { issue_date: 'asc' },
       include: { items: true },
     });
+
+    // Quote a CSV field to handle embedded commas, quotes and newlines.
+    const csvField = (v: string | number | null | undefined): string => {
+      const s = v == null ? '' : String(v);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
 
     const header = [
       'document_number',
@@ -627,17 +659,17 @@ export class BillingService {
 
     const rows = docs.map((d) =>
       [
-        d.document_number ?? '',
-        d.type,
-        d.status,
-        d.issue_date ? d.issue_date.toISOString().split('T')[0] : '',
-        d.customer_name ?? '',
-        d.customer_tax_id ?? '',
-        d.subtotal_amount.toFixed(2),
-        d.tax_amount.toFixed(2),
-        d.total_amount.toFixed(2),
-        d.currency,
-        d.payment_method ?? '',
+        csvField(d.document_number),
+        csvField(d.type),
+        csvField(d.status),
+        csvField(d.issue_date ? d.issue_date.toISOString().split('T')[0] : ''),
+        csvField(d.customer_name),
+        csvField(d.customer_tax_id),
+        csvField(d.subtotal_amount.toFixed(2)),
+        csvField(d.tax_amount.toFixed(2)),
+        csvField(d.total_amount.toFixed(2)),
+        csvField(d.currency),
+        csvField(d.payment_method),
       ].join(','),
     );
 

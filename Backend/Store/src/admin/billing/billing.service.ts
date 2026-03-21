@@ -580,7 +580,7 @@ export class BillingService {
       data: {
         name: dto.name,
         background_url: dto.background_url,
-        config_json: dto.config_json,
+        config_json: dto.config_json as Prisma.InputJsonValue,
         is_default: dto.is_default ?? false,
       },
     });
@@ -606,7 +606,7 @@ export class BillingService {
         ...(dto.background_url !== undefined && {
           background_url: dto.background_url,
         }),
-        ...(dto.config_json !== undefined && { config_json: dto.config_json }),
+        ...(dto.config_json !== undefined && { config_json: dto.config_json as Prisma.InputJsonValue }),
         ...(dto.is_default !== undefined && { is_default: dto.is_default }),
       },
     });

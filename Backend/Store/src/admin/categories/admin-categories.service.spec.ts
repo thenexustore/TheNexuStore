@@ -120,4 +120,49 @@ describe('AdminCategoriesService taxonomy audit', () => {
       }),
     );
   });
+
+  it('uses stored category name + slug when auditing misclassified mobility categories', async () => {
+    prisma.category.findMany.mockResolvedValue([
+      {
+        id: 'canon-laptops',
+        name: 'Ordenadores y portátiles',
+        slug: 'ordenadores-portatiles',
+        parent_id: null,
+        is_active: true,
+        parent: null,
+        _count: { children: 1, products_main: 0 },
+      },
+      {
+        id: 'terminal-row',
+        name: 'Terminal móvil RFID',
+        slug: 'terminal-rfid',
+        parent_id: 'canon-laptops',
+        is_active: true,
+        parent: {
+          id: 'canon-laptops',
+          name: 'Ordenadores y portátiles',
+          slug: 'ordenadores-portatiles',
+          parent_id: null,
+        },
+        _count: { children: 0, products_main: 3 },
+      },
+    ]);
+
+    const result = await service.getTaxonomyStatus();
+
+    expect(result.mismatched_level2_parenting).toEqual([
+      expect.objectContaining({
+        slug: 'terminal-rfid',
+        current_parent_slug: 'ordenadores-portatiles',
+        expected_parent_slug:
+          'telefonia-movilidad-familia-movilidad-profesional-gps-rf',
+      }),
+    ]);
+    expect(result.mismatched_summary_by_expected_parent).toEqual([
+      {
+        key: 'telefonia-movilidad-familia-movilidad-profesional-gps-rf',
+        count: 1,
+      },
+    ]);
+  });
 });

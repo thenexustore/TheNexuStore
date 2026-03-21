@@ -113,3 +113,9 @@ export function resolveCategoryScopeSlug(
 ): string {
   return category.slug;
 }
+
+export function canNavigateCategoryDirectly(
+  category: Pick<CategoryTreeNode, "children" | "depth">,
+): boolean {
+  return category.children.length > 0 || category.depth > 1;
+}

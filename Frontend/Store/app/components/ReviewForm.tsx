@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface ReviewFormProps {
   onSubmit: (reviewData: {
@@ -17,7 +16,6 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ onSubmit }) => {
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +40,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ onSubmit }) => {
 
       // Show success message
       alert("Thank you for your review! It will be visible after approval.");
-    } catch (error) {
+    } catch {
       alert("Failed to submit review. Please try again.");
     } finally {
       setSubmitting(false);

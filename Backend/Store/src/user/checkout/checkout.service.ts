@@ -240,7 +240,10 @@ export class CheckoutService {
 
       for (const cartItem of cartItemsForStock) {
         const price = cartItem.sku.prices[0];
-        const fulfillment = await this.resolveFulfillmentData(cartItem.sku_id, tx);
+        const fulfillment = await this.resolveFulfillmentData(
+          cartItem.sku_id,
+          tx,
+        );
 
         await tx.orderItem.create({
           data: {

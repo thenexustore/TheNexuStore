@@ -29,7 +29,7 @@ export {
   type OrdersResponse,
 } from "./orders";
 
-export { fetchDashboardStats, type DashboardStats } from "./dashboard";
+export { fetchDashboardStats, type DashboardStats, type DashboardAlert } from "./dashboard";
 
 export {
   fetchCoupons,
@@ -130,3 +130,34 @@ export {
   type DeployStatus,
   type DeployHistoryEntry,
 } from "./deploy";
+
+export {
+  fetchBillingDocuments,
+  fetchBillingDocumentById,
+  createBillingDocument,
+  updateBillingDocument,
+  deleteBillingDocument,
+  issueBillingDocument,
+  convertQuoteToInvoice,
+  updateBillingDocumentNumber,
+  fetchBillingSettings,
+  updateBillingSettings,
+  fetchBillingTemplates,
+  createBillingTemplate,
+  updateBillingTemplate,
+  deleteBillingTemplate,
+  markOrderDelivered,
+  downloadBillingExport,
+  type BillingDocument,
+  type BillingDocumentItem,
+  type BillingDocumentsResponse,
+  type BillingDocumentType,
+  type BillingDocumentStatus,
+  type BillingPaymentMethod,
+  type BillingLanguage,
+  type BillingSettings,
+  type BillingTemplate,
+  type BillingNumberAudit,
+  type CreateBillingDocumentInput,
+  type UpdateBillingDocumentInput,
+} from "./billing";

@@ -172,7 +172,10 @@ export class InfortisaService implements OnModuleInit {
       0;
     const stockPalma = product.StockPalma ?? product.STOCKPALMA ?? 0;
     const stockExterno =
-      product.StockExterno ?? product.STOCKEXTERNO ?? product.StockExternal ?? 0;
+      product.StockExterno ??
+      product.STOCKEXTERNO ??
+      product.StockExternal ??
+      0;
 
     return {
       SKU: sku,

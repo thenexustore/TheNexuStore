@@ -157,7 +157,6 @@ describe('InfortisaSyncService', () => {
     expect(products.upsertFromInfortisa).not.toHaveBeenCalled();
   });
 
-
   it('reports effective runtime overview', async () => {
     const runningJob = {
       nextDate: jest.fn().mockReturnValue({
@@ -324,7 +323,10 @@ describe('InfortisaSyncService', () => {
     });
     products.upsertFromInfortisa.mockResolvedValue('updated');
 
-    await (service as any).processStockUpdate({ SKU: STOCK_FIXTURE_SKU, Stock: 15 });
+    await (service as any).processStockUpdate({
+      SKU: STOCK_FIXTURE_SKU,
+      Stock: 15,
+    });
 
     expect(infortisa.getProductBySku).toHaveBeenCalledWith(STOCK_FIXTURE_SKU);
     expect(products.upsertFromInfortisa).toHaveBeenCalledWith(
@@ -350,7 +352,10 @@ describe('InfortisaSyncService', () => {
     });
     prisma.warehouse.findFirst.mockResolvedValue(null);
     const setLastSyncSpy = jest.spyOn(service as any, 'setLastSync');
-    const finalizeImportRunSpy = jest.spyOn(service as any, 'finalizeImportRun');
+    const finalizeImportRunSpy = jest.spyOn(
+      service as any,
+      'finalizeImportRun',
+    );
 
     await service.syncStockRealTime();
 

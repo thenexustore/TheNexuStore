@@ -17,6 +17,7 @@ import {
   Tags,
   Truck,
   Settings,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,6 +28,13 @@ import {
   type AdminSettings,
 } from "@/lib/admin-settings";
 import AdminBrandLogo from "@/app/components/AdminBrandLogo";
+
+type StaffUser = {
+  email: string;
+  role: string;
+  name?: string;
+  permissions?: string[];
+};
 
 type NavChild = {
   key: string;
@@ -56,6 +64,7 @@ const navigation: NavItem[] = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard },
   { key: "products", href: "/products", icon: Package, requiredPermissions: ["inventory:read"] },
   { key: "orders", href: "/orders", icon: ShoppingCart, requiredPermissions: ["orders:read"] },
+  { key: "billing", href: "/billing", icon: FileText, requiredPermissions: ["full_access"] },
   { key: "imports", href: "/imports", icon: Truck, requiredPermissions: ["imports:run", "imports:retry"] },
   { key: "rmas", href: "/rmas", icon: Package, requiredPermissions: ["orders:read", "orders:update"] },
   { key: "coupons", href: "/coupons", icon: Ticket, requiredPermissions: ["full_access"] },
@@ -83,14 +92,26 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [dashboardSettings, setDashboardSettings] = useState<AdminSettings>(() => loadAdminSettings());
+  const [staffUser, setStaffUser] = useState<StaffUser | null>(null);
 
   useEffect(() => subscribeAdminSettings(setDashboardSettings), []);
+
+  // Load logged-in user info from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("admin_user");
+      if (raw) setStaffUser(JSON.parse(raw) as StaffUser);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     if (dashboardSettings.adminLanguage !== locale) {
       router.replace(pathname, { locale: dashboardSettings.adminLanguage });
     }
   }, [dashboardSettings.adminLanguage, locale, pathname, router]);
+
   const userPermissions = (() => {
     try {
       const rawUser = localStorage.getItem("admin_user");
@@ -141,7 +162,25 @@ export default function DashboardLayout({
     })
     .filter((item): item is NavItem => item !== null);
 
+  // Build avatar initials from name or email
+  const avatarInitials = (() => {
+    const src = staffUser?.name || staffUser?.email || "";
+    const parts = src.trim().split(/[\s@.]+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0]?.slice(0, 2).toUpperCase() || "A";
+  })();
 
+  // Derive the current page label from the nav tree
+  const currentPageLabel = (() => {
+    for (const item of filteredNavigation) {
+      if (item.href && pathname === item.href) return t(item.key);
+      if (item.children) {
+        const match = item.children.find((sub) => pathname === sub.href);
+        if (match) return `${t(item.key)} › ${t(match.key)}`;
+      }
+    }
+    return null;
+  })();
 
   const toggleAdminLanguage = () => {
     const nextLocale = locale === "en" ? "es" : "en";
@@ -244,12 +283,13 @@ export default function DashboardLayout({
 
   return (
     <div className="h-screen bg-white flex overflow-hidden">
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-white border-b z-30">
-        <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={28} />
+      {/* Mobile top bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 bg-white border-b z-30">
+        <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={26} />
         <div className="flex items-center gap-2">
           <button
             onClick={toggleAdminLanguage}
-            className="px-3 py-1 text-xs rounded-full border border-zinc-300"
+            className="px-2.5 py-1 text-xs rounded-full border border-zinc-200 text-zinc-600"
           >
             {locale.toUpperCase()}
           </button>
@@ -257,7 +297,7 @@ export default function DashboardLayout({
             onClick={() => setSidebarOpen(true)}
             className="p-2 hover:bg-zinc-100 rounded-full"
           >
-            <Menu className="w-6 h-6 text-zinc-700" />
+            <Menu className="w-5 h-5 text-zinc-700" />
           </button>
         </div>
       </div>
@@ -274,60 +314,116 @@ export default function DashboardLayout({
         )}
       </AnimatePresence>
 
+      {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex ${dashboardSettings.compactSidebar ? "w-64" : "w-72"} bg-white border-r border-zinc-200 flex-col`}
+        className={`hidden lg:flex ${dashboardSettings.compactSidebar ? "w-64" : "w-72"} bg-white border-r border-zinc-100 flex-col`}
       >
-        <div className="h-20 flex items-center px-8 gap-3">
+        <div className="h-20 flex items-center px-8 gap-3 border-b border-zinc-50">
           <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={32} />
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
           {renderNavItems()}
         </nav>
-        <div className="p-4 border-t border-zinc-200">
-          <button
-            onClick={handleLogout}
-            className="group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
-          >
-            <LogOut className="w-5 h-5 text-zinc-400 group-hover:text-red-600" />
-            {t("logout")}
-          </button>
+        {/* User info + logout */}
+        <div className="border-t border-zinc-100">
+          {staffUser && (
+            <div className="px-4 pt-3 pb-1 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {avatarInitials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-800 truncate leading-tight">
+                  {staffUser.name || staffUser.email}
+                </p>
+                <p className="text-xs text-zinc-400 truncate leading-tight capitalize">
+                  {staffUser.role?.toLowerCase().replace(/_/g, " ") ?? "admin"}
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="px-4 pb-4 pt-1">
+            <button
+              onClick={handleLogout}
+              className="group w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 group-hover:text-red-600" />
+              {t("logout")}
+            </button>
+          </div>
         </div>
       </aside>
 
+      {/* Mobile slide-over sidebar */}
       <motion.aside
         initial={{ x: "-100%" }}
         animate={{ x: sidebarOpen ? 0 : "-100%" }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed inset-y-0 left-0 w-72 bg-white border-r border-zinc-200 z-50 flex flex-col lg:hidden"
+        className="fixed inset-y-0 left-0 w-72 bg-white border-r border-zinc-100 z-50 flex flex-col lg:hidden"
       >
-        <div className="h-20 flex items-center px-8">
-          <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={32} />
+        <div className="h-16 flex items-center px-6 border-b border-zinc-50">
+          <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={28} />
           <button className="ml-auto" onClick={() => setSidebarOpen(false)}>
-            <X className="w-5 h-5 text-zinc-500" />
+            <X className="w-5 h-5 text-zinc-400" />
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
           {renderNavItems()}
         </nav>
-        <div className="p-4 border-t border-zinc-200">
-          <button
-            onClick={handleLogout}
-            className="group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
-          >
-            <LogOut className="w-5 h-5 text-zinc-400 group-hover:text-red-600" />
-            {t("logout")}
-          </button>
+        <div className="border-t border-zinc-100">
+          {staffUser && (
+            <div className="px-4 pt-3 pb-1 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {avatarInitials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-800 truncate">
+                  {staffUser.name || staffUser.email}
+                </p>
+                <p className="text-xs text-zinc-400 truncate capitalize">
+                  {staffUser.role?.toLowerCase().replace(/_/g, " ") ?? "admin"}
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="px-4 pb-4 pt-1">
+            <button
+              onClick={handleLogout}
+              className="group w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 group-hover:text-red-600" />
+              {t("logout")}
+            </button>
+          </div>
         </div>
       </motion.aside>
 
+      {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden pt-16 lg:pt-0">
-        <div className="hidden lg:flex items-center justify-end px-6 pt-4 bg-zinc-50">
-          <button
-            onClick={toggleAdminLanguage}
-            className="px-3 py-1.5 text-xs rounded-full border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 transition"
-          >
-            {locale === "en" ? "EN → ES" : "ES → EN"}
-          </button>
+        {/* Desktop top bar: breadcrumb + language toggle */}
+        <div className="hidden lg:flex h-14 items-center justify-between px-8 bg-white border-b border-zinc-100 shrink-0">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <span className="font-medium text-zinc-800">
+              {currentPageLabel ?? "Panel"}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleAdminLanguage}
+              className="px-3 py-1.5 text-xs rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100 transition font-medium"
+            >
+              {locale === "en" ? "EN → ES" : "ES → EN"}
+            </button>
+            {staffUser && (
+              <div className="flex items-center gap-2.5 pl-3 border-l border-zinc-100">
+                <div className="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs font-bold">
+                  {avatarInitials}
+                </div>
+                <span className="text-sm text-zinc-700 font-medium hidden xl:block">
+                  {staffUser.name || staffUser.email.split("@")[0]}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-zinc-50">{children}</div>
       </main>

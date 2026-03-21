@@ -727,6 +727,8 @@ model Customer {
   reviews    ProductReview[]
   chatConversations ChatConversation[]
   guestChatSession  GuestChatSession?
+  fiscal_profile    CustomerFiscalProfile?
+  billing_documents BillingDocument[]
 }
 
 enum ChatStatus {
@@ -959,6 +961,7 @@ model Order {
   shipments             Shipment[]
   discounts             OrderDiscount[]
   rmas                  Rma[]
+  billing_document      BillingDocument?
 
   @@index([customer_id, created_at(sort: Desc)])
 }
@@ -1201,4 +1204,201 @@ model AuditLog {
   entity_id   String?
   metadata    Json?
   created_at  DateTime  @default(now())
+}
+
+enum BillingDocumentType {
+  INVOICE
+  QUOTE
+  CREDIT_NOTE
+}
+
+enum BillingDocumentStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PAID
+  VOID
+}
+
+enum BillingLanguage {
+  ES
+  EN
+}
+
+enum BillingPaymentMethod {
+  REDSYS
+  STRIPE
+  PAYPAL
+  COD
+  BANK_TRANSFER
+  CASH
+  OTHER
+}
+
+model BillingSeries {
+  id           String   @id @default(uuid())
+  type         BillingDocumentType
+  prefix       String
+  year         Int
+  last_counter Int      @default(0)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  documents BillingDocument[]
+
+  @@unique([type, year])
+  @@index([type, year])
+  @@map("billing_series")
+}
+
+model BillingSettings {
+  id                String   @id @default(uuid())
+  legal_name        String   @default("Sánchez Peinado Solutions S.L.U.")
+  trade_name        String   @default("NEXUS SP Solutions")
+  nif               String   @default("B75818237")
+  address_real      String   @default("Avenida España nº32, 2ºB, 51001 Ceuta")
+  address_virtual   String   @default("Calle la Sierra nº48, 13680 Fuente el Fresno")
+  iban_caixabank    String   @default("ES78 2100 8511 0102 0023 5243")
+  iban_bbva         String   @default("ES92 0182 0390 5902 0187 3003")
+  website_com       String   @default("thenexustore.com")
+  website_es        String   @default("thenexustore.es")
+  default_language  BillingLanguage @default(ES)
+  default_currency  String   @default("EUR")
+  invoice_prefix    String   @default("INV")
+  quote_prefix      String   @default("PRE")
+  credit_note_prefix String  @default("ABO")
+  default_tax_rate  Decimal  @default(0.21) @db.Decimal(5, 4)
+  extra_json        Json?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("billing_settings")
+}
+
+model BillingTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  background_url  String?
+  config_json     Json
+  is_default      Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  documents BillingDocument[]
+
+  @@index([is_default])
+  @@map("billing_templates")
+}
+
+model CustomerFiscalProfile {
+  id              String   @id @default(uuid())
+  customer_id     String   @unique
+  company_name    String?
+  tax_id          String?
+  fiscal_address  String?
+  fiscal_city     String?
+  fiscal_postal   String?
+  fiscal_country  String   @default("ES")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  customer Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@map("customer_fiscal_profiles")
+}
+
+model BillingDocument {
+  id                  String               @id @default(uuid())
+  type                BillingDocumentType
+  status              BillingDocumentStatus @default(DRAFT)
+  document_number     String?              @unique
+  series_id           String?
+  order_id            String?              @unique
+  customer_id         String?
+  language            BillingLanguage      @default(ES)
+  currency            String               @default("EUR")
+  issue_date          DateTime?
+  due_date            DateTime?
+  payment_method      BillingPaymentMethod?
+  pdf_url             String?
+
+  source_document_id  String?
+
+  company_legal_name  String?
+  company_trade_name  String?
+  company_nif         String?
+  company_address     String?
+  company_iban_1      String?
+  company_iban_2      String?
+
+  customer_name       String?
+  customer_tax_id     String?
+  customer_email      String?
+  customer_address    String?
+
+  subtotal_amount     Decimal  @default(0) @db.Decimal(12, 2)
+  tax_amount          Decimal  @default(0) @db.Decimal(12, 2)
+  discount_amount     Decimal  @default(0) @db.Decimal(12, 2)
+  total_amount        Decimal  @default(0) @db.Decimal(12, 2)
+
+  notes               String?
+  internal_notes      String?
+
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  issued_at           DateTime?
+
+  series              BillingSeries?     @relation(fields: [series_id], references: [id])
+  order               Order?             @relation(fields: [order_id], references: [id])
+  customer            Customer?          @relation(fields: [customer_id], references: [id])
+  template            BillingTemplate?   @relation(fields: [template_id], references: [id])
+  template_id         String?
+  items               BillingDocumentItem[]
+  source_document     BillingDocument?   @relation("BillingDocumentSource", fields: [source_document_id], references: [id])
+  derived_documents   BillingDocument[]  @relation("BillingDocumentSource")
+  number_audits       BillingNumberAudit[]
+
+  @@index([type, status, created_at(sort: Desc)])
+  @@index([order_id])
+  @@index([customer_id])
+  @@index([document_number])
+  @@index([issue_date])
+  @@map("billing_documents")
+}
+
+model BillingDocumentItem {
+  id              String  @id @default(uuid())
+  document_id     String
+  position        Int     @default(0)
+  description     String
+  qty             Decimal @db.Decimal(12, 4)
+  unit_price      Decimal @db.Decimal(12, 2)
+  tax_rate        Decimal @default(0.21) @db.Decimal(5, 4)
+  tax_amount      Decimal @default(0) @db.Decimal(12, 2)
+  line_subtotal   Decimal @default(0) @db.Decimal(12, 2)
+  line_total      Decimal @default(0) @db.Decimal(12, 2)
+  created_at      DateTime @default(now())
+
+  document BillingDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id, position])
+  @@map("billing_document_items")
+}
+
+model BillingNumberAudit {
+  id             String   @id @default(uuid())
+  document_id    String
+  old_number     String?
+  new_number     String
+  changed_by     String
+  changed_by_email String?
+  reason         String?
+  created_at     DateTime @default(now())
+
+  document BillingDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
+  @@map("billing_number_audits")
 }

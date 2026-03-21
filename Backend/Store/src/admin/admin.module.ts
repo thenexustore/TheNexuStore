@@ -24,6 +24,7 @@ import { CategoriesModule } from '../user/categories/categories.module';
 import { InfortisaModule } from '../infortisa/infortisa.module';
 import { AdminCategoriesModule } from './categories/admin-categories.module';
 import { DeployModule } from './deploy/deploy.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DeployModule } from './deploy/deploy.module';
     InfortisaModule,
     AdminCategoriesModule,
     DeployModule,
+    BillingModule,
   ],
   controllers: [
     AdminController,

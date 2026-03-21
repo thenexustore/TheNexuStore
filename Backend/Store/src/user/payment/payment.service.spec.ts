@@ -211,16 +211,15 @@ describe('PaymentService', () => {
       Ds_Signature: 'signature',
     });
 
-    expect(redsysService.assertNotificationMatchesExpected).toHaveBeenCalledWith(
-      notificationResult,
-      {
-        merchantOrderReference: 'merchant-order-789',
-        amountInCents: 1995,
-        currency: '978',
-        merchantCode: 'merchant-code',
-        terminal: '1',
-      },
-    );
+    expect(
+      redsysService.assertNotificationMatchesExpected,
+    ).toHaveBeenCalledWith(notificationResult, {
+      merchantOrderReference: 'merchant-order-789',
+      amountInCents: 1995,
+      currency: '978',
+      merchantCode: 'merchant-code',
+      terminal: '1',
+    });
     expect(tx.payment.update).toHaveBeenCalledWith({
       where: { id: 'payment-789' },
       data: {

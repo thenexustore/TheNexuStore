@@ -39,7 +39,8 @@ validate_infortisa_health() {
   payload="$(curl -fsS "$url")" || return 1
 
   HEALTH_PAYLOAD="$payload" node <<'NODE'
-const payload = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
+const raw = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
+const payload = (raw && typeof raw.data === 'object' && raw.data !== null) ? raw.data : raw;
 const valid =
   payload &&
   typeof payload === 'object' &&

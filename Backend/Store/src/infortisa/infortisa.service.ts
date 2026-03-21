@@ -768,8 +768,15 @@ export class InfortisaService implements OnModuleInit {
       const response = await client.get('/api/Ficha/Get', {
         params: { user: this.token },
       });
+      const normalize = (s: string) =>
+        s
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
       const healthy =
-        response.data === 'Su servicio está funcionando correctamente.';
+        normalize(String(response.data)) ===
+        'su servicio esta funcionando correctamente.';
 
       return {
         healthy,

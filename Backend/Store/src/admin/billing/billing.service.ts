@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
@@ -28,6 +29,7 @@ import {
 
 @Injectable()
 export class BillingService {
+  private readonly logger = new Logger(BillingService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── Settings ────────────────────────────────────────────────────────────────
@@ -145,12 +147,13 @@ export class BillingService {
     const { page, limit, type, status, search, from, to } = query;
     const skip = (page - 1) * limit;
 
-    const dateRange = from || to
-      ? {
-          gte: from ? new Date(from) : undefined,
-          lte: to ? this.toEndOfDay(to) : undefined,
-        }
-      : null;
+    const dateRange =
+      from || to
+        ? {
+            gte: from ? new Date(from) : undefined,
+            lte: to ? this.toEndOfDay(to) : undefined,
+          }
+        : null;
 
     // Build AND conditions separately so that combining dateRange + search
     // does not produce two sibling OR keys that would silently overwrite each
@@ -606,7 +609,9 @@ export class BillingService {
         ...(dto.background_url !== undefined && {
           background_url: dto.background_url,
         }),
-        ...(dto.config_json !== undefined && { config_json: dto.config_json as Prisma.InputJsonValue }),
+        ...(dto.config_json !== undefined && {
+          config_json: dto.config_json as Prisma.InputJsonValue,
+        }),
         ...(dto.is_default !== undefined && { is_default: dto.is_default }),
       },
     });
@@ -688,6 +693,7 @@ export class BillingService {
   // ─── Mark Order Delivered ─────────────────────────────────────────────────────
 
   async markOrderDelivered(orderId: string, dto: MarkOrderDeliveredDto) {
+    this.logger.log(`markOrderDelivered called for orderId=${orderId}`);
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -700,7 +706,10 @@ export class BillingService {
         payments: { orderBy: { created_at: 'desc' }, take: 1 },
       },
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) {
+      this.logger.warn(`Order not found: ${orderId}`);
+      throw new NotFoundException('Order not found');
+    }
 
     await this.prisma.order.update({
       where: { id: orderId },
@@ -734,8 +743,13 @@ export class BillingService {
       }
     }
 
-    const existingDoc = await this.prisma.billingDocument.findUnique({
-      where: { order_id: orderId },
+    const existingDoc = await this.prisma.billingDocument.findFirst({
+      where: {
+        order_id: orderId,
+        type: BillingDocumentType.INVOICE,
+        status: { not: BillingDocumentStatus.VOID },
+      },
+      orderBy: { created_at: 'desc' },
     });
     if (existingDoc) {
       return {

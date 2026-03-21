@@ -961,7 +961,7 @@ model Order {
   shipments             Shipment[]
   discounts             OrderDiscount[]
   rmas                  Rma[]
-  billing_document      BillingDocument?
+  billing_documents     BillingDocument[]
 
   @@index([customer_id, created_at(sort: Desc)])
 }
@@ -1315,7 +1315,7 @@ model BillingDocument {
   status              BillingDocumentStatus @default(DRAFT)
   document_number     String?              @unique
   series_id           String?
-  order_id            String?              @unique
+  order_id            String?
   customer_id         String?
   language            BillingLanguage      @default(ES)
   currency            String               @default("EUR")

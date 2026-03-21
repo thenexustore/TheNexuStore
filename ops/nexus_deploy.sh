@@ -337,6 +337,10 @@ fi
 log "Building backend"
 install_deps "$BACKEND_DIR" 1
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma generate"
+# If the billing module migration previously failed (wrong FK table names, now fixed),
+# mark it as rolled-back so it can be re-applied cleanly. Silently no-ops on fresh
+# installs or when the migration is already applied.
+run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate resolve --rolled-back '20260320000000_add_billing_module' 2>/dev/null || true"
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate deploy"
 run "cd '$BACKEND_DIR' && npm run build"
 

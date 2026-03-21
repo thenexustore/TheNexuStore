@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
+import { formatCurrency } from "../../lib/currency";
 import Image from "next/image";
 import ProductCard from "../../components/ProductCard";
 import ReviewForm from "../../components/ReviewForm";
@@ -244,12 +245,12 @@ export default function ProductPage() {
                     : "text-gray-900"
                 }`}
               >
-                €{currentVariant.price.toFixed(2)}
+                {formatCurrency(currentVariant.price)}
               </span>
               {currentVariant.compare_at_price &&
                 currentVariant.compare_at_price > currentVariant.price && (
                   <span className="ml-2 text-lg text-black/80 line-through">
-                    €{currentVariant.compare_at_price.toFixed(2)}
+                    {formatCurrency(currentVariant.compare_at_price)}
                   </span>
                 )}
             </div>

@@ -295,7 +295,10 @@ export default function PricingRulesPage() {
 
               <label className="space-y-1">
                 <div className="text-xs text-gray-600">Min margin amount</div>
-                <input className="border rounded px-3 py-2 w-full" type="number" value={form.min_margin_amount} onChange={(e) => setForm({ ...form, min_margin_amount: Number(e.target.value) })} />
+                <div className="relative">
+                  <input className="border rounded px-3 py-2 pr-8 w-full" type="number" value={form.min_margin_amount} onChange={(e) => setForm({ ...form, min_margin_amount: Number(e.target.value) })} />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">€</span>
+                </div>
               </label>
 
               <label className="space-y-1">

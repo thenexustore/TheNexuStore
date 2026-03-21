@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
+import { formatCurrency } from '../lib/currency';
 import { API_URL } from '../lib/env';
 
 type HomePayload = {
@@ -17,8 +18,6 @@ type HomePayload = {
     resolved: unknown;
   }>;
 };
-
-const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 
 const FALLBACK_IMG = '/No_Image_Available.png';
 
@@ -719,9 +718,9 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
 
           <div className="mt-3 flex items-end gap-2">
             <span className={`text-xl font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
-              {eur.format(Number(product.price || 0))}
+              {formatCurrency(Number(product.price || 0))}
             </span>
-            {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{eur.format(Number(product.compare_at_price || 0))}</span> : null}
+            {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{formatCurrency(Number(product.compare_at_price || 0))}</span> : null}
           </div>
 
           <div className="mt-2 min-h-[3rem]">

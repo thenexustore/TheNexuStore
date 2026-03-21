@@ -6,13 +6,7 @@ import { useTranslations } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { createOrder, createRedsysPayment } from "../lib/checkout";
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  }).format(amount);
-};
+import { formatCurrency } from "../lib/currency";
 
 const CHECKOUT_FORM_ID = "checkout-form";
 

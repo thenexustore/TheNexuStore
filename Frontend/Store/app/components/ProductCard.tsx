@@ -6,6 +6,7 @@ import { Star } from "lucide-react";
 import { Product } from "../lib/products";
 import { useCart } from "../../context/CartContext";
 import { useTranslations } from "next-intl";
+import { formatCurrency } from "../lib/currency";
 
 interface ProductCardProps {
   product: Product;
@@ -224,9 +225,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
           {isLowStock && !isOutOfStock && (
-            <div className="absolute top-2 left-2">
-              <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white">
-                Low Stock
+            <div className="absolute bottom-2 right-2 z-10">
+              <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow">
+                {t("lowStockBadge")}
               </span>
             </div>
           )}
@@ -304,18 +305,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   : "text-gray-900"
               }`}
             >
-              €{product.price.toFixed(2)}
+              {formatCurrency(product.price)}
             </span>
 
             {product.compare_at_price &&
               product.compare_at_price > product.price && (
                 <>
                   <span className="text-sm text-gray-500 line-through sm:text-base">
-                    €{product.compare_at_price.toFixed(2)}
+                    {formatCurrency(product.compare_at_price)}
                   </span>
                   <span className="text-xs font-semibold text-red-600 sm:text-sm">
-                    Save €
-                    {(product.compare_at_price - product.price).toFixed(2)}
+                    Save {formatCurrency(product.compare_at_price - product.price)}
                   </span>
                 </>
               )}

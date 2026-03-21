@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Banner, CreateBannerData } from "@/lib/api/banners";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { API_URL, SITE_URL } from "@/lib/constants";
+import { formatCurrency } from "@/lib/currency";
 
 interface ProductOption {
   id: string;
@@ -411,7 +412,7 @@ export default function BannerForm({
                                 <>
                                   <span>•</span>
                                   <span className="font-medium">
-                                    €{product.price.toFixed(2)}
+                                    {formatCurrency(product.price)}
                                   </span>
                                 </>
                               )}

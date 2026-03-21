@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
+import { formatCurrency } from "../lib/currency";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -22,11 +23,6 @@ interface Props {
   emptyMessage: string;
   carouselConfig?: CarouselConfig;
 }
-
-const eur = new Intl.NumberFormat("es-ES", {
-  style: "currency",
-  currency: "EUR",
-});
 
 export default function HomeProductSection({
   title,
@@ -143,11 +139,11 @@ export default function HomeProductSection({
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className={`text-base font-bold ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
-            {eur.format(product.price)}
+            {formatCurrency(product.price)}
           </span>
           {hasDeal && product.compare_at_price ? (
             <span className="text-xs text-slate-500 line-through">
-              {eur.format(product.compare_at_price)}
+              {formatCurrency(product.compare_at_price)}
             </span>
           ) : null}
         </div>

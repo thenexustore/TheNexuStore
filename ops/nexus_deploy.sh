@@ -78,6 +78,26 @@ exec node dist/src/main.js
 SCRIPT
 }
 
+write_frontend_env_files() {
+  local store_env_file="$1"
+  local admin_env_file="$2"
+  local api_url="$3"
+  local site_url="$4"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] writing $store_env_file"
+    log "[dry-run] writing $admin_env_file"
+    return 0
+  fi
+
+  local env_file
+  for env_file in "$store_env_file" "$admin_env_file"; do
+    log "Writing frontend env: $env_file"
+    printf 'NEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_SITE_URL=%s\n' "$api_url" "$site_url" > "$env_file"
+    sed -i 's/\r$//' "$env_file"
+  done
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "[ERROR] Missing command: $1" >&2
@@ -321,15 +341,7 @@ fi
 
 if [[ "$SYNC_FRONTEND_ENV" == "1" ]]; then
   run "mkdir -p '$(dirname "$STORE_ENV_FILE")' '$(dirname "$ADMIN_ENV_FILE")'"
-  run "cat > '$STORE_ENV_FILE' <<ENV
-NEXT_PUBLIC_API_URL=$DEPLOY_API_URL
-NEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL
-ENV"
-  run "cat > '$ADMIN_ENV_FILE' <<ENV
-NEXT_PUBLIC_API_URL=$DEPLOY_API_URL
-NEXT_PUBLIC_SITE_URL=$DEPLOY_SITE_URL
-ENV"
-  run "sed -i 's/\r$//' '$STORE_ENV_FILE' '$ADMIN_ENV_FILE'"
+  write_frontend_env_files "$STORE_ENV_FILE" "$ADMIN_ENV_FILE" "$DEPLOY_API_URL" "$DEPLOY_SITE_URL"
 else
   log "Skipping frontend env sync because SYNC_FRONTEND_ENV=$SYNC_FRONTEND_ENV"
 fi
@@ -337,10 +349,6 @@ fi
 log "Building backend"
 install_deps "$BACKEND_DIR" 1
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma generate"
-# If the billing module migration previously failed (wrong FK table names, now fixed),
-# mark it as rolled-back so it can be re-applied cleanly. Silently no-ops on fresh
-# installs or when the migration is already applied.
-run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate resolve --rolled-back '20260320000000_add_billing_module' 2>/dev/null || true"
 run "cd '$BACKEND_DIR' && DATABASE_URL='$DATABASE_URL' npx prisma migrate deploy"
 run "cd '$BACKEND_DIR' && npm run build"
 

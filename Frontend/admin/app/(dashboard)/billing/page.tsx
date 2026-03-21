@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   Plus,
   FileText,
@@ -587,24 +587,34 @@ export default function BillingPage() {
       </div>
 
       {/* ── Stats summary ──────────────────────────────────────────────────── */}
-      {docs.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Documentos cargados", value: String(total), icon: FileText, color: "text-zinc-500" },
-            { label: "Borradores", value: String(draftCount), icon: FileClock, color: "text-zinc-500" },
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-zinc-100 px-4 py-3 flex items-center gap-3 animate-pulse">
+              <div className="w-5 h-5 rounded bg-zinc-100 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-2.5 w-20 bg-zinc-100 rounded-full" />
+                <div className="h-5 w-10 bg-zinc-200 rounded" />
+              </div>
+            </div>
+          ))
+        ) : (
+          [
+            { label: "Total en vista", value: String(total), icon: FileText, color: "text-zinc-500" },
+            { label: "Borradores", value: String(draftCount), icon: FileClock, color: "text-zinc-400" },
             { label: "Emitidas / Enviadas", value: String(issuedCount), icon: Send, color: "text-blue-500" },
             { label: "Cobradas", value: String(paidCount), icon: CheckCircle, color: "text-emerald-500" },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-zinc-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+            <div key={label} className="bg-white rounded-xl border border-zinc-100 hover:border-zinc-200 px-4 py-3 flex items-center gap-3 transition">
               <Icon className={`w-5 h-5 shrink-0 ${color}`} />
               <div className="min-w-0">
-                <p className="text-xs text-zinc-500 truncate">{label}</p>
-                <p className="text-lg font-bold text-zinc-900 leading-tight">{value}</p>
+                <p className="text-xs text-zinc-400 truncate">{label}</p>
+                <p className="text-xl font-bold text-zinc-900 leading-tight tabular-nums">{value}</p>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
       <div className="flex gap-1 bg-zinc-100 p-1 rounded-xl w-fit">
@@ -794,8 +804,7 @@ export default function BillingPage() {
                   <th className="text-right px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">
                     Total
                   </th>
-                  <th className="text-right px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide">
-                    Acciones
+                  <th className="text-right px-4 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wide w-[120px]">
                   </th>
                 </tr>
               </thead>
@@ -848,7 +857,11 @@ export default function BillingPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div
-                          className="flex items-center justify-end gap-1"
+                          className={`flex items-center justify-end gap-1 transition-opacity ${
+                            confirmDeleteId === doc.id || issuingId === doc.id || convertingId === doc.id
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100"
+                          }`}
                           onClick={(e: { stopPropagation(): void }) => e.stopPropagation()}
                         >
                           <button
@@ -1037,6 +1050,64 @@ export default function BillingPage() {
                     {selectedDoc.language} · {selectedDoc.currency}
                   </span>
                 </div>
+
+                {/* Status lifecycle stepper */}
+                {(() => {
+                  const STEPS: BillingDocumentStatus[] = ["DRAFT", "ISSUED", "SENT", "PAID"];
+                  const isVoid = selectedDoc.status === "VOID";
+                  const currentIdx = isVoid ? -1 : STEPS.indexOf(selectedDoc.status as BillingDocumentStatus);
+                  return (
+                    <div className="px-6 py-4 border-b border-zinc-100 bg-white">
+                      {isVoid ? (
+                        <div className="flex items-center justify-center gap-2 py-0.5">
+                          <XCircle className="w-4 h-4 text-red-400" />
+                          <span className="text-sm font-medium text-red-500">Documento anulado</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          {STEPS.map((step, idx) => {
+                            const isActive = step === selectedDoc.status;
+                            const isPast = currentIdx > idx;
+                            const StepIcon = STATUS_ICONS[step] ?? FileClock;
+                            return (
+                              <Fragment key={step}>
+                                <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                                    isActive
+                                      ? "bg-zinc-900"
+                                      : isPast
+                                      ? "bg-emerald-500"
+                                      : "bg-zinc-100"
+                                  }`}>
+                                    {isPast ? (
+                                      <CheckCircle className="w-3.5 h-3.5 text-white" />
+                                    ) : (
+                                      <StepIcon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-zinc-300"}`} />
+                                    )}
+                                  </div>
+                                  <span className={`text-xs font-medium truncate max-w-full text-center px-0.5 ${
+                                    isActive
+                                      ? "text-zinc-900"
+                                      : isPast
+                                      ? "text-emerald-600"
+                                      : "text-zinc-300"
+                                  }`}>
+                                    {STATUS_LABELS[step]}
+                                  </span>
+                                </div>
+                                {idx < STEPS.length - 1 && (
+                                  <div className={`h-0.5 flex-[2] mb-5 mx-1 rounded-full transition-colors ${
+                                    isPast ? "bg-emerald-400" : "bg-zinc-100"
+                                  }`} />
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="p-6 space-y-6">
 
@@ -1488,69 +1559,80 @@ export default function BillingPage() {
 
                 {/* Column headers */}
                 <div className="grid grid-cols-12 gap-2 mb-1 px-0.5">
-                  <span className="col-span-5 text-xs text-zinc-400">Descripción</span>
+                  <span className="col-span-4 text-xs text-zinc-400">Descripción</span>
                   <span className="col-span-2 text-xs text-zinc-400 text-center">Cant.</span>
                   <span className="col-span-2 text-xs text-zinc-400 text-right">Precio</span>
-                  <span className="col-span-2 text-xs text-zinc-400 text-center">IVA%</span>
+                  <span className="col-span-1 text-xs text-zinc-400 text-center">IVA%</span>
+                  <span className="col-span-2 text-xs text-zinc-400 text-right">Importe</span>
                   <span className="col-span-1" />
                 </div>
 
                 <div className="space-y-2">
-                  {createForm.items.map((item: CreateItemState, idx: number) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg bg-zinc-50 border border-zinc-100 hover:border-zinc-200 transition"
-                    >
-                      <input
-                        value={item.description}
-                        onChange={(e: InputEv) =>
-                          updateCreateItem(idx, "description", e.target.value)
-                        }
-                        placeholder="Descripción..."
-                        className="col-span-5 border-0 bg-transparent px-1 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
-                      />
-                      <input
-                        value={item.qty}
-                        onChange={(e: InputEv) => updateCreateItem(idx, "qty", e.target.value)}
-                        type="number"
-                        min="0"
-                        step="any"
-                        className="col-span-2 border border-zinc-200 rounded-md px-2 py-1 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
-                      />
-                      <input
-                        value={item.unit_price}
-                        onChange={(e: InputEv) => updateCreateItem(idx, "unit_price", e.target.value)}
-                        placeholder="0.00"
-                        type="number"
-                        min="0"
-                        step="any"
-                        className="col-span-2 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
-                      />
-                      <div className="col-span-2 relative">
+                  {createForm.items.map((item: CreateItemState, idx: number) => {
+                    const lineBase = Number(item.qty || 1) * Number(item.unit_price || 0);
+                    const lineTax = lineBase * Number(item.tax_rate || 0.21);
+                    const lineTotal = lineBase + lineTax;
+                    return (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg bg-zinc-50 border border-zinc-100 hover:border-zinc-200 transition"
+                      >
                         <input
-                          value={String(Number(item.tax_rate) * 100)}
+                          value={item.description}
                           onChange={(e: InputEv) =>
-                            updateCreateItem(idx, "tax_rate", String(Number(e.target.value) / 100))
+                            updateCreateItem(idx, "description", e.target.value)
                           }
+                          placeholder="Descripción..."
+                          className="col-span-4 border-0 bg-transparent px-1 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+                        />
+                        <input
+                          value={item.qty}
+                          onChange={(e: InputEv) => updateCreateItem(idx, "qty", e.target.value)}
                           type="number"
                           min="0"
-                          max="100"
                           step="any"
-                          className="w-full border border-zinc-200 rounded-md px-2 py-1 text-sm pr-5 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                          className="col-span-2 border border-zinc-200 rounded-md px-2 py-1 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
+                        <input
+                          value={item.unit_price}
+                          onChange={(e: InputEv) => updateCreateItem(idx, "unit_price", e.target.value)}
+                          placeholder="0.00"
+                          type="number"
+                          min="0"
+                          step="any"
+                          className="col-span-2 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                        />
+                        <div className="col-span-1 relative">
+                          <input
+                            value={String(Number(item.tax_rate) * 100)}
+                            onChange={(e: InputEv) =>
+                              updateCreateItem(idx, "tax_rate", String(Number(e.target.value) / 100))
+                            }
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="any"
+                            className="w-full border border-zinc-200 rounded-md px-1.5 py-1 text-sm pr-4 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                          />
+                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
+                        </div>
+                        <div className="col-span-2 text-right">
+                          <span className="text-xs font-semibold text-zinc-700 tabular-nums">
+                            {lineTotal > 0 ? formatCurrency(lineTotal) : <span className="text-zinc-300">—</span>}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeCreateItem(idx)}
+                          disabled={createForm.items.length === 1}
+                          className="col-span-1 p-1.5 rounded-md hover:bg-red-50 text-zinc-300 hover:text-red-500 disabled:opacity-30 transition"
+                          title="Eliminar línea"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeCreateItem(idx)}
-                        disabled={createForm.items.length === 1}
-                        className="col-span-1 p-1.5 rounded-md hover:bg-red-50 text-zinc-300 hover:text-red-500 disabled:opacity-30 transition"
-                        title="Eliminar línea"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

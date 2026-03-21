@@ -91,6 +91,31 @@ describe('Infortisa category mapping', () => {
     );
   });
 
+  it('keeps mobile terminals out of Ordenadores y portátiles', () => {
+    expect(
+      recommendParentCategory('Informática profesional', 'Terminal móvil RFID')
+        .label,
+    ).toBe('Telefonía y movilidad');
+  });
+
+  it('keeps smartphones out of Ordenadores y portátiles', () => {
+    expect(
+      recommendParentCategory('Informática', 'Smartphone Android 5G').label,
+    ).toBe('Telefonía y movilidad');
+  });
+
+  it('keeps pen tablets in Monitores y periféricos instead of Telefonía', () => {
+    expect(
+      recommendParentCategory('Creatividad', 'Pen tablet profesional').label,
+    ).toBe('Monitores y periféricos');
+  });
+
+  it('maps security cameras into Gaming y smart home instead of TV', () => {
+    expect(
+      recommendParentCategory('Seguridad', 'Cámara seguridad IP').label,
+    ).toBe('Gaming y smart home');
+  });
+
   it('maps proyector tv keyword into TV, audio y vídeo', () => {
     expect(recommendParentCategory(null, 'Proyector TV 4K').label).toBe(
       'TV, audio y vídeo',

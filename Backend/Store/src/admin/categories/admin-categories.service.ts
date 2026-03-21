@@ -14,6 +14,16 @@ import {
 export class AdminCategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private recommendStoredCategoryParent(category: {
+    name: string;
+    slug: string;
+  }) {
+    return recommendParentCategory(
+      category.name,
+      `${category.name} ${category.slug.replace(/-/g, ' ')}`,
+    );
+  }
+
   async getTaxonomyStatus() {
     const countBy = <T extends string | null | undefined>(values: T[]) =>
       Array.from(
@@ -80,6 +90,20 @@ export class AdminCategoriesService {
         ? resolveCanonicalParentSlug(grandparent.slug)
         : null;
     };
+    const resolvePreferredCanonicalSlug = (
+      category: (typeof allCategories)[number],
+      recommendedParentKey: string,
+    ) => {
+      const recommendedCanonical =
+        resolveCanonicalParentSlug(recommendedParentKey);
+      const currentCanonical = resolveCanonicalAncestorSlug(category);
+
+      if (!recommendedCanonical) return currentCanonical;
+      if (!currentCanonical) return recommendedCanonical;
+      return currentCanonical === recommendedCanonical
+        ? currentCanonical
+        : recommendedCanonical;
+    };
 
     const orphanedCategories = parentRows
       .filter((c) => !knownParentSlugs.includes(c.slug))
@@ -130,13 +154,11 @@ export class AdminCategoriesService {
       .filter((c) => {
         if (c.slug.includes('-familia-')) return false;
 
-        const recommendedParent = recommendParentCategory(
-          null,
-          c.slug.replace(/-/g, ' '),
+        const recommendedParent = this.recommendStoredCategoryParent(c);
+        const canonicalSlug = resolvePreferredCanonicalSlug(
+          c,
+          recommendedParent.key,
         );
-        const canonicalSlug =
-          resolveCanonicalAncestorSlug(c) ??
-          resolveCanonicalParentSlug(recommendedParent.key);
 
         if (!canonicalSlug) return false;
 
@@ -148,14 +170,9 @@ export class AdminCategoriesService {
         return c.parent?.slug !== expectedLevel2.slug;
       })
       .map((c) => {
-        const recommendedParent = recommendParentCategory(
-          null,
-          c.slug.replace(/-/g, ' '),
-        );
+        const recommendedParent = this.recommendStoredCategoryParent(c);
         const canonicalSlug =
-          resolveCanonicalAncestorSlug(c) ??
-          resolveCanonicalParentSlug(recommendedParent.key) ??
-          'unknown';
+          resolvePreferredCanonicalSlug(c, recommendedParent.key) ?? 'unknown';
         const expectedLevel2 = buildCategoryLevel2Descriptor(canonicalSlug, {
           name: c.name,
           slug: c.slug,

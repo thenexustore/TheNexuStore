@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -27,6 +28,7 @@ import {
 import { CategoryDrawer } from "./CategoryDrawer";
 import { CategorySearchResultCard } from "./CategorySearchResultCard";
 import {
+  canNavigateCategoryDirectly,
   findCategoryTrailBySlug,
   normalizeCategoryTree,
   resolveCategoryScopeSlug,
@@ -37,6 +39,57 @@ import {
   type StoreBranding,
 } from "../lib/admin-branding";
 import StoreBrandLogo from "./StoreBrandLogo";
+
+function NavbarThumbnail({ src, alt }: { src?: string | null; alt: string }) {
+  const fallbackSrc = "/No_Image_Available.png";
+  const resolvedSrc = src && src.trim() !== "" ? src : fallbackSrc;
+  const [imageSrc, setImageSrc] = useState(resolvedSrc);
+
+  useEffect(() => {
+    setImageSrc(resolvedSrc);
+  }, [resolvedSrc]);
+
+  return (
+    <Image
+      src={imageSrc}
+      alt={alt}
+      fill
+      sizes="56px"
+      unoptimized
+      className="object-cover"
+      onError={() => {
+        if (imageSrc !== fallbackSrc) {
+          setImageSrc(fallbackSrc);
+        }
+      }}
+    />
+  );
+}
+
+function NavbarProfileImage({ src, alt }: { src: string; alt: string }) {
+  const fallbackSrc = "/No_Image_Available.png";
+  const [imageSrc, setImageSrc] = useState(src);
+
+  useEffect(() => {
+    setImageSrc(src);
+  }, [src]);
+
+  return (
+    <Image
+      src={imageSrc}
+      alt={alt}
+      width={36}
+      height={36}
+      unoptimized
+      className="h-9 w-9 rounded-full border-2 border-gray-200 object-cover transition-colors hover:border-[#0B123A]"
+      onError={() => {
+        if (imageSrc !== fallbackSrc) {
+          setImageSrc(fallbackSrc);
+        }
+      }}
+    />
+  );
+}
 
 type User = {
   id: string;
@@ -133,9 +186,9 @@ export default function Navbar() {
       const stored = localStorage.getItem("cart");
       if (stored) {
         try {
-          const cart = JSON.parse(stored);
+          const cart = JSON.parse(stored) as Array<{ quantity?: number }>;
           const totalItems = cart.reduce(
-            (sum: number, item: any) => sum + item.quantity,
+            (sum: number, item) => sum + (item.quantity ?? 0),
             0,
           );
           setLegacyCartCount(totalItems);
@@ -182,7 +235,10 @@ export default function Navbar() {
       const response = await productAPI.getCategoryTree(5);
       setCategoryTree(response.items ?? []);
     } catch (error) {
-      console.warn("Failed to load categories tree. Showing empty menu.", error);
+      console.warn(
+        "Failed to load categories tree. Showing empty menu.",
+        error,
+      );
       setCategoryTree([]);
     } finally {
       setCategoriesLoading(false);
@@ -283,13 +339,20 @@ export default function Navbar() {
     closeMobilePanels();
   };
 
+  const handleAllProductsClick = () => {
+    router.push("/products");
+    closeMobilePanels();
+  };
+
   const handleMobileCategorySelect = (category: CategoryTreeNode) => {
     if (category.children.length > 0) {
       setMobileCategoryPath((current) => [...current, category.id]);
       return;
     }
 
-    handleCategoryClick(category.slug);
+    if (canNavigateCategoryDirectly(category)) {
+      handleCategoryClick(category.slug);
+    }
   };
 
   const handleMobileCategoryBack = () => {
@@ -486,21 +549,9 @@ export default function Navbar() {
                                       %
                                     </span>
                                   )}
-                                <img
-                                  src={
-                                    product.thumbnail &&
-                                    product.thumbnail.trim() !== ""
-                                      ? product.thumbnail
-                                      : "/No_Image_Available.png"
-                                  }
+                                <NavbarThumbnail
+                                  src={product.thumbnail}
                                   alt={product.title}
-                                  className="h-full w-full object-cover"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src =
-                                      "/No_Image_Available.png";
-                                  }}
                                 />
                               </div>
 
@@ -527,7 +578,9 @@ export default function Navbar() {
                                       product.compare_at_price >
                                         product.price && (
                                         <p className="text-xs text-black/70 line-through">
-                                          {formatCurrency(product.compare_at_price)}
+                                          {formatCurrency(
+                                            product.compare_at_price,
+                                          )}
                                         </p>
                                       )}
                                   </div>
@@ -643,10 +696,8 @@ export default function Navbar() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link href="/account" onClick={closeMobilePanels}>
                   {user.profile_image ? (
-                    <img
+                    <NavbarProfileImage
                       src={user.profile_image}
-                      className="h-9 w-9 rounded-full object-cover border-2 border-gray-200 hover:border-[#0B123A] transition-colors"
-                      referrerPolicy="no-referrer"
                       alt="Profile"
                     />
                   ) : (
@@ -730,6 +781,7 @@ export default function Navbar() {
         onQueryChange={setCategorySearch}
         onClose={closeMobilePanels}
         onNavigate={handleCategoryClick}
+        onBrowseAllProducts={handleAllProductsClick}
         activeCategorySlug={activeCategorySlug}
       />
 
@@ -837,13 +889,23 @@ export default function Navbar() {
                       <button
                         type="button"
                         onClick={() =>
+                          canNavigateCategoryDirectly(activeMobileNode) &&
                           handleCategoryClick(activeMobileNode.slug)
                         }
-                        className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A]"
+                        disabled={
+                          !canNavigateCategoryDirectly(activeMobileNode)
+                        }
+                        className={`mt-3 w-full rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${
+                          canNavigateCategoryDirectly(activeMobileNode)
+                            ? "border-slate-200 bg-white text-[#0B123A] hover:border-[#0B123A]"
+                            : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                        }`}
                       >
-                        {t("viewAllInCategory", {
-                          name: activeMobileNode.name,
-                        })}
+                        {canNavigateCategoryDirectly(activeMobileNode)
+                          ? t("viewAllInCategory", {
+                              name: activeMobileNode.name,
+                            })
+                          : t("preparingCategory")}
                       </button>
                       <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
                         {t("mobileBrowseHint")}
@@ -854,6 +916,8 @@ export default function Navbar() {
                   {visibleMobileTreeCategories.map((category) => {
                     const isCurrentCategory =
                       activeCategorySlug === category.slug;
+                    const allowDirectNavigation =
+                      canNavigateCategoryDirectly(category);
 
                     return (
                       <div
@@ -875,7 +939,9 @@ export default function Navbar() {
                               </span>
                             ) : (
                               <span className="mt-1 block text-xs font-normal text-slate-500">
-                                {t("viewProducts")}
+                                {allowDirectNavigation
+                                  ? t("viewProducts")
+                                  : t("preparingCategory")}
                               </span>
                             )}
                           </span>
@@ -885,13 +951,23 @@ export default function Navbar() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleCategoryClick(category.slug)}
-                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isCurrentCategory ? "border-indigo-300 bg-indigo-50 text-[#0B123A]" : "border-slate-200 text-slate-600 hover:border-[#0B123A] hover:text-[#0B123A]"}`}
+                          onClick={() =>
+                            allowDirectNavigation &&
+                            handleCategoryClick(category.slug)
+                          }
+                          disabled={!allowDirectNavigation}
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            allowDirectNavigation
+                              ? isCurrentCategory
+                                ? "border-indigo-300 bg-indigo-50 text-[#0B123A]"
+                                : "border-slate-200 text-slate-600 hover:border-[#0B123A] hover:text-[#0B123A]"
+                              : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                          }`}
                           aria-label={t("viewProductsOf", {
                             name: category.name,
                           })}
                         >
-                          {t("view")}
+                          {allowDirectNavigation ? t("view") : t("soon")}
                         </button>
                       </div>
                     );

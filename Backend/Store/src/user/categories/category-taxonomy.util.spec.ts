@@ -373,6 +373,24 @@ describe('category-taxonomy.util', () => {
       subfamilyName: 'Cartelería digital profesional',
       expectedSlug: 'tv-audio-video-familia-carteleria-videoconferencia',
     },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Telefonía',
+      subfamilyName: 'Smartphone Android 5G',
+      expectedSlug: 'telefonia-movilidad-familia-smartphones-telefonia',
+    },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Movilidad profesional',
+      subfamilyName: 'Terminal móvil Android RFID',
+      expectedSlug: 'telefonia-movilidad-familia-movilidad-profesional-gps-rf',
+    },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Accesorios',
+      subfamilyName: 'Power bank MagSafe',
+      expectedSlug: 'telefonia-movilidad-familia-accesorios-movilidad',
+    },
   ])(
     'matches expected level-2 parent for $familyName / $subfamilyName',
     ({ grandparentSlug, familyName, subfamilyName, expectedSlug }) => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { getOrderByTrackingToken, type Order, type OrderItem } from "@/app/lib/checkout";
+import { formatCurrency } from "@/app/lib/currency";
 import { useOrderTrackingSocket } from "@/app/hooks/useOrderTrackingSocket";
 import {
   CheckCircle2,
@@ -65,13 +66,6 @@ const PROGRESS_STEPS: ProgressStep[] = [
     Icon: CheckCircle2,
   },
 ];
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  }).format(amount);
-};
 
 const formatStatus = (status: string) => {
   return status

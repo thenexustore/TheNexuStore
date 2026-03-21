@@ -24,6 +24,7 @@ import {
   type Product,
 } from "@/lib/api";
 import { loadAdminSettings, subscribeAdminSettings } from "@/lib/admin-settings";
+import { formatCurrency as formatCurrencyValue } from "@/lib/currency";
 
 
 interface SavedProductView {
@@ -55,11 +56,8 @@ export default function ProductsPage() {
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat(adminSettings.dateFormat, {
-      style: "currency",
-      currency: adminSettings.defaultCurrency,
-    }).format(Number(amount || 0));
+  const formatMoney = (amount: number) =>
+    formatCurrencyValue(Number(amount || 0), adminSettings.dateFormat, adminSettings.defaultCurrency);
 
   const loadImportHistory = async () => {
     try {
@@ -507,11 +505,11 @@ export default function ProductsPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-medium text-gray-900">
-                            {formatCurrency(product.price)}
+                            {formatMoney(product.price)}
                           </span>
                           {product.discount_price && (
                             <span className="text-xs text-gray-400 line-through">
-                              {formatCurrency(product.discount_price)}
+                              {formatMoney(product.discount_price)}
                             </span>
                           )}
                         </div>

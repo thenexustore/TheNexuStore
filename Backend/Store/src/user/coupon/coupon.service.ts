@@ -64,7 +64,7 @@ export class CouponService {
     ) {
       return {
         isValid: false,
-        error: `Minimum order amount is €${Number(coupon.min_order_amount).toFixed(2)}`,
+        error: `Minimum order amount is ${Number(coupon.min_order_amount).toFixed(2)} €`,
       };
     }
 

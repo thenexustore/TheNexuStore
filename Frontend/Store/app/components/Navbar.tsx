@@ -17,6 +17,7 @@ import {
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { getMe } from "../lib/auth";
+import { formatCurrency } from "../lib/currency";
 import {
   productAPI,
   Product,
@@ -492,13 +493,13 @@ export default function Navbar() {
                                           : "text-[#0B123A]"
                                       }`}
                                     >
-                                      €{product.price.toFixed(2)}
+                                      {formatCurrency(product.price)}
                                     </p>
                                     {product.compare_at_price &&
                                       product.compare_at_price >
                                         product.price && (
                                         <p className="text-xs text-black/70 line-through">
-                                          €{product.compare_at_price.toFixed(2)}
+                                          {formatCurrency(product.compare_at_price)}
                                         </p>
                                       )}
                                   </div>

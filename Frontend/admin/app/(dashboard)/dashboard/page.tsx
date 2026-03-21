@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/currency";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -53,7 +54,7 @@ export default function DashboardPage() {
     },
     {
       title: "Today's Revenue",
-      value: `€${stats?.todayRevenue?.toLocaleString("es-ES") || 0}`,
+      value: formatCurrency(Number(stats?.todayRevenue || 0)),
       icon: Euro,
       color: "bg-green-500",
       change: "+8%",
@@ -171,7 +172,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-slate-500">{order.customer}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-slate-900">€{order.amount}</p>
+                <p className="font-bold text-slate-900">{formatCurrency(Number(order.amount || 0))}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <Clock className="w-4 h-4 text-slate-400" />
                   <span className="text-sm text-slate-500">

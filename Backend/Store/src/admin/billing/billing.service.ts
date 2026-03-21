@@ -454,9 +454,11 @@ export class BillingService {
       BillingDocumentType.INVOICE,
     );
     const issueDate = dto.issue_date ? new Date(dto.issue_date) : new Date();
+    const invoiceId = crypto.randomUUID();
 
     const invoice = await this.prisma.billingDocument.create({
       data: {
+        id: invoiceId,
         type: BillingDocumentType.INVOICE,
         status: BillingDocumentStatus.ISSUED,
         document_number: number,
@@ -486,6 +488,7 @@ export class BillingService {
         tax_amount: quote.tax_amount,
         discount_amount: quote.discount_amount,
         total_amount: quote.total_amount,
+        pdf_url: `/billing/pdf/${invoiceId}`,
         items: {
           create: quote.items.map((item) => ({
             description: item.description,
@@ -500,11 +503,6 @@ export class BillingService {
         },
       },
       include: { items: true },
-    });
-
-    await this.prisma.billingDocument.update({
-      where: { id: invoice.id },
-      data: { pdf_url: `/billing/pdf/${invoice.id}` },
     });
 
     await this.prisma.billingNumberAudit.create({

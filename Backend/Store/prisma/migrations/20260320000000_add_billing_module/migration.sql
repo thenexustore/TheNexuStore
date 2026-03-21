@@ -192,16 +192,16 @@ CREATE INDEX "billing_document_items_document_id_position_idx" ON "billing_docum
 CREATE INDEX "billing_number_audits_document_id_idx" ON "billing_number_audits"("document_id");
 
 -- AddForeignKey
-ALTER TABLE "customer_fiscal_profiles" ADD CONSTRAINT "customer_fiscal_profiles_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "customer_fiscal_profiles" ADD CONSTRAINT "customer_fiscal_profiles_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "Customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "billing_documents" ADD CONSTRAINT "billing_documents_series_id_fkey" FOREIGN KEY ("series_id") REFERENCES "billing_series"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "billing_documents" ADD CONSTRAINT "billing_documents_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "billing_documents" ADD CONSTRAINT "billing_documents_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "Order"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "billing_documents" ADD CONSTRAINT "billing_documents_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "billing_documents" ADD CONSTRAINT "billing_documents_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "billing_documents" ADD CONSTRAINT "billing_documents_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "billing_templates"("id") ON DELETE SET NULL ON UPDATE CASCADE;

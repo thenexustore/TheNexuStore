@@ -6,6 +6,12 @@ export type MenuParentCategory = {
   subfamilyKeywords: readonly string[];
 };
 
+type TaxonomyOverrideRule = {
+  key: string;
+  anyOf: readonly string[];
+  noneOf?: readonly string[];
+};
+
 export const DEFAULT_PARENT_CATEGORY: Pick<
   MenuParentCategory,
   'key' | 'label'
@@ -167,16 +173,23 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
     subfamilyKeywords: [
       'smartphone',
       'telefono',
+      'telefono movil',
       'tablet',
       'smartwatch',
       'wearable',
       'mifi',
       'pda',
+      'rfid',
+      'terminal movil',
+      'terminal portatil',
+      'handheld',
+      'lector codigo',
       'radiofrecuencia',
       'funda',
       'cargador movil',
       'accesorio movil',
       'protector pantalla',
+      'power bank',
       'gps',
     ],
   },
@@ -210,7 +223,6 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'pantalla proyeccion',
       'altavoz bluetooth',
       'auriculares bluetooth',
-      'camara seguridad',
     ],
   },
   {
@@ -292,6 +304,65 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
   },
 ];
 
+const TAXONOMY_OVERRIDE_RULES: readonly TaxonomyOverrideRule[] = [
+  {
+    key: 'monitores-perifericos',
+    anyOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+  },
+  {
+    key: 'telefonia-movilidad',
+    anyOf: [
+      'smartphone',
+      'telefono movil',
+      'movil',
+      'mobile',
+      'tablet',
+      'smartwatch',
+      'wearable',
+      'mifi',
+      'pda',
+      'rfid',
+      'terminal movil',
+      'terminal portatil',
+      'handheld',
+      'gps',
+    ],
+    noneOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+  },
+  {
+    key: 'gaming-smart-home',
+    anyOf: [
+      'camara seguridad',
+      'videovigilancia',
+      'cctv',
+      'alarma',
+      'control de acceso',
+      'cerradura inteligente',
+    ],
+  },
+  {
+    key: 'ordenadores-portatiles',
+    anyOf: [
+      'portatil',
+      'notebook',
+      'laptop',
+      'ultrabook',
+      'chromebook',
+      'desktop',
+      'sobremesa',
+      'workstation',
+      'all in one',
+      'mini pc',
+      'barebone',
+      'thin client',
+      'cliente ligero',
+      'panel pc',
+      'embedded pc',
+    ],
+    noneOf: ['movil', 'telefono', 'smartphone', 'tablet'],
+  },
+];
+
 function normalizeText(value: string | null | undefined): string {
   return String(value || '')
     .normalize('NFD')
@@ -324,6 +395,20 @@ function scoreCategory(
   return score;
 }
 
+function matchesOverrideRule(
+  text: string,
+  rule: TaxonomyOverrideRule,
+): boolean {
+  const hasPositive = rule.anyOf.some((keyword) =>
+    text.includes(normalizeText(keyword)),
+  );
+  if (!hasPositive) return false;
+
+  return !(rule.noneOf ?? []).some((keyword) =>
+    text.includes(normalizeText(keyword)),
+  );
+}
+
 export function slugifyCategory(value: string): string {
   return normalizeText(value)
     .replace(/[^a-z0-9]+/g, '-')
@@ -343,9 +428,25 @@ export function recommendParentCategory(
 ): { key: string; label: string } {
   const family = normalizeText(familyName);
   const subfamily = normalizeText(subfamilyName);
+  const combined = normalizeText(`${familyName ?? ''} ${subfamilyName ?? ''}`);
 
   if (!family && !subfamily) {
     return DEFAULT_PARENT_CATEGORY;
+  }
+
+  const override = TAXONOMY_OVERRIDE_RULES.find((rule) =>
+    matchesOverrideRule(combined, rule),
+  );
+  if (override) {
+    const matchedCategory = MENU_PARENT_TAXONOMY.find(
+      (category) => category.key === override.key,
+    );
+    if (matchedCategory) {
+      return {
+        key: matchedCategory.key,
+        label: matchedCategory.label,
+      };
+    }
   }
 
   const scored = MENU_PARENT_TAXONOMY.map((category) => ({

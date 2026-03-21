@@ -37,6 +37,12 @@ type CategoryTaxonomyGroup = {
   keywords: readonly string[];
 };
 
+type CategoryTaxonomyGroupOverrideRule = {
+  groupKey: string;
+  anyOf: readonly string[];
+  noneOf?: readonly string[];
+};
+
 type CategoryLevel2Input = Pick<CategoryTaxonomyRow, 'name' | 'slug'> & {
   familyName?: string | null;
   subfamilyName?: string | null;
@@ -272,13 +278,13 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'smartphones-telefonia',
       label: 'Smartphones y telefonía',
       sortOrder: 10,
-      keywords: ['smartphone', 'telefono', 'mifi'],
+      keywords: ['smartphone', 'telefono', 'telefono movil', 'mifi'],
     },
     {
       key: 'tablets-wearables',
       label: 'Tablets y wearables',
       sortOrder: 20,
-      keywords: ['tablet', 'smartwatch', 'wearable'],
+      keywords: ['tablet', 'smartwatch', 'wearable', 'ebook', 'ereader'],
     },
     {
       key: 'movilidad-profesional-gps-rf',
@@ -290,6 +296,10 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'rfid',
         'terminal movil',
         'terminal portatil',
+        'handheld',
+        'terminal tactil',
+        'lector codigo',
+        'barcode',
         'lector de codigo',
         'lector codigo',
         'gps',
@@ -304,6 +314,9 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'cargador movil',
         'protector pantalla',
         'accesorio movil',
+        'power bank',
+        'bateria externa',
+        'soporte movil',
       ],
     },
   ],
@@ -516,6 +529,60 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
   ],
 };
 
+const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
+  Record<string, readonly CategoryTaxonomyGroupOverrideRule[]>
+> = {
+  'telefonia-movilidad': [
+    {
+      groupKey: 'movilidad-profesional-gps-rf',
+      anyOf: [
+        'rfid',
+        'terminal movil',
+        'terminal portatil',
+        'handheld',
+        'terminal tactil',
+        'lector codigo',
+        'barcode',
+        'pda',
+        'gps',
+      ],
+    },
+    {
+      groupKey: 'accesorios-movilidad',
+      anyOf: [
+        'power bank',
+        'bateria externa',
+        'cargador movil',
+        'protector pantalla',
+        'soporte movil',
+      ],
+    },
+    {
+      groupKey: 'tablets-wearables',
+      anyOf: ['smartwatch', 'wearable', 'ebook', 'ereader', 'tablet'],
+      noneOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+    },
+    {
+      groupKey: 'smartphones-telefonia',
+      anyOf: ['smartphone', 'telefono movil', 'telefono', 'movil', 'mifi'],
+      noneOf: ['terminal movil', 'terminal portatil'],
+    },
+  ],
+  'gaming-smart-home': [
+    {
+      groupKey: 'mobiliario-gaming-simracing',
+      anyOf: [
+        'silla gaming',
+        'escritorio gaming',
+        'simracing',
+        'volante',
+        'cockpit',
+        'soporte volante',
+      ],
+    },
+  ],
+};
+
 function normalizeTaxonomyText(value: string): string {
   return value
     .normalize('NFD')
@@ -544,6 +611,20 @@ function scoreGroupMatch(
   }, 0);
 }
 
+function matchesGroupOverrideRule(
+  text: string,
+  rule: CategoryTaxonomyGroupOverrideRule,
+): boolean {
+  const hasPositive = rule.anyOf.some((keyword) =>
+    text.includes(normalizeTaxonomyText(keyword)),
+  );
+  if (!hasPositive) return false;
+
+  return !(rule.noneOf ?? []).some((keyword) =>
+    text.includes(normalizeTaxonomyText(keyword)),
+  );
+}
+
 function resolveCategoryTaxonomyGroup(
   grandparentSlug: string,
   row: CategoryLevel2Input,
@@ -553,6 +634,17 @@ function resolveCategoryTaxonomyGroup(
   const detailText = normalizeTaxonomyText(
     `${row.subfamilyName ?? ''} ${row.name} ${row.slug.replace(/-/g, ' ')}`,
   );
+  const combinedText = normalizeTaxonomyText(
+    `${row.familyName ?? ''} ${row.subfamilyName ?? ''} ${row.name} ${row.slug.replace(/-/g, ' ')}`,
+  );
+
+  const override = (
+    CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES[grandparentSlug] ?? []
+  ).find((rule) => matchesGroupOverrideRule(combinedText, rule));
+  if (override) {
+    const overrideGroup = groups.find((group) => group.key === override.groupKey);
+    if (overrideGroup) return overrideGroup;
+  }
 
   const bestMatch = groups
     .map((group) => ({

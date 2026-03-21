@@ -348,7 +348,7 @@ export default function BillingPage() {
     setShowCreate(true);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     const validItems = createForm.items.filter(
       (i: CreateItemState) => i.description.trim() && i.unit_price,
@@ -417,7 +417,7 @@ export default function BillingPage() {
     }
   };
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setSavingSettings(true);
     try {

@@ -224,9 +224,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
           {isLowStock && !isOutOfStock && (
-            <div className="absolute top-2 left-2">
-              <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white">
-                Low Stock
+            <div className="absolute bottom-2 right-2 z-10">
+              <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow">
+                {t("lowStockBadge")}
               </span>
             </div>
           )}

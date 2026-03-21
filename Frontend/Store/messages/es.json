@@ -94,6 +94,7 @@
     "specifications": "Especificaciones",
     "inStock": "En stock ({count} disponibles)",
     "lowStock": "Stock bajo ({count} restantes)",
+    "lowStockBadge": "Stock bajo",
     "adding": "Añadiendo...",
     "buyNow": "Comprar ahora",
     "inCart": "{count} en carrito",

@@ -144,10 +144,18 @@ validate_infortisa_health() {
 
   HEALTH_PAYLOAD="$payload" node <<'NODE'
 const raw = JSON.parse(process.env.HEALTH_PAYLOAD || '{}');
-const payload = (raw && typeof raw.data === 'object' && raw.data !== null) ? raw.data : raw;
+const unwrapPayload = (value) => {
+  let current = value;
+  while (current && typeof current === 'object' && current.data && typeof current.data === 'object') {
+    current = current.data;
+  }
+  return current;
+};
+const payload = unwrapPayload(raw);
 const valid =
   payload &&
   typeof payload === 'object' &&
+  typeof payload.healthy === 'boolean' &&
   payload.provider === 'infortisa' &&
   typeof payload.base_url === 'string' &&
   typeof payload.checked_at === 'string' &&
@@ -155,7 +163,7 @@ const valid =
   typeof payload.latency_ms === 'number';
 
 if (!valid) {
-  console.error('Invalid Infortisa health payload shape');
+  console.error(`Invalid Infortisa health payload shape: ${JSON.stringify(raw)}`);
   process.exit(1);
 }
 
@@ -430,12 +438,12 @@ run "sed -i 's/\\r$//' '$BACKEND_START_SCRIPT'"
 
 log "Building store"
 fix_next_proxy_conflict "$STORE_DIR"
-install_deps "$STORE_DIR"
+install_deps "$STORE_DIR" 1
 run "cd '$STORE_DIR' && NODE_ENV=production npm run build"
 
 log "Building admin"
 fix_next_proxy_conflict "$ADMIN_DIR"
-install_deps "$ADMIN_DIR"
+install_deps "$ADMIN_DIR" 1
 run "cd '$ADMIN_DIR' && NODE_ENV=production npm run build"
 
 log "Restarting PM2"

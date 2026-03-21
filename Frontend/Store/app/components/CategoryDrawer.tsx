@@ -126,7 +126,7 @@ export function CategoryDrawer({
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[96vw] max-w-[1180px] bg-white shadow-2xl transition-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[96vw] max-w-[1180px] flex-col bg-white shadow-2xl transition-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-base font-semibold text-slate-900">
@@ -164,9 +164,9 @@ export function CategoryDrawer({
           </div>
         </div>
 
-        <div className="h-[calc(100vh-126px)]">
+        <div className="min-h-0 flex-1">
           {query.trim().length >= 2 ? (
-            <div className="h-full overflow-y-auto p-4">
+            <div className="h-full overflow-y-auto overscroll-contain p-4">
               {searchLoading ? (
                 <p className="text-sm text-slate-500">{t("searching")}</p>
               ) : null}
@@ -186,7 +186,7 @@ export function CategoryDrawer({
               </div>
             </div>
           ) : (
-            <>
+            <div className="flex h-full min-h-0 flex-col">
               {activeCategoryTrail.length > 0 ? (
                 <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -228,8 +228,8 @@ export function CategoryDrawer({
                   </div>
                 </div>
               ) : null}
-              <div className="grid h-full grid-cols-1 md:grid-cols-[280px_320px_1fr]">
-                <section className="border-r border-slate-200 bg-slate-50/50 p-3">
+              <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_320px_1fr]">
+                <section className="min-h-0 border-r border-slate-200 bg-slate-50/50 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2 px-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {t("parentCategories")}
@@ -238,7 +238,7 @@ export function CategoryDrawer({
                       {tree.length}
                     </span>
                   </div>
-                  <div className="h-full space-y-1 overflow-y-auto pb-4">
+                  <div className="h-full space-y-1 overflow-y-auto overscroll-contain pb-4">
                     {loading ? (
                       <p className="px-2 text-sm text-slate-500">
                         {t("loadingCategories")}
@@ -277,7 +277,7 @@ export function CategoryDrawer({
                   </div>
                 </section>
 
-                <section className="border-r border-slate-200 p-3">
+                <section className="min-h-0 border-r border-slate-200 p-3">
                   <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {t("subcategories")}
                   </p>
@@ -296,7 +296,7 @@ export function CategoryDrawer({
                       </div>
                     </div>
                   ) : null}
-                  <div className="h-full space-y-1 overflow-y-auto pb-4">
+                  <div className="h-full space-y-1 overflow-y-auto overscroll-contain pb-4">
                     {activeParent ? (
                       <>
                         <button
@@ -354,7 +354,7 @@ export function CategoryDrawer({
                   </div>
                 </section>
 
-                <section className="p-3">
+                <section className="min-h-0 p-3">
                   <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {t("lowerLevels")}
                   </p>
@@ -387,7 +387,7 @@ export function CategoryDrawer({
                       </div>
                     </div>
                   ) : null}
-                  <div className="h-full overflow-y-auto pb-4">
+                  <div className="h-full overflow-y-auto overscroll-contain pb-4">
                     {activeChild ? (
                       <>
                         <button
@@ -426,7 +426,7 @@ export function CategoryDrawer({
                   </div>
                 </section>
               </div>
-            </>
+            </div>
           )}
         </div>
       </aside>

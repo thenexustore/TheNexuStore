@@ -225,6 +225,71 @@ describe('category-taxonomy.util', () => {
     );
   });
 
+  it('rescues misplaced rows from otras-categorias when the name clearly maps to another canonical parent', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'canonical-accessories',
+        name: 'Accesorios y consumibles',
+        slug: 'accesorios-consumibles',
+        parent_id: null,
+        sort_order: 90,
+      },
+      {
+        id: 'misplaced-ap',
+        name: 'Puntos de acceso',
+        slug: 'puntos-de-acceso',
+        parent_id: 'canonical-accessories',
+        sort_order: 10,
+      },
+      {
+        id: 'misplaced-toner',
+        name: 'Tambor/Fotoconductor',
+        slug: 'tambor-fotoconductor',
+        parent_id: 'canonical-accessories',
+        sort_order: 20,
+      },
+      {
+        id: 'misplaced-ip-phone',
+        name: 'Teléfonos IP',
+        slug: 'telefonos-ip',
+        parent_id: 'canonical-accessories',
+        sort_order: 30,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const networking = tree.find((node) => node.slug === 'redes-servidores');
+    const printing = tree.find((node) => node.slug === 'impresion-escaneado');
+
+    expect(networking?.children.map((node) => node.slug)).toContain(
+      'redes-servidores-familia-redes-wifi',
+    );
+    expect(
+      networking?.children
+        .flatMap((node) => node.children)
+        .map((node) => node.slug),
+    ).toContain('puntos-de-acceso');
+
+    expect(printing?.children.map((node) => node.slug)).toContain(
+      'impresion-escaneado-familia-consumibles-impresion',
+    );
+    expect(
+      printing?.children
+        .flatMap((node) => node.children)
+        .map((node) => node.slug),
+    ).toContain('tambor-fotoconductor');
+
+    const telephony = tree.find((node) => node.slug === 'telefonia-movilidad');
+    expect(telephony?.children.map((node) => node.slug)).toContain(
+      'telefonia-movilidad-familia-smartphones-telefonia',
+    );
+    expect(
+      telephony?.children
+        .flatMap((node) => node.children)
+        .map((node) => node.slug),
+    ).toContain('telefonos-ip');
+  });
+
   it('creates synthetic level-2 parent buckets under canonical grandparents', () => {
     const normalized = normalizeCategoryTaxonomyRows([
       {

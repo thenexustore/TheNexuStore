@@ -146,6 +146,84 @@ describe('Infortisa category mapping', () => {
     );
   });
 
+  it('maps Puntos de acceso into Redes y servidores', () => {
+    expect(recommendParentCategory(null, 'Puntos de acceso').label).toBe(
+      'Redes y servidores',
+    );
+  });
+
+  it('maps Teléfonos IP into Telefonía y movilidad', () => {
+    expect(recommendParentCategory(null, 'Teléfonos IP').label).toBe(
+      'Telefonía y movilidad',
+    );
+  });
+
+  it('maps Software ofimática into Software y seguridad', () => {
+    expect(recommendParentCategory(null, 'Software Ofimática').label).toBe(
+      'Software y seguridad',
+    );
+  });
+
+  it('maps Radio despertador into TV, audio y vídeo', () => {
+    expect(recommendParentCategory(null, 'Radio despertador').label).toBe(
+      'TV, audio y vídeo',
+    );
+  });
+
+  it('maps Todo en uno into Ordenadores y portátiles', () => {
+    expect(recommendParentCategory(null, 'Todo en uno').label).toBe(
+      'Ordenadores y portátiles',
+    );
+  });
+
+  it('maps Red inalámbrica into Redes y servidores', () => {
+    expect(recommendParentCategory(null, 'Red inalámbrica').label).toBe(
+      'Redes y servidores',
+    );
+  });
+
+  it('maps Servidores Torre into Redes y servidores', () => {
+    expect(recommendParentCategory(null, 'Servidores Torre').label).toBe(
+      'Redes y servidores',
+    );
+  });
+
+  it('maps Teléfonos Fijos into Telefonía y movilidad', () => {
+    expect(recommendParentCategory(null, 'Teléfonos Fijos').label).toBe(
+      'Telefonía y movilidad',
+    );
+  });
+
+  it('maps TPV into Software y seguridad', () => {
+    expect(recommendParentCategory(null, 'TPV').label).toBe(
+      'Software y seguridad',
+    );
+  });
+
+  it('maps TFT/Táctil hasta 15 into Monitores y periféricos', () => {
+    expect(recommendParentCategory(null, 'TFT/Táctil hasta 15').label).toBe(
+      'Monitores y periféricos',
+    );
+  });
+
+  it('maps Tarjetas Controladoras into Componentes y almacenamiento', () => {
+    expect(recommendParentCategory(null, 'Tarjetas Controladoras').label).toBe(
+      'Componentes y almacenamiento',
+    );
+  });
+
+  it('maps Secure Digital into Componentes y almacenamiento', () => {
+    expect(recommendParentCategory(null, 'Secure Digital').label).toBe(
+      'Componentes y almacenamiento',
+    );
+  });
+
+  it('maps Semitorre y Miditorre into Componentes y almacenamiento', () => {
+    expect(recommendParentCategory(null, 'Semitorre y Miditorre').label).toBe(
+      'Componentes y almacenamiento',
+    );
+  });
+
   it('returns sort order 90 for Accesorios y consumibles (now in taxonomy array)', () => {
     expect(getParentCategorySortOrder('Accesorios y consumibles')).toBe(90);
   });

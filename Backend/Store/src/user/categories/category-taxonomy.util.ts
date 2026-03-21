@@ -62,7 +62,16 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'sobremesa-workstations',
       label: 'Sobremesa y workstations',
       sortOrder: 20,
-      keywords: ['sobremesa', 'desktop', 'torre', 'workstation', 'all in one'],
+      keywords: [
+        'sobremesa',
+        'desktop',
+        'torre',
+        'workstation',
+        'all in one',
+        'todo en uno',
+        'semitorre',
+        'miditorre',
+      ],
     },
     {
       key: 'mini-pc-barebones',
@@ -142,7 +151,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'monitores-pantallas',
       label: 'Monitores y pantallas',
       sortOrder: 10,
-      keywords: ['monitor', 'pantalla', 'display'],
+      keywords: ['monitor', 'pantalla', 'display', 'tft', 'tactil', 'táctil'],
     },
     {
       key: 'teclados-ratones',
@@ -217,6 +226,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'drum',
         'fusor',
         'fuser',
+        'fotoconductor',
         'rollo',
         'cinta termica',
         'papel',
@@ -236,6 +246,9 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'repetidor',
         'access point',
         'punto de acceso',
+        'puntos de acceso',
+        'red inalambrica',
+        'servidor torre',
       ],
     },
     {
@@ -373,6 +386,10 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'tdt',
         'soporte tv',
         'pantalla proyeccion',
+        'radio despertador',
+        'reproductor tv',
+        'via satelite',
+        'sintonizador radio',
       ],
     },
   ],
@@ -389,6 +406,8 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'licencia',
         'saas',
         'cloud',
+        'software ofimatica',
+        'software ofimática',
       ],
     },
     {
@@ -404,6 +423,8 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'contabilidad',
         'nomina',
         'nómina',
+        'software gestion',
+        'software gestión',
       ],
     },
     {
@@ -642,7 +663,9 @@ function resolveCategoryTaxonomyGroup(
     CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES[grandparentSlug] ?? []
   ).find((rule) => matchesGroupOverrideRule(combinedText, rule));
   if (override) {
-    const overrideGroup = groups.find((group) => group.key === override.groupKey);
+    const overrideGroup = groups.find(
+      (group) => group.key === override.groupKey,
+    );
     if (overrideGroup) return overrideGroup;
   }
 
@@ -782,9 +805,49 @@ export function normalizeCategoryTaxonomyRows(
 
   const normalizedById = new Map(normalizedRows.map((row) => [row.id, row]));
 
+  const resolveCanonicalAncestorSlug = (row: CategoryTaxonomyRow) => {
+    if (!row.parent_id) return null;
+    const directParent = normalizedById.get(row.parent_id);
+    if (!directParent) return null;
+
+    const directCanonical = resolveCanonicalParentSlug(directParent.slug);
+    if (directCanonical) return directCanonical;
+
+    if (!directParent.parent_id) return null;
+    const grandparent = normalizedById.get(directParent.parent_id);
+    return grandparent?.slug
+      ? resolveCanonicalParentSlug(grandparent.slug)
+      : null;
+  };
+
   for (const row of normalizedRows) {
     const canonicalSlug = resolveCanonicalParentSlug(row.slug);
     if (canonicalSlug) continue;
+
+    const currentCanonicalSlug = resolveCanonicalAncestorSlug(row);
+    if (!currentCanonicalSlug) continue;
+
+    const recommendedParent = recommendParentCategory(
+      row.name,
+      `${row.name} ${row.slug.replace(/-/g, ' ')}`,
+    );
+    const recommendedCanonicalSlug =
+      resolveCanonicalParentSlug(recommendedParent.key) ?? null;
+
+    if (
+      recommendedCanonicalSlug &&
+      recommendedCanonicalSlug !== currentCanonicalSlug
+    ) {
+      const currentLevel2 = buildCategoryLevel2Descriptor(
+        currentCanonicalSlug,
+        row,
+      );
+      if (currentLevel2.key === 'otras-categorias') {
+        row.parent_id =
+          parentIdByCanonicalSlug.get(recommendedCanonicalSlug) ??
+          row.parent_id;
+      }
+    }
 
     if (!row.parent_id) continue;
     const parent = normalizedById.get(row.parent_id);

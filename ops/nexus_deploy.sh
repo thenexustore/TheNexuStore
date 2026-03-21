@@ -317,12 +317,15 @@ if [[ "$NEXUS_SKIP_GIT" != "1" ]]; then
   # Self-update: if running from an installed copy (e.g. /usr/local/bin/nexus_deploy.sh)
   # that now differs from the repo after the reset, install the updated script and re-exec
   # so that the rest of the deployment runs with the current version of this script.
+  # Note: readlink -f is used intentionally — this script targets Linux only.
+  # Note: re-exec forwards "$@" so --dry-run/-n is re-parsed cleanly by the new script.
   _REPO_DEPLOY_SCRIPT="$REPO_DIR/ops/nexus_deploy.sh"
   _RUNNING_SCRIPT_REAL="$(readlink -f "${BASH_SOURCE[0]}")"
+  _REPO_SCRIPT_REAL="$(readlink -f "$_REPO_DEPLOY_SCRIPT")"
   if [[ -f "$_REPO_DEPLOY_SCRIPT" ]] && \
-     [[ "$_RUNNING_SCRIPT_REAL" != "$(readlink -f "$_REPO_DEPLOY_SCRIPT")" ]] && \
-     ! cmp -s "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL" && \
-     [[ "$NEXUS_SELF_UPDATED" != "1" ]]; then
+     [[ "$_RUNNING_SCRIPT_REAL" != "$_REPO_SCRIPT_REAL" ]] && \
+     [[ "$NEXUS_SELF_UPDATED" != "1" ]] && \
+     ! cmp -s "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL"; then
     if [[ "$DRY_RUN" == "1" ]]; then
       log "[dry-run] Deploy script updated in repo. Would install to '$_RUNNING_SCRIPT_REAL' and re-execute with new version."
     else

@@ -29,7 +29,7 @@ export {
   type OrdersResponse,
 } from "./orders";
 
-export { fetchDashboardStats, type DashboardStats } from "./dashboard";
+export { fetchDashboardStats, type DashboardStats, type DashboardAlert } from "./dashboard";
 
 export {
   fetchCoupons,

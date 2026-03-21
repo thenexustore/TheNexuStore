@@ -23,6 +23,8 @@ SITE_DOMAIN="${SITE_DOMAIN:-}"
 ADMIN_DOMAIN="${ADMIN_DOMAIN:-}"
 SKIP_EXTERNAL_HEALTHCHECKS="${SKIP_EXTERNAL_HEALTHCHECKS:-1}"
 SYNC_FRONTEND_ENV="${SYNC_FRONTEND_ENV:-1}"
+NEXUS_SELF_UPDATED="${NEXUS_SELF_UPDATED:-0}"
+NEXUS_SKIP_GIT="${NEXUS_SKIP_GIT:-0}"
 
 for c in git node npm npx sed curl; do
   command -v "$c" >/dev/null 2>&1 || {
@@ -278,36 +280,57 @@ ensure_repo
 
 detect_branch
 
-TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
-run "mkdir -p '$BACKUP_DIR'"
-create_repo_backup "$BACKUP_DIR/repo_snapshot.tgz"
+BACKUP_DIR=""
+if [[ "$NEXUS_SKIP_GIT" != "1" ]]; then
+  TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+  BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
+  run "mkdir -p '$BACKUP_DIR'"
+  create_repo_backup "$BACKUP_DIR/repo_snapshot.tgz"
 
-run "sed -i 's/\r$//' '$BACKEND_ENV_FILE'"
+  run "sed -i 's/\r$//' '$BACKEND_ENV_FILE'"
 
-run "cd '$REPO_DIR' && git fetch --all --prune"
-if git -C "$REPO_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
-  run "cd '$REPO_DIR' && git checkout '$BRANCH'"
-  run "cd '$REPO_DIR' && git reset --hard 'origin/$BRANCH'"
-  # Preserve persistent runtime storage (branding assets, settings) before cleaning.
-  # The storage/ dir is listed in Backend/Store/.gitignore so git clean ignores it,
-  # but we also back it up explicitly in case the gitignore is ever modified.
-  BACKEND_STORAGE_DIR="$BACKEND_DIR/storage"
-  if [[ -d "$BACKEND_STORAGE_DIR" ]]; then
-    if ! cp -a "$BACKEND_STORAGE_DIR" "$BACKUP_DIR/storage_snapshot"; then
-      echo "[ERROR] Could not backup backend storage to $BACKUP_DIR/storage_snapshot. Aborting to prevent data loss." >&2
-      exit 1
+  run "cd '$REPO_DIR' && git fetch --all --prune"
+  if git -C "$REPO_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+    run "cd '$REPO_DIR' && git checkout '$BRANCH'"
+    run "cd '$REPO_DIR' && git reset --hard 'origin/$BRANCH'"
+    # Preserve persistent runtime storage (branding assets, settings) before cleaning.
+    # The storage/ dir is listed in Backend/Store/.gitignore so git clean ignores it,
+    # but we also back it up explicitly in case the gitignore is ever modified.
+    BACKEND_STORAGE_DIR="$BACKEND_DIR/storage"
+    if [[ -d "$BACKEND_STORAGE_DIR" ]]; then
+      if ! cp -a "$BACKEND_STORAGE_DIR" "$BACKUP_DIR/storage_snapshot"; then
+        echo "[ERROR] Could not backup backend storage to $BACKUP_DIR/storage_snapshot. Aborting to prevent data loss." >&2
+        exit 1
+      fi
+    fi
+    run "cd '$REPO_DIR' && git clean -fd"
+    # Restore storage dir if git clean somehow removed it (e.g., if gitignore was absent)
+    if [[ ! -d "$BACKEND_STORAGE_DIR" && -d "$BACKUP_DIR/storage_snapshot" ]]; then
+      run "cp -a '$BACKUP_DIR/storage_snapshot' '$BACKEND_STORAGE_DIR'"
+      log "Restored backend storage from backup snapshot"
+    fi
+  else
+    log "WARN: origin/$BRANCH not found. Using local branch state without hard reset."
+    run "cd '$REPO_DIR' && git checkout '$BRANCH'"
+  fi
+
+  # Self-update: if running from an installed copy (e.g. /usr/local/bin/nexus_deploy.sh)
+  # that now differs from the repo after the reset, install the updated script and re-exec
+  # so that the rest of the deployment runs with the current version of this script.
+  _REPO_DEPLOY_SCRIPT="$REPO_DIR/ops/nexus_deploy.sh"
+  _RUNNING_SCRIPT_REAL="$(readlink -f "${BASH_SOURCE[0]}")"
+  if [[ -f "$_REPO_DEPLOY_SCRIPT" ]] && \
+     [[ "$_RUNNING_SCRIPT_REAL" != "$(readlink -f "$_REPO_DEPLOY_SCRIPT")" ]] && \
+     ! cmp -s "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL" && \
+     [[ "$NEXUS_SELF_UPDATED" != "1" ]]; then
+    if [[ "$DRY_RUN" == "1" ]]; then
+      log "[dry-run] Deploy script updated in repo. Would install to '$_RUNNING_SCRIPT_REAL' and re-execute with new version."
+    else
+      log "Deploy script updated in repo. Installing new version to '$_RUNNING_SCRIPT_REAL' and re-executing..."
+      install -m 755 "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL"
+      exec env NEXUS_SELF_UPDATED=1 NEXUS_SKIP_GIT=1 "$_RUNNING_SCRIPT_REAL" "$@"
     fi
   fi
-  run "cd '$REPO_DIR' && git clean -fd"
-  # Restore storage dir if git clean somehow removed it (e.g., if gitignore was absent)
-  if [[ ! -d "$BACKEND_STORAGE_DIR" && -d "$BACKUP_DIR/storage_snapshot" ]]; then
-    run "cp -a '$BACKUP_DIR/storage_snapshot' '$BACKEND_STORAGE_DIR'"
-    log "Restored backend storage from backup snapshot"
-  fi
-else
-  log "WARN: origin/$BRANCH not found. Using local branch state without hard reset."
-  run "cd '$REPO_DIR' && git checkout '$BRANCH'"
 fi
 
 set -a
@@ -390,4 +413,4 @@ if [[ "$DRY_RUN" == "0" ]]; then
   run "cd '$BACKEND_DIR' && BASE_URL='http://127.0.0.1:4000' npm run smoke:http"
 fi
 
-log "Deploy finished. Backup created at: $BACKUP_DIR"
+log "Deploy finished.${BACKUP_DIR:+ Backup created at: $BACKUP_DIR}"

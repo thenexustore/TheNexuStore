@@ -13,10 +13,59 @@ This repository now includes:
 ## 2) One-time server setup
 
 ```bash
-# from repo root
-sudo install -m 755 ops/nexus_deploy.sh /usr/local/bin/nexus_deploy.sh
+# from repo root — install the bootstrap wrapper (not the full deploy script).
+# The bootstrap is tiny and rarely changes; it always exec's whatever version of
+# ops/nexus_deploy.sh is currently checked out in the repo.
+sudo install -m 755 ops/nexus_deploy_bootstrap.sh /usr/local/bin/nexus_deploy.sh
 sudo install -m 755 ops/nexus_rollback.sh /usr/local/bin/nexus_rollback.sh
 ```
+
+> **Why a bootstrap instead of the full script?** If you install the full
+> `nexus_deploy.sh` directly, it can become stale: the running copy is loaded
+> into bash's memory at start-up, so even after `git reset --hard` updates the
+> file on disk, the old function definitions are already executing.  The bootstrap
+> is three lines — it simply `exec bash "$REPO_DIR/ops/nexus_deploy.sh" "$@"`.
+> Because bash starts a fresh process for every deploy, it always reads the latest
+> code from the repo.
+
+## 2a) Immediate fix — recovering from a stale installed deploy script
+
+If the deploy script installed at `/usr/local/bin/nexus_deploy.sh` is an **old
+copy** of the full script (pre-PR #385) and the deploy hangs or produces a line
+like:
+
+```
+cat > '/opt/TheNexuStore/Frontend/Store/.env.production' <<MARKER
+```
+
+…then bash is hung waiting for the heredoc terminator (`MARKER`) on stdin —
+it never arrives in non-interactive mode.  The root cause is that an old version
+of `write_frontend_env_files` built the heredoc using `\n` escape sequences
+inside a double-quoted string, so bash saw no real newlines and never found the
+terminator.  The `printf`-based replacement (PR #385) and the self-update
+mechanism (PR #386) are already in the repo, but they cannot help because the
+*running installed copy* predates both fixes and is already loaded into bash
+memory.  Kill the hanging process (Ctrl-C) and use one of the options below.
+
+**Option A — run the repo script directly (immediate fix, no reinstall needed):**
+
+```bash
+sudo bash /opt/TheNexuStore/ops/nexus_deploy.sh
+```
+
+**Option B — reinstall the bootstrap then deploy as normal:**
+
+```bash
+cd /opt/TheNexuStore
+git fetch --all --prune
+git reset --hard origin/main
+sudo install -m 755 ops/nexus_deploy_bootstrap.sh /usr/local/bin/nexus_deploy.sh
+sudo /usr/local/bin/nexus_deploy.sh
+```
+
+After either option succeeds the installed script will be the bootstrap and
+**all future `sudo /usr/local/bin/nexus_deploy.sh` runs will be immune to the
+stale-copy problem** — every deploy automatically uses the current repo version.
 
 ## 3) Canonical production layout
 
@@ -101,14 +150,14 @@ sed -i 's/\r$//' /opt/TheNexuStore/Frontend/admin/.env.production
 sudo /usr/local/bin/nexus_deploy.sh
 ```
 
-If `nexus_deploy.sh` is not found, update repo first and reinstall scripts:
+If `nexus_deploy.sh` is not found, or is an outdated copy, update repo first and reinstall the bootstrap:
 
 ```bash
 cd /opt/TheNexuStore
 git fetch --all --prune
 git checkout main
 git reset --hard origin/main
-sudo install -m 755 ops/nexus_deploy.sh /usr/local/bin/nexus_deploy.sh
+sudo install -m 755 ops/nexus_deploy_bootstrap.sh /usr/local/bin/nexus_deploy.sh
 sudo install -m 755 ops/nexus_rollback.sh /usr/local/bin/nexus_rollback.sh
 ```
 

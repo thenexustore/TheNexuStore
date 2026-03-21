@@ -25,6 +25,9 @@ SKIP_EXTERNAL_HEALTHCHECKS="${SKIP_EXTERNAL_HEALTHCHECKS:-1}"
 SYNC_FRONTEND_ENV="${SYNC_FRONTEND_ENV:-1}"
 NEXUS_SELF_UPDATED="${NEXUS_SELF_UPDATED:-0}"
 NEXUS_SKIP_GIT="${NEXUS_SKIP_GIT:-0}"
+# Path where the deploy script (or its bootstrap) is installed system-wide.
+# Override this if you installed it somewhere other than /usr/local/bin.
+DEPLOY_INSTALL_PATH="${DEPLOY_INSTALL_PATH:-/usr/local/bin/nexus_deploy.sh}"
 
 for c in git node npm npx sed curl; do
   command -v "$c" >/dev/null 2>&1 || {
@@ -105,6 +108,32 @@ require_cmd() {
     echo "[ERROR] Missing command: $1" >&2
     exit 1
   }
+}
+
+# Install the minimal bootstrap at DEPLOY_INSTALL_PATH so that every future
+# invocation of /usr/local/bin/nexus_deploy.sh transparently runs whatever
+# version of ops/nexus_deploy.sh the repo currently has — eliminating the
+# "stale installed copy" bootstrapping problem.
+ensure_bootstrap_installed() {
+  local install_path="$DEPLOY_INSTALL_PATH"
+  local bootstrap="$REPO_DIR/ops/nexus_deploy_bootstrap.sh"
+
+  [[ -f "$bootstrap" ]] || return 0  # bootstrap not present in repo, skip
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "[dry-run] would install deploy bootstrap to $install_path"
+    return 0
+  fi
+
+  # Already up to date? Nothing to do.
+  cmp -s "$bootstrap" "$install_path" 2>/dev/null && return 0
+
+  # Best-effort install; warn if we lack write permission so operators know.
+  if install -m 755 "$bootstrap" "$install_path" 2>/dev/null; then
+    log "Installed deploy bootstrap at $install_path — future runs will always use the repo version."
+  else
+    log "WARN: Could not install deploy bootstrap at $install_path (permission denied?). Run manually: sudo install -m 755 $bootstrap $install_path"
+  fi
 }
 
 validate_infortisa_health() {
@@ -315,11 +344,15 @@ if [[ "$NEXUS_SKIP_GIT" != "1" ]]; then
   fi
 
   # Self-update: if running from an installed copy (e.g. /usr/local/bin/nexus_deploy.sh)
-  # that now differs from the repo after the reset, install the updated script and re-exec
-  # so that the rest of the deployment runs with the current version of this script.
+  # that now differs from the repo after the reset, replace it with the bootstrap and
+  # re-exec via the repo script directly so the rest of the deployment runs with the
+  # current version.  Installing the bootstrap (rather than the full script) means
+  # every future invocation automatically uses whatever the repo has — permanently
+  # eliminating the "stale installed copy" bootstrapping problem.
   # Note: readlink -f is used intentionally — this script targets Linux only.
   # Note: re-exec forwards "$@" so --dry-run/-n is re-parsed cleanly by the new script.
   _REPO_DEPLOY_SCRIPT="$REPO_DIR/ops/nexus_deploy.sh"
+  _REPO_BOOTSTRAP_SCRIPT="$REPO_DIR/ops/nexus_deploy_bootstrap.sh"
   _RUNNING_SCRIPT_REAL="$(readlink -f "${BASH_SOURCE[0]}")"
   _REPO_SCRIPT_REAL="$(readlink -f "$_REPO_DEPLOY_SCRIPT")"
   if [[ -f "$_REPO_DEPLOY_SCRIPT" ]] && \
@@ -327,13 +360,24 @@ if [[ "$NEXUS_SKIP_GIT" != "1" ]]; then
      [[ "$NEXUS_SELF_UPDATED" != "1" ]] && \
      ! cmp -s "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL"; then
     if [[ "$DRY_RUN" == "1" ]]; then
-      log "[dry-run] Deploy script updated in repo. Would install to '$_RUNNING_SCRIPT_REAL' and re-execute with new version."
+      log "[dry-run] Deploy script updated in repo. Would install bootstrap to '$_RUNNING_SCRIPT_REAL' and re-execute with new version."
     else
-      log "Deploy script updated in repo. Installing new version to '$_RUNNING_SCRIPT_REAL' and re-executing..."
-      install -m 755 "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL"
-      exec env NEXUS_SELF_UPDATED=1 NEXUS_SKIP_GIT=1 "$_RUNNING_SCRIPT_REAL" "$@"
+      log "Deploy script updated in repo. Installing bootstrap to '$_RUNNING_SCRIPT_REAL' and re-executing..."
+      # Prefer installing the minimal bootstrap so the installed path stays stable.
+      if [[ -f "$_REPO_BOOTSTRAP_SCRIPT" ]]; then
+        install -m 755 "$_REPO_BOOTSTRAP_SCRIPT" "$_RUNNING_SCRIPT_REAL"
+      else
+        install -m 755 "$_REPO_DEPLOY_SCRIPT" "$_RUNNING_SCRIPT_REAL"
+      fi
+      # Re-exec the repo deploy script directly (not the installed path) so we
+      # bypass any wrapper and start fresh with the correct code immediately.
+      exec env NEXUS_SELF_UPDATED=1 NEXUS_SKIP_GIT=1 bash "$_REPO_DEPLOY_SCRIPT" "$@"
     fi
   fi
+
+  # Even when self-update is not needed (scripts already identical), ensure the
+  # installed path is a bootstrap so future repo updates take effect automatically.
+  ensure_bootstrap_installed
 fi
 
 set -a

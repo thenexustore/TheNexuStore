@@ -329,6 +329,34 @@ export default function Navbar() {
   }, [categorySearch]);
 
   useEffect(() => {
+    const shouldLockScroll = categoryPanelOpen || sidebarOpen;
+
+    if (!shouldLockScroll) return;
+
+    const scrollY = window.scrollY;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [categoryPanelOpen, sidebarOpen]);
+
+  useEffect(() => {
     if (categorySearch.trim().length >= 2) {
       setMobileCategoryPath([]);
     }
@@ -422,7 +450,7 @@ export default function Navbar() {
 
               {showSearchResults && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[9999] overflow-hidden">
-                  <div className="max-h-[70vh] overflow-y-auto">
+                  <div className="max-h-[70vh] overflow-y-auto overscroll-contain">
                     {searchLoading ? (
                       <div className="p-4 text-center text-gray-500">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0B123A] mx-auto"></div>
@@ -714,7 +742,7 @@ export default function Navbar() {
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-[88vw] max-w-80 bg-white/95 backdrop-blur-md shadow-2xl transform transition-transform duration-300 ease-in-out sm:w-[80vw] ${
+        className={`fixed top-0 left-0 z-50 flex h-full w-[88vw] max-w-80 flex-col bg-white/95 backdrop-blur-md shadow-2xl transform transition-transform duration-300 ease-in-out sm:w-[80vw] ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -752,7 +780,7 @@ export default function Navbar() {
           </div>
         </div>
 
-        <div className="h-[calc(100vh-144px)] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="p-4">
             {categoriesLoading ? (
               <div className="flex justify-center items-center h-40">

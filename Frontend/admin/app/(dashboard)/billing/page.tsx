@@ -417,7 +417,9 @@ export default function BillingPage() {
       toast.success(
         createType === "INVOICE"
           ? "Factura creada en borrador"
-          : "Presupuesto creado",
+          : createType === "QUOTE"
+          ? "Presupuesto creado"
+          : "Nota de crédito creada",
       );
       setShowCreate(false);
       await loadDocs(1);
@@ -496,6 +498,33 @@ export default function BillingPage() {
       toast.error(
         err instanceof Error ? err.message : "Error exportando documentos",
       );
+    }
+  };
+
+  // ─── Clear all filters and reload ────────────────────────────────────────
+
+  const handleClearFilters = async () => {
+    setSearch("");
+    setFromDate("");
+    setToDate("");
+    setStatusFilter("");
+    setPage(1);
+    setLoading(true);
+    try {
+      const res = await fetchBillingDocuments({
+        page: 1,
+        limit: 20,
+        type: tab === "ALL" ? undefined : tab,
+      });
+      setDocs(res.items);
+      setTotal(res.total);
+      setTotalPages(res.pages);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error cargando documentos",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -738,12 +767,7 @@ export default function BillingPage() {
         {/* Clear all filters */}
         {(search || fromDate || toDate || statusFilter) && (
           <button
-            onClick={() => {
-              setSearch("");
-              setFromDate("");
-              setToDate("");
-              setStatusFilter("");
-            }}
+            onClick={handleClearFilters}
             className="self-end text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition"
           >
             <X className="w-3.5 h-3.5" />
@@ -1613,7 +1637,7 @@ export default function BillingPage() {
                         />
                         <div className="col-span-1 relative">
                           <input
-                            value={String(Number(item.tax_rate) * 100)}
+                            value={parseFloat((Number(item.tax_rate) * 100).toFixed(6)).toString()}
                             onChange={(e: InputEv) =>
                               updateCreateItem(idx, "tax_rate", String(Number(e.target.value) / 100))
                             }

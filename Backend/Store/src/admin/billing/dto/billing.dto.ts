@@ -93,6 +93,23 @@ export class CreateBillingDocumentDto {
   @IsString()
   source_document_id?: string;
 
+  // Customer overrides for manual documents (when no customer_id is provided)
+  @IsOptional()
+  @IsString()
+  customer_name?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_email?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_tax_id?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_address?: string;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -132,6 +149,23 @@ export class UpdateBillingDocumentDto {
   @IsOptional()
   @IsString()
   template_id?: string;
+
+  // Customer info overrides (editable on DRAFT documents)
+  @IsOptional()
+  @IsString()
+  customer_name?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_email?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_tax_id?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_address?: string;
 
   @IsOptional()
   @IsArray()
@@ -281,6 +315,10 @@ export class UpdateBillingSettingsDto {
   @IsOptional()
   @IsEnum(BillingLanguage)
   default_language?: BillingLanguage;
+
+  @IsOptional()
+  @IsString()
+  default_currency?: string;
 
   @IsOptional()
   @IsString()

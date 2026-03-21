@@ -10,6 +10,7 @@ import {
   createCategory,
   createProduct,
 } from "@/lib/api";
+import { formatCurrency } from "@/lib/currency";
 
 interface ProductAttribute {
   key: string;
@@ -313,42 +314,48 @@ export default function NewProductPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Sale Price (€) *
+              Sale Price *
             </label>
-            <input
-              type="number"
-              value={form.sale_price}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  sale_price: Number(e.target.value),
-                }))
-              }
-              placeholder="0.00"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
-              min="0.01"
-              step="0.01"
-              required
-            />
+            <div className="relative">
+              <input
+                type="number"
+                value={form.sale_price}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    sale_price: Number(e.target.value),
+                  }))
+                }
+                placeholder="0.00"
+                className="w-full px-4 pr-10 py-3 border border-slate-300 rounded-lg"
+                min="0.01"
+                step="0.01"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">€</span>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Compare Price (€)
+              Compare Price
             </label>
-            <input
-              type="number"
-              value={form.compare_at_price || ""}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  compare_at_price: Number(e.target.value) || 0,
-                }))
-              }
-              placeholder="Optional"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg"
-              min="0"
+            <div className="relative">
+              <input
+                type="number"
+                value={form.compare_at_price || ""}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    compare_at_price: Number(e.target.value) || 0,
+                  }))
+                }
+                placeholder="Optional"
+                className="w-full px-4 pr-10 py-3 border border-slate-300 rounded-lg"
+                min="0"
               step="0.01"
-            />
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">€</span>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -549,12 +556,12 @@ export default function NewProductPage() {
                         </td>
                         <td className="py-3 px-4">
                           <span className="font-medium">
-                            €{variant.sale_price.toLocaleString()}
+                            {formatCurrency(variant.sale_price)}
                           </span>
                           {variant.compare_at_price &&
                             variant.compare_at_price > 0 && (
                               <div className="text-xs text-slate-400 line-through">
-                                €{variant.compare_at_price.toLocaleString()}
+                                {formatCurrency(variant.compare_at_price)}
                               </div>
                             )}
                         </td>
@@ -606,42 +613,48 @@ export default function NewProductPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Variant Price (€) *
+                    Variant Price *
                   </label>
-                  <input
-                    type="number"
-                    value={variantForm.sale_price}
-                    onChange={(e) =>
-                      setVariantForm((prev) => ({
-                        ...prev,
-                        sale_price: Number(e.target.value),
-                      }))
-                    }
-                    placeholder="0.00"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                    min="0.01"
-                    step="0.01"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={variantForm.sale_price}
+                      onChange={(e) =>
+                        setVariantForm((prev) => ({
+                          ...prev,
+                          sale_price: Number(e.target.value),
+                        }))
+                      }
+                      placeholder="0.00"
+                      className="w-full px-4 pr-10 py-2 border border-slate-300 rounded-lg"
+                      min="0.01"
+                      step="0.01"
+                      required
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">€</span>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Compare Price (€)
+                    Compare Price
                   </label>
-                  <input
-                    type="number"
-                    value={variantForm.compare_at_price || ""}
-                    onChange={(e) =>
-                      setVariantForm((prev) => ({
-                        ...prev,
-                        compare_at_price: Number(e.target.value) || 0,
-                      }))
-                    }
-                    placeholder="Optional"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                    min="0"
-                    step="0.01"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={variantForm.compare_at_price || ""}
+                      onChange={(e) =>
+                        setVariantForm((prev) => ({
+                          ...prev,
+                          compare_at_price: Number(e.target.value) || 0,
+                        }))
+                      }
+                      placeholder="Optional"
+                      className="w-full px-4 pr-10 py-2 border border-slate-300 rounded-lg"
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">€</span>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">

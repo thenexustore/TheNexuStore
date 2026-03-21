@@ -4,13 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { getOrder } from "@/app/lib/checkout";
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  }).format(amount);
-};
+import { formatCurrency } from "@/app/lib/currency";
 
 export default function OrderConfirmationPage() {
   const params = useParams();

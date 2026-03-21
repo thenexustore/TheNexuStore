@@ -10,6 +10,7 @@ import {
   type Coupon,
 } from "@/lib/api";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/currency";
 
 const parseMaybeNumber = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -20,14 +21,14 @@ const parseMaybeNumber = (value: unknown): number | null => {
 
 const formatAmount = (value: unknown): string => {
   const parsed = parseMaybeNumber(value);
-  return parsed === null ? "—" : `${parsed.toFixed(2)} €`;
+  return parsed === null ? "—" : formatCurrency(parsed);
 };
 
 const formatCouponValue = (type: "PERCENT" | "FIXED", value: unknown): string => {
   const parsed = parseMaybeNumber(value);
   if (parsed === null) return "—";
 
-  return type === "PERCENT" ? `${parsed}%` : `${parsed.toFixed(2)} €`;
+  return type === "PERCENT" ? `${parsed}%` : formatCurrency(parsed);
 };
 
 export default function CouponsPage() {
@@ -229,17 +230,20 @@ export default function CouponsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-600">Min order (€)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.min_order_amount}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, min_order_amount: e.target.value }))
-                  }
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
-                />
+                <label className="text-xs font-medium text-zinc-600">Min order</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.min_order_amount}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, min_order_amount: e.target.value }))
+                    }
+                    className="w-full border rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">€</span>
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -396,17 +400,20 @@ export default function CouponsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-zinc-600">Min order (€)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={editForm.min_order_amount}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, min_order_amount: e.target.value }))
-                  }
-                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-                />
+                <label className="text-xs font-medium text-zinc-600">Min order</label>
+                <div className="relative mt-1">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={editForm.min_order_amount}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, min_order_amount: e.target.value }))
+                    }
+                    className="w-full border rounded-lg px-3 py-2 pr-8 text-sm"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">€</span>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-zinc-600">Usage limit</label>

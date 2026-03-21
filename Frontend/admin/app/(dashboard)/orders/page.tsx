@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 import { loadAdminSettings, subscribeAdminSettings } from "@/lib/admin-settings";
+import { formatCurrency as formatCurrencyValue } from "@/lib/currency";
 
 const statusColors: Record<string, string> = {
   PENDING_PAYMENT: "bg-blue-100 text-blue-800",
@@ -99,11 +100,8 @@ export default function OrdersPage() {
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat(adminSettings.dateFormat, {
-      style: "currency",
-      currency: adminSettings.defaultCurrency,
-    }).format(amount);
+  const formatMoney = (amount: number) =>
+    formatCurrencyValue(Number(amount || 0), adminSettings.dateFormat, adminSettings.defaultCurrency);
 
   const formatDate = (date: string) => new Date(date).toLocaleString(adminSettings.dateFormat);
 
@@ -332,7 +330,7 @@ export default function OrdersPage() {
                         <td className="px-6 py-4 text-gray-500 text-sm">
                           {formatDate(order.createdAt)}
                         </td>
-                        <td className="px-6 py-4 font-medium">{formatCurrency(Number(order.amount))}</td>
+                        <td className="px-6 py-4 font-medium">{formatMoney(Number(order.amount))}</td>
                         <td className="px-6 py-4 text-xs text-gray-600">
                           <div className="space-y-1">
                             <p>
@@ -415,7 +413,7 @@ export default function OrdersPage() {
                       <p className="text-sm"><span className="font-medium">Order:</span> {orderDetail.order_number}</p>
                       <p className="text-sm"><span className="font-medium">Email:</span> {orderDetail.email}</p>
                       <p className="text-sm"><span className="font-medium">Status:</span> {orderDetail.status}</p>
-                      <p className="text-sm"><span className="font-medium">Total:</span> {formatCurrency(Number(orderDetail.total_amount))}</p>
+                      <p className="text-sm"><span className="font-medium">Total:</span> {formatMoney(Number(orderDetail.total_amount))}</p>
                       <p className="text-sm"><span className="font-medium">Created:</span> {new Date(orderDetail.created_at).toLocaleString()}</p>
 
                       <div className="pt-2">
@@ -426,7 +424,7 @@ export default function OrdersPage() {
                               <p className="font-medium">{item.sku?.product?.title || "Product"}</p>
                               <p>SKU: {item.sku?.sku_code || "-"}</p>
                               <p>Qty: {item.qty}</p>
-                              <p>Unit: {formatCurrency(Number(item.unit_price_snapshot || 0))}</p>
+                              <p>Unit: {formatMoney(Number(item.unit_price_snapshot || 0))}</p>
                             </div>
                           ))}
                         </div>
@@ -440,7 +438,7 @@ export default function OrdersPage() {
                               <div key={payment.id} className="rounded border bg-gray-50 p-3 text-xs">
                                 <p><span className="font-medium">Provider:</span> {payment.provider}</p>
                                 <p><span className="font-medium">Status:</span> {payment.status}</p>
-                                <p><span className="font-medium">Amount:</span> {formatCurrency(Number(payment.amount || 0))}</p>
+                                <p><span className="font-medium">Amount:</span> {formatMoney(Number(payment.amount || 0))}</p>
                                 <p><span className="font-medium">Currency:</span> {payment.currency}</p>
                                 <p><span className="font-medium">Redsys Response:</span> {payment.redsys_response_code || "-"}</p>
                                 <p><span className="font-medium">Authorization:</span> {payment.redsys_authorization_code || "-"}</p>

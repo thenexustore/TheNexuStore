@@ -26,6 +26,7 @@ import {
   toggleFeatured,
   type Product,
 } from "@/lib/api/products";
+import { formatCurrency } from "@/lib/currency";
 
 export default function ProductViewPage() {
   const { id } = useParams();
@@ -265,7 +266,7 @@ function MainContent({ product }: { product: Product }) {
                       {variant.sku_code}
                     </td>
                     <td className="py-3 px-4">
-                      €{variant.price.toLocaleString()}
+                      {formatCurrency(variant.price)}
                     </td>
                     <td className="py-3 px-4">
                       {variant.stock_quantity} units
@@ -299,7 +300,7 @@ function Sidebar({ product }: { product: Product }) {
           <div className="flex justify-between items-center">
             <span className="text-slate-600">Sale Price</span>
             <span className="text-xl font-bold text-slate-900">
-              €{product.price.toLocaleString()}
+              {formatCurrency(product.price)}
             </span>
           </div>
           {product.discount_price && (
@@ -307,7 +308,7 @@ function Sidebar({ product }: { product: Product }) {
               <div className="flex justify-between items-center">
                 <span className="text-slate-600">Compare at Price</span>
                 <span className="text-lg text-slate-400 line-through">
-                  €{product.discount_price.toLocaleString()}
+                  {formatCurrency(product.discount_price)}
                 </span>
               </div>
               {discount > 0 && (

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 import {
   fetchFeaturedProductById,
   updateFeaturedProduct,
@@ -223,8 +224,7 @@ export default function EditFeaturedProductPage() {
                       <div className="flex-1">
                         <div className="font-medium">{product.title}</div>
                         <div className="text-sm text-gray-500">
-                          SKU: {product.sku} | Brand: {product.brand} | €
-                          {product.price}
+                          SKU: {product.sku} | Brand: {product.brand} | {formatCurrency(Number(product.price || 0))}
                         </div>
                       </div>
                     </button>

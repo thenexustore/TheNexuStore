@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
 import { fetchBrands } from "@/lib/api/brands";
 import { fetchCategories } from "@/lib/api/categories";
+import { formatCurrency } from "@/lib/currency";
 import {
   createPricingRule,
   deletePricingRule,
@@ -213,7 +214,7 @@ export default function PricingPage() {
     if (minMarginPct != null && (minMarginPct < 0 || minMarginPct > 500)) return isEn ? "Min margin % must be between 0 and 500" : "Margen mínimo % debe estar entre 0 y 500";
 
     const minMarginAmount = toNumberOrNull(form.min_margin_amount);
-    if (minMarginAmount != null && (minMarginAmount < 0 || minMarginAmount > 1000000)) return isEn ? "Min margin € must be between 0 and 1000000" : "Margen mínimo € debe estar entre 0 y 1000000";
+    if (minMarginAmount != null && (minMarginAmount < 0 || minMarginAmount > 1000000)) return isEn ? "Min margin amount must be between 0 and 1000000" : "El importe del margen mínimo debe estar entre 0 y 1000000";
 
     const startsAtIso = localDateTimeToIso(form.starts_at);
     const endsAtIso = localDateTimeToIso(form.ends_at);
@@ -423,8 +424,8 @@ export default function PricingPage() {
                 <input className="border rounded-lg p-2 w-full text-sm" inputMode="decimal" type="text" placeholder="Min margin %" value={form.min_margin_pct} onChange={(e) => setForm({ ...form, min_margin_pct: e.target.value })} />
               </label>
               <label className="text-xs text-zinc-600 space-y-1">
-                <span>{isEn ? "Min margin € (optional floor)" : "Margen mínimo € (suelo opcional)"}</span>
-                <input className="border rounded-lg p-2 w-full text-sm" inputMode="decimal" type="text" placeholder="Min margin €" value={form.min_margin_amount} onChange={(e) => setForm({ ...form, min_margin_amount: e.target.value })} />
+                <span>{isEn ? "Min margin amount (optional floor)" : "Importe mínimo de margen (suelo opcional)"}</span>
+                <div className="relative"><input className="border rounded-lg p-2 pr-8 w-full text-sm" inputMode="decimal" type="text" placeholder="0.00" value={form.min_margin_amount} onChange={(e) => setForm({ ...form, min_margin_amount: e.target.value })} /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">€</span></div>
               </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -504,11 +505,11 @@ export default function PricingPage() {
           {preview && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <StatCard label="Cost" value={`${preview.cost ?? "-"} €`} />
-                <StatCard label="Compare" value={`${preview.compareAtPrice ?? "-"} €`} />
-                <StatCard label="Sale" value={`${preview.salePrice ?? "-"} €`} />
+                <StatCard label="Cost" value={preview.cost != null ? formatCurrency(preview.cost) : "-"} />
+                <StatCard label="Compare" value={preview.compareAtPrice != null ? formatCurrency(preview.compareAtPrice) : "-"} />
+                <StatCard label="Sale" value={preview.salePrice != null ? formatCurrency(preview.salePrice) : "-"} />
                 <StatCard label="Discount" value={preview.discountPct != null ? `${preview.discountPct}%` : "-"} />
-                <StatCard label="Floor" value={`${preview.floor ?? "-"} €`} />
+                <StatCard label="Floor" value={preview.floor != null ? formatCurrency(preview.floor) : "-"} />
               </div>
               <div className="flex gap-2">
                 <button className="border rounded-xl px-3 py-2 text-sm" onClick={copyPreview}>{isEn ? "Copy result" : "Copiar resultado"}</button>

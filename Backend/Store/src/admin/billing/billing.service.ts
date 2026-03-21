@@ -152,25 +152,37 @@ export class BillingService {
         }
       : null;
 
-    const where: Prisma.BillingDocumentWhereInput = {
-      ...(type && { type }),
-      ...(status && { status }),
+    // Build AND conditions separately so that combining dateRange + search
+    // does not produce two sibling OR keys that would silently overwrite each
+    // other when spread into the same object.
+    const andConditions: Prisma.BillingDocumentWhereInput[] = [];
+
+    if (dateRange) {
       // Filter issued docs by issue_date; DRAFT documents have no issue_date
       // yet so fall back to created_at to keep them visible in date searches.
-      ...(dateRange && {
+      andConditions.push({
         OR: [
           { issue_date: dateRange },
           { issue_date: null, created_at: dateRange },
         ],
-      }),
-      ...(search && {
+      });
+    }
+
+    if (search) {
+      andConditions.push({
         OR: [
           { document_number: { contains: search, mode: 'insensitive' } },
           { customer_name: { contains: search, mode: 'insensitive' } },
           { customer_email: { contains: search, mode: 'insensitive' } },
           { customer_tax_id: { contains: search, mode: 'insensitive' } },
         ],
-      }),
+      });
+    }
+
+    const where: Prisma.BillingDocumentWhereInput = {
+      ...(type && { type }),
+      ...(status && { status }),
+      ...(andConditions.length > 0 && { AND: andConditions }),
     };
 
     const [items, total] = await Promise.all([
@@ -474,7 +486,6 @@ export class BillingService {
         tax_amount: quote.tax_amount,
         discount_amount: quote.discount_amount,
         total_amount: quote.total_amount,
-        pdf_url: null,
         items: {
           create: quote.items.map((item) => ({
             description: item.description,

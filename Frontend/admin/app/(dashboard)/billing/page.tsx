@@ -18,7 +18,6 @@ import {
   Edit2,
   Clock,
   Send,
-  Banknote,
   AlertTriangle,
   CalendarDays,
   Receipt,
@@ -206,6 +205,7 @@ export default function BillingPage() {
   // Settings panel
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<BillingSettings | null>(null);
+  const [settingsLoadError, setSettingsLoadError] = useState(false);
   const [settingsForm, setSettingsForm] = useState<Partial<BillingSettings>>(
     {},
   );
@@ -410,7 +410,7 @@ export default function BillingPage() {
           description: i.description,
           qty: Number(i.qty) || 1,
           unit_price: Number(i.unit_price) || 0,
-          tax_rate: Number(i.tax_rate) ?? 0.21,
+          tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
           position: idx,
         })),
       });
@@ -432,8 +432,9 @@ export default function BillingPage() {
 
   // ─── Settings ──────────────────────────────────────────────────────────────
 
-  const openSettings = async () => {
-    setShowSettings(true);
+  const loadSettings = async () => {
+    setSettingsLoadError(false);
+    setSettings(null);
     try {
       const s = await fetchBillingSettings();
       setSettings(s);
@@ -453,10 +454,16 @@ export default function BillingPage() {
         default_tax_rate: s.default_tax_rate,
       });
     } catch (err: unknown) {
+      setSettingsLoadError(true);
       toast.error(
         err instanceof Error ? err.message : "Error cargando ajustes",
       );
     }
+  };
+
+  const openSettings = () => {
+    setShowSettings(true);
+    loadSettings();
   };
 
   const handleSaveSettings = async (e: { preventDefault(): void }) => {
@@ -527,7 +534,8 @@ export default function BillingPage() {
   }, 0);
   const liveTax = createForm.items.reduce((s: number, i: CreateItemState) => {
     const ls = Number(i.qty || 1) * Number(i.unit_price || 0);
-    return s + ls * Number(i.tax_rate || 0.21);
+    const taxRate = i.tax_rate !== "" ? Number(i.tax_rate) : 0.21;
+    return s + ls * taxRate;
   }, 0);
 
   // ─── Quick stats from loaded docs ─────────────────────────────────────────
@@ -600,10 +608,10 @@ export default function BillingPage() {
           ))
         ) : (
           [
-            { label: "Total en vista", value: String(total), icon: FileText, color: "text-zinc-500" },
-            { label: "Borradores", value: String(draftCount), icon: FileClock, color: "text-zinc-400" },
-            { label: "Emitidas / Enviadas", value: String(issuedCount), icon: Send, color: "text-blue-500" },
-            { label: "Cobradas", value: String(paidCount), icon: CheckCircle, color: "text-emerald-500" },
+            { label: "Total documentos", value: String(total), icon: FileText, color: "text-zinc-500" },
+            { label: "Borradores (pág.)", value: String(draftCount), icon: FileClock, color: "text-zinc-400" },
+            { label: "Emitidas (pág.)", value: String(issuedCount), icon: Send, color: "text-blue-500" },
+            { label: "Cobradas (pág.)", value: String(paidCount), icon: CheckCircle, color: "text-emerald-500" },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-white rounded-xl border border-zinc-100 hover:border-zinc-200 px-4 py-3 flex items-center gap-3 transition">
               <Icon className={`w-5 h-5 shrink-0 ${color}`} />
@@ -1570,7 +1578,8 @@ export default function BillingPage() {
                 <div className="space-y-2">
                   {createForm.items.map((item: CreateItemState, idx: number) => {
                     const lineBase = Number(item.qty || 1) * Number(item.unit_price || 0);
-                    const lineTax = lineBase * Number(item.tax_rate || 0.21);
+                    const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : 0.21;
+                    const lineTax = lineBase * taxRate;
                     const lineTotal = lineBase + lineTax;
                     return (
                       <div
@@ -1720,8 +1729,21 @@ export default function BillingPage() {
             </div>
 
             {settings === null ? (
-              <div className="flex-1 flex items-center justify-center py-16">
-                <Loader2 className="w-8 h-8 animate-spin text-zinc-300" />
+              <div className="flex-1 flex flex-col items-center justify-center py-16 gap-3">
+                {settingsLoadError ? (
+                  <>
+                    <AlertTriangle className="w-8 h-8 text-amber-400" />
+                    <p className="text-sm text-zinc-500">No se pudieron cargar los ajustes</p>
+                    <button
+                      onClick={loadSettings}
+                      className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                    >
+                      Reintentar
+                    </button>
+                  </>
+                ) : (
+                  <Loader2 className="w-8 h-8 animate-spin text-zinc-300" />
+                )}
               </div>
             ) : (
               <form

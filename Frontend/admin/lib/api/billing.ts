@@ -350,3 +350,29 @@ export async function downloadBillingExport(params: {
   // Brief delay so the browser can initiate the download before the URL is revoked
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
+
+export async function downloadBillingDocumentPdf(id: string): Promise<void> {
+  const token = localStorage.getItem("admin_token") ?? "";
+  const response = await fetch(`${API_URL}/admin/billing/documents/${id}/pdf`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`PDF download failed (${response.status})`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `document-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+export async function sendBillingDocument(
+  id: string,
+): Promise<{ sent: boolean; email: string }> {
+  const data = await fetchWithAuth(`${API_URL}/admin/billing/documents/${id}/send`, {
+    method: "POST",
+  });
+  return data.data as { sent: boolean; email: string };
+}

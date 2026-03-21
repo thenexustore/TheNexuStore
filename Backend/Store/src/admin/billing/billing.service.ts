@@ -26,11 +26,16 @@ import {
   UpdateBillingTemplateDto,
   UpdateDocumentNumberDto,
 } from './dto/billing.dto';
+import { MailService } from '../../auth/mail/mail.service';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -418,6 +423,7 @@ export class BillingService {
         series_id: seriesId,
         issue_date: issueDate,
         issued_at: issueDate,
+        pdf_url: `/admin/billing/documents/${id}/pdf`,
         ...(dto.payment_method !== undefined && {
           payment_method: dto.payment_method,
         }),
@@ -491,6 +497,7 @@ export class BillingService {
         payment_method: dto.payment_method ?? quote.payment_method,
         issue_date: issueDate,
         issued_at: issueDate,
+        pdf_url: `/admin/billing/documents/${invoiceId}/pdf`,
         notes: quote.notes,
         internal_notes: quote.internal_notes,
         template_id: quote.template_id,
@@ -884,5 +891,181 @@ export class BillingService {
       order_status: OrderStatus.DELIVERED,
       billing_document: billingDoc,
     };
+  }
+
+  // ─── PDF Generation ───────────────────────────────────────────────────────
+
+  async generateDocumentPdf(id: string): Promise<Buffer> {
+    const doc = await this.prisma.billingDocument.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!doc) throw new NotFoundException('Billing document not found');
+
+    return new Promise<Buffer>((resolve, reject) => {
+      const pdf = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks: Buffer[] = [];
+      pdf.on('data', (chunk: Buffer) => chunks.push(chunk));
+      pdf.on('end', () => resolve(Buffer.concat(chunks)));
+      pdf.on('error', reject);
+
+      const docRef =
+        doc.document_number ??
+        doc.id.substring(0, 8).toUpperCase();
+      const typeLabel =
+        doc.type === BillingDocumentType.INVOICE
+          ? 'FACTURA'
+          : doc.type === BillingDocumentType.QUOTE
+            ? 'PRESUPUESTO'
+            : 'NOTA DE CRÉDITO';
+
+      // Header
+      pdf.fontSize(20).font('Helvetica-Bold').text(typeLabel, { align: 'right' });
+      pdf.fontSize(12).font('Helvetica').text(`Nº: ${docRef}`, { align: 'right' });
+      if (doc.issue_date) {
+        pdf.text(
+          `Fecha: ${new Date(doc.issue_date).toLocaleDateString('es-ES')}`,
+          { align: 'right' },
+        );
+      }
+      pdf.moveDown();
+
+      // Company info
+      if (doc.company_legal_name) {
+        pdf.font('Helvetica-Bold').text(doc.company_legal_name);
+        pdf.font('Helvetica');
+        if (doc.company_nif) pdf.text(`NIF: ${doc.company_nif}`);
+        if (doc.company_address) pdf.text(doc.company_address);
+        if (doc.company_iban_1) pdf.text(`IBAN: ${doc.company_iban_1}`);
+      }
+      pdf.moveDown();
+
+      // Customer info
+      pdf.font('Helvetica-Bold').text('DATOS DEL CLIENTE');
+      pdf.font('Helvetica');
+      if (doc.customer_name) pdf.text(doc.customer_name);
+      if (doc.customer_tax_id) pdf.text(`NIF/CIF: ${doc.customer_tax_id}`);
+      if (doc.customer_email) pdf.text(doc.customer_email);
+      if (doc.customer_address) pdf.text(doc.customer_address);
+      pdf.moveDown();
+
+      // Table header
+      const colDesc = 50;
+      const colQty = 330;
+      const colPrice = 380;
+      const colTax = 430;
+      const colTotal = 490;
+      pdf.font('Helvetica-Bold');
+      pdf.text('Descripción', colDesc, pdf.y, { continued: false });
+      const tableY = pdf.y;
+      pdf.text('Cant.', colQty, tableY, { width: 50 });
+      pdf.text('P.Unit', colPrice, tableY, { width: 50 });
+      pdf.text('IVA%', colTax, tableY, { width: 50 });
+      pdf.text('Total', colTotal, tableY, { width: 60 });
+      pdf.moveDown(0.5);
+      pdf.moveTo(50, pdf.y).lineTo(560, pdf.y).stroke();
+      pdf.moveDown(0.3);
+
+      // Items
+      pdf.font('Helvetica');
+      for (const item of doc.items) {
+        const rowY = pdf.y;
+        pdf.text(item.description ?? '', colDesc, rowY, { width: 270 });
+        pdf.text(String(item.qty), colQty, rowY, { width: 50 });
+        pdf.text(
+          Number(item.unit_price).toFixed(2),
+          colPrice,
+          rowY,
+          { width: 50 },
+        );
+        pdf.text(
+          `${Number(item.tax_rate).toFixed(0)}%`,
+          colTax,
+          rowY,
+          { width: 50 },
+        );
+        pdf.text(
+          Number(item.line_total).toFixed(2),
+          colTotal,
+          rowY,
+          { width: 60 },
+        );
+        pdf.moveDown();
+      }
+
+      pdf.moveTo(50, pdf.y).lineTo(560, pdf.y).stroke();
+      pdf.moveDown(0.5);
+
+      // Totals
+      const totalsX = 380;
+      pdf.font('Helvetica');
+      pdf.text(
+        `Base imponible: ${Number(doc.subtotal_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+        totalsX,
+      );
+      pdf.text(
+        `IVA: ${Number(doc.tax_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+        totalsX,
+      );
+      if (Number(doc.discount_amount) > 0) {
+        pdf.text(
+          `Descuento: -${Number(doc.discount_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+          totalsX,
+        );
+      }
+      pdf.font('Helvetica-Bold').text(
+        `TOTAL: ${Number(doc.total_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+        totalsX,
+      );
+
+      if (doc.notes) {
+        pdf.moveDown();
+        pdf.font('Helvetica').fontSize(10).text(`Notas: ${doc.notes}`);
+      }
+
+      pdf.end();
+    });
+  }
+
+  async sendDocument(id: string): Promise<{ sent: boolean; email: string }> {
+    const doc = await this.prisma.billingDocument.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!doc) throw new NotFoundException('Billing document not found');
+    if (!doc.customer_email) {
+      throw new BadRequestException(
+        'Document has no customer email address to send to',
+      );
+    }
+
+    const pdfBuffer = await this.generateDocumentPdf(id);
+
+    const docRef = doc.document_number ?? id.substring(0, 8).toUpperCase();
+    const typeLabel =
+      doc.type === BillingDocumentType.INVOICE
+        ? 'Factura'
+        : doc.type === BillingDocumentType.QUOTE
+          ? 'Presupuesto'
+          : 'Nota de crédito';
+    const companyName = doc.company_legal_name ?? doc.company_trade_name ?? 'NEXUS';
+    const subject = `${typeLabel} ${docRef} de ${companyName}`;
+
+    await this.mailService.sendBillingDocument(
+      doc.customer_email,
+      subject,
+      companyName,
+      typeLabel,
+      docRef,
+      pdfBuffer,
+    );
+
+    await this.prisma.billingDocument.update({
+      where: { id },
+      data: { sent_at: new Date() },
+    });
+
+    this.logger.log(`Billing document ${docRef} sent to ${doc.customer_email}`);
+    return { sent: true, email: doc.customer_email };
   }
 }

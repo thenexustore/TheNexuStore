@@ -120,6 +120,11 @@ export interface CreateBillingDocumentInput {
   notes?: string;
   internal_notes?: string;
   template_id?: string;
+  // Customer info for manual documents (no customer_id lookup)
+  customer_name?: string;
+  customer_email?: string;
+  customer_tax_id?: string;
+  customer_address?: string;
   items?: Array<{
     description: string;
     qty: number;
@@ -138,6 +143,11 @@ export interface UpdateBillingDocumentInput {
   notes?: string;
   internal_notes?: string;
   template_id?: string;
+  // Customer info overrides (editable on DRAFT documents)
+  customer_name?: string;
+  customer_email?: string;
+  customer_tax_id?: string;
+  customer_address?: string;
   items?: Array<{
     description: string;
     qty: number;

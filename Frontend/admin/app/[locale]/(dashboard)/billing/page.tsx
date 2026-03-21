@@ -33,6 +33,7 @@ import {
   fetchBillingDocuments,
   fetchBillingDocumentById,
   createBillingDocument,
+  updateBillingDocument,
   deleteBillingDocument,
   issueBillingDocument,
   convertQuoteToInvoice,
@@ -40,6 +41,8 @@ import {
   fetchBillingSettings,
   updateBillingSettings,
   downloadBillingExport,
+  downloadBillingDocumentPdf,
+  sendBillingDocument,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -224,6 +227,10 @@ export default function BillingPage() {
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [transitioningId, setTransitioningId] = useState<string | null>(null);
+  const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
 
   // Escape key to close panels
   useEffect(() => {
@@ -515,6 +522,69 @@ export default function BillingPage() {
       toast.error(
         err instanceof Error ? err.message : "Error exportando documentos",
       );
+    }
+  };
+
+  // ─── PDF download ──────────────────────────────────────────────────────────
+
+  const handleDownloadPdf = async (id: string) => {
+    setDownloadingPdfId(id);
+    try {
+      await downloadBillingDocumentPdf(id);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error descargando PDF");
+    } finally {
+      setDownloadingPdfId(null);
+    }
+  };
+
+  // ─── Send document ─────────────────────────────────────────────────────────
+
+  const handleSendDocument = async (id: string) => {
+    setSendingId(id);
+    try {
+      const result = await sendBillingDocument(id);
+      toast.success(`Documento enviado a ${result.email}`);
+      // Refresh detail view to show updated sent_at
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error enviando documento");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  // ─── Status transitions ────────────────────────────────────────────────────
+
+  const handleStatusTransition = async (
+    id: string,
+    newStatus: BillingDocumentStatus,
+  ) => {
+    setTransitioningId(id);
+    try {
+      await updateBillingDocument(id, { status: newStatus });
+      toast.success(
+        newStatus === "SENT"
+          ? "Documento marcado como enviado"
+          : newStatus === "PAID"
+            ? "Documento marcado como pagado"
+            : "Documento anulado",
+      );
+      await loadDocs(page);
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error actualizando estado",
+      );
+    } finally {
+      setTransitioningId(null);
+      setConfirmVoidId(null);
     }
   };
 
@@ -1371,16 +1441,94 @@ export default function BillingPage() {
                     Editar número
                   </button>
                 )}
-                {selectedDoc.pdf_url && (
-                  <a
-                    href={selectedDoc.pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
+                {/* PDF download — always available for non-DRAFT */}
+                {selectedDoc.status !== "DRAFT" && (
+                  <button
+                    onClick={() => handleDownloadPdf(selectedDoc.id)}
+                    disabled={downloadingPdfId === selectedDoc.id}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 transition"
                   >
-                    <Download className="w-4 h-4" />
+                    {downloadingPdfId === selectedDoc.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
                     Descargar PDF
-                  </a>
+                  </button>
+                )}
+                {/* Send by email */}
+                {selectedDoc.status !== "DRAFT" && selectedDoc.status !== "VOID" && selectedDoc.customer_email && (
+                  <button
+                    onClick={() => handleSendDocument(selectedDoc.id)}
+                    disabled={sendingId === selectedDoc.id}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
+                  >
+                    {sendingId === selectedDoc.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Enviar por email
+                  </button>
+                )}
+                {/* Mark as Sent */}
+                {selectedDoc.status === "ISSUED" && (
+                  <button
+                    onClick={() => handleStatusTransition(selectedDoc.id, "SENT")}
+                    disabled={transitioningId === selectedDoc.id}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition shadow-sm"
+                  >
+                    {transitioningId === selectedDoc.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    Marcar enviada
+                  </button>
+                )}
+                {/* Mark as Paid */}
+                {(selectedDoc.status === "ISSUED" || selectedDoc.status === "SENT") && (
+                  <button
+                    onClick={() => handleStatusTransition(selectedDoc.id, "PAID")}
+                    disabled={transitioningId === selectedDoc.id}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
+                  >
+                    {transitioningId === selectedDoc.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    Marcar cobrada
+                  </button>
+                )}
+                {/* Void document */}
+                {selectedDoc.status !== "VOID" && selectedDoc.status !== "DRAFT" && (
+                  confirmVoidId === selectedDoc.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-500">¿Anular definitivamente?</span>
+                      <button
+                        onClick={() => handleStatusTransition(selectedDoc.id, "VOID")}
+                        disabled={transitioningId === selectedDoc.id}
+                        className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                      >
+                        Sí, anular
+                      </button>
+                      <button
+                        onClick={() => setConfirmVoidId(null)}
+                        className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmVoidId(selectedDoc.id)}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Anular
+                    </button>
+                  )
                 )}
                 {(selectedDoc.status === "DRAFT" || selectedDoc.status === "VOID") && (
                   confirmDeleteId === selectedDoc.id ? (

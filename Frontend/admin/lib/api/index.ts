@@ -148,6 +148,8 @@ export {
   deleteBillingTemplate,
   markOrderDelivered,
   downloadBillingExport,
+  downloadBillingDocumentPdf,
+  sendBillingDocument,
   type BillingDocument,
   type BillingDocumentItem,
   type BillingDocumentsResponse,

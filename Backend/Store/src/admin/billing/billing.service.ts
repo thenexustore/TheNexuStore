@@ -68,6 +68,9 @@ export class BillingService {
         ...(dto.default_language !== undefined && {
           default_language: dto.default_language,
         }),
+        ...(dto.default_currency !== undefined && {
+          default_currency: dto.default_currency,
+        }),
         ...(dto.invoice_prefix !== undefined && {
           invoice_prefix: dto.invoice_prefix,
         }),
@@ -194,7 +197,6 @@ export class BillingService {
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: { items: true, series: true },
       }),
       this.prisma.billingDocument.count({ where }),
     ]);
@@ -268,6 +270,10 @@ export class BillingService {
         company_address: settings.address_real,
         company_iban_1: settings.iban_caixabank,
         company_iban_2: settings.iban_bbva,
+        customer_name: docData.customer_name,
+        customer_email: docData.customer_email,
+        customer_tax_id: docData.customer_tax_id,
+        customer_address: docData.customer_address,
         subtotal_amount: subtotal,
         tax_amount: taxAmount,
         total_amount: total,
@@ -348,6 +354,18 @@ export class BillingService {
         ...(docData.template_id !== undefined && {
           template_id: docData.template_id,
         }),
+        ...(docData.customer_name !== undefined && {
+          customer_name: docData.customer_name,
+        }),
+        ...(docData.customer_email !== undefined && {
+          customer_email: docData.customer_email,
+        }),
+        ...(docData.customer_tax_id !== undefined && {
+          customer_tax_id: docData.customer_tax_id,
+        }),
+        ...(docData.customer_address !== undefined && {
+          customer_address: docData.customer_address,
+        }),
         ...(items !== undefined && {
           subtotal_amount: subtotal,
           tax_amount: taxAmount,
@@ -403,7 +421,6 @@ export class BillingService {
         ...(dto.payment_method !== undefined && {
           payment_method: dto.payment_method,
         }),
-        pdf_url: `/billing/pdf/${id}`,
       },
       include: { items: true },
     });
@@ -491,7 +508,6 @@ export class BillingService {
         tax_amount: quote.tax_amount,
         discount_amount: quote.discount_amount,
         total_amount: quote.total_amount,
-        pdf_url: `/billing/pdf/${invoiceId}`,
         items: {
           create: quote.items.map((item) => ({
             description: item.description,
@@ -663,6 +679,7 @@ export class BillingService {
       'status',
       'issue_date',
       'customer_name',
+      'customer_email',
       'customer_tax_id',
       'subtotal_amount',
       'tax_amount',
@@ -678,6 +695,7 @@ export class BillingService {
         csvField(d.status),
         csvField(d.issue_date ? d.issue_date.toISOString().split('T')[0] : ''),
         csvField(d.customer_name),
+        csvField(d.customer_email),
         csvField(d.customer_tax_id),
         csvField(d.subtotal_amount.toFixed(2)),
         csvField(d.tax_amount.toFixed(2)),

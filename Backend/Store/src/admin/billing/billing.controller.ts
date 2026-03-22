@@ -304,8 +304,10 @@ export class BillingController {
     let url: string;
     try {
       url = await saveBase64Image(dto.image_base64, 'billing');
-    } catch (err: any) {
-      throw new BadRequestException(err?.message ?? 'Error al guardar la imagen');
+    } catch (err: unknown) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Error al guardar la imagen',
+      );
     }
     return { success: true, url };
   }

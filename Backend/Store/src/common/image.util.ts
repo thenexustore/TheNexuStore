@@ -7,7 +7,7 @@ export async function saveBase64Image(base64: string, subDir = 'products') {
   if (!matches) throw new Error('Invalid base64 image');
 
   const mimeType = matches[1].toLowerCase();
-  const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  const allowed = ['image/png', 'image/jpeg', 'image/webp'];
   if (!allowed.includes(mimeType)) {
     throw new Error(`Unsupported image type: ${mimeType}`);
   }

@@ -936,9 +936,8 @@ export default function BillingPage() {
 
   const handleUploadBg = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!e.target) return;
     // Reset so same file can be re-selected
-    (e.target as HTMLInputElement).value = "";
+    e.target.value = "";
     if (!file) return;
 
     const allowed = ["image/png", "image/jpeg", "image/webp"];

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   FileText,
@@ -45,6 +45,7 @@ import {
   downloadBillingExport,
   downloadBillingDocumentPdf,
   sendBillingDocument,
+  fetchProducts,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -52,6 +53,7 @@ import {
   type BillingSettings,
   type BillingNumberAudit,
   type BillingDocumentItem,
+  type Product,
 } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -473,7 +475,97 @@ export default function BillingPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showCreatePreview, setShowCreatePreview] = useState(false);
 
-  // Escape key to close panels; 'n' to open new invoice
+  // Per-row product search state for line items autocomplete
+  type ItemSearchState = { query: string; results: Product[]; open: boolean; loading: boolean };
+  const [itemSearches, setItemSearches] = useState<ItemSearchState[]>([
+    { query: "", results: [], open: false, loading: false },
+  ]);
+  const productSearchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  const syncItemSearchCount = useCallback((count: number) => {
+    setItemSearches((prev) => {
+      if (prev.length === count) return prev;
+      if (prev.length < count) {
+        return [...prev, ...Array.from({ length: count - prev.length }, () => ({
+          query: "", results: [], open: false, loading: false,
+        }))];
+      }
+      return prev.slice(0, count);
+    });
+  }, []);
+
+  // Keep itemSearches in sync with createForm.items length
+  useEffect(() => {
+    syncItemSearchCount(createForm.items.length);
+  }, [createForm.items.length, syncItemSearchCount]);
+
+  const handleDescriptionChange = useCallback((idx: number, value: string) => {
+    // Update the form item description as usual
+    setCreateForm((f: CreateFormState) => ({
+      ...f,
+      items: f.items.map((item: CreateItemState, i: number) =>
+        i === idx ? { ...item, description: value } : item,
+      ),
+    }));
+
+    // Update query in search state and trigger debounced search
+    setItemSearches((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], query: value };
+      return next;
+    });
+
+    if (productSearchTimers.current[idx]) {
+      clearTimeout(productSearchTimers.current[idx]);
+    }
+
+    if (value.trim().length < 2) {
+      setItemSearches((prev) => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], results: [], open: false, loading: false };
+        return next;
+      });
+      return;
+    }
+
+    setItemSearches((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], loading: true };
+      return next;
+    });
+
+    productSearchTimers.current[idx] = setTimeout(async () => {
+      try {
+        const res = await fetchProducts(1, 8, value.trim());
+        setItemSearches((prev) => {
+          const next = [...prev];
+          next[idx] = { ...next[idx], results: res.products ?? [], open: (res.products?.length ?? 0) > 0, loading: false };
+          return next;
+        });
+      } catch {
+        setItemSearches((prev) => {
+          const next = [...prev];
+          next[idx] = { ...next[idx], results: [], open: false, loading: false };
+          return next;
+        });
+      }
+    }, 280);
+  }, []);
+
+  const selectProduct = useCallback((idx: number, product: Product) => {
+    const price = product.discount_price ?? product.price ?? 0;
+    setCreateForm((f: CreateFormState) => ({
+      ...f,
+      items: f.items.map((item: CreateItemState, i: number) =>
+        i === idx ? { ...item, description: product.title, unit_price: String(price) } : item,
+      ),
+    }));
+    setItemSearches((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], query: product.title, results: [], open: false, loading: false };
+      return next;
+    });
+  }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -661,6 +753,7 @@ export default function BillingPage() {
       customer_address: "",
       items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
     });
+    setItemSearches([{ query: "", results: [], open: false, loading: false }]);
     setShowCreate(true);
   };
 
@@ -2343,19 +2436,70 @@ export default function BillingPage() {
                     const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : 0.21;
                     const lineTax = lineBase * taxRate;
                     const lineTotal = lineBase + lineTax;
+                    const search = itemSearches[idx] ?? { query: "", results: [], open: false, loading: false };
                     return (
                       <div
                         key={idx}
                         className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg bg-zinc-50 border border-zinc-100 hover:border-zinc-200 transition"
                       >
-                        <input
-                          value={item.description}
-                          onChange={(e: InputEv) =>
-                            updateCreateItem(idx, "description", e.target.value)
-                          }
-                          placeholder="Descripción..."
-                          className="col-span-4 border-0 bg-transparent px-1 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
-                        />
+                        {/* Description with product autocomplete */}
+                        <div className="col-span-4 relative">
+                          <input
+                            value={item.description}
+                            onChange={(e: InputEv) => handleDescriptionChange(idx, e.target.value)}
+                            onFocus={() => {
+                              if (search.results.length > 0) {
+                                setItemSearches((prev) => {
+                                  const next = [...prev];
+                                  next[idx] = { ...next[idx], open: true };
+                                  return next;
+                                });
+                              }
+                            }}
+                            onBlur={() => {
+                              // Small delay so click on result fires first
+                              setTimeout(() => {
+                                setItemSearches((prev) => {
+                                  const next = [...prev];
+                                  if (next[idx]) next[idx] = { ...next[idx], open: false };
+                                  return next;
+                                });
+                              }, 150);
+                            }}
+                            placeholder="Descripción o producto..."
+                            className="w-full border-0 bg-transparent px-1 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+                          />
+                          {search.loading && (
+                            <span className="absolute right-1 top-1/2 -translate-y-1/2">
+                              <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin" />
+                            </span>
+                          )}
+                          {search.open && search.results.length > 0 && (
+                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg overflow-hidden">
+                              {search.results.map((product: Product) => {
+                                const price = product.discount_price ?? product.price ?? 0;
+                                return (
+                                  <button
+                                    key={product.id}
+                                    type="button"
+                                    onMouseDown={() => selectProduct(idx, product)}
+                                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-indigo-50 text-left text-xs transition"
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <span className="font-medium text-zinc-800 truncate block">{product.title}</span>
+                                      {product.sku_code && (
+                                        <span className="text-zinc-400 font-mono">{product.sku_code}</span>
+                                      )}
+                                    </div>
+                                    <span className="ml-3 text-indigo-600 font-semibold tabular-nums shrink-0">
+                                      {price.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                         <input
                           value={item.qty}
                           onChange={(e: InputEv) => updateCreateItem(idx, "qty", e.target.value)}

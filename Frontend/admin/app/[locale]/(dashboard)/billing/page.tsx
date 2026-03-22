@@ -70,6 +70,8 @@ type CreateFormState = {
   notes: string;
   payment_method: BillingPaymentMethod | "";
   language: "ES" | "EN";
+  issue_date: string;
+  due_date: string;
   customer_name: string;
   customer_email: string;
   customer_tax_id: string;
@@ -431,6 +433,8 @@ export default function BillingPage() {
     notes: "",
     payment_method: "",
     language: "ES",
+    issue_date: "",
+    due_date: "",
     customer_name: "",
     customer_email: "",
     customer_tax_id: "",
@@ -467,18 +471,29 @@ export default function BillingPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showCreatePreview, setShowCreatePreview] = useState(false);
 
-  // Escape key to close panels
+  // Escape key to close panels; 'n' to open new invoice
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (showCreate) { setShowCreate(false); setShowCreatePreview(false); return; }
-      if (editNumberDoc) { setEditNumberDoc(null); return; }
-      if (showSettings) { setShowSettings(false); return; }
-      if (showDetail) { setShowDetail(false); setSelectedDoc(null); return; }
+      if (e.key === "Escape") {
+        if (showCreate) { setShowCreate(false); setShowCreatePreview(false); return; }
+        if (editNumberDoc) { setEditNumberDoc(null); return; }
+        if (showSettings) { setShowSettings(false); return; }
+        if (showDetail) { setShowDetail(false); setSelectedDoc(null); setShowPreview(false); return; }
+      }
+      // 'n' shortcut → new invoice (only when no modal/panel is open and not in a text input)
+      if (
+        e.key === "n" &&
+        !showCreate && !showDetail && !showSettings && !editNumberDoc &&
+        !(document.activeElement instanceof HTMLInputElement) &&
+        !(document.activeElement instanceof HTMLTextAreaElement) &&
+        !(document.activeElement instanceof HTMLSelectElement)
+      ) {
+        openCreateForm("INVOICE");
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showCreate, editNumberDoc, showSettings, showDetail]);
+  }, [showCreate, editNumberDoc, showSettings, showDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Load documents ────────────────────────────────────────────────────────
 
@@ -636,6 +651,8 @@ export default function BillingPage() {
       notes: "",
       payment_method: "",
       language: "ES",
+      issue_date: new Date().toISOString().split("T")[0],
+      due_date: "",
       customer_name: "",
       customer_email: "",
       customer_tax_id: "",
@@ -661,6 +678,8 @@ export default function BillingPage() {
         language: createForm.language,
         payment_method: createForm.payment_method || undefined,
         notes: createForm.notes || undefined,
+        issue_date: createForm.issue_date || undefined,
+        due_date: createForm.due_date || undefined,
         customer_name: createForm.customer_name || undefined,
         customer_email: createForm.customer_email || undefined,
         customer_tax_id: createForm.customer_tax_id || undefined,
@@ -925,10 +944,20 @@ export default function BillingPage() {
           </button>
           <button
             onClick={() => openCreateForm("INVOICE")}
+            title="Nueva factura (atajo: N)"
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Nueva Factura
+            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/15 text-white/70 ml-1">N</kbd>
+          </button>
+          <button
+            onClick={() => openCreateForm("CREDIT_NOTE")}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-orange-200 bg-orange-50 text-sm font-medium text-orange-700 hover:bg-orange-100 transition shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nota de crédito</span>
+            <span className="sm:hidden">Abono</span>
           </button>
           <button
             onClick={handleExport}
@@ -949,7 +978,7 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* ── Stats summary ──────────────────────────────────────────────────── */}
+      {/* ── Stats summary (clickable quick-filters) ────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
@@ -963,18 +992,64 @@ export default function BillingPage() {
           ))
         ) : (
           [
-            { label: "Total documentos", value: String(total), icon: FileText, color: "text-zinc-500" },
-            { label: "Borradores (pág.)", value: String(draftCount), icon: FileClock, color: "text-zinc-400" },
-            { label: "Emitidas (pág.)", value: String(issuedCount), icon: Send, color: "text-blue-500" },
-            { label: "Cobradas (pág.)", value: String(paidCount), icon: CheckCircle, color: "text-emerald-500" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-zinc-100 hover:border-zinc-200 px-4 py-3 flex items-center gap-3 transition">
-              <Icon className={`w-5 h-5 shrink-0 ${color}`} />
+            {
+              label: "Total documentos",
+              value: String(total),
+              icon: FileText,
+              iconColor: "text-zinc-500",
+              bg: "bg-white",
+              ring: !statusFilter && tab === "ALL" ? "ring-2 ring-zinc-900" : "",
+              action: () => { setStatusFilter(""); setTab("ALL"); loadDocs(1); },
+              hint: "Ver todos",
+            },
+            {
+              label: "Borradores",
+              value: String(draftCount),
+              icon: FileClock,
+              iconColor: "text-zinc-400",
+              bg: statusFilter === "DRAFT" ? "bg-zinc-900" : "bg-white",
+              ring: statusFilter === "DRAFT" ? "" : "",
+              textColor: statusFilter === "DRAFT" ? "text-white" : "text-zinc-900",
+              labelColor: statusFilter === "DRAFT" ? "text-zinc-300" : "text-zinc-400",
+              action: () => { setStatusFilter(statusFilter === "DRAFT" ? "" : "DRAFT"); setPage(1); loadDocs(1); },
+              hint: "Filtrar borradores",
+            },
+            {
+              label: "Emitidas / Enviadas",
+              value: String(issuedCount),
+              icon: Send,
+              iconColor: statusFilter === "ISSUED" ? "text-white" : "text-blue-500",
+              bg: statusFilter === "ISSUED" ? "bg-blue-600" : "bg-white",
+              textColor: statusFilter === "ISSUED" ? "text-white" : "text-zinc-900",
+              labelColor: statusFilter === "ISSUED" ? "text-blue-100" : "text-zinc-400",
+              action: () => { setStatusFilter(statusFilter === "ISSUED" ? "" : "ISSUED"); setPage(1); loadDocs(1); },
+              hint: "Filtrar emitidas",
+            },
+            {
+              label: "Cobradas",
+              value: String(paidCount),
+              icon: CheckCircle,
+              iconColor: statusFilter === "PAID" ? "text-white" : "text-emerald-500",
+              bg: statusFilter === "PAID" ? "bg-emerald-600" : "bg-white",
+              textColor: statusFilter === "PAID" ? "text-white" : "text-zinc-900",
+              labelColor: statusFilter === "PAID" ? "text-emerald-100" : "text-zinc-400",
+              action: () => { setStatusFilter(statusFilter === "PAID" ? "" : "PAID"); setPage(1); loadDocs(1); },
+              hint: "Filtrar cobradas",
+            },
+          ].map(({ label, value, icon: Icon, iconColor, bg, ring = "", textColor = "text-zinc-900", labelColor = "text-zinc-400", action, hint }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={action}
+              title={hint}
+              className={`${bg} ${ring} rounded-xl border border-zinc-100 hover:border-zinc-300 px-4 py-3 flex items-center gap-3 transition cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900`}
+            >
+              <Icon className={`w-5 h-5 shrink-0 ${iconColor}`} />
               <div className="min-w-0">
-                <p className="text-xs text-zinc-400 truncate">{label}</p>
-                <p className="text-xl font-bold text-zinc-900 leading-tight tabular-nums">{value}</p>
+                <p className={`text-xs truncate ${labelColor}`}>{label}</p>
+                <p className={`text-xl font-bold leading-tight tabular-nums ${textColor}`}>{value}</p>
               </div>
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -1123,7 +1198,7 @@ export default function BillingPage() {
               </p>
             </div>
             {!statusFilter && !search && !fromDate && !toDate && (
-              <div className="flex gap-2 mt-1">
+              <div className="flex flex-wrap gap-2 mt-1 justify-center">
                 <button
                   onClick={() => openCreateForm("QUOTE")}
                   className="text-sm text-zinc-600 border border-zinc-300 px-3 py-1.5 rounded-lg hover:bg-zinc-50 transition"
@@ -1135,6 +1210,12 @@ export default function BillingPage() {
                   className="text-sm text-white bg-zinc-900 px-3 py-1.5 rounded-lg hover:bg-zinc-700 transition"
                 >
                   Nueva factura
+                </button>
+                <button
+                  onClick={() => openCreateForm("CREDIT_NOTE")}
+                  className="text-sm text-orange-700 border border-orange-200 bg-orange-50 px-3 py-1.5 rounded-lg hover:bg-orange-100 transition"
+                >
+                  Nota de crédito
                 </button>
               </div>
             )}
@@ -1640,174 +1721,189 @@ export default function BillingPage() {
               </div>
             ) : null}
 
-            {/* Footer actions */}
+            {/* Footer actions — grouped by intent */}
             {selectedDoc && (
-              <div className="shrink-0 flex flex-wrap gap-2 px-6 py-4 border-t border-zinc-100 bg-white">
-                {/* Vista previa */}
-                <button
-                  onClick={() => setShowPreview(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
-                >
-                  <Eye className="w-4 h-4" />
-                  Vista previa
-                </button>
-                {selectedDoc.status === "DRAFT" && (
+              <div className="shrink-0 border-t border-zinc-100 bg-white">
+                {/* Primary workflow row */}
+                <div className="flex flex-wrap gap-2 px-6 py-3 border-b border-zinc-50">
+                  {/* Vista previa — always available */}
                   <button
-                    onClick={() => handleIssue(selectedDoc.id)}
-                    disabled={issuingId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
+                    onClick={() => setShowPreview(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition"
                   >
-                    {issuingId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Emitir documento
+                    <Eye className="w-4 h-4" />
+                    Vista previa
                   </button>
-                )}
-                {selectedDoc.type === "QUOTE" && selectedDoc.status !== "VOID" && (
-                  <button
-                    onClick={() => handleConvert(selectedDoc.id)}
-                    disabled={convertingId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition shadow-sm"
-                  >
-                    {convertingId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <ArrowRight className="w-4 h-4" />
-                    )}
-                    Convertir a factura
-                  </button>
-                )}
-                {selectedDoc.document_number && (
-                  <button
-                    onClick={() => {
-                      closeDetail();
-                      openEditNumber(selectedDoc);
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Editar número
-                  </button>
-                )}
-                {/* PDF download — always available for non-DRAFT */}
-                {selectedDoc.status !== "DRAFT" && (
-                  <button
-                    onClick={() => handleDownloadPdf(selectedDoc.id)}
-                    disabled={downloadingPdfId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 transition"
-                  >
-                    {downloadingPdfId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )}
-                    Descargar PDF
-                  </button>
-                )}
-                {/* Send by email */}
-                {selectedDoc.status !== "DRAFT" && selectedDoc.status !== "VOID" && selectedDoc.customer_email && (
-                  <button
-                    onClick={() => handleSendDocument(selectedDoc.id)}
-                    disabled={sendingId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
-                  >
-                    {sendingId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Enviar por email
-                  </button>
-                )}
-                {/* Mark as Sent */}
-                {selectedDoc.status === "ISSUED" && (
-                  <button
-                    onClick={() => handleStatusTransition(selectedDoc.id, "SENT")}
-                    disabled={transitioningId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition shadow-sm"
-                  >
-                    {transitioningId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4" />
-                    )}
-                    Marcar enviada
-                  </button>
-                )}
-                {/* Mark as Paid */}
-                {(selectedDoc.status === "ISSUED" || selectedDoc.status === "SENT") && (
-                  <button
-                    onClick={() => handleStatusTransition(selectedDoc.id, "PAID")}
-                    disabled={transitioningId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
-                  >
-                    {transitioningId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4" />
-                    )}
-                    Marcar cobrada
-                  </button>
-                )}
-                {/* Void document */}
-                {selectedDoc.status !== "VOID" && selectedDoc.status !== "DRAFT" && (
-                  confirmVoidId === selectedDoc.id ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-zinc-500">¿Anular definitivamente?</span>
-                      <button
-                        onClick={() => handleStatusTransition(selectedDoc.id, "VOID")}
-                        disabled={transitioningId === selectedDoc.id}
-                        className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
-                      >
-                        Sí, anular
-                      </button>
-                      <button
-                        onClick={() => setConfirmVoidId(null)}
-                        className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
+                  {/* PDF download — non-DRAFT */}
+                  {selectedDoc.status !== "DRAFT" && (
                     <button
-                      onClick={() => setConfirmVoidId(selectedDoc.id)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition"
+                      onClick={() => handleDownloadPdf(selectedDoc.id)}
+                      disabled={downloadingPdfId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition"
                     >
-                      <XCircle className="w-4 h-4" />
-                      Anular
+                      {downloadingPdfId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      PDF
                     </button>
-                  )
-                )}
-                {(selectedDoc.status === "DRAFT" || selectedDoc.status === "VOID") && (
-                  confirmDeleteId === selectedDoc.id ? (
-                    <div className="flex items-center gap-2 ml-auto">
-                      <span className="text-xs text-zinc-500">¿Eliminar definitivamente?</span>
-                      <button
-                        onClick={() => handleDelete(selectedDoc.id)}
-                        disabled={deletingId === selectedDoc.id}
-                        className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
-                      >
-                        Sí, eliminar
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
+                  )}
+                  {/* Send by email */}
+                  {selectedDoc.status !== "DRAFT" && selectedDoc.status !== "VOID" && selectedDoc.customer_email && (
                     <button
-                      onClick={() => setConfirmDeleteId(selectedDoc.id)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition ml-auto"
+                      onClick={() => handleSendDocument(selectedDoc.id)}
+                      disabled={sendingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 disabled:opacity-50 transition"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Eliminar
+                      {sendingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Enviar email
                     </button>
-                  )
-                )}
+                  )}
+                  {/* Edit number */}
+                  {selectedDoc.document_number && (
+                    <button
+                      onClick={() => {
+                        closeDetail();
+                        openEditNumber(selectedDoc);
+                      }}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Editar nº
+                    </button>
+                  )}
+                </div>
+
+                {/* Status-action row */}
+                <div className="flex flex-wrap items-center gap-2 px-6 py-3">
+                  {/* Emit draft */}
+                  {selectedDoc.status === "DRAFT" && (
+                    <button
+                      onClick={() => handleIssue(selectedDoc.id)}
+                      disabled={issuingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {issuingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Emitir documento
+                    </button>
+                  )}
+                  {/* Convert quote to invoice */}
+                  {selectedDoc.type === "QUOTE" && selectedDoc.status !== "VOID" && (
+                    <button
+                      onClick={() => handleConvert(selectedDoc.id)}
+                      disabled={convertingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {convertingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4" />
+                      )}
+                      Convertir a factura
+                    </button>
+                  )}
+                  {/* Mark as Sent */}
+                  {selectedDoc.status === "ISSUED" && (
+                    <button
+                      onClick={() => handleStatusTransition(selectedDoc.id, "SENT")}
+                      disabled={transitioningId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {transitioningId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Marcar enviada
+                    </button>
+                  )}
+                  {/* Mark as Paid */}
+                  {(selectedDoc.status === "ISSUED" || selectedDoc.status === "SENT") && (
+                    <button
+                      onClick={() => handleStatusTransition(selectedDoc.id, "PAID")}
+                      disabled={transitioningId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {transitioningId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Marcar cobrada
+                    </button>
+                  )}
+
+                  {/* Spacer pushes destructive actions to the right */}
+                  <div className="flex-1" />
+
+                  {/* Void document */}
+                  {selectedDoc.status !== "VOID" && selectedDoc.status !== "DRAFT" && (
+                    confirmVoidId === selectedDoc.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">¿Anular definitivamente?</span>
+                        <button
+                          onClick={() => handleStatusTransition(selectedDoc.id, "VOID")}
+                          disabled={transitioningId === selectedDoc.id}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Sí, anular
+                        </button>
+                        <button
+                          onClick={() => setConfirmVoidId(null)}
+                          className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmVoidId(selectedDoc.id)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Anular
+                      </button>
+                    )
+                  )}
+                  {/* Delete draft/void */}
+                  {(selectedDoc.status === "DRAFT" || selectedDoc.status === "VOID") && (
+                    confirmDeleteId === selectedDoc.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">¿Eliminar definitivamente?</span>
+                        <button
+                          onClick={() => handleDelete(selectedDoc.id)}
+                          disabled={deletingId === selectedDoc.id}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Sí, eliminar
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(selectedDoc.id)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Eliminar
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1999,8 +2095,8 @@ export default function BillingPage() {
                 <BillingPreview data={{
                   type: createType,
                   document_number: null,
-                  issue_date: new Date().toISOString(),
-                  due_date: null,
+                  issue_date: createForm.issue_date || new Date().toISOString(),
+                  due_date: createForm.due_date || null,
                   payment_method: createForm.payment_method as BillingPaymentMethod | null || null,
                   currency: settings?.default_currency ?? "EUR",
                   company_legal_name: settings?.legal_name ?? null,
@@ -2088,6 +2184,36 @@ export default function BillingPage() {
                     <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                    Fecha de emisión
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.issue_date}
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({ ...f, issue_date: e.target.value }))
+                    }
+                    className="w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                    Fecha de vencimiento <span className="text-zinc-400 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.due_date}
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({ ...f, due_date: e.target.value }))
+                    }
+                    className="w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
               </div>
 
               {/* Customer info */}

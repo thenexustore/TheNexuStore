@@ -249,7 +249,7 @@ export default function OrdersPage() {
     setMarkingDelivered(true);
     try {
       const result = await markOrderDelivered(selectedOrderId, deliverTrackingUrl || undefined);
-      toast.success("Pedido marcado como entregado. Factura en borrador creada.");
+      toast.success("Pedido marcado como entregado. Factura emitida y enviada al cliente.");
       setDeliverTrackingUrl("");
       const updated = await fetchOrderById(selectedOrderId);
       setOrderDetail(updated);
@@ -744,7 +744,7 @@ export default function OrdersPage() {
                               disabled={markingDelivered}
                               className="w-full rounded bg-emerald-600 px-3 py-2 text-white text-xs font-medium disabled:opacity-50 hover:bg-emerald-700"
                             >
-                              {markingDelivered ? "Procesando..." : "✓ Marcar como entregado y crear factura borrador"}
+                              {markingDelivered ? "Procesando..." : "✓ Marcar como entregado y enviar factura"}
                             </button>
                           </div>
                         </div>

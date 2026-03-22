@@ -786,9 +786,36 @@ export class BillingService {
       orderBy: { created_at: 'desc' },
     });
     if (existingDoc) {
+      let finalDoc = existingDoc;
+      if (existingDoc.status === BillingDocumentStatus.DRAFT) {
+        // Issue the draft (assigns number + issue_date)
+        finalDoc = await this.issueDocument(existingDoc.id, {}, 'system');
+        // Send email (transitions ISSUED → SENT)
+        try {
+          await this.sendDocument(finalDoc.id);
+          finalDoc = await this.prisma.billingDocument.findUnique({
+            where: { id: finalDoc.id },
+            include: { items: true },
+          }) ?? finalDoc;
+        } catch (err) {
+          this.logger.warn(`Could not send billing document email for order ${orderId}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } else if (existingDoc.status === BillingDocumentStatus.ISSUED) {
+        // Send email only (transitions ISSUED → SENT)
+        try {
+          await this.sendDocument(existingDoc.id);
+          finalDoc = await this.prisma.billingDocument.findUnique({
+            where: { id: existingDoc.id },
+            include: { items: true },
+          }) ?? existingDoc;
+        } catch (err) {
+          this.logger.warn(`Could not send billing document email for order ${orderId}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      // SENT / PAID / VOID: nothing extra
       return {
         order_status: OrderStatus.DELIVERED,
-        billing_document: existingDoc,
+        billing_document: finalDoc,
       };
     }
 
@@ -896,9 +923,26 @@ export class BillingService {
       include: { items: true },
     });
 
+    // Issue the newly created draft and send email
+    let finalDoc: typeof billingDoc = billingDoc;
+    try {
+      finalDoc = await this.issueDocument(billingDoc.id, {}, 'system');
+    } catch (err) {
+      this.logger.warn(`Could not issue billing document for order ${orderId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    try {
+      await this.sendDocument(finalDoc.id);
+      finalDoc = await this.prisma.billingDocument.findUnique({
+        where: { id: finalDoc.id },
+        include: { items: true },
+      }) ?? finalDoc;
+    } catch (err) {
+      this.logger.warn(`Could not send billing document email for order ${orderId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     return {
       order_status: OrderStatus.DELIVERED,
-      billing_document: billingDoc,
+      billing_document: finalDoc,
     };
   }
 

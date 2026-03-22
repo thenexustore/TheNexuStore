@@ -619,6 +619,65 @@ const TAXONOMY_OVERRIDE_RULES: readonly TaxonomyOverrideRule[] = [
   },
 ];
 
+const TAXONOMY_OVERRIDE_RULES: readonly TaxonomyOverrideRule[] = [
+  {
+    key: 'monitores-perifericos',
+    anyOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+  },
+  {
+    key: 'telefonia-movilidad',
+    anyOf: [
+      'smartphone',
+      'telefono movil',
+      'movil',
+      'mobile',
+      'tablet',
+      'smartwatch',
+      'wearable',
+      'mifi',
+      'pda',
+      'rfid',
+      'terminal movil',
+      'terminal portatil',
+      'handheld',
+      'gps',
+    ],
+    noneOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+  },
+  {
+    key: 'gaming-smart-home',
+    anyOf: [
+      'camara seguridad',
+      'videovigilancia',
+      'cctv',
+      'alarma',
+      'control de acceso',
+      'cerradura inteligente',
+    ],
+  },
+  {
+    key: 'ordenadores-portatiles',
+    anyOf: [
+      'portatil',
+      'notebook',
+      'laptop',
+      'ultrabook',
+      'chromebook',
+      'desktop',
+      'sobremesa',
+      'workstation',
+      'all in one',
+      'mini pc',
+      'barebone',
+      'thin client',
+      'cliente ligero',
+      'panel pc',
+      'embedded pc',
+    ],
+    noneOf: ['movil', 'telefono', 'smartphone', 'tablet'],
+  },
+];
+
 function normalizeText(value: string | null | undefined): string {
   return String(value || '')
     .normalize('NFD')

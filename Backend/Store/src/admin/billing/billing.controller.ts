@@ -36,7 +36,7 @@ import {
 class UploadBillingBgDto {
   @IsString()
   @MaxLength(10_000_000)
-  image_base64: string;
+  image_base64!: string;
 }
 
 @Controller('admin/billing')

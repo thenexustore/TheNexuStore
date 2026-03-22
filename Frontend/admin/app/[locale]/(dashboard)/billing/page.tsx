@@ -67,6 +67,10 @@ type CreateFormState = {
   notes: string;
   payment_method: BillingPaymentMethod | "";
   language: "ES" | "EN";
+  customer_name: string;
+  customer_email: string;
+  customer_tax_id: string;
+  customer_address: string;
   items: CreateItemState[];
 };
 
@@ -191,6 +195,10 @@ export default function BillingPage() {
     notes: "",
     payment_method: "",
     language: "ES",
+    customer_name: "",
+    customer_email: "",
+    customer_tax_id: "",
+    customer_address: "",
     items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
   });
 
@@ -385,6 +393,10 @@ export default function BillingPage() {
       notes: "",
       payment_method: "",
       language: "ES",
+      customer_name: "",
+      customer_email: "",
+      customer_tax_id: "",
+      customer_address: "",
       items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
     });
     setShowCreate(true);
@@ -406,6 +418,10 @@ export default function BillingPage() {
         language: createForm.language,
         payment_method: createForm.payment_method || undefined,
         notes: createForm.notes || undefined,
+        customer_name: createForm.customer_name || undefined,
+        customer_email: createForm.customer_email || undefined,
+        customer_tax_id: createForm.customer_tax_id || undefined,
+        customer_address: createForm.customer_address || undefined,
         items: validItems.map((i: CreateItemState, idx: number) => ({
           description: i.description,
           qty: Number(i.qty) || 1,
@@ -450,6 +466,7 @@ export default function BillingPage() {
         iban_bbva: s.iban_bbva,
         website_com: s.website_com,
         website_es: s.website_es,
+        default_currency: s.default_currency,
         invoice_prefix: s.invoice_prefix,
         quote_prefix: s.quote_prefix,
         credit_note_prefix: s.credit_note_prefix,
@@ -1574,6 +1591,71 @@ export default function BillingPage() {
                 </select>
               </div>
 
+              {/* Customer info */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <User className="w-3.5 h-3.5 text-zinc-400" />
+                  <label className="text-xs font-semibold text-zinc-600 uppercase tracking-wide">
+                    Datos del cliente
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1">
+                      Nombre / Razón social
+                    </label>
+                    <input
+                      value={createForm.customer_name}
+                      onChange={(e: InputEv) =>
+                        setCreateForm((f: CreateFormState) => ({ ...f, customer_name: e.target.value }))
+                      }
+                      placeholder="Empresa S.L. o Nombre Apellido"
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1">
+                      NIF / CIF
+                    </label>
+                    <input
+                      value={createForm.customer_tax_id}
+                      onChange={(e: InputEv) =>
+                        setCreateForm((f: CreateFormState) => ({ ...f, customer_tax_id: e.target.value }))
+                      }
+                      placeholder="B12345678"
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={createForm.customer_email}
+                      onChange={(e: InputEv) =>
+                        setCreateForm((f: CreateFormState) => ({ ...f, customer_email: e.target.value }))
+                      }
+                      placeholder="cliente@empresa.com"
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1">
+                      Dirección fiscal
+                    </label>
+                    <input
+                      value={createForm.customer_address}
+                      onChange={(e: InputEv) =>
+                        setCreateForm((f: CreateFormState) => ({ ...f, customer_address: e.target.value }))
+                      }
+                      placeholder="Calle, ciudad, CP, país"
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Line items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -1848,31 +1930,50 @@ export default function BillingPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="max-w-xs">
-                    <label className="text-xs font-medium text-zinc-600 block mb-1">
-                      IVA por defecto
-                    </label>
-                    <div className="relative">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-zinc-600 block mb-1">
+                        Moneda por defecto
+                      </label>
                       <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="any"
-                        value={
-                          settingsForm.default_tax_rate != null
-                            ? String(Number(settingsForm.default_tax_rate) * 100)
-                            : ""
-                        }
+                        value={settingsForm.default_currency ?? "EUR"}
                         onChange={(e: InputEv) =>
                           setSettingsForm((f: Partial<BillingSettings>) => ({
                             ...f,
-                            default_tax_rate: Number(e.target.value) / 100,
+                            default_currency: e.target.value.toUpperCase(),
                           }))
                         }
-                        className="w-full border border-zinc-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                        placeholder="21"
+                        maxLength={3}
+                        placeholder="EUR"
+                        className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-zinc-900"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">%</span>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-600 block mb-1">
+                        IVA por defecto
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="any"
+                          value={
+                            settingsForm.default_tax_rate != null
+                              ? String(Number(settingsForm.default_tax_rate) * 100)
+                              : ""
+                          }
+                          onChange={(e: InputEv) =>
+                            setSettingsForm((f: Partial<BillingSettings>) => ({
+                              ...f,
+                              default_tax_rate: Number(e.target.value) / 100,
+                            }))
+                          }
+                          className="w-full border border-zinc-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                          placeholder="21"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">%</span>
+                      </div>
                     </div>
                   </div>
                 </div>

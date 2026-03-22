@@ -264,7 +264,7 @@ export class BillingService {
         order_id: docData.order_id,
         customer_id: docData.customer_id,
         language: docData.language ?? BillingLanguage.ES,
-        currency: settings.default_currency,
+        currency: docData.currency ?? settings.default_currency,
         payment_method: docData.payment_method,
         issue_date: docData.issue_date ? new Date(docData.issue_date) : null,
         due_date: docData.due_date ? new Date(docData.due_date) : null,

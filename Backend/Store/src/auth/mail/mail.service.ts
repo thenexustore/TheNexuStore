@@ -92,4 +92,33 @@ export class MailService {
       `,
     });
   }
+
+  async sendBillingDocument(
+    email: string,
+    subject: string,
+    companyName: string,
+    docTypeLabel: string,
+    docRef: string,
+    pdfBuffer: Buffer,
+  ) {
+    await this.getTransporter().sendMail({
+      from: this.getFromAddress(),
+      to: email,
+      subject,
+      html: `
+        <p>Estimado/a cliente,</p>
+        <p>Adjuntamos ${docTypeLabel.toLowerCase()} <b>${docRef}</b> emitida por <b>${companyName}</b>.</p>
+        <p>Si tiene alguna pregunta, no dude en ponerse en contacto con nosotros.</p>
+        <br/>
+        <p>Atentamente,<br/>${companyName}</p>
+      `,
+      attachments: [
+        {
+          filename: `${docRef}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    });
+  }
 }

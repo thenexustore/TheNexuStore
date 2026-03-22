@@ -87,6 +87,10 @@ export class CreateBillingDocumentDto {
 
   @IsOptional()
   @IsString()
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
   template_id?: string;
 
   @IsOptional()
@@ -207,6 +211,10 @@ export class BillingDocumentsQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @IsOptional()
+  @IsString()
+  order_id?: string;
 }
 
 export class IssueBillingDocumentDto {

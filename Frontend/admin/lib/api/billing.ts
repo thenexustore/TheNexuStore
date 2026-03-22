@@ -58,6 +58,7 @@ export interface BillingDocument {
   created_at: string;
   updated_at: string;
   issued_at: string | null;
+  sent_at: string | null;
   items: BillingDocumentItem[];
 }
 
@@ -165,6 +166,7 @@ export async function fetchBillingDocuments(params: {
   search?: string;
   from?: string;
   to?: string;
+  order_id?: string;
 }): Promise<BillingDocumentsResponse> {
   const query = new URLSearchParams();
   if (params.page) query.set("page", String(params.page));
@@ -174,6 +176,7 @@ export async function fetchBillingDocuments(params: {
   if (params.search) query.set("search", params.search);
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
+  if (params.order_id) query.set("order_id", params.order_id);
   return fetchWithAuth(`/admin/billing/documents?${query.toString()}`);
 }
 
@@ -349,4 +352,43 @@ export async function downloadBillingExport(params: {
   document.body.removeChild(a);
   // Brief delay so the browser can initiate the download before the URL is revoked
   setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+export async function downloadBillingDocumentPdf(id: string): Promise<void> {
+  const token = localStorage.getItem("admin_token") ?? "";
+  const response = await fetch(`${API_URL}/admin/billing/documents/${id}/pdf`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`PDF download failed (${response.status})`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `document-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+export async function sendBillingDocument(
+  id: string,
+): Promise<{ sent: boolean; email: string }> {
+  return fetchWithAuth(`/admin/billing/documents/${id}/send`, {
+    method: "POST",
+  });
+}
+
+export async function fetchBillingDocumentsByOrder(
+  orderId: string,
+): Promise<{ documents: BillingDocument[]; order_number: string | null }> {
+  return fetchWithAuth(`/admin/billing/orders/${orderId}/documents`);
+}
+
+export async function createBillingDocumentFromOrder(
+  orderId: string,
+): Promise<{ billing_document: BillingDocument; created: boolean }> {
+  return fetchWithAuth(`/admin/billing/orders/${orderId}/create-document`, {
+    method: "POST",
+  });
 }

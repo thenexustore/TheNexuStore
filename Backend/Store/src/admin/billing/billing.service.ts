@@ -26,11 +26,16 @@ import {
   UpdateBillingTemplateDto,
   UpdateDocumentNumberDto,
 } from './dto/billing.dto';
+import { MailService } from '../../auth/mail/mail.service';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -147,7 +152,7 @@ export class BillingService {
   // ─── Documents ────────────────────────────────────────────────────────────────
 
   async listDocuments(query: BillingDocumentsQueryDto) {
-    const { page, limit, type, status, search, from, to } = query;
+    const { page, limit, type, status, search, from, to, order_id } = query;
     const skip = (page - 1) * limit;
 
     const dateRange =
@@ -188,6 +193,7 @@ export class BillingService {
     const where: Prisma.BillingDocumentWhereInput = {
       ...(type && { type }),
       ...(status && { status }),
+      ...(order_id && { order_id }),
       ...(andConditions.length > 0 && { AND: andConditions }),
     };
 
@@ -228,9 +234,10 @@ export class BillingService {
   async createDocument(dto: CreateBillingDocumentDto) {
     const { items, ...docData } = dto;
     const settings = await this.getSettings();
+    const defaultTaxRate = Number(settings.default_tax_rate);
 
     const lineItems = (items ?? []).map((item, i) => {
-      const taxRate = item.tax_rate ?? 0.21;
+      const taxRate = item.tax_rate ?? defaultTaxRate;
       const lineSubtotal = Number(item.qty) * Number(item.unit_price);
       const taxAmount = lineSubtotal * taxRate;
       const lineTotal = lineSubtotal + taxAmount;
@@ -257,6 +264,7 @@ export class BillingService {
         order_id: docData.order_id,
         customer_id: docData.customer_id,
         language: docData.language ?? BillingLanguage.ES,
+        currency: docData.currency ?? settings.default_currency,
         payment_method: docData.payment_method,
         issue_date: docData.issue_date ? new Date(docData.issue_date) : null,
         due_date: docData.due_date ? new Date(docData.due_date) : null,
@@ -301,6 +309,9 @@ export class BillingService {
     let total = 0;
 
     if (items !== undefined) {
+      const settings = await this.getSettings();
+      const defaultTaxRate = Number(settings.default_tax_rate);
+
       // Wrap delete + recreate in a transaction to avoid leaving the document
       // without items if the createMany call fails.
       await this.prisma.$transaction(async (tx) => {
@@ -309,7 +320,7 @@ export class BillingService {
         });
 
         const lineItems = items.map((item, i) => {
-          const taxRate = item.tax_rate ?? 0.21;
+          const taxRate = item.tax_rate ?? defaultTaxRate;
           const lineSubtotal = Number(item.qty) * Number(item.unit_price);
           const taxAmountLine = lineSubtotal * taxRate;
           const lineTotal = lineSubtotal + taxAmountLine;
@@ -418,6 +429,7 @@ export class BillingService {
         series_id: seriesId,
         issue_date: issueDate,
         issued_at: issueDate,
+        pdf_url: `/admin/billing/documents/${id}/pdf`,
         ...(dto.payment_method !== undefined && {
           payment_method: dto.payment_method,
         }),
@@ -491,6 +503,7 @@ export class BillingService {
         payment_method: dto.payment_method ?? quote.payment_method,
         issue_date: issueDate,
         issued_at: issueDate,
+        pdf_url: `/admin/billing/documents/${invoiceId}/pdf`,
         notes: quote.notes,
         internal_notes: quote.internal_notes,
         template_id: quote.template_id,
@@ -884,5 +897,351 @@ export class BillingService {
       order_status: OrderStatus.DELIVERED,
       billing_document: billingDoc,
     };
+  }
+
+  // ─── Billing from order (independent of delivery) ─────────────────────────
+
+  async getDocumentsByOrderId(orderId: string): Promise<{ documents: any[]; order_number: string | null }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, order_number: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const documents = await this.prisma.billingDocument.findMany({
+      where: { order_id: orderId },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return { documents, order_number: order.order_number ?? null };
+  }
+
+  /**
+   * Creates a billing document (draft invoice) from an existing order.
+   * Idempotent: if a non-VOID invoice already exists for this order, returns
+   * the existing one instead of creating a duplicate.
+   */
+  async createDocumentFromOrder(orderId: string): Promise<any> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { sku: { include: { product: true } } },
+        },
+        customer: {
+          include: { fiscal_profile: true },
+        },
+        payments: { orderBy: { created_at: 'desc' }, take: 1 },
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Idempotency: return existing non-void invoice if present
+    const existing = await this.prisma.billingDocument.findFirst({
+      where: {
+        order_id: orderId,
+        type: BillingDocumentType.INVOICE,
+        status: { not: BillingDocumentStatus.VOID },
+      },
+      orderBy: { created_at: 'desc' },
+      include: { items: true },
+    });
+    if (existing) return { billing_document: existing, created: false };
+
+    const settings = await this.getSettings();
+    const customer = order.customer;
+    const fiscalProfile = customer?.fiscal_profile;
+    const billingAddr = order.billing_address_json as Record<string, unknown>;
+
+    const customerName =
+      fiscalProfile?.company_name ??
+      ((billingAddr?.full_name as string) ||
+        `${customer?.first_name ?? ''} ${customer?.last_name ?? ''}`.trim() ||
+        order.email);
+    const customerTaxId =
+      fiscalProfile?.tax_id ?? (billingAddr?.vat_id as string) ?? null;
+    const customerEmail = order.email;
+    const customerAddress = fiscalProfile?.fiscal_address
+      ? [
+          fiscalProfile.fiscal_address,
+          fiscalProfile.fiscal_city,
+          fiscalProfile.fiscal_postal,
+          fiscalProfile.fiscal_country,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : billingAddr
+        ? [
+            billingAddr.address_line1,
+            billingAddr.city,
+            billingAddr.postal_code,
+            billingAddr.country,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : null;
+
+    const payment = order.payments[0];
+    let paymentMethod: BillingPaymentMethod | null = null;
+    if (payment) {
+      switch (payment.provider) {
+        case 'REDSYS':
+          paymentMethod = BillingPaymentMethod.REDSYS;
+          break;
+        case 'STRIPE':
+          paymentMethod = BillingPaymentMethod.STRIPE;
+          break;
+        case 'PAYPAL':
+          paymentMethod = BillingPaymentMethod.PAYPAL;
+          break;
+        case 'COD':
+          paymentMethod = BillingPaymentMethod.COD;
+          break;
+        default:
+          paymentMethod = BillingPaymentMethod.OTHER;
+      }
+    }
+
+    const taxRate = Number(settings.default_tax_rate);
+    const lineItems = order.items.map((item, i) => {
+      const lineSubtotal = Number(item.unit_price) * item.qty;
+      const taxAmountLine = lineSubtotal * taxRate;
+      const lineTotal = lineSubtotal + taxAmountLine;
+      return {
+        description:
+          item.title_snapshot || item.sku?.product?.title || item.sku_id,
+        qty: item.qty,
+        unit_price: item.unit_price,
+        tax_rate: taxRate,
+        line_subtotal: lineSubtotal,
+        tax_amount: taxAmountLine,
+        line_total: lineTotal,
+        position: i,
+      };
+    });
+
+    const subtotal = lineItems.reduce((s, i) => s + i.line_subtotal, 0);
+    const taxTotal = lineItems.reduce((s, i) => s + i.tax_amount, 0);
+    const total = lineItems.reduce((s, i) => s + i.line_total, 0);
+
+    const billingDoc = await this.prisma.billingDocument.create({
+      data: {
+        type: BillingDocumentType.INVOICE,
+        status: BillingDocumentStatus.DRAFT,
+        order_id: orderId,
+        customer_id: order.customer_id ?? undefined,
+        language: BillingLanguage.ES,
+        currency: order.currency,
+        payment_method: paymentMethod ?? undefined,
+        company_legal_name: settings.legal_name,
+        company_trade_name: settings.trade_name,
+        company_nif: settings.nif,
+        company_address: settings.address_real,
+        company_iban_1: settings.iban_caixabank,
+        company_iban_2: settings.iban_bbva,
+        customer_name: customerName,
+        customer_tax_id: customerTaxId,
+        customer_email: customerEmail,
+        customer_address: customerAddress,
+        subtotal_amount: subtotal,
+        tax_amount: taxTotal,
+        discount_amount: Number(order.discount_amount),
+        total_amount: total,
+        items: { create: lineItems },
+      },
+      include: { items: true },
+    });
+
+    return { billing_document: billingDoc, created: true };
+  }
+
+  // ─── PDF Generation ───────────────────────────────────────────────────────
+
+  async generateDocumentPdf(id: string): Promise<Buffer> {
+    const doc = await this.prisma.billingDocument.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!doc) throw new NotFoundException('Billing document not found');
+
+    return new Promise<Buffer>((resolve, reject) => {
+      const pdf = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks: Buffer[] = [];
+      pdf.on('data', (chunk: Buffer) => chunks.push(chunk));
+      pdf.on('end', () => resolve(Buffer.concat(chunks)));
+      pdf.on('error', reject);
+
+      const docRef =
+        doc.document_number ??
+        doc.id.substring(0, 8).toUpperCase();
+      const typeLabel =
+        doc.type === BillingDocumentType.INVOICE
+          ? 'FACTURA'
+          : doc.type === BillingDocumentType.QUOTE
+            ? 'PRESUPUESTO'
+            : 'NOTA DE CRÉDITO';
+
+      // Header
+      pdf.fontSize(20).font('Helvetica-Bold').text(typeLabel, { align: 'right' });
+      pdf.fontSize(12).font('Helvetica').text(`Nº: ${docRef}`, { align: 'right' });
+      if (doc.issue_date) {
+        pdf.text(
+          `Fecha: ${new Date(doc.issue_date).toLocaleDateString('es-ES')}`,
+          { align: 'right' },
+        );
+      }
+      pdf.moveDown();
+
+      // Company info
+      if (doc.company_legal_name) {
+        pdf.font('Helvetica-Bold').text(doc.company_legal_name);
+        pdf.font('Helvetica');
+        if (doc.company_nif) pdf.text(`NIF: ${doc.company_nif}`);
+        if (doc.company_address) pdf.text(doc.company_address);
+        if (doc.company_iban_1) pdf.text(`IBAN: ${doc.company_iban_1}`);
+      }
+      pdf.moveDown();
+
+      // Customer info
+      pdf.font('Helvetica-Bold').text('DATOS DEL CLIENTE');
+      pdf.font('Helvetica');
+      if (doc.customer_name) pdf.text(doc.customer_name);
+      if (doc.customer_tax_id) pdf.text(`NIF/CIF: ${doc.customer_tax_id}`);
+      if (doc.customer_email) pdf.text(doc.customer_email);
+      if (doc.customer_address) pdf.text(doc.customer_address);
+      pdf.moveDown();
+
+      // Table header
+      const colDesc = 50;
+      const colQty = 330;
+      const colPrice = 380;
+      const colTax = 430;
+      const colTotal = 490;
+      pdf.font('Helvetica-Bold');
+      pdf.text('Descripción', colDesc, pdf.y, { continued: false });
+      const tableY = pdf.y;
+      pdf.text('Cant.', colQty, tableY, { width: 50 });
+      pdf.text('P.Unit', colPrice, tableY, { width: 50 });
+      pdf.text('IVA%', colTax, tableY, { width: 50 });
+      pdf.text('Total', colTotal, tableY, { width: 60 });
+      pdf.moveDown(0.5);
+      pdf.moveTo(50, pdf.y).lineTo(560, pdf.y).stroke();
+      pdf.moveDown(0.3);
+
+      // Items
+      pdf.font('Helvetica');
+      for (const item of doc.items) {
+        const rowY = pdf.y;
+        pdf.text(item.description ?? '', colDesc, rowY, { width: 270 });
+        pdf.text(String(item.qty), colQty, rowY, { width: 50 });
+        pdf.text(
+          Number(item.unit_price).toFixed(2),
+          colPrice,
+          rowY,
+          { width: 50 },
+        );
+        pdf.text(
+          `${Number(item.tax_rate).toFixed(0)}%`,
+          colTax,
+          rowY,
+          { width: 50 },
+        );
+        pdf.text(
+          Number(item.line_total).toFixed(2),
+          colTotal,
+          rowY,
+          { width: 60 },
+        );
+        pdf.moveDown();
+      }
+
+      pdf.moveTo(50, pdf.y).lineTo(560, pdf.y).stroke();
+      pdf.moveDown(0.5);
+
+      // Totals
+      const totalsX = 380;
+      pdf.font('Helvetica');
+      pdf.text(
+        `Base imponible: ${Number(doc.subtotal_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+        totalsX,
+      );
+      pdf.text(
+        `IVA: ${Number(doc.tax_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+        totalsX,
+      );
+      if (Number(doc.discount_amount) > 0) {
+        pdf.text(
+          `Descuento: -${Number(doc.discount_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+          totalsX,
+        );
+      }
+      pdf.font('Helvetica-Bold').text(
+        `TOTAL: ${Number(doc.total_amount).toFixed(2)} ${doc.currency ?? 'EUR'}`,
+        totalsX,
+      );
+
+      if (doc.notes) {
+        pdf.moveDown();
+        pdf.font('Helvetica').fontSize(10).text(`Notas: ${doc.notes}`);
+      }
+
+      pdf.end();
+    });
+  }
+
+  async sendDocument(id: string): Promise<{ sent: boolean; email: string }> {
+    const doc = await this.prisma.billingDocument.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!doc) throw new NotFoundException('Billing document not found');
+    if (
+      doc.status === BillingDocumentStatus.DRAFT ||
+      doc.status === BillingDocumentStatus.VOID
+    ) {
+      throw new BadRequestException(
+        `Cannot send a document in ${doc.status} status — it must be ISSUED or SENT`,
+      );
+    }
+    if (!doc.customer_email) {
+      throw new BadRequestException(
+        'Document has no customer email address to send to',
+      );
+    }
+
+    const pdfBuffer = await this.generateDocumentPdf(id);
+
+    const docRef = doc.document_number ?? id.substring(0, 8).toUpperCase();
+    const typeLabel =
+      doc.type === BillingDocumentType.INVOICE
+        ? 'Factura'
+        : doc.type === BillingDocumentType.QUOTE
+          ? 'Presupuesto'
+          : 'Nota de crédito';
+    const companyName = doc.company_legal_name ?? doc.company_trade_name ?? 'NEXUS';
+    const subject = `${typeLabel} ${docRef} de ${companyName}`;
+
+    await this.mailService.sendBillingDocument(
+      doc.customer_email,
+      subject,
+      companyName,
+      typeLabel,
+      docRef,
+      pdfBuffer,
+    );
+
+    await this.prisma.billingDocument.update({
+      where: { id },
+      data: {
+        sent_at: new Date(),
+        // Automatically advance ISSUED → SENT when the document is emailed to the customer
+        ...(doc.status === BillingDocumentStatus.ISSUED && {
+          status: BillingDocumentStatus.SENT,
+        }),
+      },
+    });
+
+    this.logger.log(`Billing document ${docRef} sent to ${doc.customer_email}`);
+    return { sent: true, email: doc.customer_email };
   }
 }

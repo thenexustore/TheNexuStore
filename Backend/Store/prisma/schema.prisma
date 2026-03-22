@@ -1349,6 +1349,7 @@ model BillingDocument {
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
   issued_at           DateTime?
+  sent_at             DateTime?
 
   series              BillingSeries?     @relation(fields: [series_id], references: [id])
   order               Order?             @relation(fields: [order_id], references: [id])

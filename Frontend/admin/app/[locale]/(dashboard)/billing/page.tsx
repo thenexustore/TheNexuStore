@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   FileText,
@@ -28,11 +29,17 @@ import {
   User,
   CreditCard,
   Hash,
+  ShoppingCart,
+  ExternalLink,
+  Layers,
+  Star,
+  ImageIcon,
 } from "lucide-react";
 import {
   fetchBillingDocuments,
   fetchBillingDocumentById,
   createBillingDocument,
+  updateBillingDocument,
   deleteBillingDocument,
   issueBillingDocument,
   convertQuoteToInvoice,
@@ -40,6 +47,13 @@ import {
   fetchBillingSettings,
   updateBillingSettings,
   downloadBillingExport,
+  downloadBillingDocumentPdf,
+  sendBillingDocument,
+  fetchProducts,
+  fetchBillingTemplates,
+  createBillingTemplate,
+  updateBillingTemplate,
+  deleteBillingTemplate,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -47,6 +61,8 @@ import {
   type BillingSettings,
   type BillingNumberAudit,
   type BillingDocumentItem,
+  type BillingTemplate,
+  type Product,
 } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -67,14 +83,50 @@ type CreateFormState = {
   notes: string;
   payment_method: BillingPaymentMethod | "";
   language: "ES" | "EN";
+  issue_date: string;
+  due_date: string;
   customer_name: string;
   customer_email: string;
   customer_tax_id: string;
   customer_address: string;
   items: CreateItemState[];
+  template_id?: string;
 };
 
 type InputEv = { target: { value: string } };
+
+// ─── Preview data interface ───────────────────────────────────────────────────
+
+interface BillingPreviewData {
+  type: BillingDocumentType;
+  document_number?: string | null;
+  issue_date?: string | null;
+  due_date?: string | null;
+  payment_method?: BillingPaymentMethod | null;
+  currency?: string | null;
+  company_legal_name?: string | null;
+  company_trade_name?: string | null;
+  company_nif?: string | null;
+  company_address?: string | null;
+  company_iban_1?: string | null;
+  company_iban_2?: string | null;
+  customer_name?: string | null;
+  customer_tax_id?: string | null;
+  customer_email?: string | null;
+  customer_address?: string | null;
+  subtotal_amount?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount?: number;
+  notes?: string | null;
+  items: Array<{
+    description?: string | null;
+    qty: number;
+    unit_price: number;
+    tax_rate: number;
+    line_total?: number | null;
+  }>;
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -164,6 +216,206 @@ function formatDate(val: string | null | undefined): string {
   return new Date(val).toLocaleDateString("es-ES");
 }
 
+// ─── BillingPreview ───────────────────────────────────────────────────────────
+
+function BillingPreview({ data }: { data: BillingPreviewData }) {
+  const cur = data.currency ?? "EUR";
+  const fmt = (v: number) =>
+    new Intl.NumberFormat("es-ES", { style: "currency", currency: cur }).format(v);
+  const fmtDate = (v: string | null | undefined) =>
+    v ? new Date(v).toLocaleDateString("es-ES") : "—";
+
+  const typeLabel =
+    data.type === "INVOICE" ? "FACTURA" :
+    data.type === "QUOTE" ? "PRESUPUESTO" : "NOTA DE CRÉDITO";
+  const typeColor =
+    data.type === "INVOICE" ? "#1d4ed8" :
+    data.type === "QUOTE" ? "#b45309" : "#c2410c";
+
+  // Recompute totals from items when doc doesn't have them (create form)
+  const computedSubtotal = data.items.reduce(
+    (s, i) => s + i.qty * i.unit_price, 0,
+  );
+  const computedTax = data.items.reduce(
+    (s, i) => s + i.qty * i.unit_price * i.tax_rate, 0,
+  );
+  const subtotal = data.subtotal_amount ?? computedSubtotal;
+  const tax = data.tax_amount ?? computedTax;
+  const discount = data.discount_amount ?? 0;
+  const total = data.total_amount ?? subtotal + tax - discount;
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        fontSize: "11px",
+        color: "#18181b",
+        width: "210mm",
+        minHeight: "297mm",
+        margin: "0 auto",
+        padding: "14mm 16mm 14mm 16mm",
+        boxSizing: "border-box",
+        boxShadow: "0 4px 32px rgba(0,0,0,0.13)",
+        position: "relative",
+      }}
+    >
+      {/* ── Top header bar ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `3px solid ${typeColor}`, paddingBottom: "10px", marginBottom: "14px" }}>
+        {/* Company block */}
+        <div style={{ maxWidth: "55%" }}>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: "#18181b", lineHeight: 1.2 }}>
+            {data.company_legal_name || <span style={{ color: "#a1a1aa" }}>Nombre empresa</span>}
+          </div>
+          {data.company_trade_name && (
+            <div style={{ fontSize: "11px", color: "#71717a", marginTop: "2px" }}>{data.company_trade_name}</div>
+          )}
+          {data.company_nif && (
+            <div style={{ fontSize: "10.5px", color: "#52525b", marginTop: "3px" }}>NIF: {data.company_nif}</div>
+          )}
+          {data.company_address && (
+            <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px", whiteSpace: "pre-line" }}>{data.company_address}</div>
+          )}
+        </div>
+
+        {/* Doc type + number block */}
+        <div style={{ textAlign: "right", minWidth: "40%" }}>
+          <div style={{ fontSize: "18px", fontWeight: 800, color: typeColor, letterSpacing: "0.03em" }}>
+            {typeLabel}
+          </div>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: "#3f3f46", marginTop: "3px", fontFamily: "monospace" }}>
+            {data.document_number || <span style={{ color: "#a1a1aa" }}>Número pendiente de asignar</span>}
+          </div>
+          <div style={{ fontSize: "10px", color: "#71717a", marginTop: "4px" }}>
+            <span>Fecha: </span>
+            <span style={{ fontWeight: 600, color: "#18181b" }}>{fmtDate(data.issue_date)}</span>
+          </div>
+          {data.due_date && (
+            <div style={{ fontSize: "10px", color: "#71717a", marginTop: "1px" }}>
+              <span>Vencimiento: </span>
+              <span style={{ fontWeight: 600, color: "#18181b" }}>{fmtDate(data.due_date)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Two-column: Emisor / Cliente ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+        <div style={{ background: "#f4f4f5", borderRadius: "6px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>DATOS DEL EMISOR</div>
+          <div style={{ fontWeight: 700, fontSize: "11px" }}>{data.company_legal_name || "—"}</div>
+          {data.company_nif && <div style={{ fontSize: "10px", color: "#52525b", marginTop: "2px" }}>NIF: {data.company_nif}</div>}
+          {data.company_address && <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>{data.company_address}</div>}
+          {data.company_iban_1 && (
+            <div style={{ fontSize: "9.5px", fontFamily: "monospace", color: "#52525b", marginTop: "5px", background: "#e4e4e7", borderRadius: "4px", padding: "2px 6px" }}>
+              {data.company_iban_1}
+            </div>
+          )}
+          {data.company_iban_2 && (
+            <div style={{ fontSize: "9.5px", fontFamily: "monospace", color: "#52525b", marginTop: "2px", background: "#e4e4e7", borderRadius: "4px", padding: "2px 6px" }}>
+              {data.company_iban_2}
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: "#f4f4f5", borderRadius: "6px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>DATOS DEL CLIENTE</div>
+          <div style={{ fontWeight: 700, fontSize: "11px" }}>{data.customer_name || <span style={{ color: "#a1a1aa" }}>Nombre del cliente</span>}</div>
+          {data.customer_tax_id && <div style={{ fontSize: "10px", color: "#52525b", marginTop: "2px" }}>NIF/CIF: {data.customer_tax_id}</div>}
+          {data.customer_address && <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>{data.customer_address}</div>}
+          {data.customer_email && <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>{data.customer_email}</div>}
+        </div>
+      </div>
+
+      {/* ── Payment method strip ── */}
+      {data.payment_method && (
+        <div style={{ display: "flex", gap: "12px", marginBottom: "14px", fontSize: "10px", color: "#52525b" }}>
+          <span style={{ fontWeight: 600 }}>Forma de pago:</span>
+          <span style={{ color: "#18181b" }}>
+            {data.payment_method === "BANK_TRANSFER" ? "Transferencia bancaria" :
+             data.payment_method === "CASH" ? "Efectivo" :
+             data.payment_method === "COD" ? "Contra reembolso" :
+             data.payment_method}
+          </span>
+        </div>
+      )}
+
+      {/* ── Line items table ── */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "16px", fontSize: "10.5px" }}>
+        <thead>
+          <tr style={{ background: typeColor }}>
+            <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 700, color: "#fff", borderRadius: "3px 0 0 0" }}>Descripción</th>
+            <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "50px" }}>Cant.</th>
+            <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "70px" }}>P. unitario</th>
+            <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "50px" }}>IVA %</th>
+            <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: "#fff", width: "80px", borderRadius: "0 3px 0 0" }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.items.length === 0 && (
+            <tr>
+              <td colSpan={5} style={{ textAlign: "center", padding: "18px 8px", color: "#a1a1aa" }}>Sin líneas</td>
+            </tr>
+          )}
+          {data.items.map((item, idx) => {
+            const lineBase = item.qty * item.unit_price;
+            const lineTotal = item.line_total ?? lineBase + lineBase * item.tax_rate;
+            return (
+              <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                <td style={{ padding: "6px 8px", color: "#18181b" }}>{item.description || <span style={{ color: "#a1a1aa" }}>—</span>}</td>
+                <td style={{ padding: "6px 8px", textAlign: "center", color: "#3f3f46" }}>{item.qty}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", color: "#3f3f46" }}>{fmt(item.unit_price)}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", color: "#71717a" }}>{(item.tax_rate * 100).toFixed(0)}%</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600, color: "#18181b" }}>{fmt(lineTotal)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* ── Totals block ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
+        <div style={{ width: "210px", border: `1px solid ${typeColor}30`, borderRadius: "7px", overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 12px", fontSize: "10.5px", color: "#3f3f46", borderBottom: "1px solid #f0f0f0" }}>
+            <span>Base imponible</span>
+            <span>{fmt(subtotal)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 12px", fontSize: "10.5px", color: "#3f3f46", borderBottom: "1px solid #f0f0f0" }}>
+            <span>IVA</span>
+            <span>{fmt(tax)}</span>
+          </div>
+          {discount > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 12px", fontSize: "10.5px", color: "#dc2626", borderBottom: "1px solid #f0f0f0" }}>
+              <span>Descuento</span>
+              <span>-{fmt(discount)}</span>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 12px", fontSize: "13px", fontWeight: 800, color: "#fff", background: typeColor }}>
+            <span>TOTAL</span>
+            <span>{fmt(total)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Notes ── */}
+      {data.notes && (
+        <div style={{ background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: "6px", padding: "8px 12px", marginBottom: "12px" }}>
+          <div style={{ fontSize: "9px", fontWeight: 700, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>NOTAS</div>
+          <div style={{ fontSize: "10.5px", color: "#3f3f46", lineHeight: 1.5 }}>{data.notes}</div>
+        </div>
+      )}
+
+      {/* ── IBAN footer ── */}
+      {(data.company_iban_1 || data.company_iban_2) && (
+        <div style={{ position: "absolute", bottom: "14mm", left: "16mm", right: "16mm", borderTop: "1px solid #e4e4e7", paddingTop: "6px", fontSize: "9px", color: "#71717a", display: "flex", gap: "16px" }}>
+          {data.company_iban_1 && <span>IBAN: <span style={{ fontFamily: "monospace", color: "#52525b" }}>{data.company_iban_1}</span></span>}
+          {data.company_iban_2 && <span>IBAN: <span style={{ fontFamily: "monospace", color: "#52525b" }}>{data.company_iban_2}</span></span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
@@ -195,6 +447,8 @@ export default function BillingPage() {
     notes: "",
     payment_method: "",
     language: "ES",
+    issue_date: "",
+    due_date: "",
     customer_name: "",
     customer_email: "",
     customer_tax_id: "",
@@ -219,24 +473,148 @@ export default function BillingPage() {
   );
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Templates panel
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<BillingTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState(false);
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<BillingTemplate | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [templateBgUrl, setTemplateBgUrl] = useState("");
+  const [templateConfigJson, setTemplateConfigJson] = useState("{}");
+  const [templateIsDefault, setTemplateIsDefault] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<string | null>(null);
+
   // Action states
   const [issuingId, setIssuingId] = useState<string | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [transitioningId, setTransitioningId] = useState<string | null>(null);
+  const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showCreatePreview, setShowCreatePreview] = useState(false);
 
-  // Escape key to close panels
+  // Per-row product search state for line items autocomplete
+  type ItemSearchState = { query: string; results: Product[]; open: boolean; loading: boolean };
+  const [itemSearches, setItemSearches] = useState<ItemSearchState[]>([
+    { query: "", results: [], open: false, loading: false },
+  ]);
+  const productSearchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  const syncItemSearchCount = useCallback((count: number) => {
+    setItemSearches((prev) => {
+      if (prev.length === count) return prev;
+      if (prev.length < count) {
+        return [...prev, ...Array.from({ length: count - prev.length }, () => ({
+          query: "", results: [], open: false, loading: false,
+        }))];
+      }
+      return prev.slice(0, count);
+    });
+  }, []);
+
+  // Keep itemSearches in sync with createForm.items length
+  useEffect(() => {
+    syncItemSearchCount(createForm.items.length);
+  }, [createForm.items.length, syncItemSearchCount]);
+
+  const handleDescriptionChange = useCallback((idx: number, value: string) => {
+    // Update the form item description as usual
+    setCreateForm((f: CreateFormState) => ({
+      ...f,
+      items: f.items.map((item: CreateItemState, i: number) =>
+        i === idx ? { ...item, description: value } : item,
+      ),
+    }));
+
+    // Update query in search state and trigger debounced search
+    setItemSearches((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], query: value };
+      return next;
+    });
+
+    if (productSearchTimers.current[idx]) {
+      clearTimeout(productSearchTimers.current[idx]);
+    }
+
+    if (value.trim().length < 2) {
+      setItemSearches((prev) => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], results: [], open: false, loading: false };
+        return next;
+      });
+      return;
+    }
+
+    setItemSearches((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], loading: true };
+      return next;
+    });
+
+    productSearchTimers.current[idx] = setTimeout(async () => {
+      try {
+        const res = await fetchProducts(1, 8, value.trim());
+        setItemSearches((prev) => {
+          const next = [...prev];
+          next[idx] = { ...next[idx], results: res.products ?? [], open: (res.products?.length ?? 0) > 0, loading: false };
+          return next;
+        });
+      } catch {
+        setItemSearches((prev) => {
+          const next = [...prev];
+          next[idx] = { ...next[idx], results: [], open: false, loading: false };
+          return next;
+        });
+      }
+    }, 280);
+  }, []);
+
+  const selectProduct = useCallback((idx: number, product: Product) => {
+    const price = product.discount_price ?? product.price ?? 0;
+    setCreateForm((f: CreateFormState) => ({
+      ...f,
+      items: f.items.map((item: CreateItemState, i: number) =>
+        i === idx ? { ...item, description: product.title, unit_price: String(price) } : item,
+      ),
+    }));
+    setItemSearches((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], query: product.title, results: [], open: false, loading: false };
+      return next;
+    });
+  }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (showCreate) { setShowCreate(false); return; }
-      if (editNumberDoc) { setEditNumberDoc(null); return; }
-      if (showSettings) { setShowSettings(false); return; }
-      if (showDetail) { setShowDetail(false); setSelectedDoc(null); return; }
+      if (e.key === "Escape") {
+        if (showTemplateForm) { setShowTemplateForm(false); return; }
+        if (showCreate) { setShowCreate(false); setShowCreatePreview(false); return; }
+        if (editNumberDoc) { setEditNumberDoc(null); return; }
+        if (showSettings) { setShowSettings(false); return; }
+        if (showTemplates) { setShowTemplates(false); return; }
+        if (showDetail) { setShowDetail(false); setSelectedDoc(null); setShowPreview(false); return; }
+      }
+      // 'n' shortcut → new invoice (only when no modal/panel is open and not in a text input)
+      if (
+        e.key === "n" &&
+        !showCreate && !showDetail && !showSettings && !editNumberDoc &&
+        !(document.activeElement instanceof HTMLInputElement) &&
+        !(document.activeElement instanceof HTMLTextAreaElement) &&
+        !(document.activeElement instanceof HTMLSelectElement)
+      ) {
+        openCreateForm("INVOICE");
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showCreate, editNumberDoc, showSettings, showDetail]);
+  }, [showCreate, editNumberDoc, showSettings, showDetail, showTemplates, showTemplateForm]);
 
   // ─── Load documents ────────────────────────────────────────────────────────
 
@@ -295,6 +673,7 @@ export default function BillingPage() {
   const closeDetail = () => {
     setShowDetail(false);
     setSelectedDoc(null);
+    setShowPreview(false);
   };
 
   // ─── Issue document ────────────────────────────────────────────────────────
@@ -393,12 +772,17 @@ export default function BillingPage() {
       notes: "",
       payment_method: "",
       language: "ES",
+      issue_date: new Date().toISOString().split("T")[0],
+      due_date: "",
       customer_name: "",
       customer_email: "",
       customer_tax_id: "",
       customer_address: "",
       items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
+      template_id: templates.find((t) => t.is_default)?.id ?? "",
     });
+    setItemSearches([{ query: "", results: [], open: false, loading: false }]);
+    if (templates.length === 0) loadTemplates();
     setShowCreate(true);
   };
 
@@ -418,10 +802,13 @@ export default function BillingPage() {
         language: createForm.language,
         payment_method: createForm.payment_method || undefined,
         notes: createForm.notes || undefined,
+        issue_date: createForm.issue_date || undefined,
+        due_date: createForm.due_date || undefined,
         customer_name: createForm.customer_name || undefined,
         customer_email: createForm.customer_email || undefined,
         customer_tax_id: createForm.customer_tax_id || undefined,
         customer_address: createForm.customer_address || undefined,
+        template_id: createForm.template_id || undefined,
         items: validItems.map((i: CreateItemState, idx: number) => ({
           description: i.description,
           qty: Number(i.qty) || 1,
@@ -438,6 +825,7 @@ export default function BillingPage() {
           : "Nota de crédito creada",
       );
       setShowCreate(false);
+      setShowCreatePreview(false);
       await loadDocs(1);
     } catch (err: unknown) {
       toast.error(
@@ -501,6 +889,106 @@ export default function BillingPage() {
     }
   };
 
+  // ─── Templates ─────────────────────────────────────────────────────────────
+
+  const loadTemplates = async () => {
+    setTemplatesLoading(true);
+    setTemplatesError(false);
+    try {
+      const data = await fetchBillingTemplates();
+      setTemplates(data);
+    } catch {
+      setTemplatesError(true);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const handleOpenTemplates = () => {
+    setShowTemplates(true);
+    loadTemplates();
+  };
+
+  const openTemplateForm = (template?: BillingTemplate) => {
+    if (template) {
+      setEditingTemplate(template);
+      setTemplateName(template.name);
+      setTemplateBgUrl(template.background_url ?? "");
+      setTemplateConfigJson(
+        template.config_json
+          ? JSON.stringify(template.config_json, null, 2)
+          : "{}",
+      );
+      setTemplateIsDefault(template.is_default);
+    } else {
+      setEditingTemplate(null);
+      setTemplateName("");
+      setTemplateBgUrl("");
+      setTemplateConfigJson("{}");
+      setTemplateIsDefault(false);
+    }
+    setShowTemplateForm(true);
+  };
+
+  const handleSaveTemplate = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    if (!templateName.trim()) {
+      toast.error("El nombre de la plantilla es obligatorio");
+      return;
+    }
+    let parsedConfig: Record<string, unknown> = {};
+    try {
+      parsedConfig = JSON.parse(templateConfigJson || "{}");
+    } catch {
+      toast.error("El JSON de configuración no es válido");
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      if (editingTemplate) {
+        await updateBillingTemplate(editingTemplate.id, {
+          name: templateName.trim(),
+          background_url: templateBgUrl.trim() || undefined,
+          config_json: parsedConfig,
+          is_default: templateIsDefault,
+        });
+        toast.success("Plantilla actualizada");
+      } else {
+        await createBillingTemplate({
+          name: templateName.trim(),
+          background_url: templateBgUrl.trim() || undefined,
+          config_json: parsedConfig,
+          is_default: templateIsDefault,
+        });
+        toast.success("Plantilla creada");
+      }
+      setShowTemplateForm(false);
+      await loadTemplates();
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error guardando plantilla",
+      );
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    setDeletingTemplateId(id);
+    try {
+      await deleteBillingTemplate(id);
+      toast.success("Plantilla eliminada");
+      setConfirmDeleteTemplateId(null);
+      await loadTemplates();
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error eliminando plantilla",
+      );
+    } finally {
+      setDeletingTemplateId(null);
+    }
+  };
+
   // ─── Export ────────────────────────────────────────────────────────────────
 
   const handleExport = async () => {
@@ -515,6 +1003,71 @@ export default function BillingPage() {
       toast.error(
         err instanceof Error ? err.message : "Error exportando documentos",
       );
+    }
+  };
+
+  // ─── PDF download ──────────────────────────────────────────────────────────
+
+  const handleDownloadPdf = async (id: string) => {
+    setDownloadingPdfId(id);
+    try {
+      await downloadBillingDocumentPdf(id);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error descargando PDF");
+    } finally {
+      setDownloadingPdfId(null);
+    }
+  };
+
+  // ─── Send document ─────────────────────────────────────────────────────────
+
+  const handleSendDocument = async (id: string) => {
+    setSendingId(id);
+    try {
+      const result = await sendBillingDocument(id);
+      toast.success(`Documento enviado a ${result.email}`);
+      // Refresh the list so status badge updates (ISSUED → SENT)
+      await loadDocs(page);
+      // Refresh the detail panel to show updated sent_at and status
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error enviando documento");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  // ─── Status transitions ────────────────────────────────────────────────────
+
+  const handleStatusTransition = async (
+    id: string,
+    newStatus: BillingDocumentStatus,
+  ) => {
+    setTransitioningId(id);
+    try {
+      await updateBillingDocument(id, { status: newStatus });
+      toast.success(
+        newStatus === "SENT"
+          ? "Documento marcado como enviado"
+          : newStatus === "PAID"
+            ? "Documento marcado como pagado"
+            : "Documento anulado",
+      );
+      await loadDocs(page);
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error actualizando estado",
+      );
+    } finally {
+      setTransitioningId(null);
+      setConfirmVoidId(null);
     }
   };
 
@@ -616,10 +1169,20 @@ export default function BillingPage() {
           </button>
           <button
             onClick={() => openCreateForm("INVOICE")}
+            title="Nueva factura (atajo: N)"
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Nueva Factura
+            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/15 text-white/70 ml-1">N</kbd>
+          </button>
+          <button
+            onClick={() => openCreateForm("CREDIT_NOTE")}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-orange-200 bg-orange-50 text-sm font-medium text-orange-700 hover:bg-orange-100 transition shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nota de crédito</span>
+            <span className="sm:hidden">Abono</span>
           </button>
           <button
             onClick={handleExport}
@@ -628,6 +1191,14 @@ export default function BillingPage() {
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
+          </button>
+          <button
+            onClick={handleOpenTemplates}
+            title="Gestión de plantillas"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 bg-white text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition shadow-sm"
+          >
+            <Layers className="w-4 h-4" />
+            <span className="hidden sm:inline">Plantillas</span>
           </button>
           <button
             onClick={openSettings}
@@ -640,7 +1211,7 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* ── Stats summary ──────────────────────────────────────────────────── */}
+      {/* ── Stats summary (clickable quick-filters) ────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
@@ -654,18 +1225,64 @@ export default function BillingPage() {
           ))
         ) : (
           [
-            { label: "Total documentos", value: String(total), icon: FileText, color: "text-zinc-500" },
-            { label: "Borradores (pág.)", value: String(draftCount), icon: FileClock, color: "text-zinc-400" },
-            { label: "Emitidas (pág.)", value: String(issuedCount), icon: Send, color: "text-blue-500" },
-            { label: "Cobradas (pág.)", value: String(paidCount), icon: CheckCircle, color: "text-emerald-500" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-zinc-100 hover:border-zinc-200 px-4 py-3 flex items-center gap-3 transition">
-              <Icon className={`w-5 h-5 shrink-0 ${color}`} />
+            {
+              label: "Total documentos",
+              value: String(total),
+              icon: FileText,
+              iconColor: "text-zinc-500",
+              bg: "bg-white",
+              ring: !statusFilter && tab === "ALL" ? "ring-2 ring-zinc-900" : "",
+              action: () => { setStatusFilter(""); setTab("ALL"); loadDocs(1); },
+              hint: "Ver todos",
+            },
+            {
+              label: "Borradores",
+              value: String(draftCount),
+              icon: FileClock,
+              iconColor: "text-zinc-400",
+              bg: statusFilter === "DRAFT" ? "bg-zinc-900" : "bg-white",
+              ring: statusFilter === "DRAFT" ? "" : "",
+              textColor: statusFilter === "DRAFT" ? "text-white" : "text-zinc-900",
+              labelColor: statusFilter === "DRAFT" ? "text-zinc-300" : "text-zinc-400",
+              action: () => { setStatusFilter(statusFilter === "DRAFT" ? "" : "DRAFT"); setPage(1); loadDocs(1); },
+              hint: "Filtrar borradores",
+            },
+            {
+              label: "Emitidas / Enviadas",
+              value: String(issuedCount),
+              icon: Send,
+              iconColor: statusFilter === "ISSUED" ? "text-white" : "text-blue-500",
+              bg: statusFilter === "ISSUED" ? "bg-blue-600" : "bg-white",
+              textColor: statusFilter === "ISSUED" ? "text-white" : "text-zinc-900",
+              labelColor: statusFilter === "ISSUED" ? "text-blue-100" : "text-zinc-400",
+              action: () => { setStatusFilter(statusFilter === "ISSUED" ? "" : "ISSUED"); setPage(1); loadDocs(1); },
+              hint: "Filtrar emitidas",
+            },
+            {
+              label: "Cobradas",
+              value: String(paidCount),
+              icon: CheckCircle,
+              iconColor: statusFilter === "PAID" ? "text-white" : "text-emerald-500",
+              bg: statusFilter === "PAID" ? "bg-emerald-600" : "bg-white",
+              textColor: statusFilter === "PAID" ? "text-white" : "text-zinc-900",
+              labelColor: statusFilter === "PAID" ? "text-emerald-100" : "text-zinc-400",
+              action: () => { setStatusFilter(statusFilter === "PAID" ? "" : "PAID"); setPage(1); loadDocs(1); },
+              hint: "Filtrar cobradas",
+            },
+          ].map(({ label, value, icon: Icon, iconColor, bg, ring = "", textColor = "text-zinc-900", labelColor = "text-zinc-400", action, hint }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={action}
+              title={hint}
+              className={`${bg} ${ring} rounded-xl border border-zinc-100 hover:border-zinc-300 px-4 py-3 flex items-center gap-3 transition cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900`}
+            >
+              <Icon className={`w-5 h-5 shrink-0 ${iconColor}`} />
               <div className="min-w-0">
-                <p className="text-xs text-zinc-400 truncate">{label}</p>
-                <p className="text-xl font-bold text-zinc-900 leading-tight tabular-nums">{value}</p>
+                <p className={`text-xs truncate ${labelColor}`}>{label}</p>
+                <p className={`text-xl font-bold leading-tight tabular-nums ${textColor}`}>{value}</p>
               </div>
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -814,7 +1431,7 @@ export default function BillingPage() {
               </p>
             </div>
             {!statusFilter && !search && !fromDate && !toDate && (
-              <div className="flex gap-2 mt-1">
+              <div className="flex flex-wrap gap-2 mt-1 justify-center">
                 <button
                   onClick={() => openCreateForm("QUOTE")}
                   className="text-sm text-zinc-600 border border-zinc-300 px-3 py-1.5 rounded-lg hover:bg-zinc-50 transition"
@@ -826,6 +1443,12 @@ export default function BillingPage() {
                   className="text-sm text-white bg-zinc-900 px-3 py-1.5 rounded-lg hover:bg-zinc-700 transition"
                 >
                   Nueva factura
+                </button>
+                <button
+                  onClick={() => openCreateForm("CREDIT_NOTE")}
+                  className="text-sm text-orange-700 border border-orange-200 bg-orange-50 px-3 py-1.5 rounded-lg hover:bg-orange-100 transition"
+                >
+                  Nota de crédito
                 </button>
               </div>
             )}
@@ -890,10 +1513,20 @@ export default function BillingPage() {
                           {STATUS_LABELS[doc.status as BillingDocumentStatus]}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-zinc-700 max-w-[160px] truncate text-sm">
-                        {doc.customer_name ?? doc.customer_email ?? (
-                          <span className="text-zinc-400">—</span>
-                        )}
+                      <td className="px-4 py-3 text-zinc-700 max-w-[180px] text-sm">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="truncate">
+                            {doc.customer_name ?? doc.customer_email ?? (
+                              <span className="text-zinc-400">—</span>
+                            )}
+                          </span>
+                          {doc.order_id && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
+                              <ShoppingCart className="w-3 h-3 shrink-0" />
+                              Pedido vinculado
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-zinc-500 text-xs">
                         <span className="flex items-center gap-1">
@@ -1205,15 +1838,37 @@ export default function BillingPage() {
                         <p className="text-xs text-zinc-400">{selectedDoc.customer_address}</p>
                       )}
                     </div>
+
+                    {/* Linked order badge */}
+                    {selectedDoc.order_id && (
+                      <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ShoppingCart className="w-4 h-4 text-indigo-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-indigo-700">Documento generado desde pedido</p>
+                            <p className="text-xs text-indigo-500 font-mono truncate">{selectedDoc.order_id}</p>
+                          </div>
+                        </div>
+                        <Link
+                          href="/orders"
+                          className="inline-flex items-center gap-1 text-xs text-indigo-600 font-medium hover:underline shrink-0"
+                        >
+                          Ver pedidos <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   {/* Dates */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
                       { label: "Emisión", value: formatDate(selectedDoc.issue_date) },
                       { label: "Vencimiento", value: formatDate(selectedDoc.due_date) },
                       { label: "Creado", value: formatDate(selectedDoc.created_at) },
                       { label: "Actualizado", value: formatDate(selectedDoc.updated_at) },
+                      ...(selectedDoc.sent_at
+                        ? [{ label: "Enviado", value: formatDate(selectedDoc.sent_at) }]
+                        : []),
                     ].map(({ label, value }) => (
                       <div key={label} className="rounded-lg bg-zinc-50 border border-zinc-100 p-3">
                         <p className="text-xs text-zinc-400 mb-0.5">{label}</p>
@@ -1328,92 +1983,242 @@ export default function BillingPage() {
               </div>
             ) : null}
 
-            {/* Footer actions */}
+            {/* Footer actions — grouped by intent */}
             {selectedDoc && (
-              <div className="shrink-0 flex flex-wrap gap-2 px-6 py-4 border-t border-zinc-100 bg-white">
-                {selectedDoc.status === "DRAFT" && (
+              <div className="shrink-0 border-t border-zinc-100 bg-white">
+                {/* Primary workflow row */}
+                <div className="flex flex-wrap gap-2 px-6 py-3 border-b border-zinc-50">
+                  {/* Vista previa — always available */}
                   <button
-                    onClick={() => handleIssue(selectedDoc.id)}
-                    disabled={issuingId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
+                    onClick={() => setShowPreview(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition"
                   >
-                    {issuingId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Emitir documento
+                    <Eye className="w-4 h-4" />
+                    Vista previa
                   </button>
-                )}
-                {selectedDoc.type === "QUOTE" && selectedDoc.status !== "VOID" && (
-                  <button
-                    onClick={() => handleConvert(selectedDoc.id)}
-                    disabled={convertingId === selectedDoc.id}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition shadow-sm"
-                  >
-                    {convertingId === selectedDoc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <ArrowRight className="w-4 h-4" />
-                    )}
-                    Convertir a factura
-                  </button>
-                )}
-                {selectedDoc.document_number && (
-                  <button
-                    onClick={() => {
-                      closeDetail();
-                      openEditNumber(selectedDoc);
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Editar número
-                  </button>
-                )}
-                {selectedDoc.pdf_url && (
-                  <a
-                    href={selectedDoc.pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
-                  >
-                    <Download className="w-4 h-4" />
-                    Descargar PDF
-                  </a>
-                )}
-                {(selectedDoc.status === "DRAFT" || selectedDoc.status === "VOID") && (
-                  confirmDeleteId === selectedDoc.id ? (
-                    <div className="flex items-center gap-2 ml-auto">
-                      <span className="text-xs text-zinc-500">¿Eliminar definitivamente?</span>
-                      <button
-                        onClick={() => handleDelete(selectedDoc.id)}
-                        disabled={deletingId === selectedDoc.id}
-                        className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
-                      >
-                        Sí, eliminar
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
+                  {/* PDF download — non-DRAFT */}
+                  {selectedDoc.status !== "DRAFT" && (
                     <button
-                      onClick={() => setConfirmDeleteId(selectedDoc.id)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition ml-auto"
+                      onClick={() => handleDownloadPdf(selectedDoc.id)}
+                      disabled={downloadingPdfId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Eliminar
+                      {downloadingPdfId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      PDF
                     </button>
-                  )
-                )}
+                  )}
+                  {/* Send by email */}
+                  {selectedDoc.status !== "DRAFT" && selectedDoc.status !== "VOID" && selectedDoc.customer_email && (
+                    <button
+                      onClick={() => handleSendDocument(selectedDoc.id)}
+                      disabled={sendingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 disabled:opacity-50 transition"
+                    >
+                      {sendingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Enviar email
+                    </button>
+                  )}
+                  {/* Edit number */}
+                  {selectedDoc.document_number && (
+                    <button
+                      onClick={() => {
+                        closeDetail();
+                        openEditNumber(selectedDoc);
+                      }}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Editar nº
+                    </button>
+                  )}
+                </div>
+
+                {/* Status-action row */}
+                <div className="flex flex-wrap items-center gap-2 px-6 py-3">
+                  {/* Emit draft */}
+                  {selectedDoc.status === "DRAFT" && (
+                    <button
+                      onClick={() => handleIssue(selectedDoc.id)}
+                      disabled={issuingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {issuingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Emitir documento
+                    </button>
+                  )}
+                  {/* Convert quote to invoice */}
+                  {selectedDoc.type === "QUOTE" && selectedDoc.status !== "VOID" && (
+                    <button
+                      onClick={() => handleConvert(selectedDoc.id)}
+                      disabled={convertingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {convertingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4" />
+                      )}
+                      Convertir a factura
+                    </button>
+                  )}
+                  {/* Mark as Sent */}
+                  {selectedDoc.status === "ISSUED" && (
+                    <button
+                      onClick={() => handleStatusTransition(selectedDoc.id, "SENT")}
+                      disabled={transitioningId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {transitioningId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Marcar enviada
+                    </button>
+                  )}
+                  {/* Mark as Paid */}
+                  {(selectedDoc.status === "ISSUED" || selectedDoc.status === "SENT") && (
+                    <button
+                      onClick={() => handleStatusTransition(selectedDoc.id, "PAID")}
+                      disabled={transitioningId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {transitioningId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Marcar cobrada
+                    </button>
+                  )}
+
+                  {/* Spacer pushes destructive actions to the right */}
+                  <div className="flex-1" />
+
+                  {/* Void document */}
+                  {selectedDoc.status !== "VOID" && selectedDoc.status !== "DRAFT" && (
+                    confirmVoidId === selectedDoc.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">¿Anular definitivamente?</span>
+                        <button
+                          onClick={() => handleStatusTransition(selectedDoc.id, "VOID")}
+                          disabled={transitioningId === selectedDoc.id}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Sí, anular
+                        </button>
+                        <button
+                          onClick={() => setConfirmVoidId(null)}
+                          className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmVoidId(selectedDoc.id)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Anular
+                      </button>
+                    )
+                  )}
+                  {/* Delete draft/void */}
+                  {(selectedDoc.status === "DRAFT" || selectedDoc.status === "VOID") && (
+                    confirmDeleteId === selectedDoc.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500">¿Eliminar definitivamente?</span>
+                        <button
+                          onClick={() => handleDelete(selectedDoc.id)}
+                          disabled={deletingId === selectedDoc.id}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Sí, eliminar
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-3 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(selectedDoc.id)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Eliminar
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             )}
           </div>
         </>
+      )}
+
+      {/* ─── Preview overlay ──────────────────────────────────────────────── */}
+      {showPreview && selectedDoc && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-start justify-center py-6 px-4 overflow-y-auto">
+          <div className="w-full" style={{ maxWidth: "230mm" }}>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-white text-sm font-semibold">Vista previa del documento</span>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20 transition"
+              >
+                <X className="w-4 h-4" />
+                Cerrar
+              </button>
+            </div>
+            <BillingPreview data={{
+              type: selectedDoc.type as BillingDocumentType,
+              document_number: selectedDoc.document_number,
+              issue_date: selectedDoc.issue_date,
+              due_date: selectedDoc.due_date,
+              payment_method: selectedDoc.payment_method as BillingPaymentMethod | null,
+              currency: selectedDoc.currency,
+              company_legal_name: selectedDoc.company_legal_name,
+              company_trade_name: selectedDoc.company_trade_name,
+              company_nif: selectedDoc.company_nif,
+              company_address: selectedDoc.company_address,
+              company_iban_1: selectedDoc.company_iban_1,
+              company_iban_2: selectedDoc.company_iban_2,
+              customer_name: selectedDoc.customer_name,
+              customer_tax_id: selectedDoc.customer_tax_id,
+              customer_email: selectedDoc.customer_email,
+              customer_address: selectedDoc.customer_address,
+              subtotal_amount: Number(selectedDoc.subtotal_amount),
+              tax_amount: Number(selectedDoc.tax_amount),
+              discount_amount: Number(selectedDoc.discount_amount),
+              total_amount: Number(selectedDoc.total_amount),
+              notes: selectedDoc.notes,
+              items: (selectedDoc.items ?? []).map((it: BillingDocumentItem) => ({
+                description: it.description,
+                qty: Number(it.qty),
+                unit_price: Number(it.unit_price),
+                tax_rate: Number(it.tax_rate),
+                line_total: Number(it.line_total),
+              })),
+            }} />
+          </div>
+        </div>
       )}
 
       {/* ─── Edit number modal ────────────────────────────────────────────── */}
@@ -1520,16 +2325,68 @@ export default function BillingPage() {
                 </h3>
               </div>
               <button
-                onClick={() => setShowCreate(false)}
+                onClick={() => { setShowCreate(false); setShowCreatePreview(false); }}
                 className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Preview / Form tabs */}
+            <div className="flex gap-1 px-6 pt-3 pb-0 border-b border-zinc-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCreatePreview(false)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-t-lg border-b-2 transition ${!showCreatePreview ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-400 hover:text-zinc-600"}`}
+              >
+                Formulario
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreatePreview(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t-lg border-b-2 transition ${showCreatePreview ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-400 hover:text-zinc-600"}`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Vista previa
+              </button>
+            </div>
+
+            {/* Live preview tab */}
+            {showCreatePreview && (
+              <div className="flex-1 overflow-y-auto bg-zinc-100 p-4">
+                <BillingPreview data={{
+                  type: createType,
+                  document_number: null,
+                  issue_date: createForm.issue_date ? createForm.issue_date : null,
+                  due_date: createForm.due_date || null,
+                  payment_method: createForm.payment_method as BillingPaymentMethod | null || null,
+                  currency: settings?.default_currency ?? "EUR",
+                  company_legal_name: settings?.legal_name ?? null,
+                  company_trade_name: settings?.trade_name ?? null,
+                  company_nif: settings?.nif ?? null,
+                  company_address: settings?.address_real ?? null,
+                  company_iban_1: settings?.iban_caixabank ?? null,
+                  company_iban_2: settings?.iban_bbva ?? null,
+                  customer_name: createForm.customer_name || null,
+                  customer_tax_id: createForm.customer_tax_id || null,
+                  customer_email: createForm.customer_email || null,
+                  customer_address: createForm.customer_address || null,
+                  notes: createForm.notes || null,
+                  items: createForm.items
+                    .filter((i: CreateItemState) => i.description || Number(i.unit_price) > 0)
+                    .map((i: CreateItemState) => ({
+                      description: i.description,
+                      qty: Number(i.qty) || 1,
+                      unit_price: Number(i.unit_price) || 0,
+                      tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
+                    })),
+                }} />
+              </div>
+            )}
+
             <form
               onSubmit={handleCreate}
-              className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
+              className={`flex-1 overflow-y-auto px-6 py-5 space-y-5${showCreatePreview ? " hidden" : ""}`}
             >
               {/* Type + Language */}
               <div className="grid grid-cols-2 gap-4">
@@ -1589,6 +2446,36 @@ export default function BillingPage() {
                     <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                    Fecha de emisión
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.issue_date}
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({ ...f, issue_date: e.target.value }))
+                    }
+                    className="w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                    Fecha de vencimiento <span className="text-zinc-400 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.due_date}
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({ ...f, due_date: e.target.value }))
+                    }
+                    className="w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  />
+                </div>
               </div>
 
               {/* Customer info */}
@@ -1687,19 +2574,70 @@ export default function BillingPage() {
                     const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : 0.21;
                     const lineTax = lineBase * taxRate;
                     const lineTotal = lineBase + lineTax;
+                    const search = itemSearches[idx] ?? { query: "", results: [], open: false, loading: false };
                     return (
                       <div
                         key={idx}
                         className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg bg-zinc-50 border border-zinc-100 hover:border-zinc-200 transition"
                       >
-                        <input
-                          value={item.description}
-                          onChange={(e: InputEv) =>
-                            updateCreateItem(idx, "description", e.target.value)
-                          }
-                          placeholder="Descripción..."
-                          className="col-span-4 border-0 bg-transparent px-1 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
-                        />
+                        {/* Description with product autocomplete */}
+                        <div className="col-span-4 relative">
+                          <input
+                            value={item.description}
+                            onChange={(e: InputEv) => handleDescriptionChange(idx, e.target.value)}
+                            onFocus={() => {
+                              if (search.results.length > 0) {
+                                setItemSearches((prev) => {
+                                  const next = [...prev];
+                                  next[idx] = { ...next[idx], open: true };
+                                  return next;
+                                });
+                              }
+                            }}
+                            onBlur={() => {
+                              // Small delay so click on result fires first
+                              setTimeout(() => {
+                                setItemSearches((prev) => {
+                                  const next = [...prev];
+                                  if (next[idx]) next[idx] = { ...next[idx], open: false };
+                                  return next;
+                                });
+                              }, 150);
+                            }}
+                            placeholder="Descripción o producto..."
+                            className="w-full border-0 bg-transparent px-1 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none"
+                          />
+                          {search.loading && (
+                            <span className="absolute right-1 top-1/2 -translate-y-1/2">
+                              <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin" />
+                            </span>
+                          )}
+                          {search.open && search.results.length > 0 && (
+                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg overflow-hidden">
+                              {search.results.map((product: Product) => {
+                                const price = product.discount_price ?? product.price ?? 0;
+                                return (
+                                  <button
+                                    key={product.id}
+                                    type="button"
+                                    onMouseDown={() => selectProduct(idx, product)}
+                                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-indigo-50 text-left text-xs transition"
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <span className="font-medium text-zinc-800 truncate block">{product.title}</span>
+                                      {product.sku_code && (
+                                        <span className="text-zinc-400 font-mono">{product.sku_code}</span>
+                                      )}
+                                    </div>
+                                    <span className="ml-3 text-indigo-600 font-semibold tabular-nums shrink-0">
+                                      {price.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                         <input
                           value={item.qty}
                           onChange={(e: InputEv) => updateCreateItem(idx, "qty", e.target.value)}
@@ -1788,10 +2726,39 @@ export default function BillingPage() {
                 />
               </div>
 
+              {/* Template selector */}
+              {templates.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                    <label className="text-xs font-semibold text-zinc-600">
+                      Plantilla de diseño
+                    </label>
+                  </div>
+                  <select
+                    value={createForm.template_id ?? ""}
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({
+                        ...f,
+                        template_id: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  >
+                    <option value="">— Sin plantilla —</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.is_default ? " (predeterminada)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-1 border-t border-zinc-100">
                 <button
                   type="button"
-                  onClick={() => setShowCreate(false)}
+                  onClick={() => { setShowCreate(false); setShowCreatePreview(false); }}
                   className="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                 >
                   Cancelar
@@ -1808,6 +2775,282 @@ export default function BillingPage() {
                   ) : (
                     "Crear en borrador"
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Templates modal ───────────────────────────────────────────────── */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl border border-zinc-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-indigo-50 p-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900">Plantillas de facturación</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openTemplateForm()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Nueva plantilla
+                </button>
+                <button
+                  onClick={() => setShowTemplates(false)}
+                  className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {templatesLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-8 h-8 animate-spin text-zinc-300" />
+                </div>
+              ) : templatesError ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <AlertTriangle className="w-8 h-8 text-amber-400" />
+                  <p className="text-sm text-zinc-500">No se pudieron cargar las plantillas</p>
+                  <button
+                    onClick={loadTemplates}
+                    className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <div className="rounded-full bg-zinc-100 p-4">
+                    <Layers className="w-8 h-8 text-zinc-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-700">Sin plantillas</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Crea una plantilla para personalizar el diseño de tus facturas
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openTemplateForm()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Crear primera plantilla
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {templates.map((tpl) => (
+                    <div
+                      key={tpl.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-white transition"
+                    >
+                      {/* Background preview */}
+                      <div className="w-12 h-12 rounded-lg border border-zinc-200 bg-white overflow-hidden shrink-0 flex items-center justify-center">
+                        {tpl.background_url ? (
+                          <img
+                            src={tpl.background_url}
+                            alt={tpl.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="w-5 h-5 text-zinc-300" />
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-zinc-900 truncate">{tpl.name}</p>
+                          {tpl.is_default && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                              <Star className="w-2.5 h-2.5" />
+                              Predeterminada
+                            </span>
+                          )}
+                        </div>
+                        {tpl.background_url && (
+                          <p className="text-xs text-zinc-400 mt-0.5 truncate">{tpl.background_url}</p>
+                        )}
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Creada {new Date(tpl.created_at).toLocaleDateString("es-ES")}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => openTemplateForm(tpl)}
+                          className="p-1.5 rounded-lg hover:bg-zinc-200 text-zinc-500 transition"
+                          title="Editar plantilla"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        {confirmDeleteTemplateId === tpl.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-zinc-500">¿Eliminar?</span>
+                            <button
+                              onClick={() => handleDeleteTemplate(tpl.id)}
+                              disabled={deletingTemplateId === tpl.id}
+                              className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {deletingTemplateId === tpl.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : "Sí"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteTemplateId(null)}
+                              className="px-2 py-1 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteTemplateId(tpl.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-500 transition"
+                            title="Eliminar plantilla"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Template form modal ────────────────────────────────────────────── */}
+      {showTemplateForm && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-zinc-200 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-indigo-50 p-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900">
+                  {editingTemplate ? "Editar plantilla" : "Nueva plantilla"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowTemplateForm(false)}
+                className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveTemplate}
+              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+            >
+              {/* Name */}
+              <div>
+                <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                  Nombre <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={templateName}
+                  onChange={(e: InputEv) => setTemplateName(e.target.value)}
+                  required
+                  placeholder="Ej: Plantilla estándar"
+                  className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+
+              {/* Background URL */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-zinc-400" />
+                  <label className="text-xs font-semibold text-zinc-600">
+                    URL de fondo <span className="text-zinc-400 font-normal">(opcional)</span>
+                  </label>
+                </div>
+                <input
+                  value={templateBgUrl}
+                  onChange={(e: InputEv) => setTemplateBgUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/background.png"
+                  className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+                {templateBgUrl && (
+                  <div className="mt-2 w-full h-24 rounded-lg border border-zinc-200 overflow-hidden bg-zinc-100">
+                    <img
+                      src={templateBgUrl}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Config JSON */}
+              <div>
+                <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                  Configuración JSON <span className="text-zinc-400 font-normal">(opcional)</span>
+                </label>
+                <textarea
+                  value={templateConfigJson}
+                  onChange={(e: InputEv) => setTemplateConfigJson(e.target.value)}
+                  rows={5}
+                  className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  placeholder="{}"
+                  spellCheck={false}
+                />
+                <p className="text-xs text-zinc-400 mt-1">
+                  Objeto JSON con opciones de personalización de la plantilla
+                </p>
+              </div>
+
+              {/* Is Default */}
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition">
+                <input
+                  type="checkbox"
+                  checked={templateIsDefault}
+                  onChange={(e) => setTemplateIsDefault(e.target.checked)}
+                  className="w-4 h-4 rounded accent-zinc-900"
+                />
+                <div>
+                  <p className="text-sm font-medium text-zinc-800">Establecer como predeterminada</p>
+                  <p className="text-xs text-zinc-400">
+                    Se aplicará automáticamente al crear nuevos documentos
+                  </p>
+                </div>
+                <Star className={`w-4 h-4 ml-auto ${templateIsDefault ? "text-amber-500" : "text-zinc-300"}`} />
+              </label>
+
+              <div className="flex justify-end gap-2 pt-1 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateForm(false)}
+                  className="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTemplate}
+                  className="px-5 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 transition shadow-sm"
+                >
+                  {savingTemplate ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Guardando...
+                    </span>
+                  ) : editingTemplate ? "Guardar cambios" : "Crear plantilla"}
                 </button>
               </div>
             </form>

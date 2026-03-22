@@ -334,4 +334,79 @@ export class BillingController {
       message: 'Order marked as delivered and draft invoice created',
     };
   }
+
+  // ─── Order billing documents ──────────────────────────────────────────────
+
+  @Get('orders/:orderId/documents')
+  async getDocumentsByOrderId(@Param('orderId') orderId: string) {
+    const data = await this.billingService.getDocumentsByOrderId(orderId);
+    return { success: true, data };
+  }
+
+  @Post('orders/:orderId/create-document')
+  async createDocumentFromOrder(
+    @Param('orderId') orderId: string,
+    @Req() req: Request,
+  ) {
+    const actor = req.user as any;
+    const result = await this.billingService.createDocumentFromOrder(orderId);
+    if (result.created) {
+      await this.auditLogService.logAction({
+        actor,
+        action: 'BILLING_DOCUMENT_CREATED',
+        resource: 'BILLING_DOCUMENT',
+        resourceId: result.billing_document.id,
+        method: req.method,
+        path: req.originalUrl,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent') || undefined,
+        requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
+        metadata: { order_id: orderId, type: 'INVOICE', source: 'from_order' },
+      });
+    }
+    return {
+      success: true,
+      data: result,
+      message: result.created
+        ? 'Factura en borrador creada desde pedido'
+        : 'Ya existe una factura para este pedido',
+    };
+  }
+
+  // ─── PDF & Send ───────────────────────────────────────────────────────────
+
+  @Get('documents/:id/pdf')
+  async downloadPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.billingService.generateDocumentPdf(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="document-${id}.pdf"`,
+    );
+    res.send(pdfBuffer);
+  }
+
+  @Post('documents/:id/send')
+  async sendDocument(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const data = await this.billingService.sendDocument(id);
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'BILLING_DOCUMENT_SENT',
+      resource: 'BILLING_DOCUMENT',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
+      metadata: { email: data.email },
+    });
+    return { success: true, data, message: `Documento enviado a ${data.email}` };
+  }
 }

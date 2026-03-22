@@ -37,10 +37,64 @@ type CategoryTaxonomyGroup = {
   keywords: readonly string[];
 };
 
+type CategoryTaxonomyGroupOverrideRule = {
+  groupKey: string;
+  anyOf: readonly string[];
+  noneOf?: readonly string[];
+};
+
 type CategoryLevel2Input = Pick<CategoryTaxonomyRow, 'name' | 'slug'> & {
   familyName?: string | null;
   subfamilyName?: string | null;
 };
+
+const SOFTWARE_BUSINESS_KEYWORDS = [
+  'erp',
+  'crm',
+  'facturacion',
+  'facturación',
+  'tpv',
+  'punto de venta',
+  'contabilidad',
+  'nomina',
+  'nómina',
+  'software gestion',
+  'software gestión',
+] as const;
+
+const GAMING_SECURITY_KEYWORDS = [
+  'videovigilancia',
+  'cctv',
+  'camara ip',
+  'cámara ip',
+  'camara inalambrica',
+  'cámara inalámbrica',
+  'camara seguridad',
+  'cámara seguridad',
+  'camara wifi',
+  'cámara wifi',
+  'camara exterior',
+  'cámara exterior',
+  'nvr',
+  'dvr',
+  'videoportero',
+  'kit videovigilancia',
+] as const;
+
+const ACCESSORY_ORGANIZATION_KEYWORDS = [
+  'candado portatil',
+  'candado portátil',
+  'cable lock',
+  'filtro privacidad',
+  'privacidad pantalla',
+  'organizador cables',
+  'bridas',
+  'bridas velcro',
+  'filtro de privacidad',
+  'anclaje seguridad',
+  'anclaje antirrobo',
+  'soporte antirrobo',
+] as const;
 
 const CATEGORY_TAXONOMY_GROUPS: Readonly<
   Record<string, readonly CategoryTaxonomyGroup[]>
@@ -56,7 +110,16 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'sobremesa-workstations',
       label: 'Sobremesa y workstations',
       sortOrder: 20,
-      keywords: ['sobremesa', 'desktop', 'torre', 'workstation', 'all in one'],
+      keywords: [
+        'sobremesa',
+        'desktop',
+        'torre',
+        'workstation',
+        'all in one',
+        'todo en uno',
+        'semitorre',
+        'miditorre',
+      ],
     },
     {
       key: 'mini-pc-barebones',
@@ -136,7 +199,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'monitores-pantallas',
       label: 'Monitores y pantallas',
       sortOrder: 10,
-      keywords: ['monitor', 'pantalla', 'display'],
+      keywords: ['monitor', 'pantalla', 'display', 'tft', 'tactil', 'táctil'],
     },
     {
       key: 'teclados-ratones',
@@ -174,7 +237,16 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'docks-creacion-accesorios',
       label: 'Docks, creación y accesorios',
       sortOrder: 40,
-      keywords: ['dock', 'hub', 'stylus', 'pen tablet', 'grabadora'],
+      keywords: [
+        'dock',
+        'docking station',
+        'dock usb c',
+        'replicador puertos',
+        'hub',
+        'stylus',
+        'pen tablet',
+        'grabadora',
+      ],
     },
   ],
   'impresion-escaneado': [
@@ -211,8 +283,15 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'drum',
         'fusor',
         'fuser',
+        'fotoconductor',
         'rollo',
+        'rollo termico',
+        'rollo térmico',
         'cinta termica',
+        'cinta resina',
+        'ribbon',
+        'etiqueta termica',
+        'etiqueta térmica',
         'papel',
       ],
     },
@@ -230,6 +309,9 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'repetidor',
         'access point',
         'punto de acceso',
+        'puntos de acceso',
+        'red inalambrica',
+        'servidor torre',
       ],
     },
     {
@@ -262,8 +344,12 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'pdu',
         'cableado',
         'patch panel',
+        'panel de parcheo',
+        'latiguillo',
+        'armario rack',
         'fibra optica',
         'transceiver',
+        'sfp',
       ],
     },
   ],
@@ -272,13 +358,13 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'smartphones-telefonia',
       label: 'Smartphones y telefonía',
       sortOrder: 10,
-      keywords: ['smartphone', 'telefono', 'mifi'],
+      keywords: ['smartphone', 'telefono', 'telefono movil', 'mifi'],
     },
     {
       key: 'tablets-wearables',
       label: 'Tablets y wearables',
       sortOrder: 20,
-      keywords: ['tablet', 'smartwatch', 'wearable'],
+      keywords: ['tablet', 'smartwatch', 'wearable', 'ebook', 'ereader'],
     },
     {
       key: 'movilidad-profesional-gps-rf',
@@ -290,6 +376,10 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'rfid',
         'terminal movil',
         'terminal portatil',
+        'handheld',
+        'terminal tactil',
+        'lector codigo',
+        'barcode',
         'lector de codigo',
         'lector codigo',
         'gps',
@@ -304,6 +394,9 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'cargador movil',
         'protector pantalla',
         'accesorio movil',
+        'power bank',
+        'bateria externa',
+        'soporte movil',
       ],
     },
   ],
@@ -316,10 +409,13 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'television',
         'televisión',
         'tv',
+        'led',
+        'mini led',
         'oled',
         'qled',
         'google tv',
         'android tv',
+        'smart tv',
       ],
     },
     {
@@ -360,6 +456,10 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'tdt',
         'soporte tv',
         'pantalla proyeccion',
+        'radio despertador',
+        'reproductor tv',
+        'via satelite',
+        'sintonizador radio',
       ],
     },
   ],
@@ -376,6 +476,8 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'licencia',
         'saas',
         'cloud',
+        'software ofimatica',
+        'software ofimática',
       ],
     },
     {
@@ -383,14 +485,8 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       label: 'Gestión, facturación y TPV',
       sortOrder: 15,
       keywords: [
-        'erp',
-        'facturacion',
-        'facturación',
-        'tpv',
-        'punto de venta',
-        'contabilidad',
-        'nomina',
-        'nómina',
+
+        ...SOFTWARE_BUSINESS_KEYWORDS,
       ],
     },
     {
@@ -461,7 +557,12 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'seguridad-control-acceso',
       label: 'Seguridad y control de acceso',
       sortOrder: 30,
-      keywords: ['videovigilancia', 'cctv', 'alarma', 'control de acceso'],
+      keywords: [
+
+        ...GAMING_SECURITY_KEYWORDS,
+        'alarma',
+        'control de acceso',
+      ],
     },
   ],
   'accesorios-consumibles': [
@@ -469,19 +570,43 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'cables-adaptadores',
       label: 'Cables y adaptadores',
       sortOrder: 10,
-      keywords: ['cable', 'adaptador', 'hub'],
+      keywords: [
+        'cable',
+        'adaptador',
+        'hub',
+        'hdmi',
+        'displayport',
+        'usb c',
+        'usb-c',
+        'vga',
+        'dvi',
+        'jack',
+      ],
     },
     {
       key: 'energia-carga',
       label: 'Energía y carga',
       sortOrder: 20,
-      keywords: ['cargador', 'regleta', 'alargador'],
+      keywords: ['cargador', 'cargador universal', 'regleta', 'alargador', 'power strip', 'base multiple', 'base múltiple', 'base enchufes'],
     },
     {
       key: 'fundas-transporte',
       label: 'Fundas y transporte',
       sortOrder: 30,
-      keywords: ['bolsa', 'mochila', 'maletin', 'funda'],
+      keywords: [
+        'bolsa',
+        'mochila',
+        'mochila portatil',
+        'mochila portátil',
+        'maletin',
+        'maletin trolley',
+        'maletín trolley',
+        'funda',
+        'funda portátil',
+        'sleeve',
+        'bandolera',
+        'trolley',
+      ],
     },
     {
       key: 'soportes-ergonomia',
@@ -491,15 +616,45 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'soporte',
         'brazo monitor',
         'elevador',
+        'elevador portatil',
+        'elevador portátil',
+        'soporte portatil',
+        'soporte portátil',
+        'reposamunecas',
+        'reposamuñecas',
+        'alfombrilla',
+        'alfombrilla ergonomica',
+        'alfombrilla ergonómica',
         'reposapie',
         'ergonomia',
+      ],
+    },
+    {
+      key: 'seguridad-organizacion',
+      label: 'Seguridad y organización',
+      sortOrder: 37,
+      keywords: [
+
+        ...ACCESSORY_ORGANIZATION_KEYWORDS,
       ],
     },
     {
       key: 'pilas-baterias',
       label: 'Pilas y baterías',
       sortOrder: 40,
-      keywords: ['pila', 'bateria'],
+      keywords: [
+        'pila',
+        'bateria',
+        'pila boton',
+        'pila botón',
+        'bateria recargable',
+        'batería recargable',
+        'pilas aa',
+        'pilas aaa',
+        'cr2032',
+        'aa',
+        'aaa',
+      ],
     },
     {
       key: 'limpieza-mantenimiento',
@@ -509,8 +664,107 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'limpieza',
         'aire comprimido',
         'spray',
+        'spray limpieza',
         'toallita',
+        'toallitas',
+        'kit limpieza',
+        'limpiador pantalla',
+        'gel limpieza',
         'mantenimiento',
+      ],
+    },
+  ],
+};
+
+const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
+  Record<string, readonly CategoryTaxonomyGroupOverrideRule[]>
+> = {
+  'impresion-escaneado': [
+    {
+      groupKey: 'consumibles-impresion',
+      anyOf: [
+        'ribbon',
+        'etiqueta termica',
+        'etiqueta térmica',
+        'rollo termico',
+        'rollo térmico',
+        'cinta resina',
+      ],
+    },
+  ],
+  'software-seguridad': [
+    {
+      groupKey: 'gestion-facturacion-pdv',
+      anyOf: [
+
+        ...SOFTWARE_BUSINESS_KEYWORDS,
+      ],
+    },
+  ],
+  'telefonia-movilidad': [
+    {
+      groupKey: 'movilidad-profesional-gps-rf',
+      anyOf: [
+        'rfid',
+        'terminal movil',
+        'terminal portatil',
+        'handheld',
+        'terminal tactil',
+        'lector codigo',
+        'barcode',
+        'pda',
+        'gps',
+      ],
+    },
+    {
+      groupKey: 'accesorios-movilidad',
+      anyOf: [
+        'power bank',
+        'bateria externa',
+        'cargador movil',
+        'protector pantalla',
+        'soporte movil',
+      ],
+    },
+    {
+      groupKey: 'tablets-wearables',
+      anyOf: ['smartwatch', 'wearable', 'ebook', 'ereader', 'tablet'],
+      noneOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+    },
+    {
+      groupKey: 'smartphones-telefonia',
+      anyOf: ['smartphone', 'telefono movil', 'telefono', 'movil', 'mifi'],
+      noneOf: ['terminal movil', 'terminal portatil'],
+    },
+  ],
+  'gaming-smart-home': [
+    {
+      groupKey: 'mobiliario-gaming-simracing',
+      anyOf: [
+        'silla gaming',
+        'escritorio gaming',
+        'simracing',
+        'volante',
+        'cockpit',
+        'soporte volante',
+      ],
+    },
+    {
+      groupKey: 'seguridad-control-acceso',
+      anyOf: [
+
+        ...GAMING_SECURITY_KEYWORDS,
+        'control de acceso',
+        'alarma',
+      ],
+    },
+  ],
+  'accesorios-consumibles': [
+    {
+      groupKey: 'seguridad-organizacion',
+      anyOf: [
+
+        ...ACCESSORY_ORGANIZATION_KEYWORDS,
       ],
     },
   ],
@@ -544,6 +798,20 @@ function scoreGroupMatch(
   }, 0);
 }
 
+function matchesGroupOverrideRule(
+  text: string,
+  rule: CategoryTaxonomyGroupOverrideRule,
+): boolean {
+  const hasPositive = rule.anyOf.some((keyword) =>
+    text.includes(normalizeTaxonomyText(keyword)),
+  );
+  if (!hasPositive) return false;
+
+  return !(rule.noneOf ?? []).some((keyword) =>
+    text.includes(normalizeTaxonomyText(keyword)),
+  );
+}
+
 function resolveCategoryTaxonomyGroup(
   grandparentSlug: string,
   row: CategoryLevel2Input,
@@ -553,6 +821,19 @@ function resolveCategoryTaxonomyGroup(
   const detailText = normalizeTaxonomyText(
     `${row.subfamilyName ?? ''} ${row.name} ${row.slug.replace(/-/g, ' ')}`,
   );
+  const combinedText = normalizeTaxonomyText(
+    `${row.familyName ?? ''} ${row.subfamilyName ?? ''} ${row.name} ${row.slug.replace(/-/g, ' ')}`,
+  );
+
+  const override = (
+    CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES[grandparentSlug] ?? []
+  ).find((rule) => matchesGroupOverrideRule(combinedText, rule));
+  if (override) {
+    const overrideGroup = groups.find(
+      (group) => group.key === override.groupKey,
+    );
+    if (overrideGroup) return overrideGroup;
+  }
 
   const bestMatch = groups
     .map((group) => ({
@@ -690,9 +971,49 @@ export function normalizeCategoryTaxonomyRows(
 
   const normalizedById = new Map(normalizedRows.map((row) => [row.id, row]));
 
+  const resolveCanonicalAncestorSlug = (row: CategoryTaxonomyRow) => {
+    if (!row.parent_id) return null;
+    const directParent = normalizedById.get(row.parent_id);
+    if (!directParent) return null;
+
+    const directCanonical = resolveCanonicalParentSlug(directParent.slug);
+    if (directCanonical) return directCanonical;
+
+    if (!directParent.parent_id) return null;
+    const grandparent = normalizedById.get(directParent.parent_id);
+    return grandparent?.slug
+      ? resolveCanonicalParentSlug(grandparent.slug)
+      : null;
+  };
+
   for (const row of normalizedRows) {
     const canonicalSlug = resolveCanonicalParentSlug(row.slug);
     if (canonicalSlug) continue;
+
+    const currentCanonicalSlug = resolveCanonicalAncestorSlug(row);
+    if (!currentCanonicalSlug) continue;
+
+    const recommendedParent = recommendParentCategory(
+      row.name,
+      `${row.name} ${row.slug.replace(/-/g, ' ')}`,
+    );
+    const recommendedCanonicalSlug =
+      resolveCanonicalParentSlug(recommendedParent.key) ?? null;
+
+    if (
+      recommendedCanonicalSlug &&
+      recommendedCanonicalSlug !== currentCanonicalSlug
+    ) {
+      const currentLevel2 = buildCategoryLevel2Descriptor(
+        currentCanonicalSlug,
+        row,
+      );
+      if (currentLevel2.key === 'otras-categorias') {
+        row.parent_id =
+          parentIdByCanonicalSlug.get(recommendedCanonicalSlug) ??
+          row.parent_id;
+      }
+    }
 
     if (!row.parent_id) continue;
     const parent = normalizedById.get(row.parent_id);

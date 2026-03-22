@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
+import { canNavigateCategoryDirectly } from "../lib/category-navigation";
 import { CategoryTreeNode } from "../lib/products";
 import { getCategoryIcon } from "../lib/category-icons";
 
@@ -9,9 +10,15 @@ type Props = {
   open: boolean;
   tree: CategoryTreeNode[];
   onNavigate: (slug: string) => void;
+  onBrowseAllProducts?: () => void;
 };
 
-export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
+export function CategoryMegaMenu({
+  open,
+  tree,
+  onNavigate,
+  onBrowseAllProducts,
+}: Props) {
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [activeChildId, setActiveChildId] = useState<string | null>(null);
 
@@ -21,7 +28,9 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
   );
 
   const activeParent = useMemo(
-    () => tree.find((item) => item.id === activeParentId) ?? firstParentWithChildren,
+    () =>
+      tree.find((item) => item.id === activeParentId) ??
+      firstParentWithChildren,
     [tree, activeParentId, firstParentWithChildren],
   );
 
@@ -37,14 +46,25 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
     [activeChild],
   );
 
+  const activeParentCanNavigate = activeParent
+    ? canNavigateCategoryDirectly(activeParent)
+    : false;
+  const subcategoryHeading = activeParent?.name ?? "Subcategorías";
+  const lowerLevelsHeading =
+    activeChild?.name ?? activeParent?.name ?? "Niveles inferiores";
+
   if (!open) return null;
 
   return (
     <div className="absolute left-0 top-full z-50 mt-2 grid h-[72vh] max-h-[640px] w-[1140px] grid-cols-[280px_330px_1fr] gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
       <aside className="overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2">
-        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Categorías padre
-        </p>
+        <button
+          type="button"
+          onClick={() => onBrowseAllProducts?.()}
+          className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 transition-colors hover:text-[#0B123A]"
+        >
+          TODOS TUS PRODUCTOS
+        </button>
         <div className="space-y-1">
           {tree.map((parent) => {
             const isActive = activeParent?.id === parent.id;
@@ -56,7 +76,7 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
                   setActiveParentId(parent.id);
                   setActiveChildId(null);
                 }}
-                onClick={() => onNavigate(parent.slug)}
+                onClick={() => setActiveParentId(parent.id)}
                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                   isActive
                     ? "bg-[#0B123A] text-white shadow-sm"
@@ -64,12 +84,16 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  {ParentIcon && <ParentIcon className="h-4 w-4 flex-shrink-0" />}
+                  {ParentIcon && (
+                    <ParentIcon className="h-4 w-4 flex-shrink-0" />
+                  )}
                   <span className="font-medium">{parent.name}</span>
                 </span>
                 <span className="flex items-center gap-1">
                   {parent.children.length > 0 && (
-                    <span className="text-xs opacity-60">({parent.children.length})</span>
+                    <span className="text-xs opacity-60">
+                      ({parent.children.length})
+                    </span>
                   )}
                   <ChevronRight className="h-4 w-4" />
                 </span>
@@ -83,15 +107,26 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
         {activeParent ? (
           <>
             <button
-              onClick={() => onNavigate(activeParent.slug)}
-              className="mb-3 flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+              onClick={() =>
+                activeParentCanNavigate && onNavigate(activeParent.slug)
+              }
+              disabled={!activeParentCanNavigate}
+              className={`mb-3 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                activeParentCanNavigate
+                  ? "border-slate-200 text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                  : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+              }`}
             >
-              <span>Ver todo en {activeParent.name}</span>
+              <span>
+                {activeParentCanNavigate
+                  ? `Ver todo en ${activeParent.name}`
+                  : `${activeParent.name} · Próximamente`}
+              </span>
               <ChevronRight className="h-4 w-4" />
             </button>
 
             <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Subcategorías
+              {subcategoryHeading}
             </p>
 
             <div className="space-y-1">
@@ -126,7 +161,9 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Selección activa
                 </p>
-                <p className="text-base font-semibold text-slate-900">{activeChild.name}</p>
+                <p className="text-base font-semibold text-slate-900">
+                  {activeChild.name}
+                </p>
               </div>
               <Sparkles className="h-4 w-4 text-[#0B123A]" />
             </div>
@@ -139,7 +176,7 @@ export function CategoryMegaMenu({ open, tree, onNavigate }: Props) {
             </button>
 
             <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Categorías destacadas
+              {lowerLevelsHeading}
             </p>
 
             <div className="grid grid-cols-2 gap-2">

@@ -17,7 +17,7 @@ export function Pagination({
     const pages = [];
     const half = Math.floor(maxVisiblePages / 2);
     let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisiblePages - 1);
+    const end = Math.min(totalPages, start + maxVisiblePages - 1);
 
     if (end - start + 1 < maxVisiblePages) {
       start = Math.max(1, end - maxVisiblePages + 1);
@@ -59,7 +59,9 @@ export function Pagination({
 
         {totalPages > maxVisiblePages && currentPage < totalPages - 2 && (
           <>
-            <span className="flex h-10 w-10 items-center justify-center text-slate-400">…</span>
+            <span className="flex h-10 w-10 items-center justify-center text-slate-400">
+              …
+            </span>
             <button
               onClick={() => onPageChange(totalPages)}
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"

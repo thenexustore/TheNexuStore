@@ -656,6 +656,12 @@ export default function BillingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, statusFilter]);
 
+  // Pre-load templates once on mount so openCreateForm can auto-select the default
+  useEffect(() => {
+    loadTemplates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Open detail ──────────────────────────────────────────────────────────
 
   const openDetail = async (id: string) => {
@@ -881,7 +887,9 @@ export default function BillingPage() {
     e.preventDefault();
     setSavingSettings(true);
     try {
-      await updateBillingSettings(settingsForm);
+      const updated = await updateBillingSettings(settingsForm);
+      // Refresh settings state so the create-form live preview uses up-to-date company data
+      setSettings(updated);
       toast.success("Ajustes guardados");
       setShowSettings(false);
     } catch (err: unknown) {
@@ -989,7 +997,8 @@ export default function BillingPage() {
       if (editingTemplate) {
         await updateBillingTemplate(editingTemplate.id, {
           name: templateName.trim(),
-          background_url: templateBgUrl.trim() || undefined,
+          // Send null explicitly to clear an existing background_url (undefined would be ignored by the API)
+          background_url: templateBgUrl.trim() || null,
           config_json: parsedConfig,
           is_default: templateIsDefault,
         });
@@ -1273,7 +1282,7 @@ export default function BillingPage() {
               iconColor: "text-zinc-500",
               bg: "bg-white",
               ring: !statusFilter && tab === "ALL" ? "ring-2 ring-zinc-900" : "",
-              action: () => { setStatusFilter(""); setTab("ALL"); loadDocs(1); },
+              action: () => { setStatusFilter(""); setTab("ALL"); },
               hint: "Ver todos",
             },
             {
@@ -1285,7 +1294,7 @@ export default function BillingPage() {
               ring: statusFilter === "DRAFT" ? "" : "",
               textColor: statusFilter === "DRAFT" ? "text-white" : "text-zinc-900",
               labelColor: statusFilter === "DRAFT" ? "text-zinc-300" : "text-zinc-400",
-              action: () => { setStatusFilter(statusFilter === "DRAFT" ? "" : "DRAFT"); setPage(1); loadDocs(1); },
+              action: () => { setStatusFilter(statusFilter === "DRAFT" ? "" : "DRAFT"); setPage(1); },
               hint: "Filtrar borradores",
             },
             {
@@ -1296,7 +1305,7 @@ export default function BillingPage() {
               bg: statusFilter === "ISSUED" ? "bg-blue-600" : "bg-white",
               textColor: statusFilter === "ISSUED" ? "text-white" : "text-zinc-900",
               labelColor: statusFilter === "ISSUED" ? "text-blue-100" : "text-zinc-400",
-              action: () => { setStatusFilter(statusFilter === "ISSUED" ? "" : "ISSUED"); setPage(1); loadDocs(1); },
+              action: () => { setStatusFilter(statusFilter === "ISSUED" ? "" : "ISSUED"); setPage(1); },
               hint: "Filtrar emitidas",
             },
             {
@@ -1307,7 +1316,7 @@ export default function BillingPage() {
               bg: statusFilter === "PAID" ? "bg-emerald-600" : "bg-white",
               textColor: statusFilter === "PAID" ? "text-white" : "text-zinc-900",
               labelColor: statusFilter === "PAID" ? "text-emerald-100" : "text-zinc-400",
-              action: () => { setStatusFilter(statusFilter === "PAID" ? "" : "PAID"); setPage(1); loadDocs(1); },
+              action: () => { setStatusFilter(statusFilter === "PAID" ? "" : "PAID"); setPage(1); },
               hint: "Filtrar cobradas",
             },
           ].map(({ label, value, icon: Icon, iconColor, bg, ring = "", textColor = "text-zinc-900", labelColor = "text-zinc-400", action, hint }) => (

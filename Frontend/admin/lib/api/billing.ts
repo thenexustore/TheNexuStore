@@ -280,7 +280,7 @@ export async function updateBillingTemplate(
   id: string,
   input: Partial<{
     name: string;
-    background_url: string;
+    background_url: string | null;
     config_json: Record<string, unknown>;
     is_default: boolean;
   }>,

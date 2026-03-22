@@ -309,7 +309,7 @@ export class BillingController {
         err instanceof Error ? err.message : 'Error al guardar la imagen',
       );
     }
-    return { success: true, url };
+    return { success: true, data: { url } };
   }
 
   // ─── Export ───────────────────────────────────────────────────────────────

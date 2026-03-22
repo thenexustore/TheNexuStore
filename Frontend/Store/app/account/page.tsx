@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { getMe, updateProfile } from "../lib/auth";
+import { getOrders, downloadInvoicePdf, Order } from "../lib/checkout";
 import { useAuth } from "../providers/AuthProvider";
 
 export default function AccountPage() {
@@ -12,6 +13,10 @@ export default function AccountPage() {
   const [edit, setEdit] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
 
   const [profile, setProfile] = useState({
     first_name: "",
@@ -68,8 +73,25 @@ export default function AccountPage() {
           is_default: res.address.is_default || false,
         });
       }
+      // Load customer orders
+      setOrdersLoading(true);
+      getOrders()
+        .then((data) => setOrders(data ?? []))
+        .catch(() => setOrders([]))
+        .finally(() => setOrdersLoading(false));
     });
   }, [router]);
+
+  const handleDownloadInvoice = async (docId: string) => {
+    setDownloadingDoc(docId);
+    try {
+      await downloadInvoicePdf(docId);
+    } catch {
+      // silently ignore — browser will show native error if any
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
 
   const handleSave = async () => {
     if (loading) return;
@@ -83,7 +105,7 @@ export default function AccountPage() {
     };
 
     if (!normalizedProfile.first_name || !normalizedProfile.last_name) {
-      setError("First and last name are required");
+      setError("El nombre y apellido son obligatorios");
       return;
     }
 
@@ -120,7 +142,7 @@ export default function AccountPage() {
       ];
 
       if (requiredAddressFields.some((value) => value.length === 0)) {
-        setError("Complete address line 1, city, postal code, region, and country");
+        setError("Completa dirección, ciudad, código postal, región y país");
         return;
       }
     }
@@ -137,10 +159,35 @@ export default function AccountPage() {
       await refreshUser();
       setEdit(false);
     } catch (err: any) {
-      setError(err?.message || "Failed to update profile");
+      setError(err?.message || "Error al guardar el perfil");
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: currency || "EUR",
+    }).format(amount);
+  };
+
+  const statusLabels: Record<string, string> = {
+    PENDING: "Pendiente",
+    CONFIRMED: "Confirmado",
+    PROCESSING: "En proceso",
+    SHIPPED: "Enviado",
+    DELIVERED: "Entregado",
+    CANCELLED: "Cancelado",
   };
 
   if (!user) return null;
@@ -151,8 +198,8 @@ export default function AccountPage() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b pb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
-            <p className="text-slate-500 text-sm mt-1">Manage your profile and shipping information.</p>
+            <h1 className="text-3xl font-bold tracking-tight">Mi cuenta</h1>
+            <p className="text-slate-500 text-sm mt-1">Gestiona tu perfil e información de envío.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {!edit ? (
@@ -160,7 +207,7 @@ export default function AccountPage() {
                 onClick={() => setEdit(true)}
                 className="btn btn-primary"
               >
-                Edit Profile
+                Editar perfil
               </button>
             ) : (
               <>
@@ -168,14 +215,14 @@ export default function AccountPage() {
                   onClick={() => setEdit(false)}
                   className="btn btn-outline"
                 >
-                  Cancel
+                  Cancelar
                 </button>
                 <button
                   disabled={loading}
                   onClick={handleSave}
                   className="btn btn-primary"
                 >
-                  {loading ? "Saving..." : "Save Changes"}
+                  {loading ? "Guardando..." : "Guardar cambios"}
                 </button>
               </>
             )}
@@ -183,7 +230,7 @@ export default function AccountPage() {
               onClick={() => logout().then(() => router.push("/login"))}
               className="btn btn-danger"
             >
-              Logout
+              Cerrar sesión
             </button>
           </div>
         </div>
@@ -220,11 +267,11 @@ export default function AccountPage() {
           <div className="lg:col-span-2 space-y-6">
             <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b bg-gray-50/50">
-                <h3 className="font-semibold text-slate-800">Personal Details</h3>
+                <h3 className="font-semibold text-slate-800">Datos personales</h3>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="label">First Name</label>
+                  <label className="label">Nombre</label>
                   <input
                     disabled={!edit}
                     className="input"
@@ -233,7 +280,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Last Name</label>
+                  <label className="label">Apellidos</label>
                   <input
                     disabled={!edit}
                     className="input"
@@ -242,7 +289,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="label text-slate-400">Email Address (Locked)</label>
+                  <label className="label text-slate-400">Correo electrónico (bloqueado)</label>
                   <input disabled className="input bg-gray-50 cursor-not-allowed opacity-70" value={user.email} />
                 </div>
               </div>
@@ -250,40 +297,100 @@ export default function AccountPage() {
 
             <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b bg-gray-50/50">
-                <h3 className="font-semibold text-slate-800">Shipping Address</h3>
+                <h3 className="font-semibold text-slate-800">Dirección de envío</h3>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="label">Company</label>
-                  <input disabled={!edit} className="input" placeholder="Company Name" value={address.company} onChange={(e) => setAddress({ ...address, company: e.target.value })} />
+                  <label className="label">Empresa</label>
+                  <input disabled={!edit} className="input" placeholder="Nombre de empresa" value={address.company} onChange={(e) => setAddress({ ...address, company: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Phone</label>
-                  <input disabled={!edit} className="input" placeholder="+1..." value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} />
+                  <label className="label">Teléfono</label>
+                  <input disabled={!edit} className="input" placeholder="+34..." value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="label">Street Address</label>
-                  <input disabled={!edit} className="input" placeholder="Address Line 1" value={address.address_line1} onChange={(e) => setAddress({ ...address, address_line1: e.target.value })} />
+                  <label className="label">Dirección</label>
+                  <input disabled={!edit} className="input" placeholder="Calle y número" value={address.address_line1} onChange={(e) => setAddress({ ...address, address_line1: e.target.value })} />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <input disabled={!edit} className="input" placeholder="Suite, Apt, etc. (Optional)" value={address.address_line2} onChange={(e) => setAddress({ ...address, address_line2: e.target.value })} />
+                  <input disabled={!edit} className="input" placeholder="Piso, puerta, etc. (Opcional)" value={address.address_line2} onChange={(e) => setAddress({ ...address, address_line2: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">City</label>
-                  <input disabled={!edit} className="input" placeholder="City" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
+                  <label className="label">Ciudad</label>
+                  <input disabled={!edit} className="input" placeholder="Ciudad" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Postal Code</label>
-                  <input disabled={!edit} className="input" placeholder="Postal Code" value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} />
+                  <label className="label">Código postal</label>
+                  <input disabled={!edit} className="input" placeholder="Código postal" value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Region / State</label>
-                  <input disabled={!edit} className="input" placeholder="Region" value={address.region} onChange={(e) => setAddress({ ...address, region: e.target.value })} />
+                  <label className="label">Provincia / Región</label>
+                  <input disabled={!edit} className="input" placeholder="Provincia" value={address.region} onChange={(e) => setAddress({ ...address, region: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Country</label>
-                  <input disabled={!edit} className="input" placeholder="Country" value={address.country} onChange={(e) => setAddress({ ...address, country: e.target.value })} />
+                  <label className="label">País</label>
+                  <input disabled={!edit} className="input" placeholder="País" value={address.country} onChange={(e) => setAddress({ ...address, country: e.target.value })} />
                 </div>
+              </div>
+            </section>
+
+            {/* Orders & Invoices */}
+            <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b bg-gray-50/50">
+                <h3 className="font-semibold text-slate-800">Pedidos y facturas</h3>
+              </div>
+              <div className="p-6">
+                {ordersLoading ? (
+                  <p className="text-sm text-slate-400">Cargando pedidos...</p>
+                ) : orders.length === 0 ? (
+                  <p className="text-sm text-slate-400">No tienes pedidos todavía.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {orders.map((order) => {
+                      const availableDocs = (order.billing_documents ?? []).filter(
+                        (d) => ["ISSUED", "SENT", "PAID"].includes(d.status)
+                      );
+                      return (
+                        <div
+                          key={order.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border px-4 py-3 hover:bg-gray-50/50 transition-colors"
+                        >
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-semibold text-slate-800">
+                              Pedido {order.order_number}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {formatDate(order.created_at)} · {formatCurrency(order.total_amount, order.currency)}
+                            </p>
+                            <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                              {statusLabels[order.status] ?? order.status}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {availableDocs.map((doc) => (
+                              <button
+                                key={doc.id}
+                                onClick={() => handleDownloadInvoice(doc.id)}
+                                disabled={downloadingDoc === doc.id}
+                                className="btn btn-outline text-xs flex items-center gap-1.5 disabled:opacity-50"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                </svg>
+                                {downloadingDoc === doc.id
+                                  ? "Descargando..."
+                                  : `Descargar factura${doc.document_number ? ` ${doc.document_number}` : ""}`}
+                              </button>
+                            ))}
+                            {availableDocs.length === 0 && (
+                              <span className="text-xs text-slate-400 italic">Factura disponible al entregar</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
           </div>

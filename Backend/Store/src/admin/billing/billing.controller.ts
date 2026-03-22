@@ -356,7 +356,7 @@ export class BillingController {
     return {
       success: true,
       data,
-      message: 'Order marked as delivered and draft invoice created',
+      message: 'Order marked as delivered and invoice issued/sent',
     };
   }
 

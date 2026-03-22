@@ -61,6 +61,15 @@ export interface Shipment {
   }>;
 }
 
+export interface BillingDocumentRef {
+  id: string;
+  document_number: string | null;
+  status: string;
+  issue_date: string | null;
+  total_amount: number;
+  currency: string;
+}
+
 export interface Order {
   id: string;
   order_number: string;
@@ -78,6 +87,7 @@ export interface Order {
   shipments?: Shipment[];
   shipping_address: ShippingAddress;
   billing_address: BillingAddress;
+  billing_documents?: BillingDocumentRef[];
 }
 
 export interface PaymentIntent {
@@ -183,4 +193,24 @@ export const confirmPayment = async (
       payment_method_id: paymentMethodId,
     }),
   });
+};
+
+export const downloadInvoicePdf = async (docId: string): Promise<void> => {
+  const { API_URL: apiUrl } = await import("./env");
+  const response = await fetch(`${apiUrl}/checkout/documents/${docId}/pdf`, {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error("No se pudo descargar la factura");
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `factura-${docId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 };

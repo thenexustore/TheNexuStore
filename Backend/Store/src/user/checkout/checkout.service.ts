@@ -16,7 +16,7 @@ import {
   OrderResponseDto,
   PaymentIntentDto,
 } from './dto/checkout-response.dto';
-import { PaymentProvider, Prisma } from '@prisma/client';
+import { PaymentProvider, Prisma, BillingDocumentType, BillingDocumentStatus } from '@prisma/client';
 import { AppLogger } from '../../common/app-logger.service';
 import { MailService } from '../../auth/mail/mail.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
@@ -550,6 +550,14 @@ export class CheckoutService {
           details: event.details,
         })),
       })),
+      billing_documents: order.billing_documents?.map((bd: any) => ({
+        id: bd.id,
+        document_number: bd.document_number,
+        status: bd.status,
+        issue_date: bd.issue_date,
+        total_amount: Number(bd.total_amount),
+        currency: bd.currency,
+      })) ?? [],
     };
   }
 
@@ -612,10 +620,36 @@ export class CheckoutService {
             },
           },
         },
+        billing_documents: {
+          where: {
+            type: BillingDocumentType.INVOICE,
+            status: { in: [BillingDocumentStatus.ISSUED, BillingDocumentStatus.SENT, BillingDocumentStatus.PAID] },
+          },
+          orderBy: { created_at: 'desc' },
+        },
       },
     });
 
     return orders.map((order) => this.serializeOrder(order));
+  }
+
+  async getCustomerDocumentPdf(docId: string, customerId: string): Promise<Buffer> {
+    const doc = await this.prisma.billingDocument.findUnique({
+      where: { id: docId },
+    });
+    if (!doc) throw new NotFoundException('Billing document not found');
+    if (doc.customer_id !== customerId) {
+      throw new ForbiddenException('Access denied');
+    }
+    const allowedStatuses: BillingDocumentStatus[] = [
+      BillingDocumentStatus.ISSUED,
+      BillingDocumentStatus.SENT,
+      BillingDocumentStatus.PAID,
+    ];
+    if (!allowedStatuses.includes(doc.status)) {
+      throw new ForbiddenException('Document is not available for download');
+    }
+    return this.billingService.generateDocumentPdf(docId);
   }
 
   async getOrderByTrackingToken(trackingToken: string): Promise<any> {

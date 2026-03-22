@@ -5,8 +5,10 @@ import {
   Body,
   Param,
   Request,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { CheckoutService } from './checkout.service';
 import { CreateOrderDto } from './dto/checkout.dto';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -42,5 +44,21 @@ export class CheckoutController {
   @Get('track/:token')
   async trackOrder(@Param('token') token: string) {
     return this.checkoutService.getOrderByTrackingToken(token);
+  }
+
+  @Get('documents/:id/pdf')
+  @UseGuards(AuthGuard)
+  async downloadDocumentPdf(
+    @Request() req,
+    @Param('id') docId: string,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.checkoutService.getCustomerDocumentPdf(docId, req.user.id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="factura-${docId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
   }
 }

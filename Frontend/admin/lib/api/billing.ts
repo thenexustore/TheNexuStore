@@ -299,6 +299,15 @@ export async function deleteBillingTemplate(
   });
 }
 
+export async function uploadBillingTemplateBackground(
+  imageBase64: string,
+): Promise<{ url: string }> {
+  return fetchWithAuth("/admin/billing/templates/upload-background", {
+    method: "POST",
+    body: JSON.stringify({ image_base64: imageBase64 }),
+  });
+}
+
 export async function markOrderDelivered(
   orderId: string,
   tracking_url?: string,

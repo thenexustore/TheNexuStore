@@ -34,6 +34,7 @@ import {
   Layers,
   Star,
   ImageIcon,
+  Upload,
 } from "lucide-react";
 import {
   fetchBillingDocuments,
@@ -54,6 +55,7 @@ import {
   createBillingTemplate,
   updateBillingTemplate,
   deleteBillingTemplate,
+  uploadBillingTemplateBackground,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -487,6 +489,8 @@ export default function BillingPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<string | null>(null);
+  const [uploadingBg, setUploadingBg] = useState(false);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
 
   // Action states
   const [issuingId, setIssuingId] = useState<string | null>(null);
@@ -928,6 +932,44 @@ export default function BillingPage() {
       setTemplateIsDefault(false);
     }
     setShowTemplateForm(true);
+  };
+
+  const handleUploadBg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    // Reset so same file can be re-selected
+    (e.target as HTMLInputElement).value = "";
+    if (!file) return;
+
+    const allowed = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Formato no permitido. Usa PNG, JPEG o WebP.");
+      return;
+    }
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error("La imagen no puede superar 5 MB.");
+      return;
+    }
+
+    setUploadingBg(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = () => res(reader.result as string);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadBillingTemplateBackground(base64);
+      setTemplateBgUrl(result.url);
+      toast.success("Imagen subida correctamente");
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al subir la imagen",
+      );
+    } finally {
+      setUploadingBg(false);
+    }
   };
 
   const handleSaveTemplate = async (e: { preventDefault(): void }) => {
@@ -2560,11 +2602,11 @@ export default function BillingPage() {
 
                 {/* Column headers */}
                 <div className="grid grid-cols-12 gap-2 mb-1 px-0.5">
-                  <span className="col-span-4 text-xs text-zinc-400">Descripción</span>
-                  <span className="col-span-2 text-xs text-zinc-400 text-center">Cant.</span>
-                  <span className="col-span-2 text-xs text-zinc-400 text-right">Precio</span>
-                  <span className="col-span-1 text-xs text-zinc-400 text-center">IVA%</span>
-                  <span className="col-span-2 text-xs text-zinc-400 text-right">Importe</span>
+                  <span className="col-span-4 text-xs font-medium text-zinc-500">Descripción</span>
+                  <span className="col-span-1 text-xs font-medium text-zinc-500 text-center">Cant.</span>
+                  <span className="col-span-2 text-xs font-medium text-zinc-500 text-right">Precio unit.</span>
+                  <span className="col-span-2 text-xs font-medium text-zinc-500 text-center">IVA %</span>
+                  <span className="col-span-2 text-xs font-medium text-zinc-500 text-right">Importe</span>
                   <span className="col-span-1" />
                 </div>
 
@@ -2644,7 +2686,7 @@ export default function BillingPage() {
                           type="number"
                           min="0"
                           step="any"
-                          className="col-span-2 border border-zinc-200 rounded-md px-2 py-1 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                          className="col-span-1 border border-zinc-200 rounded-md px-2 py-1 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
                         />
                         <input
                           value={item.unit_price}
@@ -2655,7 +2697,8 @@ export default function BillingPage() {
                           step="any"
                           className="col-span-2 border border-zinc-200 rounded-md px-2 py-1 text-sm text-right bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
                         />
-                        <div className="col-span-1 relative">
+                        {/* IVA % — 2 cols for proper visibility */}
+                        <div className="col-span-2 relative">
                           <input
                             value={parseFloat((Number(item.tax_rate) * 100).toFixed(6)).toString()}
                             onChange={(e: InputEv) =>
@@ -2665,9 +2708,9 @@ export default function BillingPage() {
                             min="0"
                             max="100"
                             step="any"
-                            className="w-full border border-zinc-200 rounded-md px-1.5 py-1 text-sm pr-4 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                            className="w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm pr-7 bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900 font-medium text-zinc-800"
                           />
-                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">%</span>
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-500 pointer-events-none">%</span>
                         </div>
                         <div className="col-span-2 text-right">
                           <span className="text-xs font-semibold text-zinc-700 tabular-nums">
@@ -2971,28 +3014,72 @@ export default function BillingPage() {
                 />
               </div>
 
-              {/* Background URL */}
+              {/* Background image */}
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <ImageIcon className="w-3.5 h-3.5 text-zinc-400" />
                   <label className="text-xs font-semibold text-zinc-600">
-                    URL de fondo <span className="text-zinc-400 font-normal">(opcional)</span>
+                    Imagen de fondo <span className="text-zinc-400 font-normal">(opcional)</span>
                   </label>
                 </div>
+
+                {/* Upload button */}
+                <input
+                  ref={bgFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleUploadBg}
+                />
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => bgFileInputRef.current?.click()}
+                    disabled={uploadingBg}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 transition shadow-sm"
+                  >
+                    {uploadingBg ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Subiendo...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Subir imagen
+                      </>
+                    )}
+                  </button>
+                  <span className="self-center text-xs text-zinc-400">PNG, JPEG o WebP · máx. 5 MB</span>
+                </div>
+
+                {/* Manual URL input */}
                 <input
                   value={templateBgUrl}
                   onChange={(e: InputEv) => setTemplateBgUrl(e.target.value)}
-                  placeholder="https://ejemplo.com/background.png"
+                  placeholder="O pega una URL: https://ejemplo.com/fondo.png"
                   className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
                 />
+
+                {/* Preview */}
                 {templateBgUrl && (
-                  <div className="mt-2 w-full h-24 rounded-lg border border-zinc-200 overflow-hidden bg-zinc-100">
+                  <div className="mt-2 relative w-full h-28 rounded-lg border border-zinc-200 overflow-hidden bg-zinc-100">
                     <img
                       src={templateBgUrl}
-                      alt="Vista previa"
+                      alt="Vista previa del fondo"
                       className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setTemplateBgUrl("")}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition"
+                      title="Eliminar imagen"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
               </div>

@@ -661,6 +661,28 @@ export default function BillingPage() {
   // Pre-load templates once on mount so openCreateForm can auto-select the default
   useEffect(() => {
     loadTemplates();
+    // Pre-load settings silently on mount so openCreateForm can use the configured default_tax_rate
+    if (!settings) {
+      fetchBillingSettings().then((s) => {
+        setSettings(s);
+        setSettingsForm({
+          legal_name: s.legal_name,
+          trade_name: s.trade_name,
+          nif: s.nif,
+          address_real: s.address_real,
+          address_virtual: s.address_virtual,
+          iban_caixabank: s.iban_caixabank,
+          iban_bbva: s.iban_bbva,
+          website_com: s.website_com,
+          website_es: s.website_es,
+          default_currency: s.default_currency,
+          invoice_prefix: s.invoice_prefix,
+          quote_prefix: s.quote_prefix,
+          credit_note_prefix: s.credit_note_prefix,
+          default_tax_rate: s.default_tax_rate,
+        });
+      }).catch(() => { /* non-critical — falls back to 21% hardcoded */ });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -695,8 +717,12 @@ export default function BillingPage() {
     try {
       const doc = await issueBillingDocument(id);
       toast.success(`Documento emitido: ${doc.document_number}`);
-      if (selectedDoc?.id === id) setSelectedDoc(doc as BillingDocumentWithAudits);
       await loadDocs(page);
+      // Refresh the detail panel with full document (including number_audits)
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
     } catch (err: unknown) {
       toast.error(
         err instanceof Error ? err.message : "Error emitiendo documento",
@@ -779,6 +805,9 @@ export default function BillingPage() {
   // ─── Create document ───────────────────────────────────────────────────────
 
   const openCreateForm = (type: BillingDocumentType) => {
+    const defaultTaxRate = settings?.default_tax_rate != null
+      ? String(settings.default_tax_rate)
+      : "0.21";
     setCreateType(type);
     setCreateForm({
       notes: "",
@@ -790,7 +819,7 @@ export default function BillingPage() {
       customer_email: "",
       customer_tax_id: "",
       customer_address: "",
-      items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
+      items: [{ description: "", qty: "1", unit_price: "", tax_rate: defaultTaxRate }],
       template_id: templates.find((t) => t.is_default)?.id ?? "",
     });
     setItemSearches([{ query: "", results: [], open: false, loading: false }]);
@@ -1074,17 +1103,8 @@ export default function BillingPage() {
       if (result.errors.length > 0) {
         toast.warning(`${result.errors.length} error(es) durante el backfill. Revisa los logs.`);
       }
-      // Reload document list to show newly created drafts
-      await fetchBillingDocuments({
-        page: 1,
-        limit: 20,
-        type: tab === "ALL" ? undefined : tab,
-        status: statusFilter || undefined,
-      }).then((data) => {
-        setDocs(data.items);
-        setTotal(data.total);
-        setPage(1);
-      }).catch(() => {});
+      // Reload document list to show newly created drafts (also updates totalPages)
+      await loadDocs(1);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error al ejecutar el backfill");
     } finally {
@@ -1217,11 +1237,14 @@ export default function BillingPage() {
   // ─── Create item helpers ───────────────────────────────────────────────────
 
   const addCreateItem = () => {
+    const defaultTaxRate = settings?.default_tax_rate != null
+      ? String(settings.default_tax_rate)
+      : "0.21";
     setCreateForm((f: CreateFormState) => ({
       ...f,
       items: [
         ...f.items,
-        { description: "", qty: "1", unit_price: "", tax_rate: "0.21" },
+        { description: "", qty: "1", unit_price: "", tax_rate: defaultTaxRate },
       ],
     }));
   };

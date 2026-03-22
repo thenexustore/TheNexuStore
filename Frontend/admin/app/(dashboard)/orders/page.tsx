@@ -9,6 +9,10 @@ import {
   XCircle,
   Clock,
   MessageSquare,
+  FileText,
+  ExternalLink,
+  Loader2,
+  Receipt,
 } from "lucide-react";
 import {
   addOrderNote,
@@ -18,10 +22,13 @@ import {
   fetchOrderTimeline,
   markOrderDelivered,
   updateOrderShipment,
+  fetchBillingDocumentsByOrder,
+  createBillingDocumentFromOrder,
   type Order,
   type OrderDetail,
   type OrderShipment,
   type OrderTimelineEntry,
+  type BillingDocument,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { loadAdminSettings, subscribeAdminSettings } from "@/lib/admin-settings";
@@ -101,6 +108,11 @@ export default function OrdersPage() {
   const [markingDelivered, setMarkingDelivered] = useState(false);
   const [adminSettings, setAdminSettings] = useState(() => loadAdminSettings());
 
+  // Billing state for selected order
+  const [orderBillingDocs, setOrderBillingDocs] = useState<BillingDocument[]>([]);
+  const [billingDocsLoading, setBillingDocsLoading] = useState(false);
+  const [generatingBillingDoc, setGeneratingBillingDoc] = useState(false);
+
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
 
   const formatMoney = (amount: number) =>
@@ -144,7 +156,18 @@ export default function OrdersPage() {
     try {
       setSelectedOrderId(orderId);
       setDetailLoading(true);
+      setOrderBillingDocs([]);
       await refreshOrderDetail(orderId);
+      // Load billing docs in background
+      setBillingDocsLoading(true);
+      try {
+        const billingData = await fetchBillingDocumentsByOrder(orderId);
+        setOrderBillingDocs(billingData.documents ?? []);
+      } catch {
+        // non-critical
+      } finally {
+        setBillingDocsLoading(false);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to load order detail");
       setSelectedOrderId(null);
@@ -225,17 +248,40 @@ export default function OrdersPage() {
     if (!selectedOrderId) return;
     setMarkingDelivered(true);
     try {
-      await markOrderDelivered(selectedOrderId, deliverTrackingUrl || undefined);
+      const result = await markOrderDelivered(selectedOrderId, deliverTrackingUrl || undefined);
       toast.success("Pedido marcado como entregado. Factura en borrador creada.");
       setDeliverTrackingUrl("");
       const updated = await fetchOrderById(selectedOrderId);
       setOrderDetail(updated);
       const tl = await fetchOrderTimeline(selectedOrderId);
       setTimeline(tl);
+      // Reload billing docs to reflect the newly created doc
+      const billingData = await fetchBillingDocumentsByOrder(selectedOrderId);
+      setOrderBillingDocs(billingData.documents ?? []);
     } catch (err: any) {
       toast.error(err.message || "Error al marcar como entregado");
     } finally {
       setMarkingDelivered(false);
+    }
+  };
+
+  const handleGenerateBillingDoc = async () => {
+    if (!selectedOrderId) return;
+    setGeneratingBillingDoc(true);
+    try {
+      const result = await createBillingDocumentFromOrder(selectedOrderId);
+      if (result.created) {
+        toast.success("Factura en borrador creada correctamente.");
+      } else {
+        toast.info("Ya existe una factura activa para este pedido.");
+      }
+      // Always reload to get the authoritative state from the server
+      const billingData = await fetchBillingDocumentsByOrder(selectedOrderId);
+      setOrderBillingDocs(billingData.documents ?? []);
+    } catch (err: any) {
+      toast.error(err.message || "Error al generar factura");
+    } finally {
+      setGeneratingBillingDoc(false);
     }
   };
 
@@ -703,6 +749,83 @@ export default function OrdersPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* ── Billing documents ───────────────────────────────── */}
+                      <div className="pt-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-semibold text-zinc-700 flex items-center gap-1.5">
+                            <Receipt className="w-4 h-4 text-zinc-400" />
+                            Facturación
+                          </h4>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href="/billing"
+                              className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                            >
+                              Ver en facturación <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {billingDocsLoading ? (
+                          <div className="flex items-center gap-2 text-xs text-zinc-400 py-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Cargando documentos...
+                          </div>
+                        ) : orderBillingDocs.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {orderBillingDocs.map((doc) => (
+                              <div
+                                key={doc.id}
+                                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="font-semibold text-zinc-700 truncate block">
+                                      {doc.document_number ?? `Borrador (${doc.id.slice(0, 8)})`}
+                                    </span>
+                                    <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                                      doc.status === "PAID" ? "bg-emerald-100 text-emerald-700" :
+                                      doc.status === "ISSUED" || doc.status === "SENT" ? "bg-blue-100 text-blue-700" :
+                                      doc.status === "DRAFT" ? "bg-zinc-100 text-zinc-600" :
+                                      "bg-red-100 text-red-600"
+                                    }`}>
+                                      {doc.status === "DRAFT" ? "Borrador" :
+                                       doc.status === "ISSUED" ? "Emitida" :
+                                       doc.status === "SENT" ? "Enviada" :
+                                       doc.status === "PAID" ? "Cobrada" :
+                                       doc.status === "VOID" ? "Anulada" : doc.status}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="text-zinc-500 font-medium tabular-nums ml-2">
+                                  {Number(doc.total_amount ?? 0).toLocaleString("es-ES", { style: "currency", currency: doc.currency ?? "EUR" })}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-zinc-400 py-1">No hay documentos de facturación para este pedido.</p>
+                        )}
+
+                        {/* Generate billing doc button */}
+                        {orderBillingDocs.filter((d) => d.type === "INVOICE" && d.status !== "VOID").length === 0 && (
+                          <button
+                            type="button"
+                            onClick={handleGenerateBillingDoc}
+                            disabled={generatingBillingDoc}
+                            className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-indigo-700 text-xs font-medium hover:bg-indigo-100 disabled:opacity-50 flex items-center justify-center gap-1.5 transition"
+                          >
+                            {generatingBillingDoc ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <FileText className="w-3.5 h-3.5" />
+                            )}
+                            {generatingBillingDoc ? "Generando..." : "Generar factura en borrador"}
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>

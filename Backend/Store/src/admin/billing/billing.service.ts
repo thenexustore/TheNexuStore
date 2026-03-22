@@ -152,7 +152,7 @@ export class BillingService {
   // ─── Documents ────────────────────────────────────────────────────────────────
 
   async listDocuments(query: BillingDocumentsQueryDto) {
-    const { page, limit, type, status, search, from, to } = query;
+    const { page, limit, type, status, search, from, to, order_id } = query;
     const skip = (page - 1) * limit;
 
     const dateRange =
@@ -193,6 +193,7 @@ export class BillingService {
     const where: Prisma.BillingDocumentWhereInput = {
       ...(type && { type }),
       ...(status && { status }),
+      ...(order_id && { order_id }),
       ...(andConditions.length > 0 && { AND: andConditions }),
     };
 
@@ -896,6 +897,162 @@ export class BillingService {
       order_status: OrderStatus.DELIVERED,
       billing_document: billingDoc,
     };
+  }
+
+  // ─── Billing from order (independent of delivery) ─────────────────────────
+
+  async getDocumentsByOrderId(orderId: string): Promise<{ documents: any[]; order_number: string | null }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, order_number: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const documents = await this.prisma.billingDocument.findMany({
+      where: { order_id: orderId },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return { documents, order_number: order.order_number ?? null };
+  }
+
+  /**
+   * Creates a billing document (draft invoice) from an existing order.
+   * Idempotent: if a non-VOID invoice already exists for this order, returns
+   * the existing one instead of creating a duplicate.
+   */
+  async createDocumentFromOrder(orderId: string): Promise<any> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { sku: { include: { product: true } } },
+        },
+        customer: {
+          include: { fiscal_profile: true },
+        },
+        payments: { orderBy: { created_at: 'desc' }, take: 1 },
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Idempotency: return existing non-void invoice if present
+    const existing = await this.prisma.billingDocument.findFirst({
+      where: {
+        order_id: orderId,
+        type: BillingDocumentType.INVOICE,
+        status: { not: BillingDocumentStatus.VOID },
+      },
+      orderBy: { created_at: 'desc' },
+      include: { items: true },
+    });
+    if (existing) return { billing_document: existing, created: false };
+
+    const settings = await this.getSettings();
+    const customer = order.customer;
+    const fiscalProfile = customer?.fiscal_profile;
+    const billingAddr = order.billing_address_json as Record<string, unknown>;
+
+    const customerName =
+      fiscalProfile?.company_name ??
+      ((billingAddr?.full_name as string) ||
+        `${customer?.first_name ?? ''} ${customer?.last_name ?? ''}`.trim() ||
+        order.email);
+    const customerTaxId =
+      fiscalProfile?.tax_id ?? (billingAddr?.vat_id as string) ?? null;
+    const customerEmail = order.email;
+    const customerAddress = fiscalProfile?.fiscal_address
+      ? [
+          fiscalProfile.fiscal_address,
+          fiscalProfile.fiscal_city,
+          fiscalProfile.fiscal_postal,
+          fiscalProfile.fiscal_country,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : billingAddr
+        ? [
+            billingAddr.address_line1,
+            billingAddr.city,
+            billingAddr.postal_code,
+            billingAddr.country,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : null;
+
+    const payment = order.payments[0];
+    let paymentMethod: BillingPaymentMethod | null = null;
+    if (payment) {
+      switch (payment.provider) {
+        case 'REDSYS':
+          paymentMethod = BillingPaymentMethod.REDSYS;
+          break;
+        case 'STRIPE':
+          paymentMethod = BillingPaymentMethod.STRIPE;
+          break;
+        case 'PAYPAL':
+          paymentMethod = BillingPaymentMethod.PAYPAL;
+          break;
+        case 'COD':
+          paymentMethod = BillingPaymentMethod.COD;
+          break;
+        default:
+          paymentMethod = BillingPaymentMethod.OTHER;
+      }
+    }
+
+    const taxRate = Number(settings.default_tax_rate);
+    const lineItems = order.items.map((item, i) => {
+      const lineSubtotal = Number(item.unit_price) * item.qty;
+      const taxAmountLine = lineSubtotal * taxRate;
+      const lineTotal = lineSubtotal + taxAmountLine;
+      return {
+        description:
+          item.title_snapshot || item.sku?.product?.title || item.sku_id,
+        qty: item.qty,
+        unit_price: item.unit_price,
+        tax_rate: taxRate,
+        line_subtotal: lineSubtotal,
+        tax_amount: taxAmountLine,
+        line_total: lineTotal,
+        position: i,
+      };
+    });
+
+    const subtotal = lineItems.reduce((s, i) => s + i.line_subtotal, 0);
+    const taxTotal = lineItems.reduce((s, i) => s + i.tax_amount, 0);
+    const total = lineItems.reduce((s, i) => s + i.line_total, 0);
+
+    const billingDoc = await this.prisma.billingDocument.create({
+      data: {
+        type: BillingDocumentType.INVOICE,
+        status: BillingDocumentStatus.DRAFT,
+        order_id: orderId,
+        customer_id: order.customer_id ?? undefined,
+        language: BillingLanguage.ES,
+        currency: order.currency,
+        payment_method: paymentMethod ?? undefined,
+        company_legal_name: settings.legal_name,
+        company_trade_name: settings.trade_name,
+        company_nif: settings.nif,
+        company_address: settings.address_real,
+        company_iban_1: settings.iban_caixabank,
+        company_iban_2: settings.iban_bbva,
+        customer_name: customerName,
+        customer_tax_id: customerTaxId,
+        customer_email: customerEmail,
+        customer_address: customerAddress,
+        subtotal_amount: subtotal,
+        tax_amount: taxTotal,
+        discount_amount: Number(order.discount_amount),
+        total_amount: total,
+        items: { create: lineItems },
+      },
+      include: { items: true },
+    });
+
+    return { billing_document: billingDoc, created: true };
   }
 
   // ─── PDF Generation ───────────────────────────────────────────────────────

@@ -28,6 +28,8 @@ import {
   User,
   CreditCard,
   Hash,
+  ShoppingCart,
+  ExternalLink,
 } from "lucide-react";
 import {
   fetchBillingDocuments,
@@ -1280,10 +1282,20 @@ export default function BillingPage() {
                           {STATUS_LABELS[doc.status as BillingDocumentStatus]}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-zinc-700 max-w-[160px] truncate text-sm">
-                        {doc.customer_name ?? doc.customer_email ?? (
-                          <span className="text-zinc-400">—</span>
-                        )}
+                      <td className="px-4 py-3 text-zinc-700 max-w-[180px] text-sm">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="truncate">
+                            {doc.customer_name ?? doc.customer_email ?? (
+                              <span className="text-zinc-400">—</span>
+                            )}
+                          </span>
+                          {doc.order_id && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
+                              <ShoppingCart className="w-3 h-3 shrink-0" />
+                              Pedido vinculado
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-zinc-500 text-xs">
                         <span className="flex items-center gap-1">
@@ -1595,6 +1607,25 @@ export default function BillingPage() {
                         <p className="text-xs text-zinc-400">{selectedDoc.customer_address}</p>
                       )}
                     </div>
+
+                    {/* Linked order badge */}
+                    {selectedDoc.order_id && (
+                      <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ShoppingCart className="w-4 h-4 text-indigo-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-indigo-700">Documento generado desde pedido</p>
+                            <p className="text-xs text-indigo-500 font-mono truncate">{selectedDoc.order_id}</p>
+                          </div>
+                        </div>
+                        <a
+                          href="/orders"
+                          className="inline-flex items-center gap-1 text-xs text-indigo-600 font-medium hover:underline shrink-0"
+                        >
+                          Ver pedidos <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Dates */}
@@ -2095,7 +2126,7 @@ export default function BillingPage() {
                 <BillingPreview data={{
                   type: createType,
                   document_number: null,
-                  issue_date: createForm.issue_date || new Date().toISOString(),
+                  issue_date: createForm.issue_date ? createForm.issue_date : null,
                   due_date: createForm.due_date || null,
                   payment_method: createForm.payment_method as BillingPaymentMethod | null || null,
                   currency: settings?.default_currency ?? "EUR",

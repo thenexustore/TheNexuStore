@@ -166,6 +166,7 @@ export async function fetchBillingDocuments(params: {
   search?: string;
   from?: string;
   to?: string;
+  order_id?: string;
 }): Promise<BillingDocumentsResponse> {
   const query = new URLSearchParams();
   if (params.page) query.set("page", String(params.page));
@@ -175,6 +176,7 @@ export async function fetchBillingDocuments(params: {
   if (params.search) query.set("search", params.search);
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
+  if (params.order_id) query.set("order_id", params.order_id);
   return fetchWithAuth(`/admin/billing/documents?${query.toString()}`);
 }
 
@@ -373,6 +375,20 @@ export async function sendBillingDocument(
   id: string,
 ): Promise<{ sent: boolean; email: string }> {
   return fetchWithAuth(`/admin/billing/documents/${id}/send`, {
+    method: "POST",
+  });
+}
+
+export async function fetchBillingDocumentsByOrder(
+  orderId: string,
+): Promise<{ documents: BillingDocument[]; order_number: string | null }> {
+  return fetchWithAuth(`/admin/billing/orders/${orderId}/documents`);
+}
+
+export async function createBillingDocumentFromOrder(
+  orderId: string,
+): Promise<{ billing_document: BillingDocument; created: boolean }> {
+  return fetchWithAuth(`/admin/billing/orders/${orderId}/create-document`, {
     method: "POST",
   });
 }

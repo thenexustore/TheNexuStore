@@ -150,6 +150,8 @@ export {
   downloadBillingExport,
   downloadBillingDocumentPdf,
   sendBillingDocument,
+  fetchBillingDocumentsByOrder,
+  createBillingDocumentFromOrder,
   type BillingDocument,
   type BillingDocumentItem,
   type BillingDocumentsResponse,

@@ -207,6 +207,10 @@ export class BillingDocumentsQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @IsOptional()
+  @IsString()
+  order_id?: string;
 }
 
 export class IssueBillingDocumentDto {

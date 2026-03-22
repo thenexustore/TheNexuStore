@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CategorySearchResult, CategoryTreeNode } from "../lib/products";
-import { findCategoryTrailBySlug } from "../lib/category-navigation";
+import {
+  canNavigateCategoryDirectly,
+  findCategoryTrailBySlug,
+} from "../lib/category-navigation";
 import { getCategoryIcon } from "../lib/category-icons";
 import { CategorySearchResultCard } from "./CategorySearchResultCard";
 
@@ -18,6 +21,7 @@ type Props = {
   onQueryChange: (value: string) => void;
   onClose: () => void;
   onNavigate: (slug: string) => void;
+  onBrowseAllProducts: () => void;
   activeCategorySlug?: string | null;
 };
 
@@ -31,6 +35,7 @@ export function CategoryDrawer({
   onQueryChange,
   onClose,
   onNavigate,
+  onBrowseAllProducts,
   activeCategorySlug,
 }: Props) {
   const t = useTranslations("nav");
@@ -48,19 +53,40 @@ export function CategoryDrawer({
     [tree],
   );
 
+  const trailParent = activeCategoryTrail[0];
+  const trailChild = activeCategoryTrail[1];
+
   const activeParent = useMemo(
     () =>
       tree.find((item) => item.id === activeParentId) ??
+      trailParent ??
       firstParentWithChildren,
-    [tree, activeParentId, firstParentWithChildren],
+    [tree, activeParentId, trailParent, firstParentWithChildren],
   );
 
-  const activeChild = useMemo(
-    () =>
-      activeParent?.children.find((item) => item.id === activeChildId) ??
-      activeParent?.children[0],
-    [activeParent, activeChildId],
-  );
+  const activeChild = useMemo(() => {
+    const selectedChild = activeParent?.children.find(
+      (item) => item.id === activeChildId,
+    );
+
+    if (selectedChild) {
+      return selectedChild;
+    }
+
+    if (trailChild && activeParent?.id === trailParent?.id) {
+      return activeParent.children.find((item) => item.id === trailChild.id);
+    }
+
+    return activeParent?.children[0];
+  }, [activeParent, activeChildId, trailChild, trailParent]);
+
+  const activeParentCanNavigate = activeParent
+    ? canNavigateCategoryDirectly(activeParent)
+    : false;
+
+  const subcategoryHeading = activeParent?.name ?? t("subcategories");
+  const lowerLevelsHeading =
+    activeChild?.name ?? activeParent?.name ?? t("lowerLevels");
 
   const handleTrailSelection = (index: number) => {
     if (index === 0) {
@@ -106,17 +132,6 @@ export function CategoryDrawer({
 
     return () => window.clearTimeout(timer);
   }, [open]);
-
-  useEffect(() => {
-    if (!open || activeCategoryTrail.length === 0) return;
-
-    setActiveParentId(activeCategoryTrail[0]?.id ?? null);
-    setActiveChildId(
-      activeCategoryTrail[1]?.id ??
-        activeCategoryTrail[0]?.children[0]?.id ??
-        null,
-    );
-  }, [open, activeCategoryTrail]);
 
   return (
     <>
@@ -231,9 +246,13 @@ export function CategoryDrawer({
               <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_320px_1fr]">
                 <section className="min-h-0 border-r border-slate-200 bg-slate-50/50 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2 px-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {t("parentCategories")}
-                    </p>
+                    <button
+                      type="button"
+                      onClick={onBrowseAllProducts}
+                      className="text-xs font-semibold uppercase tracking-wide text-slate-500 transition-colors hover:text-[#0B123A]"
+                    >
+                      {t("allYourProducts")}
+                    </button>
                     <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
                       {tree.length}
                     </span>
@@ -279,7 +298,7 @@ export function CategoryDrawer({
 
                 <section className="min-h-0 border-r border-slate-200 p-3">
                   <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {t("subcategories")}
+                    {subcategoryHeading}
                   </p>
                   {activeParent ? (
                     <div className="mb-3 space-y-2 px-2 text-xs text-slate-500">
@@ -300,10 +319,22 @@ export function CategoryDrawer({
                     {activeParent ? (
                       <>
                         <button
-                          onClick={() => onNavigate(activeParent.slug)}
-                          className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                          onClick={() =>
+                            activeParentCanNavigate &&
+                            onNavigate(activeParent.slug)
+                          }
+                          disabled={!activeParentCanNavigate}
+                          className={`mb-2 w-full rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                            activeParentCanNavigate
+                              ? "border-slate-200 text-[#0B123A] hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                              : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                          }`}
                         >
-                          {t("viewAllInCategory", { name: activeParent.name })}
+                          {activeParentCanNavigate
+                            ? t("viewAllInCategory", {
+                                name: activeParent.name,
+                              })
+                            : t("preparingCategory")}
                         </button>
 
                         {activeParent.children.length === 0 ? (
@@ -356,7 +387,7 @@ export function CategoryDrawer({
 
                 <section className="min-h-0 p-3">
                   <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {t("lowerLevels")}
+                    {lowerLevelsHeading}
                   </p>
                   {activeChild ? (
                     <div className="mb-3 space-y-2 px-2">

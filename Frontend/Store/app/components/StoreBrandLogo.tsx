@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { loadStoreBranding, type StoreBranding } from "@/app/lib/admin-branding";
+import Image from "next/image";
+import { useMemo, useState } from "react";
+import {
+  loadStoreBranding,
+  type StoreBranding,
+} from "@/app/lib/admin-branding";
 
 export default function StoreBrandLogo({
   branding,
@@ -18,26 +22,43 @@ export default function StoreBrandLogo({
 }) {
   const fallbackBranding = useMemo(() => loadStoreBranding(), []);
   const resolved = branding ?? fallbackBranding;
-  const candidates = variant === "dark" ? resolved.darkSrcCandidates : resolved.srcCandidates;
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [candidates]);
-
+  const candidates =
+    variant === "dark" ? resolved.darkSrcCandidates : resolved.srcCandidates;
+  const candidateKey = candidates.join("|");
+  const [candidateState, setCandidateState] = useState({
+    key: candidateKey,
+    index: 0,
+  });
+  const index = candidateState.key === candidateKey ? candidateState.index : 0;
   const src = candidates[index] || "/logo.png";
-  const brightness = Math.max(60, Math.min(140, Number(resolved.brightness) || 100));
-  const saturation = Math.max(60, Math.min(140, Number(resolved.saturation) || 100));
-  const filter = brightness === 100 && saturation === 100
-    ? "none"
-    : `brightness(${brightness}%) saturate(${saturation}%)`;
+  const brightness = Math.max(
+    60,
+    Math.min(140, Number(resolved.brightness) || 100),
+  );
+  const saturation = Math.max(
+    60,
+    Math.min(140, Number(resolved.saturation) || 100),
+  );
+  const filter =
+    brightness === 100 && saturation === 100
+      ? "none"
+      : `brightness(${brightness}%) saturate(${saturation}%)`;
 
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
+      width={240}
+      height={height ?? resolved.height}
+      unoptimized
       onError={() => {
-            setIndex((i) => (i < candidates.length - 1 ? i + 1 : i));
+        setCandidateState((current) => {
+          const currentIndex = current.key === candidateKey ? current.index : 0;
+          return {
+            key: candidateKey,
+            index: Math.min(currentIndex + 1, candidates.length - 1),
+          };
+        });
       }}
       className={className}
       style={{

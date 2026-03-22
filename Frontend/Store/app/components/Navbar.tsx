@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -27,6 +28,7 @@ import {
 import { CategoryDrawer } from "./CategoryDrawer";
 import { CategorySearchResultCard } from "./CategorySearchResultCard";
 import {
+  canNavigateCategoryDirectly,
   findCategoryTrailBySlug,
   normalizeCategoryTree,
   resolveCategoryScopeSlug,
@@ -38,6 +40,57 @@ import {
 } from "../lib/admin-branding";
 import StoreBrandLogo from "./StoreBrandLogo";
 
+function NavbarThumbnail({ src, alt }: { src?: string | null; alt: string }) {
+  const fallbackSrc = "/No_Image_Available.png";
+  const resolvedSrc = src && src.trim() !== "" ? src : fallbackSrc;
+  const [imageSrc, setImageSrc] = useState(resolvedSrc);
+
+  useEffect(() => {
+    setImageSrc(resolvedSrc);
+  }, [resolvedSrc]);
+
+  return (
+    <Image
+      src={imageSrc}
+      alt={alt}
+      fill
+      sizes="56px"
+      unoptimized
+      className="object-cover"
+      onError={() => {
+        if (imageSrc !== fallbackSrc) {
+          setImageSrc(fallbackSrc);
+        }
+      }}
+    />
+  );
+}
+
+function NavbarProfileImage({ src, alt }: { src: string; alt: string }) {
+  const fallbackSrc = "/No_Image_Available.png";
+  const [imageSrc, setImageSrc] = useState(src);
+
+  useEffect(() => {
+    setImageSrc(src);
+  }, [src]);
+
+  return (
+    <Image
+      src={imageSrc}
+      alt={alt}
+      width={36}
+      height={36}
+      unoptimized
+      className="h-9 w-9 rounded-full border-2 border-gray-200 object-cover transition-colors hover:border-[#0B123A]"
+      onError={() => {
+        if (imageSrc !== fallbackSrc) {
+          setImageSrc(fallbackSrc);
+        }
+      }}
+    />
+  );
+}
+
 type User = {
   id: string;
   firstName?: string;
@@ -48,10 +101,23 @@ type User = {
   profile_image?: string;
 };
 
+type BrandSearchResult = {
+  id: string;
+  name: string;
+  slug: string;
+  count: number;
+};
+
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [brandSearchResults, setBrandSearchResults] = useState<
+    BrandSearchResult[]
+  >([]);
+  const [globalCategorySearchResults, setGlobalCategorySearchResults] =
+    useState<CategorySearchResult[]>([]);
+  const [searchProductTotal, setSearchProductTotal] = useState(0);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [categoryTreeState, setCategoryTree] = useState<CategoryTreeNode[]>([]);
@@ -133,9 +199,9 @@ export default function Navbar() {
       const stored = localStorage.getItem("cart");
       if (stored) {
         try {
-          const cart = JSON.parse(stored);
+          const cart = JSON.parse(stored) as Array<{ quantity?: number }>;
           const totalItems = cart.reduce(
-            (sum: number, item: any) => sum + item.quantity,
+            (sum: number, item) => sum + (item.quantity ?? 0),
             0,
           );
           setLegacyCartCount(totalItems);
@@ -154,6 +220,27 @@ export default function Navbar() {
     window.addEventListener("cart-update", handleCartUpdate);
     return () => window.removeEventListener("cart-update", handleCartUpdate);
   }, []);
+
+  const resetSearchSuggestions = useCallback(() => {
+    setSearchResults([]);
+    setBrandSearchResults([]);
+    setGlobalCategorySearchResults([]);
+    setSearchProductTotal(0);
+    setShowSearchResults(false);
+  }, []);
+
+  const clearSearchInput = useCallback(() => {
+    setSearch("");
+    setShowSearchResults(false);
+  }, []);
+
+  const navigateToSearchResults = useCallback(() => {
+    const normalizedSearch = search.trim();
+    if (!normalizedSearch) return;
+
+    router.push(`/products?search=${encodeURIComponent(normalizedSearch)}`);
+    clearSearchInput();
+  }, [clearSearchInput, router, search]);
 
   useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
@@ -182,7 +269,10 @@ export default function Navbar() {
       const response = await productAPI.getCategoryTree(5);
       setCategoryTree(response.items ?? []);
     } catch (error) {
-      console.warn("Failed to load categories tree. Showing empty menu.", error);
+      console.warn(
+        "Failed to load categories tree. Showing empty menu.",
+        error,
+      );
       setCategoryTree([]);
     } finally {
       setCategoriesLoading(false);
@@ -205,23 +295,32 @@ export default function Navbar() {
 
   const handleSearch = useCallback(async (query: string) => {
     if (query.trim().length < 2) {
-      setSearchResults([]);
-      setShowSearchResults(false);
+      resetSearchSuggestions();
       return;
     }
 
     setSearchLoading(true);
     try {
-      const results = await productAPI.searchProducts(query, 5);
-      setSearchResults(results);
+      const [productResponse, categoryResults] = await Promise.all([
+        productAPI.getProducts({
+          search: query,
+          limit: 5,
+        }),
+        productAPI.searchCategories(query, 5),
+      ]);
+
+      setSearchResults(productResponse.products ?? []);
+      setBrandSearchResults((productResponse.filters?.brands ?? []).slice(0, 5));
+      setGlobalCategorySearchResults(categoryResults);
+      setSearchProductTotal(productResponse.total ?? 0);
       setShowSearchResults(true);
     } catch (error) {
       console.error("Search error:", error);
-      setSearchResults([]);
+      resetSearchSuggestions();
     } finally {
       setSearchLoading(false);
     }
-  }, []);
+  }, [resetSearchSuggestions]);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -235,18 +334,13 @@ export default function Navbar() {
         handleSearch(value);
       }, 300);
     } else {
-      setSearchResults([]);
-      setShowSearchResults(false);
+      resetSearchSuggestions();
     }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (search.trim()) {
-      router.push(`/products?search=${encodeURIComponent(search)}`);
-      setShowSearchResults(false);
-      setSearch("");
-    }
+    navigateToSearchResults();
   };
 
   const closeMobilePanels = () => {
@@ -262,14 +356,18 @@ export default function Navbar() {
   const handleProductClick = (product: Product) => {
     router.push(`/products/${product.slug}`);
     closeMobilePanels();
-    setSearch("");
+    clearSearchInput();
+  };
+
+  const handleBrandClick = (brandSlug: string) => {
+    router.push(`/products?brand=${encodeURIComponent(brandSlug)}`);
+    closeMobilePanels();
+    clearSearchInput();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && search.trim()) {
-      router.push(`/products?search=${encodeURIComponent(search)}`);
-      setShowSearchResults(false);
-      setSearch("");
+      navigateToSearchResults();
     }
     if (e.key === "Escape") {
       setShowSearchResults(false);
@@ -283,13 +381,20 @@ export default function Navbar() {
     closeMobilePanels();
   };
 
+  const handleAllProductsClick = () => {
+    router.push("/products");
+    closeMobilePanels();
+  };
+
   const handleMobileCategorySelect = (category: CategoryTreeNode) => {
     if (category.children.length > 0) {
       setMobileCategoryPath((current) => [...current, category.id]);
       return;
     }
 
-    handleCategoryClick(category.slug);
+    if (canNavigateCategoryDirectly(category)) {
+      handleCategoryClick(category.slug);
+    }
   };
 
   const handleMobileCategoryBack = () => {
@@ -456,103 +561,164 @@ export default function Navbar() {
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0B123A] mx-auto"></div>
                         <p className="mt-2 text-sm">{t("searching")}</p>
                       </div>
-                    ) : searchResults.length > 0 ? (
+                    ) : searchResults.length > 0 ||
+                      brandSearchResults.length > 0 ||
+                      globalCategorySearchResults.length > 0 ? (
                       <>
                         <div className="p-3 border-b border-gray-100 bg-gray-50 sticky top-0">
-                          <p className="text-sm font-medium text-gray-700">
-                            {t("productsFound", {
-                              count: searchResults.length,
-                            })}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-gray-700">
+                            <p>
+                              {t("productsFound", {
+                                count: searchProductTotal,
+                              })}
+                            </p>
+                            <p>
+                              {t("brandsFound", {
+                                count: brandSearchResults.length,
+                              })}
+                            </p>
+                            <p>
+                              {t("categoriesFound", {
+                                count: globalCategorySearchResults.length,
+                              })}
+                            </p>
+                          </div>
                         </div>
-                        <div className="divide-y divide-gray-100">
-                          {searchResults.map((product) => (
-                            <button
-                              key={product.id}
-                              onClick={() => handleProductClick(product)}
-                              className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
-                            >
-                              <div className="relative h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
-                                {product.compare_at_price &&
-                                  product.compare_at_price > product.price && (
-                                    <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-                                      -
-                                      {Math.round(
-                                        ((product.compare_at_price -
-                                          product.price) /
-                                          product.compare_at_price) *
-                                          100,
-                                      )}
-                                      %
-                                    </span>
-                                  )}
-                                <img
-                                  src={
-                                    product.thumbnail &&
-                                    product.thumbnail.trim() !== ""
-                                      ? product.thumbnail
-                                      : "/No_Image_Available.png"
-                                  }
-                                  alt={product.title}
-                                  className="h-full w-full object-cover"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src =
-                                      "/No_Image_Available.png";
-                                  }}
-                                />
+                        <div className="space-y-4 p-3">
+                          {globalCategorySearchResults.length > 0 && (
+                            <section className="space-y-2">
+                              <div className="px-1">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {t("categoriesSection")}
+                                </p>
                               </div>
+                              <div className="space-y-2">
+                                {globalCategorySearchResults.map((category) => (
+                                  <CategorySearchResultCard
+                                    key={category.id}
+                                    item={category}
+                                    onClick={handleCategoryClick}
+                                    compact
+                                  />
+                                ))}
+                              </div>
+                            </section>
+                          )}
 
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {product.title}
+                          {brandSearchResults.length > 0 && (
+                            <section className="space-y-2">
+                              <div className="px-1">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {t("brandsSection")}
                                 </p>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {product.brand_name}
-                                </p>
-                                <div className="flex items-center justify-between mt-1">
-                                  <div className="flex items-center gap-2">
-                                    <p
-                                      className={`text-sm font-extrabold ${
-                                        product.compare_at_price &&
-                                        product.compare_at_price > product.price
-                                          ? "text-red-600"
-                                          : "text-[#0B123A]"
-                                      }`}
-                                    >
-                                      {formatCurrency(product.price)}
-                                    </p>
-                                    {product.compare_at_price &&
-                                      product.compare_at_price >
-                                        product.price && (
-                                        <p className="text-xs text-black/70 line-through">
-                                          {formatCurrency(product.compare_at_price)}
-                                        </p>
-                                      )}
-                                  </div>
-                                  {product.rating_avg && (
-                                    <div className="flex items-center text-xs text-gray-600">
-                                      <span className="text-yellow-400">★</span>
-                                      <span className="ml-1">
-                                        {product.rating_avg.toFixed(1)}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
                               </div>
-                            </button>
-                          ))}
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {brandSearchResults.map((brand) => (
+                                  <button
+                                    key={brand.id}
+                                    type="button"
+                                    onClick={() => handleBrandClick(brand.slug)}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
+                                  >
+                                    <p className="truncate font-semibold text-slate-800">
+                                      {brand.name}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      {t("brandProductsCount", {
+                                        count: brand.count,
+                                      })}
+                                    </p>
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+                          )}
+
+                          {searchResults.length > 0 && (
+                            <section className="space-y-2">
+                              <div className="px-1">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {t("productsSection")}
+                                </p>
+                              </div>
+                              <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-slate-100">
+                                {searchResults.map((product) => (
+                                  <button
+                                    key={product.id}
+                                    onClick={() => handleProductClick(product)}
+                                    className="flex w-full items-center gap-3 bg-white p-3 text-left transition-colors hover:bg-gray-50"
+                                  >
+                                    <div className="relative h-14 w-14 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                                      {product.compare_at_price &&
+                                        product.compare_at_price > product.price && (
+                                          <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                                            -
+                                            {Math.round(
+                                              ((product.compare_at_price -
+                                                product.price) /
+                                                product.compare_at_price) *
+                                                100,
+                                            )}
+                                            %
+                                          </span>
+                                        )}
+                                      <NavbarThumbnail
+                                        src={product.thumbnail}
+                                        alt={product.title}
+                                      />
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        {product.title}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {product.brand_name}
+                                      </p>
+                                      <div className="flex items-center justify-between mt-1">
+                                        <div className="flex items-center gap-2">
+                                          <p
+                                            className={`text-sm font-extrabold ${
+                                              product.compare_at_price &&
+                                              product.compare_at_price >
+                                                product.price
+                                                ? "text-red-600"
+                                                : "text-[#0B123A]"
+                                            }`}
+                                          >
+                                            {formatCurrency(product.price)}
+                                          </p>
+                                          {product.compare_at_price &&
+                                            product.compare_at_price >
+                                              product.price && (
+                                              <p className="text-xs text-black/70 line-through">
+                                                {formatCurrency(
+                                                  product.compare_at_price,
+                                                )}
+                                              </p>
+                                            )}
+                                        </div>
+                                        {product.rating_avg && (
+                                          <div className="flex items-center text-xs text-gray-600">
+                                            <span className="text-yellow-400">
+                                              ★
+                                            </span>
+                                            <span className="ml-1">
+                                              {product.rating_avg.toFixed(1)}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+                          )}
                         </div>
                         <div className="p-3 border-t border-gray-100 bg-gray-50 sticky bottom-0">
                           <button
-                            onClick={() => {
-                              router.push(
-                                `/products?search=${encodeURIComponent(search)}`,
-                              );
-                              setShowSearchResults(false);
-                              setSearch("");
-                            }}
+                            onClick={navigateToSearchResults}
                             className="w-full text-center text-sm font-medium text-[#0B123A] hover:text-[#1a245a] py-2 flex items-center justify-center gap-2"
                           >
                             {t("viewAllResults")}
@@ -643,10 +809,8 @@ export default function Navbar() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link href="/account" onClick={closeMobilePanels}>
                   {user.profile_image ? (
-                    <img
+                    <NavbarProfileImage
                       src={user.profile_image}
-                      className="h-9 w-9 rounded-full object-cover border-2 border-gray-200 hover:border-[#0B123A] transition-colors"
-                      referrerPolicy="no-referrer"
                       alt="Profile"
                     />
                   ) : (
@@ -730,6 +894,7 @@ export default function Navbar() {
         onQueryChange={setCategorySearch}
         onClose={closeMobilePanels}
         onNavigate={handleCategoryClick}
+        onBrowseAllProducts={handleAllProductsClick}
         activeCategorySlug={activeCategorySlug}
       />
 
@@ -837,13 +1002,23 @@ export default function Navbar() {
                       <button
                         type="button"
                         onClick={() =>
+                          canNavigateCategoryDirectly(activeMobileNode) &&
                           handleCategoryClick(activeMobileNode.slug)
                         }
-                        className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A]"
+                        disabled={
+                          !canNavigateCategoryDirectly(activeMobileNode)
+                        }
+                        className={`mt-3 w-full rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${
+                          canNavigateCategoryDirectly(activeMobileNode)
+                            ? "border-slate-200 bg-white text-[#0B123A] hover:border-[#0B123A]"
+                            : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                        }`}
                       >
-                        {t("viewAllInCategory", {
-                          name: activeMobileNode.name,
-                        })}
+                        {canNavigateCategoryDirectly(activeMobileNode)
+                          ? t("viewAllInCategory", {
+                              name: activeMobileNode.name,
+                            })
+                          : t("preparingCategory")}
                       </button>
                       <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
                         {t("mobileBrowseHint")}
@@ -854,6 +1029,8 @@ export default function Navbar() {
                   {visibleMobileTreeCategories.map((category) => {
                     const isCurrentCategory =
                       activeCategorySlug === category.slug;
+                    const allowDirectNavigation =
+                      canNavigateCategoryDirectly(category);
 
                     return (
                       <div
@@ -875,7 +1052,9 @@ export default function Navbar() {
                               </span>
                             ) : (
                               <span className="mt-1 block text-xs font-normal text-slate-500">
-                                {t("viewProducts")}
+                                {allowDirectNavigation
+                                  ? t("viewProducts")
+                                  : t("preparingCategory")}
                               </span>
                             )}
                           </span>
@@ -885,13 +1064,23 @@ export default function Navbar() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleCategoryClick(category.slug)}
-                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${isCurrentCategory ? "border-indigo-300 bg-indigo-50 text-[#0B123A]" : "border-slate-200 text-slate-600 hover:border-[#0B123A] hover:text-[#0B123A]"}`}
+                          onClick={() =>
+                            allowDirectNavigation &&
+                            handleCategoryClick(category.slug)
+                          }
+                          disabled={!allowDirectNavigation}
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            allowDirectNavigation
+                              ? isCurrentCategory
+                                ? "border-indigo-300 bg-indigo-50 text-[#0B123A]"
+                                : "border-slate-200 text-slate-600 hover:border-[#0B123A] hover:text-[#0B123A]"
+                              : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                          }`}
                           aria-label={t("viewProductsOf", {
                             name: category.name,
                           })}
                         >
-                          {t("view")}
+                          {allowDirectNavigation ? t("view") : t("soon")}
                         </button>
                       </div>
                     );

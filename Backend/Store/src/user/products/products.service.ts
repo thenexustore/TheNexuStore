@@ -404,6 +404,22 @@ export class ProductsService {
           { title: { contains: search, mode: 'insensitive' } },
           { short_description: { contains: search, mode: 'insensitive' } },
           { description_html: { contains: search, mode: 'insensitive' } },
+          { brand: { name: { contains: search, mode: 'insensitive' } } },
+          { brand: { slug: { contains: search, mode: 'insensitive' } } },
+          { main_category: { name: { contains: search, mode: 'insensitive' } } },
+          { main_category: { slug: { contains: search, mode: 'insensitive' } } },
+          {
+            categories: {
+              some: {
+                category: {
+                  OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { slug: { contains: search, mode: 'insensitive' } },
+                  ],
+                },
+              },
+            },
+          },
           {
             skus: {
               some: { sku_code: { contains: search, mode: 'insensitive' } },
@@ -1329,6 +1345,22 @@ export class ProductsService {
             { title: { contains: query, mode: 'insensitive' } },
             { short_description: { contains: query, mode: 'insensitive' } },
             { description_html: { contains: query, mode: 'insensitive' } },
+            { brand: { name: { contains: query, mode: 'insensitive' } } },
+            { brand: { slug: { contains: query, mode: 'insensitive' } } },
+            { main_category: { name: { contains: query, mode: 'insensitive' } } },
+            { main_category: { slug: { contains: query, mode: 'insensitive' } } },
+            {
+              categories: {
+                some: {
+                  category: {
+                    OR: [
+                      { name: { contains: query, mode: 'insensitive' } },
+                      { slug: { contains: query, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+              },
+            },
             {
               skus: {
                 some: { sku_code: { contains: query, mode: 'insensitive' } },

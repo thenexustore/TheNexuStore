@@ -6,6 +6,12 @@ export type MenuParentCategory = {
   subfamilyKeywords: readonly string[];
 };
 
+type TaxonomyOverrideRule = {
+  key: string;
+  anyOf: readonly string[];
+  noneOf?: readonly string[];
+};
+
 export const DEFAULT_PARENT_CATEGORY: Pick<
   MenuParentCategory,
   'key' | 'label'
@@ -13,6 +19,56 @@ export const DEFAULT_PARENT_CATEGORY: Pick<
   key: 'accesorios-consumibles',
   label: 'Accesorios y consumibles',
 };
+
+const SOFTWARE_BUSINESS_KEYWORDS = [
+  'software gestion',
+  'software ofimatica',
+  'software gestión',
+  'software ofimática',
+  'facturacion',
+  'facturación',
+  'tpv',
+  'erp',
+  'crm',
+  'contabilidad',
+  'nomina',
+  'nómina',
+  'punto de venta',
+] as const;
+
+const GAMING_SECURITY_KEYWORDS = [
+  'videovigilancia',
+  'cctv',
+  'camara ip',
+  'cámara ip',
+  'camara inalambrica',
+  'cámara inalámbrica',
+  'camara seguridad',
+  'cámara seguridad',
+  'camara wifi',
+  'cámara wifi',
+  'camara exterior',
+  'cámara exterior',
+  'nvr',
+  'dvr',
+  'videoportero',
+  'kit videovigilancia',
+] as const;
+
+const ACCESSORY_ORGANIZATION_KEYWORDS = [
+  'candado portatil',
+  'candado portátil',
+  'cable lock',
+  'filtro privacidad',
+  'privacidad pantalla',
+  'organizador cables',
+  'bridas',
+  'bridas velcro',
+  'filtro de privacidad',
+  'anclaje seguridad',
+  'anclaje antirrobo',
+  'soporte antirrobo',
+] as const;
 
 export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
   {
@@ -34,8 +90,9 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'nettop',
       'barebone',
       'embedded',
+      'todo en uno',
     ],
-    subfamilyKeywords: ['ultrabook', 'chromebook', 'torre pc'],
+    subfamilyKeywords: ['ultrabook', 'chromebook', 'torre pc', 'todo en uno'],
   },
   {
     key: 'componentes-almacenamiento',
@@ -70,6 +127,15 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'cooler',
       'disipador',
       'adaptador interno',
+      'semitorre',
+      'miditorre',
+      'tarjeta controladora',
+      'tarjetas controladoras',
+      'secure digital',
+      'sd',
+      'micro sd',
+      'tarjeta sonido',
+      'tarjetas sonido',
     ],
   },
   {
@@ -89,9 +155,15 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'dock',
       'hub usb',
       'capturadora',
+      'docking station',
+      'dock usb c',
+      'replicador puertos',
       'monitor gaming',
       'pantalla',
       'display',
+      'tft',
+      'tactil',
+      'táctil',
       'lector',
       'scanner de mano',
       'trackball',
@@ -129,6 +201,14 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'cinta termica',
       'papel',
       'etiquetadora',
+      'fotoconductor',
+      'tambor',
+      'ribbon',
+      'etiqueta termica',
+      'etiqueta térmica',
+      'rollo termico',
+      'rollo térmico',
+      'cinta resina',
     ],
   },
   {
@@ -148,10 +228,19 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'ups',
       'cableado',
       'transceiver',
+      'sfp',
       'patch panel',
+      'panel de parcheo',
+      'latiguillo',
+      'armario rack',
       'kvm',
       'punto de acceso',
+      'puntos de acceso',
+      'red inalambrica',
+      'red inalámbrica',
       'mesh',
+      'servidor torre',
+      'servidores torre',
       'powerline',
       'repetidor',
       'amplificador wifi',
@@ -167,17 +256,28 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
     subfamilyKeywords: [
       'smartphone',
       'telefono',
+      'telefono movil',
       'tablet',
       'smartwatch',
       'wearable',
       'mifi',
       'pda',
+      'rfid',
+      'terminal movil',
+      'terminal portatil',
+      'handheld',
+      'lector codigo',
       'radiofrecuencia',
       'funda',
       'cargador movil',
       'accesorio movil',
       'protector pantalla',
+      'power bank',
       'gps',
+      'telefono ip',
+      'telefonos ip',
+      'telefonos fijos',
+      'teléfonos fijos',
     ],
   },
   {
@@ -210,7 +310,11 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'pantalla proyeccion',
       'altavoz bluetooth',
       'auriculares bluetooth',
-      'camara seguridad',
+      'reproductor tv',
+      'radio despertador',
+      'reproductor tv',
+      'via satelite',
+      'sintonizador radio',
     ],
   },
   {
@@ -232,6 +336,7 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'cloud',
       'saas',
       'office',
+      ...SOFTWARE_BUSINESS_KEYWORDS,
       'sistema operativo',
       'endpoint',
       'vpn',
@@ -251,8 +356,7 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'consola',
       'vr',
       'simracing',
-      'videovigilancia',
-      'cctv',
+      ...GAMING_SECURITY_KEYWORDS,
       'hogar inteligente',
       'sensor',
       'iluminacion inteligente',
@@ -279,6 +383,14 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'mochila',
       'maletin',
       'funda portatil',
+      'funda portátil',
+      'sleeve',
+      'bandolera',
+      'trolley',
+      'mochila portatil',
+      'mochila portátil',
+      'maletin trolley',
+      'maletín trolley',
     ],
     subfamilyKeywords: [
       'pila',
@@ -288,7 +400,222 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'alargador',
       'soporte',
       'brazo monitor',
+      'hdmi',
+      'displayport',
+      'usb c',
+      'usb-c',
+      'vga',
+      'dvi',
+      'jack',
+      'reposamunecas',
+      'reposamuñecas',
+      'alfombrilla',
+      'alfombrilla ergonomica',
+      'alfombrilla ergonómica',
+      'elevador portatil',
+      'elevador portátil',
+      'soporte portatil',
+      'soporte portátil',
+      'sleeve',
+      'bandolera',
+      'trolley',
+      'mochila portatil',
+      'mochila portátil',
+      'maletin trolley',
+      'maletín trolley',
+      'funda portátil',
+      'aire comprimido',
+      'spray limpieza',
+      'toallitas',
+      'kit limpieza',
+      'limpiador pantalla',
+      'gel limpieza',
+      'pila boton',
+      'pila botón',
+      'bateria recargable',
+      'batería recargable',
+      'pilas aa',
+      'pilas aaa',
+      'cr2032',
+      'aa',
+      'aaa',
+      'power strip',
+      'base multiple',
+      'base múltiple',
+      'base enchufes',
+      'cargador universal',
+      ...ACCESSORY_ORGANIZATION_KEYWORDS,
     ],
+  },
+];
+
+const PARENT_CATEGORY_OVERRIDE_RULES: readonly TaxonomyOverrideRule[] = [
+  {
+    key: 'monitores-perifericos',
+    anyOf: ['docking station', 'dock usb c', 'replicador puertos'],
+  },
+  {
+    key: 'accesorios-consumibles',
+    anyOf: [
+      'aire comprimido',
+      'spray limpieza',
+      'toallitas',
+      'kit limpieza',
+      'limpiador pantalla',
+      'gel limpieza',
+      'pila boton',
+      'pila botón',
+      'bateria recargable',
+      'batería recargable',
+      'pilas aa',
+      'pilas aaa',
+      'cr2032',
+      'aa',
+      'aaa',
+      'power strip',
+      'base multiple',
+      'base múltiple',
+      'base enchufes',
+      'cargador universal',
+      ...ACCESSORY_ORGANIZATION_KEYWORDS,
+    ],
+  },
+  {
+    key: 'accesorios-consumibles',
+    anyOf: [
+      'hdmi',
+      'displayport',
+      'usb c',
+      'usb-c',
+      'vga',
+      'dvi',
+      'jack',
+      'reposamunecas',
+      'reposamuñecas',
+      'alfombrilla ergonomica',
+      'alfombrilla ergonómica',
+      'elevador portatil',
+      'elevador portátil',
+      'soporte portatil',
+      'soporte portátil',
+      'sleeve',
+      'bandolera',
+      'trolley',
+      'mochila portatil',
+      'mochila portátil',
+      'maletin trolley',
+      'maletín trolley',
+      'funda portátil',
+      'aire comprimido',
+      'spray limpieza',
+      'toallitas',
+      'kit limpieza',
+      'limpiador pantalla',
+      'gel limpieza',
+      'pila boton',
+      'pila botón',
+      'bateria recargable',
+      'batería recargable',
+      'pilas aa',
+      'pilas aaa',
+      'cr2032',
+      'aa',
+      'aaa',
+      'power strip',
+      'base multiple',
+      'base múltiple',
+      'base enchufes',
+      'cargador universal',
+      'candado portatil',
+      'candado portátil',
+      'cable lock',
+      'filtro privacidad',
+      'privacidad pantalla',
+      'organizador cables',
+      'bridas',
+      'bridas velcro',
+      'filtro de privacidad',
+      'anclaje seguridad',
+      'anclaje antirrobo',
+      'soporte antirrobo',
+    ],
+    noneOf: ['monitor', 'pantalla'],
+  },
+  {
+    key: 'monitores-perifericos',
+    anyOf: [
+      'pen tablet',
+      'tableta grafica',
+      'tableta digitalizadora',
+      'docking station',
+      'dock usb c',
+      'replicador puertos',
+    ],
+  },
+  {
+    key: 'telefonia-movilidad',
+    anyOf: [
+      'smartphone',
+      'telefono movil',
+      'movil',
+      'mobile',
+      'tablet',
+      'smartwatch',
+      'wearable',
+      'mifi',
+      'pda',
+      'rfid',
+      'terminal movil',
+      'terminal portatil',
+      'handheld',
+      'gps',
+    ],
+    noneOf: ['pen tablet', 'tableta grafica', 'tableta digitalizadora'],
+  },
+  {
+    key: 'gaming-smart-home',
+    anyOf: [
+      'camara seguridad',
+      'cámara seguridad',
+      'camara ip',
+      'cámara ip',
+      'camara inalambrica',
+      'cámara inalámbrica',
+      'camara wifi',
+      'cámara wifi',
+      'camara exterior',
+      'cámara exterior',
+      'nvr',
+      'dvr',
+      'videoportero',
+      'kit videovigilancia',
+      'videovigilancia',
+      'cctv',
+      'alarma',
+      'control de acceso',
+      'cerradura inteligente',
+    ],
+  },
+  {
+    key: 'ordenadores-portatiles',
+    anyOf: [
+      'portatil',
+      'notebook',
+      'laptop',
+      'ultrabook',
+      'chromebook',
+      'desktop',
+      'sobremesa',
+      'workstation',
+      'all in one',
+      'mini pc',
+      'barebone',
+      'thin client',
+      'cliente ligero',
+      'panel pc',
+      'embedded pc',
+    ],
+    noneOf: ['movil', 'telefono', 'smartphone', 'tablet'],
   },
 ];
 
@@ -324,6 +651,20 @@ function scoreCategory(
   return score;
 }
 
+function matchesOverrideRule(
+  text: string,
+  rule: TaxonomyOverrideRule,
+): boolean {
+  const hasPositive = rule.anyOf.some((keyword) =>
+    text.includes(normalizeText(keyword)),
+  );
+  if (!hasPositive) return false;
+
+  return !(rule.noneOf ?? []).some((keyword) =>
+    text.includes(normalizeText(keyword)),
+  );
+}
+
 export function slugifyCategory(value: string): string {
   return normalizeText(value)
     .replace(/[^a-z0-9]+/g, '-')
@@ -343,9 +684,25 @@ export function recommendParentCategory(
 ): { key: string; label: string } {
   const family = normalizeText(familyName);
   const subfamily = normalizeText(subfamilyName);
+  const combined = normalizeText(`${familyName ?? ''} ${subfamilyName ?? ''}`);
 
   if (!family && !subfamily) {
     return DEFAULT_PARENT_CATEGORY;
+  }
+
+  const override = PARENT_CATEGORY_OVERRIDE_RULES.find((rule) =>
+    matchesOverrideRule(combined, rule),
+  );
+  if (override) {
+    const matchedCategory = MENU_PARENT_TAXONOMY.find(
+      (category) => category.key === override.key,
+    );
+    if (matchedCategory) {
+      return {
+        key: matchedCategory.key,
+        label: matchedCategory.label,
+      };
+    }
   }
 
   const scored = MENU_PARENT_TAXONOMY.map((category) => ({

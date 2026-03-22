@@ -225,6 +225,71 @@ describe('category-taxonomy.util', () => {
     );
   });
 
+  it('rescues misplaced rows from otras-categorias when the name clearly maps to another canonical parent', () => {
+    const normalized = normalizeCategoryTaxonomyRows([
+      {
+        id: 'canonical-accessories',
+        name: 'Accesorios y consumibles',
+        slug: 'accesorios-consumibles',
+        parent_id: null,
+        sort_order: 90,
+      },
+      {
+        id: 'misplaced-ap',
+        name: 'Puntos de acceso',
+        slug: 'puntos-de-acceso',
+        parent_id: 'canonical-accessories',
+        sort_order: 10,
+      },
+      {
+        id: 'misplaced-toner',
+        name: 'Tambor/Fotoconductor',
+        slug: 'tambor-fotoconductor',
+        parent_id: 'canonical-accessories',
+        sort_order: 20,
+      },
+      {
+        id: 'misplaced-ip-phone',
+        name: 'Teléfonos IP',
+        slug: 'telefonos-ip',
+        parent_id: 'canonical-accessories',
+        sort_order: 30,
+      },
+    ]);
+
+    const tree = buildCategoryTaxonomyTree(normalized, 3);
+    const networking = tree.find((node) => node.slug === 'redes-servidores');
+    const printing = tree.find((node) => node.slug === 'impresion-escaneado');
+
+    expect(networking?.children.map((node) => node.slug)).toContain(
+      'redes-servidores-familia-redes-wifi',
+    );
+    expect(
+      networking?.children
+        .flatMap((node) => node.children)
+        .map((node) => node.slug),
+    ).toContain('puntos-de-acceso');
+
+    expect(printing?.children.map((node) => node.slug)).toContain(
+      'impresion-escaneado-familia-consumibles-impresion',
+    );
+    expect(
+      printing?.children
+        .flatMap((node) => node.children)
+        .map((node) => node.slug),
+    ).toContain('tambor-fotoconductor');
+
+    const telephony = tree.find((node) => node.slug === 'telefonia-movilidad');
+    expect(telephony?.children.map((node) => node.slug)).toContain(
+      'telefonia-movilidad-familia-smartphones-telefonia',
+    );
+    expect(
+      telephony?.children
+        .flatMap((node) => node.children)
+        .map((node) => node.slug),
+    ).toContain('telefonos-ip');
+  });
+
   it('creates synthetic level-2 parent buckets under canonical grandparents', () => {
     const normalized = normalizeCategoryTaxonomyRows([
       {
@@ -295,6 +360,24 @@ describe('category-taxonomy.util', () => {
       expectedSlug: 'redes-servidores-familia-rack-energia-cableado',
     },
     {
+      grandparentSlug: 'redes-servidores',
+      familyName: 'Infraestructura',
+      subfamilyName: 'SFP 10G multimodo',
+      expectedSlug: 'redes-servidores-familia-rack-energia-cableado',
+    },
+    {
+      grandparentSlug: 'redes-servidores',
+      familyName: 'Cableado',
+      subfamilyName: 'Latiguillo fibra óptica',
+      expectedSlug: 'redes-servidores-familia-rack-energia-cableado',
+    },
+    {
+      grandparentSlug: 'redes-servidores',
+      familyName: 'Rack',
+      subfamilyName: 'Armario rack mural 19',
+      expectedSlug: 'redes-servidores-familia-rack-energia-cableado',
+    },
+    {
       grandparentSlug: 'software-seguridad',
       familyName: 'Ofimática',
       subfamilyName: 'Microsoft 365 Empresa',
@@ -332,6 +415,150 @@ describe('category-taxonomy.util', () => {
     },
     {
       grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Cableado',
+      subfamilyName: 'HDMI 2.1 alta velocidad',
+      expectedSlug: 'accesorios-consumibles-familia-cables-adaptadores',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Adaptadores',
+      subfamilyName: 'USB-C a HDMI',
+      expectedSlug: 'accesorios-consumibles-familia-cables-adaptadores',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Cableado',
+      subfamilyName: 'DisplayPort 1.4',
+      expectedSlug: 'accesorios-consumibles-familia-cables-adaptadores',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Ergonomía',
+      subfamilyName: 'Reposamuñecas gel teclado',
+      expectedSlug: 'accesorios-consumibles-familia-soportes-ergonomia',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Ergonomía',
+      subfamilyName: 'Soporte portátil plegable',
+      expectedSlug: 'accesorios-consumibles-familia-soportes-ergonomia',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Accesorios',
+      subfamilyName: 'Alfombrilla ergonómica',
+      expectedSlug: 'accesorios-consumibles-familia-soportes-ergonomia',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Transporte',
+      subfamilyName: 'Sleeve 15.6',
+      expectedSlug: 'accesorios-consumibles-familia-fundas-transporte',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Transporte',
+      subfamilyName: 'Mochila portátil 15.6',
+      expectedSlug: 'accesorios-consumibles-familia-fundas-transporte',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Transporte',
+      subfamilyName: 'Maletín trolley',
+      expectedSlug: 'accesorios-consumibles-familia-fundas-transporte',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Mantenimiento',
+      subfamilyName: 'Aire comprimido multiuso',
+      expectedSlug: 'accesorios-consumibles-familia-limpieza-mantenimiento',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Limpieza',
+      subfamilyName: 'Kit limpieza pantalla',
+      expectedSlug: 'accesorios-consumibles-familia-limpieza-mantenimiento',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Limpieza',
+      subfamilyName: 'Toallitas limpieza monitor',
+      expectedSlug: 'accesorios-consumibles-familia-limpieza-mantenimiento',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Baterías',
+      subfamilyName: 'Pila botón CR2032',
+      expectedSlug: 'accesorios-consumibles-familia-pilas-baterias',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Baterías',
+      subfamilyName: 'Batería recargable AA',
+      expectedSlug: 'accesorios-consumibles-familia-pilas-baterias',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Baterías',
+      subfamilyName: 'Pilas AAA',
+      expectedSlug: 'accesorios-consumibles-familia-pilas-baterias',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Energía',
+      subfamilyName: 'Power strip 6 tomas',
+      expectedSlug: 'accesorios-consumibles-familia-energia-carga',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Energía',
+      subfamilyName: 'Base múltiple 6 tomas',
+      expectedSlug: 'accesorios-consumibles-familia-energia-carga',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Carga',
+      subfamilyName: 'Cargador universal portátil',
+      expectedSlug: 'accesorios-consumibles-familia-energia-carga',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Seguridad',
+      subfamilyName: 'Candado portátil con llave',
+      expectedSlug: 'accesorios-consumibles-familia-seguridad-organizacion',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Seguridad',
+      subfamilyName: 'Filtro privacidad 15.6',
+      expectedSlug: 'accesorios-consumibles-familia-seguridad-organizacion',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Organización',
+      subfamilyName: 'Organizador cables escritorio',
+      expectedSlug: 'accesorios-consumibles-familia-seguridad-organizacion',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Seguridad',
+      subfamilyName: 'Filtro de privacidad magnético',
+      expectedSlug: 'accesorios-consumibles-familia-seguridad-organizacion',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Seguridad',
+      subfamilyName: 'Anclaje antirrobo sobremesa',
+      expectedSlug: 'accesorios-consumibles-familia-seguridad-organizacion',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
+      familyName: 'Organización',
+      subfamilyName: 'Bridas velcro reutilizables',
+      expectedSlug: 'accesorios-consumibles-familia-seguridad-organizacion',
+    },
+    {
+      grandparentSlug: 'accesorios-consumibles',
       familyName: 'Consumibles',
       subfamilyName: 'Spray de limpieza',
       expectedSlug: 'accesorios-consumibles-familia-limpieza-mantenimiento',
@@ -349,10 +576,64 @@ describe('category-taxonomy.util', () => {
       expectedSlug: 'gaming-smart-home-familia-mobiliario-gaming-simracing',
     },
     {
+      grandparentSlug: 'gaming-smart-home',
+      familyName: 'Seguridad',
+      subfamilyName: 'Cámara IP WiFi exterior',
+      expectedSlug: 'gaming-smart-home-familia-seguridad-control-acceso',
+    },
+    {
+      grandparentSlug: 'tv-audio-video',
+      familyName: 'TV',
+      subfamilyName: 'Mini LED 55',
+      expectedSlug: 'tv-audio-video-familia-televisores-smart-tv',
+    },
+    {
+      grandparentSlug: 'gaming-smart-home',
+      familyName: 'Seguridad',
+      subfamilyName: 'NVR videovigilancia 8 canales',
+      expectedSlug: 'gaming-smart-home-familia-seguridad-control-acceso',
+    },
+    {
+      grandparentSlug: 'gaming-smart-home',
+      familyName: 'Seguridad',
+      subfamilyName: 'Videoportero WiFi',
+      expectedSlug: 'gaming-smart-home-familia-seguridad-control-acceso',
+    },
+    {
       grandparentSlug: 'software-seguridad',
       familyName: 'Gestión empresarial',
       subfamilyName: 'TPV y facturación',
       expectedSlug: 'software-seguridad-familia-gestion-facturacion-pdv',
+    },
+    {
+      grandparentSlug: 'software-seguridad',
+      familyName: 'Gestión empresarial',
+      subfamilyName: 'CRM cloud para ventas',
+      expectedSlug: 'software-seguridad-familia-gestion-facturacion-pdv',
+    },
+    {
+      grandparentSlug: 'software-seguridad',
+      familyName: 'Gestión empresarial',
+      subfamilyName: 'Software de nómina',
+      expectedSlug: 'software-seguridad-familia-gestion-facturacion-pdv',
+    },
+    {
+      grandparentSlug: 'monitores-perifericos',
+      familyName: 'Periféricos',
+      subfamilyName: 'Docking station USB-C',
+      expectedSlug: 'monitores-perifericos-familia-docks-creacion-accesorios',
+    },
+    {
+      grandparentSlug: 'impresion-escaneado',
+      familyName: 'Consumibles',
+      subfamilyName: 'Ribbon resina cera',
+      expectedSlug: 'impresion-escaneado-familia-consumibles-impresion',
+    },
+    {
+      grandparentSlug: 'impresion-escaneado',
+      familyName: 'Etiquetado',
+      subfamilyName: 'Etiqueta térmica 100x150',
+      expectedSlug: 'impresion-escaneado-familia-consumibles-impresion',
     },
     {
       grandparentSlug: 'software-seguridad',
@@ -372,6 +653,24 @@ describe('category-taxonomy.util', () => {
       familyName: 'AV',
       subfamilyName: 'Cartelería digital profesional',
       expectedSlug: 'tv-audio-video-familia-carteleria-videoconferencia',
+    },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Telefonía',
+      subfamilyName: 'Smartphone Android 5G',
+      expectedSlug: 'telefonia-movilidad-familia-smartphones-telefonia',
+    },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Movilidad profesional',
+      subfamilyName: 'Terminal móvil Android RFID',
+      expectedSlug: 'telefonia-movilidad-familia-movilidad-profesional-gps-rf',
+    },
+    {
+      grandparentSlug: 'telefonia-movilidad',
+      familyName: 'Accesorios',
+      subfamilyName: 'Power bank MagSafe',
+      expectedSlug: 'telefonia-movilidad-familia-accesorios-movilidad',
     },
   ])(
     'matches expected level-2 parent for $familyName / $subfamilyName',

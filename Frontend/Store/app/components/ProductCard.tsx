@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Star } from "lucide-react";
@@ -17,16 +18,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
   product,
   className = "",
 }) => {
-  if (!product) {
-    return (
-      <div className={`bg-white rounded-xl shadow-sm p-4 ${className}`}>
-        <div className="text-center text-gray-500 py-8">
-          Product not available
-        </div>
-      </div>
-    );
-  }
-
   const isOutOfStock =
     product.stock_status === "OUT_OF_STOCK" ||
     (product.stock_quantity ?? 0) <= 0;
@@ -156,6 +147,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
     window.dispatchEvent(new CustomEvent("favorites-update"));
   };
 
+  if (!product) {
+    return (
+      <div className={`bg-white rounded-xl shadow-sm p-4 ${className}`}>
+        <div className="text-center text-gray-500 py-8">
+          Product not available
+        </div>
+      </div>
+    );
+  }
+
   const imageSrc =
     product.thumbnail && product.thumbnail.trim() !== ""
       ? product.thumbnail
@@ -199,21 +200,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
       <Link href={`/products/${product.slug}`} className="block p-4 focus-ring">
         <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gray-50 mb-4">
-          <img
+          <Image
             src={imageSrc}
             alt={product.title}
-            loading="lazy"
-            decoding="async"
-            style={{
-              height: "100%",
-              width: "100%",
-              objectFit: "contain",
-              padding: "2px",
-            }}
-            className="transition-transform duration-300 group-hover:scale-105"
+            fill
+            unoptimized
+            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            className="p-0.5 object-contain transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = "/No_Image_Available.png";
+              const target = e.currentTarget as HTMLImageElement;
+              if (target.src.endsWith("/No_Image_Available.png")) return;
+              target.src = "/No_Image_Available.png";
             }}
           />
 

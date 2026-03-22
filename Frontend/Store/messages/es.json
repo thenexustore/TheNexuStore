@@ -4,6 +4,12 @@
     "searchPlaceholder": "Buscar productos, marcas, categorías...",
     "searching": "Buscando...",
     "productsFound": "{count} producto(s) encontrado(s)",
+    "brandsFound": "{count} marca(s) encontrada(s)",
+    "categoriesFound": "{count} categoría(s) encontrada(s)",
+    "productsSection": "Productos",
+    "brandsSection": "Marcas",
+    "categoriesSection": "Categorías",
+    "brandProductsCount": "{count} producto(s)",
     "viewAllResults": "Ver todos los resultados",
     "noResults": "No se encontraron resultados",
     "tryKeywords": "Prueba con otras palabras",
@@ -78,6 +84,14 @@
   "products": {
     "all": "Todos los productos",
     "found": "{count} productos encontrados",
+    "searchTermLabel": "Búsqueda",
+    "searchRefineTitle": "Afina tu búsqueda",
+    "searchRefineHint": "También puedes entrar directamente por una categoría o marca relacionada con este término.",
+    "emptySearchRefineTitle": "Prueba por una ruta más concreta",
+    "emptySearchRefineHint": "No hemos encontrado productos con la combinación actual, pero estas categorías o marcas sí están relacionadas con tu búsqueda.",
+    "relatedCategories": "Categorías relacionadas",
+    "relatedBrands": "Marcas relacionadas",
+    "clearSearchAndFilters": "Limpiar búsqueda y filtros",
     "sortBy": "Ordenar por:",
     "newest": "Más recientes",
     "nameAZ": "Nombre: A a Z",
@@ -107,7 +121,8 @@
     "noImage": "Sin imagen",
     "premiumDesc": "Producto de alta calidad con excelentes características y rendimiento.",
     "description": "Descripción",
-    "relatedProducts": "Productos relacionados"
+    "relatedProducts": "Productos relacionados",
+    "mobileRefineLabel": "Refinado móvil"
   },
   "cart": {
     "emptyTitle": "Tu carrito está vacío",

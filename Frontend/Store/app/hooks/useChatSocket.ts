@@ -29,7 +29,10 @@ export function useChatSocket({
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const onNewMessageRef = useRef(onNewMessage);
-  onNewMessageRef.current = onNewMessage;
+
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -54,7 +57,7 @@ export function useChatSocket({
       socketRef.current = null;
       setConnected(false);
     };
-  }, [enabled]);
+  }, [conversationId, enabled]);
 
   useEffect(() => {
     const socket = socketRef.current;

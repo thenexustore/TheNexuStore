@@ -22,7 +22,10 @@ export function useOrderTrackingSocket(params: {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const onUpdateRef = useRef(onUpdate);
-  onUpdateRef.current = onUpdate;
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
 
   useEffect(() => {
     if (!enabled) {

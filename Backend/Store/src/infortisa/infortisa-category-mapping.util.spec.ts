@@ -29,6 +29,11 @@ describe('Infortisa category mapping', () => {
     expect(result.label).toBe('TV, audio y vídeo');
   });
 
+  it('maps short LED labels into TV, audio y vídeo', () => {
+    const result = recommendParentCategory(null, 'Led');
+    expect(result.label).toBe('TV, audio y vídeo');
+  });
+
   it('prioritizes subfamily keywords in correct parent when family is generic', () => {
     const result = recommendParentCategory('Hardware', 'Impresoras Láser');
     expect(result.label).toBe('Impresión y escaneado');
@@ -116,6 +121,19 @@ describe('Infortisa category mapping', () => {
     ).toBe('Gaming y smart home');
   });
 
+  it.each([
+    'Cámara IP',
+    'Cámara inalámbrica',
+    'Cámara WiFi',
+    'NVR 8 canales',
+    'DVR videovigilancia',
+    'Videoportero WiFi',
+  ])('maps %s into Gaming y smart home', (label) => {
+    expect(recommendParentCategory(null, label).label).toBe(
+      'Gaming y smart home',
+    );
+  });
+
   it('maps proyector tv keyword into TV, audio y vídeo', () => {
     expect(recommendParentCategory(null, 'Proyector TV 4K').label).toBe(
       'TV, audio y vídeo',
@@ -125,6 +143,30 @@ describe('Infortisa category mapping', () => {
   it('maps windows keyword into Software y seguridad', () => {
     expect(recommendParentCategory(null, 'Windows 11 Pro').label).toBe(
       'Software y seguridad',
+    );
+  });
+
+  it('maps CRM keyword into Software y seguridad', () => {
+    expect(recommendParentCategory(null, 'CRM cloud para ventas').label).toBe(
+      'Software y seguridad',
+    );
+  });
+
+  it('maps nómina keyword into Software y seguridad', () => {
+    expect(recommendParentCategory(null, 'Software de nómina').label).toBe(
+      'Software y seguridad',
+    );
+  });
+
+  it('maps docking station keyword into Monitores y periféricos', () => {
+    expect(recommendParentCategory(null, 'Docking station USB-C').label).toBe(
+      'Monitores y periféricos',
+    );
+  });
+
+  it('maps ribbon keyword into Impresión y escaneado', () => {
+    expect(recommendParentCategory(null, 'Ribbon resina cera').label).toBe(
+      'Impresión y escaneado',
     );
   });
 
@@ -140,6 +182,150 @@ describe('Infortisa category mapping', () => {
     );
   });
 
+  it('maps HDMI into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'HDMI').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps DisplayPort into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'DisplayPort').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps USB-C a HDMI into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'USB-C a HDMI').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps reposamuñecas into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Reposamuñecas gel').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps soporte portátil into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Soporte portátil plegable').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps alfombrilla ergonómica into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Alfombrilla ergonómica').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps sleeve into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Sleeve 15.6').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps mochila portátil into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Mochila portátil 15.6').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps maletín trolley into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Maletín trolley').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps aire comprimido into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Aire comprimido').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps kit limpieza into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Kit limpieza pantalla').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps toallitas into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Toallitas limpieza').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps pila botón into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Pila botón CR2032').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps batería recargable into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Batería recargable AA').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps pilas AAA into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Pilas AAA').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps power strip into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Power strip').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps base múltiple into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Base múltiple 6 tomas').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps cargador universal into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Cargador universal').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps candado portátil into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Candado portátil').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps filtro privacidad into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Filtro privacidad 15.6').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps organizador cables into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Organizador cables').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps filtro de privacidad into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Filtro de privacidad').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps anclaje antirrobo into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Anclaje antirrobo').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
+  it('maps bridas velcro into Accesorios y consumibles', () => {
+    expect(recommendParentCategory(null, 'Bridas velcro').label).toBe(
+      'Accesorios y consumibles',
+    );
+  });
+
   it('maps regleta keyword into Accesorios y consumibles', () => {
     expect(recommendParentCategory(null, 'Regleta 6 tomas').label).toBe(
       'Accesorios y consumibles',
@@ -148,6 +334,24 @@ describe('Infortisa category mapping', () => {
 
   it('maps Puntos de acceso into Redes y servidores', () => {
     expect(recommendParentCategory(null, 'Puntos de acceso').label).toBe(
+      'Redes y servidores',
+    );
+  });
+
+  it('maps SFP into Redes y servidores', () => {
+    expect(recommendParentCategory(null, 'SFP 10G').label).toBe(
+      'Redes y servidores',
+    );
+  });
+
+  it('maps latiguillo into Redes y servidores', () => {
+    expect(recommendParentCategory(null, 'Latiguillo fibra óptica').label).toBe(
+      'Redes y servidores',
+    );
+  });
+
+  it('maps armario rack into Redes y servidores', () => {
+    expect(recommendParentCategory(null, 'Armario rack 19').label).toBe(
       'Redes y servidores',
     );
   });

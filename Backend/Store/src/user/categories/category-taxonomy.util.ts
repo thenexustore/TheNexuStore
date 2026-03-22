@@ -48,6 +48,54 @@ type CategoryLevel2Input = Pick<CategoryTaxonomyRow, 'name' | 'slug'> & {
   subfamilyName?: string | null;
 };
 
+const SOFTWARE_BUSINESS_KEYWORDS = [
+  'erp',
+  'crm',
+  'facturacion',
+  'facturación',
+  'tpv',
+  'punto de venta',
+  'contabilidad',
+  'nomina',
+  'nómina',
+  'software gestion',
+  'software gestión',
+] as const;
+
+const GAMING_SECURITY_KEYWORDS = [
+  'videovigilancia',
+  'cctv',
+  'camara ip',
+  'cámara ip',
+  'camara inalambrica',
+  'cámara inalámbrica',
+  'camara seguridad',
+  'cámara seguridad',
+  'camara wifi',
+  'cámara wifi',
+  'camara exterior',
+  'cámara exterior',
+  'nvr',
+  'dvr',
+  'videoportero',
+  'kit videovigilancia',
+] as const;
+
+const ACCESSORY_ORGANIZATION_KEYWORDS = [
+  'candado portatil',
+  'candado portátil',
+  'cable lock',
+  'filtro privacidad',
+  'privacidad pantalla',
+  'organizador cables',
+  'bridas',
+  'bridas velcro',
+  'filtro de privacidad',
+  'anclaje seguridad',
+  'anclaje antirrobo',
+  'soporte antirrobo',
+] as const;
+
 const CATEGORY_TAXONOMY_GROUPS: Readonly<
   Record<string, readonly CategoryTaxonomyGroup[]>
 > = {
@@ -189,7 +237,16 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'docks-creacion-accesorios',
       label: 'Docks, creación y accesorios',
       sortOrder: 40,
-      keywords: ['dock', 'hub', 'stylus', 'pen tablet', 'grabadora'],
+      keywords: [
+        'dock',
+        'docking station',
+        'dock usb c',
+        'replicador puertos',
+        'hub',
+        'stylus',
+        'pen tablet',
+        'grabadora',
+      ],
     },
   ],
   'impresion-escaneado': [
@@ -228,7 +285,13 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'fuser',
         'fotoconductor',
         'rollo',
+        'rollo termico',
+        'rollo térmico',
         'cinta termica',
+        'cinta resina',
+        'ribbon',
+        'etiqueta termica',
+        'etiqueta térmica',
         'papel',
       ],
     },
@@ -281,8 +344,12 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'pdu',
         'cableado',
         'patch panel',
+        'panel de parcheo',
+        'latiguillo',
+        'armario rack',
         'fibra optica',
         'transceiver',
+        'sfp',
       ],
     },
   ],
@@ -342,10 +409,13 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'television',
         'televisión',
         'tv',
+        'led',
+        'mini led',
         'oled',
         'qled',
         'google tv',
         'android tv',
+        'smart tv',
       ],
     },
     {
@@ -415,16 +485,7 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       label: 'Gestión, facturación y TPV',
       sortOrder: 15,
       keywords: [
-        'erp',
-        'facturacion',
-        'facturación',
-        'tpv',
-        'punto de venta',
-        'contabilidad',
-        'nomina',
-        'nómina',
-        'software gestion',
-        'software gestión',
+        ...SOFTWARE_BUSINESS_KEYWORDS,
       ],
     },
     {
@@ -495,7 +556,11 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'seguridad-control-acceso',
       label: 'Seguridad y control de acceso',
       sortOrder: 30,
-      keywords: ['videovigilancia', 'cctv', 'alarma', 'control de acceso'],
+      keywords: [
+        ...GAMING_SECURITY_KEYWORDS,
+        'alarma',
+        'control de acceso',
+      ],
     },
   ],
   'accesorios-consumibles': [
@@ -503,19 +568,43 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       key: 'cables-adaptadores',
       label: 'Cables y adaptadores',
       sortOrder: 10,
-      keywords: ['cable', 'adaptador', 'hub'],
+      keywords: [
+        'cable',
+        'adaptador',
+        'hub',
+        'hdmi',
+        'displayport',
+        'usb c',
+        'usb-c',
+        'vga',
+        'dvi',
+        'jack',
+      ],
     },
     {
       key: 'energia-carga',
       label: 'Energía y carga',
       sortOrder: 20,
-      keywords: ['cargador', 'regleta', 'alargador'],
+      keywords: ['cargador', 'cargador universal', 'regleta', 'alargador', 'power strip', 'base multiple', 'base múltiple', 'base enchufes'],
     },
     {
       key: 'fundas-transporte',
       label: 'Fundas y transporte',
       sortOrder: 30,
-      keywords: ['bolsa', 'mochila', 'maletin', 'funda'],
+      keywords: [
+        'bolsa',
+        'mochila',
+        'mochila portatil',
+        'mochila portátil',
+        'maletin',
+        'maletin trolley',
+        'maletín trolley',
+        'funda',
+        'funda portátil',
+        'sleeve',
+        'bandolera',
+        'trolley',
+      ],
     },
     {
       key: 'soportes-ergonomia',
@@ -525,15 +614,44 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'soporte',
         'brazo monitor',
         'elevador',
+        'elevador portatil',
+        'elevador portátil',
+        'soporte portatil',
+        'soporte portátil',
+        'reposamunecas',
+        'reposamuñecas',
+        'alfombrilla',
+        'alfombrilla ergonomica',
+        'alfombrilla ergonómica',
         'reposapie',
         'ergonomia',
+      ],
+    },
+    {
+      key: 'seguridad-organizacion',
+      label: 'Seguridad y organización',
+      sortOrder: 37,
+      keywords: [
+        ...ACCESSORY_ORGANIZATION_KEYWORDS,
       ],
     },
     {
       key: 'pilas-baterias',
       label: 'Pilas y baterías',
       sortOrder: 40,
-      keywords: ['pila', 'bateria'],
+      keywords: [
+        'pila',
+        'bateria',
+        'pila boton',
+        'pila botón',
+        'bateria recargable',
+        'batería recargable',
+        'pilas aa',
+        'pilas aaa',
+        'cr2032',
+        'aa',
+        'aaa',
+      ],
     },
     {
       key: 'limpieza-mantenimiento',
@@ -543,7 +661,12 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
         'limpieza',
         'aire comprimido',
         'spray',
+        'spray limpieza',
         'toallita',
+        'toallitas',
+        'kit limpieza',
+        'limpiador pantalla',
+        'gel limpieza',
         'mantenimiento',
       ],
     },
@@ -553,6 +676,27 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
 const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
   Record<string, readonly CategoryTaxonomyGroupOverrideRule[]>
 > = {
+  'impresion-escaneado': [
+    {
+      groupKey: 'consumibles-impresion',
+      anyOf: [
+        'ribbon',
+        'etiqueta termica',
+        'etiqueta térmica',
+        'rollo termico',
+        'rollo térmico',
+        'cinta resina',
+      ],
+    },
+  ],
+  'software-seguridad': [
+    {
+      groupKey: 'gestion-facturacion-pdv',
+      anyOf: [
+        ...SOFTWARE_BUSINESS_KEYWORDS,
+      ],
+    },
+  ],
   'telefonia-movilidad': [
     {
       groupKey: 'movilidad-profesional-gps-rf',
@@ -599,6 +743,22 @@ const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
         'volante',
         'cockpit',
         'soporte volante',
+      ],
+    },
+    {
+      groupKey: 'seguridad-control-acceso',
+      anyOf: [
+        ...GAMING_SECURITY_KEYWORDS,
+        'control de acceso',
+        'alarma',
+      ],
+    },
+  ],
+  'accesorios-consumibles': [
+    {
+      groupKey: 'seguridad-organizacion',
+      anyOf: [
+        ...ACCESSORY_ORGANIZATION_KEYWORDS,
       ],
     },
   ],

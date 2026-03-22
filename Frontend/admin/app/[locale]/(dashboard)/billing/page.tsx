@@ -948,7 +948,7 @@ export default function BillingPage() {
       if (editingTemplate) {
         await updateBillingTemplate(editingTemplate.id, {
           name: templateName.trim(),
-          background_url: templateBgUrl.trim() || null,
+          background_url: templateBgUrl.trim() || undefined,
           config_json: parsedConfig,
           is_default: templateIsDefault,
         });
@@ -956,7 +956,7 @@ export default function BillingPage() {
       } else {
         await createBillingTemplate({
           name: templateName.trim(),
-          background_url: templateBgUrl.trim() || null,
+          background_url: templateBgUrl.trim() || undefined,
           config_json: parsedConfig,
           is_default: templateIsDefault,
         });

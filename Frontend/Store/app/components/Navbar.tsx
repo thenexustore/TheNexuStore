@@ -108,6 +108,29 @@ type BrandSearchResult = {
   count: number;
 };
 
+function deriveBrandSearchResults(productResponse: {
+  products?: Product[];
+  filters?: { brands?: BrandSearchResult[] };
+}): BrandSearchResult[] {
+  const brandsFromFilters = productResponse.filters?.brands ?? [];
+  if (brandsFromFilters.length > 0) {
+    return brandsFromFilters.slice(0, 5);
+  }
+
+  const uniqueBrands = new Map<string, BrandSearchResult>();
+  for (const product of productResponse.products ?? []) {
+    if (!product.brand_slug || uniqueBrands.has(product.brand_slug)) continue;
+    uniqueBrands.set(product.brand_slug, {
+      id: product.brand_slug,
+      name: product.brand_name,
+      slug: product.brand_slug,
+      count: 1,
+    });
+  }
+
+  return Array.from(uniqueBrands.values()).slice(0, 5);
+}
+
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
@@ -310,7 +333,7 @@ export default function Navbar() {
       ]);
 
       setSearchResults(productResponse.products ?? []);
-      setBrandSearchResults((productResponse.filters?.brands ?? []).slice(0, 5));
+      setBrandSearchResults(deriveBrandSearchResults(productResponse));
       setGlobalCategorySearchResults(categoryResults);
       setSearchProductTotal(productResponse.total ?? 0);
       setShowSearchResults(true);
@@ -544,7 +567,7 @@ export default function Navbar() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => search.length >= 2 && setShowSearchResults(true)}
                 placeholder={t("searchPlaceholder")}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-0 pr-12 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:bg-white"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-5 py-0 pr-12 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
               />
               <button
                 type="submit"

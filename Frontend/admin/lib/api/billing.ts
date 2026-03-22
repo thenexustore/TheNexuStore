@@ -401,3 +401,14 @@ export async function createBillingDocumentFromOrder(
     method: "POST",
   });
 }
+
+export async function backfillPaidOrderBillingDocs(): Promise<{
+  processed: number;
+  created: number;
+  skipped: number;
+  errors: string[];
+}> {
+  return fetchWithAuth(`/admin/billing/backfill-paid-orders`, {
+    method: "POST",
+  });
+}

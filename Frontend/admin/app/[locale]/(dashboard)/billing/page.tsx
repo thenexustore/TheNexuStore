@@ -56,6 +56,7 @@ import {
   updateBillingTemplate,
   deleteBillingTemplate,
   uploadBillingTemplateBackground,
+  backfillPaidOrderBillingDocs,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -503,6 +504,7 @@ export default function BillingPage() {
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showCreatePreview, setShowCreatePreview] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   // Per-row product search state for line items autocomplete
   type ItemSearchState = { query: string; results: Product[]; open: boolean; loading: boolean };
@@ -1056,6 +1058,40 @@ export default function BillingPage() {
     }
   };
 
+  // ─── Backfill paid orders ──────────────────────────────────────────────────
+
+  const handleBackfillPaidOrders = async () => {
+    setBackfilling(true);
+    try {
+      const result = await backfillPaidOrderBillingDocs();
+      if (result.created > 0) {
+        toast.success(
+          `Backfill completado: ${result.created} factura(s) en borrador creada(s), ${result.skipped} omitida(s).`,
+        );
+      } else {
+        toast.info(`Todos los pedidos pagados ya tenían factura (${result.skipped} omitidos).`);
+      }
+      if (result.errors.length > 0) {
+        toast.warning(`${result.errors.length} error(es) durante el backfill. Revisa los logs.`);
+      }
+      // Reload document list to show newly created drafts
+      await fetchBillingDocuments({
+        page: 1,
+        limit: 20,
+        type: tab === "ALL" ? undefined : tab,
+        status: statusFilter || undefined,
+      }).then((data) => {
+        setDocs(data.items);
+        setTotal(data.total);
+        setPage(1);
+      }).catch(() => {});
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al ejecutar el backfill");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   // ─── PDF download ──────────────────────────────────────────────────────────
 
   const handleDownloadPdf = async (id: string) => {
@@ -1085,6 +1121,36 @@ export default function BillingPage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error enviando documento");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  // ─── Issue + send in one action ────────────────────────────────────────────
+
+  const handleIssueAndSend = async (id: string) => {
+    setIssuingId(id);
+    try {
+      const issuedDoc = await issueBillingDocument(id);
+      toast.success(`Documento emitido: ${issuedDoc.document_number}`);
+      if (selectedDoc?.id === id) setSelectedDoc(issuedDoc as BillingDocumentWithAudits);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error emitiendo documento");
+      setIssuingId(null);
+      return;
+    }
+    setIssuingId(null);
+    setSendingId(id);
+    try {
+      const result = await sendBillingDocument(id);
+      toast.success(`Factura enviada por email a ${result.email}`);
+      await loadDocs(page);
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Factura emitida pero error al enviar email");
     } finally {
       setSendingId(null);
     }
@@ -1257,6 +1323,19 @@ export default function BillingPage() {
           >
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">Ajustes</span>
+          </button>
+          <button
+            onClick={handleBackfillPaidOrders}
+            disabled={backfilling}
+            title="Crear facturas en borrador para todos los pedidos pagados sin factura"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-amber-300 bg-amber-50 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50 transition shadow-sm"
+          >
+            {backfilling ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Receipt className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">{backfilling ? "Generando..." : "Recuperar pedidos"}</span>
           </button>
         </div>
       </div>
@@ -2097,7 +2176,7 @@ export default function BillingPage() {
                   {selectedDoc.status === "DRAFT" && (
                     <button
                       onClick={() => handleIssue(selectedDoc.id)}
-                      disabled={issuingId === selectedDoc.id}
+                      disabled={issuingId === selectedDoc.id || sendingId === selectedDoc.id}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
                     >
                       {issuingId === selectedDoc.id ? (
@@ -2106,6 +2185,21 @@ export default function BillingPage() {
                         <Send className="w-4 h-4" />
                       )}
                       Emitir documento
+                    </button>
+                  )}
+                  {/* Emit + send in one click (only for INVOICE drafts with customer email) */}
+                  {selectedDoc.status === "DRAFT" && selectedDoc.type === "INVOICE" && selectedDoc.customer_email && (
+                    <button
+                      onClick={() => handleIssueAndSend(selectedDoc.id)}
+                      disabled={issuingId === selectedDoc.id || sendingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {issuingId === selectedDoc.id || sendingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Emitir y enviar factura
                     </button>
                   )}
                   {/* Convert quote to invoice */}

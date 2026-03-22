@@ -1291,4 +1291,60 @@ export class BillingService {
     this.logger.log(`Billing document ${docRef} sent to ${doc.customer_email}`);
     return { sent: true, email: doc.customer_email };
   }
+
+  // ─── Backfill ─────────────────────────────────────────────────────────────
+
+  /**
+   * Creates draft billing documents for all confirmed paid orders that do not
+   * yet have an existing billing document. Safe to call multiple times
+   * (idempotent per order via createDocumentFromOrder).
+   */
+  async backfillPaidOrders(): Promise<{
+    processed: number;
+    created: number;
+    skipped: number;
+    errors: string[];
+  }> {
+    this.logger.log('backfillPaidOrders: starting');
+
+    // All orders in a confirmed-payment state
+    const confirmedOrders = await this.prisma.order.findMany({
+      where: {
+        status: {
+          in: [
+            OrderStatus.PAID,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+          ],
+        },
+      },
+      select: { id: true, order_number: true },
+    });
+
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const order of confirmedOrders) {
+      try {
+        const result = await this.createDocumentFromOrder(order.id);
+        if (result.created) {
+          created++;
+          this.logger.log(`backfillPaidOrders: created draft for order ${order.order_number}`);
+        } else {
+          skipped++;
+        }
+      } catch (err) {
+        const msg = `Order ${order.order_number ?? order.id}: ${err instanceof Error ? err.message : String(err)}`;
+        this.logger.warn(`backfillPaidOrders error — ${msg}`);
+        errors.push(msg);
+      }
+    }
+
+    this.logger.log(
+      `backfillPaidOrders: done — processed=${confirmedOrders.length} created=${created} skipped=${skipped} errors=${errors.length}`,
+    );
+    return { processed: confirmedOrders.length, created, skipped, errors };
+  }
 }

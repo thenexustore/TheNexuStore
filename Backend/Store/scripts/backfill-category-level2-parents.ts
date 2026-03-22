@@ -36,6 +36,42 @@ type AuditRow = {
   action: 'reparent' | 'create_level2_and_reparent';
 };
 
+const countBy = (values: Array<string | null | undefined>) =>
+  Array.from(
+    values.reduce((acc, value) => {
+      const key = value ?? 'null';
+      acc.set(key, (acc.get(key) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>()),
+  )
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+
+function recommendStoredCategoryParent(category: {
+  name: string;
+  slug: string;
+}) {
+  return recommendParentCategory(
+    category.name,
+    `${category.name} ${category.slug.replace(/-/g, ' ')}`,
+  );
+}
+
+function resolvePreferredCanonicalSlug(input: {
+  currentCanonicalSlug: string | null;
+  recommendedParentKey: string;
+}) {
+  const recommendedCanonical = resolveCanonicalParentSlug(
+    input.recommendedParentKey,
+  );
+
+  if (!recommendedCanonical) return input.currentCanonicalSlug;
+  if (!input.currentCanonicalSlug) return recommendedCanonical;
+  return input.currentCanonicalSlug === recommendedCanonical
+    ? input.currentCanonicalSlug
+    : recommendedCanonical;
+}
+
 async function ensureCanonicalParent(canonicalSlug: string) {
   const taxonomyEntry = MENU_PARENT_TAXONOMY.find(
     (entry) => slugifyCategory(entry.key) === canonicalSlug,
@@ -132,12 +168,11 @@ async function main() {
       continue;
     }
 
-    const recommendedParent = recommendParentCategory(
-      null,
-      category.slug.replace(/-/g, ' '),
-    );
-    const canonicalSlug =
-      parentCanonicalSlug ?? resolveCanonicalParentSlug(recommendedParent.key);
+    const recommendedParent = recommendStoredCategoryParent(category);
+    const canonicalSlug = resolvePreferredCanonicalSlug({
+      currentCanonicalSlug: parentCanonicalSlug,
+      recommendedParentKey: recommendedParent.key,
+    });
 
     if (!canonicalSlug) {
       continue;
@@ -162,6 +197,7 @@ async function main() {
         };
 
     const level2Descriptor = buildCategoryLevel2Descriptor(canonicalSlug, {
+      familyName: category.parent?.slug ?? category.name,
       name: category.name,
       slug: category.slug,
       subfamilyName: category.name,
@@ -242,6 +278,15 @@ async function main() {
       reparented: updated,
       already_compliant: alreadyCompliant,
     },
+    summary_by_target_abuelo: countBy(
+      auditRows.map((row) => row.target_abuelo_slug),
+    ),
+    summary_by_target_padre: countBy(
+      auditRows.map((row) => row.target_padre_slug),
+    ),
+    summary_by_current_parent: countBy(
+      auditRows.map((row) => row.current_parent_slug),
+    ),
     affected_categories: auditRows,
   };
 

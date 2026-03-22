@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
@@ -587,7 +588,7 @@ export default function BillingPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showCreate, editNumberDoc, showSettings, showDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showCreate, editNumberDoc, showSettings, showDetail]);
 
   // ─── Load documents ────────────────────────────────────────────────────────
 
@@ -1711,12 +1712,12 @@ export default function BillingPage() {
                             <p className="text-xs text-indigo-500 font-mono truncate">{selectedDoc.order_id}</p>
                           </div>
                         </div>
-                        <a
+                        <Link
                           href="/orders"
                           className="inline-flex items-center gap-1 text-xs text-indigo-600 font-medium hover:underline shrink-0"
                         >
                           Ver pedidos <ExternalLink className="w-3 h-3" />
-                        </a>
+                        </Link>
                       </div>
                     )}
                   </div>

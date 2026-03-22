@@ -58,6 +58,7 @@ export interface BillingDocument {
   created_at: string;
   updated_at: string;
   issued_at: string | null;
+  sent_at: string | null;
   items: BillingDocumentItem[];
 }
 
@@ -371,8 +372,7 @@ export async function downloadBillingDocumentPdf(id: string): Promise<void> {
 export async function sendBillingDocument(
   id: string,
 ): Promise<{ sent: boolean; email: string }> {
-  const data = await fetchWithAuth(`${API_URL}/admin/billing/documents/${id}/send`, {
+  return fetchWithAuth(`/admin/billing/documents/${id}/send`, {
     method: "POST",
   });
-  return data.data as { sent: boolean; email: string };
 }

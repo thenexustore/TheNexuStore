@@ -782,7 +782,9 @@ export default function BillingPage() {
     try {
       const result = await sendBillingDocument(id);
       toast.success(`Documento enviado a ${result.email}`);
-      // Refresh detail view to show updated sent_at
+      // Refresh the list so status badge updates (ISSUED → SENT)
+      await loadDocs(page);
+      // Refresh the detail panel to show updated sent_at and status
       if (selectedDoc?.id === id) {
         const refreshed = await fetchBillingDocumentById(id);
         setSelectedDoc(refreshed);
@@ -1515,12 +1517,15 @@ export default function BillingPage() {
                   </div>
 
                   {/* Dates */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
                       { label: "Emisión", value: formatDate(selectedDoc.issue_date) },
                       { label: "Vencimiento", value: formatDate(selectedDoc.due_date) },
                       { label: "Creado", value: formatDate(selectedDoc.created_at) },
                       { label: "Actualizado", value: formatDate(selectedDoc.updated_at) },
+                      ...(selectedDoc.sent_at
+                        ? [{ label: "Enviado", value: formatDate(selectedDoc.sent_at) }]
+                        : []),
                     ].map(({ label, value }) => (
                       <div key={label} className="rounded-lg bg-zinc-50 border border-zinc-100 p-3">
                         <p className="text-xs text-zinc-400 mb-0.5">{label}</p>

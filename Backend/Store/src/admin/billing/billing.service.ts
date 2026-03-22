@@ -233,9 +233,10 @@ export class BillingService {
   async createDocument(dto: CreateBillingDocumentDto) {
     const { items, ...docData } = dto;
     const settings = await this.getSettings();
+    const defaultTaxRate = Number(settings.default_tax_rate);
 
     const lineItems = (items ?? []).map((item, i) => {
-      const taxRate = item.tax_rate ?? 0.21;
+      const taxRate = item.tax_rate ?? defaultTaxRate;
       const lineSubtotal = Number(item.qty) * Number(item.unit_price);
       const taxAmount = lineSubtotal * taxRate;
       const lineTotal = lineSubtotal + taxAmount;
@@ -262,6 +263,7 @@ export class BillingService {
         order_id: docData.order_id,
         customer_id: docData.customer_id,
         language: docData.language ?? BillingLanguage.ES,
+        currency: settings.default_currency,
         payment_method: docData.payment_method,
         issue_date: docData.issue_date ? new Date(docData.issue_date) : null,
         due_date: docData.due_date ? new Date(docData.due_date) : null,
@@ -306,6 +308,9 @@ export class BillingService {
     let total = 0;
 
     if (items !== undefined) {
+      const settings = await this.getSettings();
+      const defaultTaxRate = Number(settings.default_tax_rate);
+
       // Wrap delete + recreate in a transaction to avoid leaving the document
       // without items if the createMany call fails.
       await this.prisma.$transaction(async (tx) => {
@@ -314,7 +319,7 @@ export class BillingService {
         });
 
         const lineItems = items.map((item, i) => {
-          const taxRate = item.tax_rate ?? 0.21;
+          const taxRate = item.tax_rate ?? defaultTaxRate;
           const lineSubtotal = Number(item.qty) * Number(item.unit_price);
           const taxAmountLine = lineSubtotal * taxRate;
           const lineTotal = lineSubtotal + taxAmountLine;
@@ -1033,6 +1038,14 @@ export class BillingService {
       include: { items: true },
     });
     if (!doc) throw new NotFoundException('Billing document not found');
+    if (
+      doc.status === BillingDocumentStatus.DRAFT ||
+      doc.status === BillingDocumentStatus.VOID
+    ) {
+      throw new BadRequestException(
+        `Cannot send a document in ${doc.status} status — it must be ISSUED or SENT`,
+      );
+    }
     if (!doc.customer_email) {
       throw new BadRequestException(
         'Document has no customer email address to send to',
@@ -1062,7 +1075,13 @@ export class BillingService {
 
     await this.prisma.billingDocument.update({
       where: { id },
-      data: { sent_at: new Date() },
+      data: {
+        sent_at: new Date(),
+        // Automatically advance ISSUED → SENT when the document is emailed to the customer
+        ...(doc.status === BillingDocumentStatus.ISSUED && {
+          status: BillingDocumentStatus.SENT,
+        }),
+      },
     });
 
     this.logger.log(`Billing document ${docRef} sent to ${doc.customer_email}`);

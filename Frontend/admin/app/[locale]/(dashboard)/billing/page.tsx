@@ -31,6 +31,9 @@ import {
   Hash,
   ShoppingCart,
   ExternalLink,
+  Layers,
+  Star,
+  ImageIcon,
 } from "lucide-react";
 import {
   fetchBillingDocuments,
@@ -47,6 +50,10 @@ import {
   downloadBillingDocumentPdf,
   sendBillingDocument,
   fetchProducts,
+  fetchBillingTemplates,
+  createBillingTemplate,
+  updateBillingTemplate,
+  deleteBillingTemplate,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -54,6 +61,7 @@ import {
   type BillingSettings,
   type BillingNumberAudit,
   type BillingDocumentItem,
+  type BillingTemplate,
   type Product,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -82,6 +90,7 @@ type CreateFormState = {
   customer_tax_id: string;
   customer_address: string;
   items: CreateItemState[];
+  template_id?: string;
 };
 
 type InputEv = { target: { value: string } };
@@ -464,6 +473,21 @@ export default function BillingPage() {
   );
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Templates panel
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<BillingTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState(false);
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<BillingTemplate | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [templateBgUrl, setTemplateBgUrl] = useState("");
+  const [templateConfigJson, setTemplateConfigJson] = useState("{}");
+  const [templateIsDefault, setTemplateIsDefault] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<string | null>(null);
+
   // Action states
   const [issuingId, setIssuingId] = useState<string | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
@@ -570,9 +594,11 @@ export default function BillingPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (showTemplateForm) { setShowTemplateForm(false); return; }
         if (showCreate) { setShowCreate(false); setShowCreatePreview(false); return; }
         if (editNumberDoc) { setEditNumberDoc(null); return; }
         if (showSettings) { setShowSettings(false); return; }
+        if (showTemplates) { setShowTemplates(false); return; }
         if (showDetail) { setShowDetail(false); setSelectedDoc(null); setShowPreview(false); return; }
       }
       // 'n' shortcut → new invoice (only when no modal/panel is open and not in a text input)
@@ -588,7 +614,7 @@ export default function BillingPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showCreate, editNumberDoc, showSettings, showDetail]);
+  }, [showCreate, editNumberDoc, showSettings, showDetail, showTemplates, showTemplateForm]);
 
   // ─── Load documents ────────────────────────────────────────────────────────
 
@@ -753,8 +779,10 @@ export default function BillingPage() {
       customer_tax_id: "",
       customer_address: "",
       items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
+      template_id: templates.find((t) => t.is_default)?.id ?? "",
     });
     setItemSearches([{ query: "", results: [], open: false, loading: false }]);
+    if (templates.length === 0) loadTemplates();
     setShowCreate(true);
   };
 
@@ -780,6 +808,7 @@ export default function BillingPage() {
         customer_email: createForm.customer_email || undefined,
         customer_tax_id: createForm.customer_tax_id || undefined,
         customer_address: createForm.customer_address || undefined,
+        template_id: createForm.template_id || undefined,
         items: validItems.map((i: CreateItemState, idx: number) => ({
           description: i.description,
           qty: Number(i.qty) || 1,
@@ -857,6 +886,106 @@ export default function BillingPage() {
       );
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  // ─── Templates ─────────────────────────────────────────────────────────────
+
+  const loadTemplates = async () => {
+    setTemplatesLoading(true);
+    setTemplatesError(false);
+    try {
+      const data = await fetchBillingTemplates();
+      setTemplates(data);
+    } catch {
+      setTemplatesError(true);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const handleOpenTemplates = () => {
+    setShowTemplates(true);
+    loadTemplates();
+  };
+
+  const openTemplateForm = (template?: BillingTemplate) => {
+    if (template) {
+      setEditingTemplate(template);
+      setTemplateName(template.name);
+      setTemplateBgUrl(template.background_url ?? "");
+      setTemplateConfigJson(
+        template.config_json
+          ? JSON.stringify(template.config_json, null, 2)
+          : "{}",
+      );
+      setTemplateIsDefault(template.is_default);
+    } else {
+      setEditingTemplate(null);
+      setTemplateName("");
+      setTemplateBgUrl("");
+      setTemplateConfigJson("{}");
+      setTemplateIsDefault(false);
+    }
+    setShowTemplateForm(true);
+  };
+
+  const handleSaveTemplate = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    if (!templateName.trim()) {
+      toast.error("El nombre de la plantilla es obligatorio");
+      return;
+    }
+    let parsedConfig: Record<string, unknown> = {};
+    try {
+      parsedConfig = JSON.parse(templateConfigJson || "{}");
+    } catch {
+      toast.error("El JSON de configuración no es válido");
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      if (editingTemplate) {
+        await updateBillingTemplate(editingTemplate.id, {
+          name: templateName.trim(),
+          background_url: templateBgUrl.trim() || null,
+          config_json: parsedConfig,
+          is_default: templateIsDefault,
+        });
+        toast.success("Plantilla actualizada");
+      } else {
+        await createBillingTemplate({
+          name: templateName.trim(),
+          background_url: templateBgUrl.trim() || null,
+          config_json: parsedConfig,
+          is_default: templateIsDefault,
+        });
+        toast.success("Plantilla creada");
+      }
+      setShowTemplateForm(false);
+      await loadTemplates();
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error guardando plantilla",
+      );
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    setDeletingTemplateId(id);
+    try {
+      await deleteBillingTemplate(id);
+      toast.success("Plantilla eliminada");
+      setConfirmDeleteTemplateId(null);
+      await loadTemplates();
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Error eliminando plantilla",
+      );
+    } finally {
+      setDeletingTemplateId(null);
     }
   };
 
@@ -1062,6 +1191,14 @@ export default function BillingPage() {
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
+          </button>
+          <button
+            onClick={handleOpenTemplates}
+            title="Gestión de plantillas"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 bg-white text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition shadow-sm"
+          >
+            <Layers className="w-4 h-4" />
+            <span className="hidden sm:inline">Plantillas</span>
           </button>
           <button
             onClick={openSettings}
@@ -2589,6 +2726,35 @@ export default function BillingPage() {
                 />
               </div>
 
+              {/* Template selector */}
+              {templates.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                    <label className="text-xs font-semibold text-zinc-600">
+                      Plantilla de diseño
+                    </label>
+                  </div>
+                  <select
+                    value={createForm.template_id ?? ""}
+                    onChange={(e: InputEv) =>
+                      setCreateForm((f: CreateFormState) => ({
+                        ...f,
+                        template_id: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  >
+                    <option value="">— Sin plantilla —</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.is_default ? " (predeterminada)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-1 border-t border-zinc-100">
                 <button
                   type="button"
@@ -2609,6 +2775,282 @@ export default function BillingPage() {
                   ) : (
                     "Crear en borrador"
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Templates modal ───────────────────────────────────────────────── */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl border border-zinc-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-indigo-50 p-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900">Plantillas de facturación</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openTemplateForm()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Nueva plantilla
+                </button>
+                <button
+                  onClick={() => setShowTemplates(false)}
+                  className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {templatesLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-8 h-8 animate-spin text-zinc-300" />
+                </div>
+              ) : templatesError ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <AlertTriangle className="w-8 h-8 text-amber-400" />
+                  <p className="text-sm text-zinc-500">No se pudieron cargar las plantillas</p>
+                  <button
+                    onClick={loadTemplates}
+                    className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <div className="rounded-full bg-zinc-100 p-4">
+                    <Layers className="w-8 h-8 text-zinc-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-700">Sin plantillas</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Crea una plantilla para personalizar el diseño de tus facturas
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openTemplateForm()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Crear primera plantilla
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {templates.map((tpl) => (
+                    <div
+                      key={tpl.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-white transition"
+                    >
+                      {/* Background preview */}
+                      <div className="w-12 h-12 rounded-lg border border-zinc-200 bg-white overflow-hidden shrink-0 flex items-center justify-center">
+                        {tpl.background_url ? (
+                          <img
+                            src={tpl.background_url}
+                            alt={tpl.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="w-5 h-5 text-zinc-300" />
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-zinc-900 truncate">{tpl.name}</p>
+                          {tpl.is_default && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                              <Star className="w-2.5 h-2.5" />
+                              Predeterminada
+                            </span>
+                          )}
+                        </div>
+                        {tpl.background_url && (
+                          <p className="text-xs text-zinc-400 mt-0.5 truncate">{tpl.background_url}</p>
+                        )}
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Creada {new Date(tpl.created_at).toLocaleDateString("es-ES")}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => openTemplateForm(tpl)}
+                          className="p-1.5 rounded-lg hover:bg-zinc-200 text-zinc-500 transition"
+                          title="Editar plantilla"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        {confirmDeleteTemplateId === tpl.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-zinc-500">¿Eliminar?</span>
+                            <button
+                              onClick={() => handleDeleteTemplate(tpl.id)}
+                              disabled={deletingTemplateId === tpl.id}
+                              className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {deletingTemplateId === tpl.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : "Sí"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteTemplateId(null)}
+                              className="px-2 py-1 rounded-lg border text-xs text-zinc-600 hover:bg-zinc-50"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteTemplateId(tpl.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-500 transition"
+                            title="Eliminar plantilla"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Template form modal ────────────────────────────────────────────── */}
+      {showTemplateForm && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-zinc-200 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-indigo-50 p-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900">
+                  {editingTemplate ? "Editar plantilla" : "Nueva plantilla"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowTemplateForm(false)}
+                className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveTemplate}
+              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+            >
+              {/* Name */}
+              <div>
+                <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                  Nombre <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={templateName}
+                  onChange={(e: InputEv) => setTemplateName(e.target.value)}
+                  required
+                  placeholder="Ej: Plantilla estándar"
+                  className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+
+              {/* Background URL */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-zinc-400" />
+                  <label className="text-xs font-semibold text-zinc-600">
+                    URL de fondo <span className="text-zinc-400 font-normal">(opcional)</span>
+                  </label>
+                </div>
+                <input
+                  value={templateBgUrl}
+                  onChange={(e: InputEv) => setTemplateBgUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/background.png"
+                  className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+                {templateBgUrl && (
+                  <div className="mt-2 w-full h-24 rounded-lg border border-zinc-200 overflow-hidden bg-zinc-100">
+                    <img
+                      src={templateBgUrl}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Config JSON */}
+              <div>
+                <label className="text-xs font-semibold text-zinc-600 block mb-1.5">
+                  Configuración JSON <span className="text-zinc-400 font-normal">(opcional)</span>
+                </label>
+                <textarea
+                  value={templateConfigJson}
+                  onChange={(e: InputEv) => setTemplateConfigJson(e.target.value)}
+                  rows={5}
+                  className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                  placeholder="{}"
+                  spellCheck={false}
+                />
+                <p className="text-xs text-zinc-400 mt-1">
+                  Objeto JSON con opciones de personalización de la plantilla
+                </p>
+              </div>
+
+              {/* Is Default */}
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition">
+                <input
+                  type="checkbox"
+                  checked={templateIsDefault}
+                  onChange={(e) => setTemplateIsDefault(e.target.checked)}
+                  className="w-4 h-4 rounded accent-zinc-900"
+                />
+                <div>
+                  <p className="text-sm font-medium text-zinc-800">Establecer como predeterminada</p>
+                  <p className="text-xs text-zinc-400">
+                    Se aplicará automáticamente al crear nuevos documentos
+                  </p>
+                </div>
+                <Star className={`w-4 h-4 ml-auto ${templateIsDefault ? "text-amber-500" : "text-zinc-300"}`} />
+              </label>
+
+              <div className="flex justify-end gap-2 pt-1 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateForm(false)}
+                  className="px-4 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTemplate}
+                  className="px-5 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 disabled:opacity-50 transition shadow-sm"
+                >
+                  {savingTemplate ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Guardando...
+                    </span>
+                  ) : editingTemplate ? "Guardar cambios" : "Crear plantilla"}
                 </button>
               </div>
             </form>

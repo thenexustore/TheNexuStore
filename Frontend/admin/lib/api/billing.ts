@@ -280,7 +280,7 @@ export async function updateBillingTemplate(
   id: string,
   input: Partial<{
     name: string;
-    background_url: string;
+    background_url: string | null;
     config_json: Record<string, unknown>;
     is_default: boolean;
   }>,
@@ -296,6 +296,15 @@ export async function deleteBillingTemplate(
 ): Promise<{ deleted: boolean }> {
   return fetchWithAuth(`/admin/billing/templates/${id}`, {
     method: "DELETE",
+  });
+}
+
+export async function uploadBillingTemplateBackground(
+  imageBase64: string,
+): Promise<{ url: string }> {
+  return fetchWithAuth("/admin/billing/templates/upload-background", {
+    method: "POST",
+    body: JSON.stringify({ image_base64: imageBase64 }),
   });
 }
 

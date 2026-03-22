@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,9 +14,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import { IsString, MaxLength } from 'class-validator';
 import { AdminGuard } from '../admin.guard';
 import { AuditLogService } from '../audit-log.service';
 import { BillingService } from './billing.service';
+import { saveBase64Image } from '../../common/image.util';
 import {
   BillingDocumentsQueryDto,
   ConvertQuoteToInvoiceDto,
@@ -29,6 +32,12 @@ import {
   UpdateBillingTemplateDto,
   UpdateDocumentNumberDto,
 } from './dto/billing.dto';
+
+class UploadBillingBgDto {
+  @IsString()
+  @MaxLength(10_000_000)
+  image_base64!: string;
+}
 
 @Controller('admin/billing')
 @UseGuards(AdminGuard)
@@ -285,6 +294,22 @@ export class BillingController {
       requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
     });
     return { success: true, data };
+  }
+
+  @Post('templates/upload-background')
+  async uploadTemplateBackground(@Body() dto: UploadBillingBgDto) {
+    if (!dto.image_base64?.startsWith('data:image/')) {
+      throw new BadRequestException('Se requiere una imagen en formato base64 válido');
+    }
+    let url: string;
+    try {
+      url = await saveBase64Image(dto.image_base64, 'billing');
+    } catch (err: unknown) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Error al guardar la imagen',
+      );
+    }
+    return { success: true, data: { url } };
   }
 
   // ─── Export ───────────────────────────────────────────────────────────────

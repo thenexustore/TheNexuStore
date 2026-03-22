@@ -22,6 +22,7 @@ import { MailService } from '../../auth/mail/mail.service';
 import { ShippingTaxService } from '../../shipping-tax/shipping-tax.service';
 import { RedsysService } from '../payment/redsys.service';
 import { randomBytes, randomInt } from 'crypto';
+import { BillingService } from '../../admin/billing/billing.service';
 
 @Injectable()
 export class CheckoutService {
@@ -33,6 +34,7 @@ export class CheckoutService {
     private shippingTaxService: ShippingTaxService,
     private redsysService: RedsysService,
     private readonly logger: AppLogger,
+    private readonly billingService: BillingService,
   ) {}
 
   private readonly FRONTEND_URL =
@@ -316,6 +318,19 @@ export class CheckoutService {
       paymentProvider: paymentMethod,
       total,
     });
+
+    // For COD orders the payment is confirmed immediately at checkout (order → PROCESSING).
+    // Auto-create a draft billing document so it appears in the billing tab straight away.
+    // Fire-and-forget — billing errors must not break the checkout response.
+    if (paymentMethod === 'COD') {
+      this.billingService.createDocumentFromOrder(result.order.id).catch((err: unknown) => {
+        this.logger.warn(
+          'Failed to auto-create billing document for COD checkout order',
+          'CheckoutService',
+          { orderId: result.order.id, error: err instanceof Error ? err.message : String(err) },
+        );
+      });
+    }
 
     return {
       order: {

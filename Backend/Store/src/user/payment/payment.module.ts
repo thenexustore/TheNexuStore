@@ -5,9 +5,10 @@ import { PaymentController } from './payment.controller';
 import { PaymentsController } from './payments.controller';
 import { CommonModule } from '../../common/common.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { BillingModule } from '../../admin/billing/billing.module';
 
 @Module({
-  imports: [CommonModule, AuthModule],
+  imports: [CommonModule, AuthModule, BillingModule],
   controllers: [PaymentController, PaymentsController],
   providers: [RedsysService, PaymentService],
   exports: [RedsysService, PaymentService],

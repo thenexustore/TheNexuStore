@@ -146,6 +146,7 @@ export {
   createBillingTemplate,
   updateBillingTemplate,
   deleteBillingTemplate,
+  uploadBillingTemplateBackground,
   markOrderDelivered,
   downloadBillingExport,
   downloadBillingDocumentPdf,

@@ -348,6 +348,9 @@ export class BillingService {
       where: { id },
       data: {
         ...(docData.status !== undefined && { status: docData.status }),
+        // When a document is manually advanced to SENT, record the sent timestamp
+        // (sendDocument sets it automatically for email sends; this covers manual transitions)
+        ...(docData.status === BillingDocumentStatus.SENT && { sent_at: new Date() }),
         ...(docData.language !== undefined && { language: docData.language }),
         ...(docData.payment_method !== undefined && {
           payment_method: docData.payment_method,

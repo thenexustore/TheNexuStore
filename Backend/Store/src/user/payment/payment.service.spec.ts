@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { RedsysService } from './redsys.service';
 import { AppLogger } from '../../common/app-logger.service';
 import { RetryService } from '../../common/retry.service';
+import { BillingService } from '../../admin/billing/billing.service';
 
 describe('PaymentService', () => {
   const originalEnv = { ...process.env };
@@ -48,6 +49,10 @@ describe('PaymentService', () => {
     notifyByOrderId: jest.fn(),
   } as any;
 
+  const billingService = {
+    createDocumentFromOrder: jest.fn().mockResolvedValue(undefined),
+  } as unknown as BillingService;
+
   let service: PaymentService;
 
   beforeEach(() => {
@@ -67,6 +72,7 @@ describe('PaymentService', () => {
       logger,
       retryService,
       orderTrackingEvents,
+      billingService,
     );
 
     (redsysService.getCurrencyNumericCode as jest.Mock).mockReturnValue('978');

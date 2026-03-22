@@ -273,7 +273,7 @@ export class UpdateBillingTemplateDto {
 
   @IsOptional()
   @IsString()
-  background_url?: string;
+  background_url?: string | null;
 
   @IsOptional()
   config_json?: Record<string, unknown>;

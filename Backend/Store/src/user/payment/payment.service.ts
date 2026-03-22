@@ -20,6 +20,7 @@ import {
 import { AppLogger } from '../../common/app-logger.service';
 import { RetryService } from '../../common/retry.service';
 import { OrderTrackingEventsService } from '../../order-tracking/order-tracking-events.service';
+import { BillingService } from '../../admin/billing/billing.service';
 
 export interface CreatePaymentDto {
   orderId: string;
@@ -58,6 +59,7 @@ export class PaymentService {
     private readonly logger: AppLogger,
     private readonly retryService: RetryService,
     private readonly orderTrackingEvents: OrderTrackingEventsService,
+    private readonly billingService: BillingService,
   ) {}
 
   async createPayment(dto: CreatePaymentDto): Promise<PaymentResult> {
@@ -183,6 +185,16 @@ export class PaymentService {
     this.logger.log('COD payment transaction completed', 'PaymentService', {
       orderId,
       paymentId: payment.id,
+    });
+
+    // Auto-create a draft billing document for the newly confirmed COD order.
+    // Fire-and-forget — billing errors must not break the payment confirmation.
+    this.billingService.createDocumentFromOrder(orderId).catch((err: unknown) => {
+      this.logger.warn(
+        'Failed to auto-create billing document for COD order',
+        'PaymentService',
+        { orderId, error: err instanceof Error ? err.message : String(err) },
+      );
     });
 
     return {
@@ -421,6 +433,16 @@ export class PaymentService {
         payment.order_id,
         'payment_captured',
       );
+
+      // Auto-create a draft billing document for the paid order.
+      // Fire-and-forget — billing errors must not block the Redsys webhook response.
+      this.billingService.createDocumentFromOrder(payment.order_id).catch((err: unknown) => {
+        this.logger.warn(
+          'Failed to auto-create billing document for Redsys-paid order',
+          'PaymentService',
+          { orderId: payment.order_id, error: err instanceof Error ? err.message : String(err) },
+        );
+      });
     } else {
       await this.prisma.$transaction(async (tx) => {
         await tx.payment.update({

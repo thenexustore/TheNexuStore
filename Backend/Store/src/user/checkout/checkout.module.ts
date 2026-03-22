@@ -7,8 +7,8 @@ import { AuthModule } from '../../auth/auth.module';
 import { CouponModule } from '../coupon/coupon.module';
 import { MailModule } from '../../auth/mail/mail.module';
 import { RedsysService } from '../payment/redsys.service';
-
 import { ShippingTaxModule } from '../../shipping-tax/shipping-tax.module';
+import { BillingModule } from '../../admin/billing/billing.module';
 
 @Module({
   imports: [
@@ -18,6 +18,7 @@ import { ShippingTaxModule } from '../../shipping-tax/shipping-tax.module';
     CouponModule,
     MailModule,
     ShippingTaxModule,
+    BillingModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService, RedsysService],

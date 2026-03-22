@@ -336,7 +336,6 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'cloud',
       'saas',
       'office',
-
       ...SOFTWARE_BUSINESS_KEYWORDS,
       'sistema operativo',
       'endpoint',
@@ -357,7 +356,6 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'consola',
       'vr',
       'simracing',
-
       ...GAMING_SECURITY_KEYWORDS,
       'hogar inteligente',
       'sensor',
@@ -446,7 +444,6 @@ export const MENU_PARENT_TAXONOMY: readonly MenuParentCategory[] = [
       'base múltiple',
       'base enchufes',
       'cargador universal',
-
       ...ACCESSORY_ORGANIZATION_KEYWORDS,
     ],
   },
@@ -480,7 +477,6 @@ const TAXONOMY_OVERRIDE_RULES: readonly TaxonomyOverrideRule[] = [
       'base múltiple',
       'base enchufes',
       'cargador universal',
-
       ...ACCESSORY_ORGANIZATION_KEYWORDS,
     ],
   },

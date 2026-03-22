@@ -229,14 +229,18 @@ export default function Navbar() {
     setShowSearchResults(false);
   }, []);
 
+  const clearSearchInput = useCallback(() => {
+    setSearch("");
+    setShowSearchResults(false);
+  }, []);
+
   const navigateToSearchResults = useCallback(() => {
     const normalizedSearch = search.trim();
     if (!normalizedSearch) return;
 
     router.push(`/products?search=${encodeURIComponent(normalizedSearch)}`);
-    setSearch("");
-    setShowSearchResults(false);
-  }, [router, search]);
+    clearSearchInput();
+  }, [clearSearchInput, router, search]);
 
   useEffect(() => subscribeStoreBranding(setStoreBranding), []);
 
@@ -352,13 +356,13 @@ export default function Navbar() {
   const handleProductClick = (product: Product) => {
     router.push(`/products/${product.slug}`);
     closeMobilePanels();
-    setSearch("");
+    clearSearchInput();
   };
 
   const handleBrandClick = (brandSlug: string) => {
     router.push(`/products?brand=${encodeURIComponent(brandSlug)}`);
     closeMobilePanels();
-    setSearch("");
+    clearSearchInput();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

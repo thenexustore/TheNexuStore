@@ -485,7 +485,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       label: 'Gestión, facturación y TPV',
       sortOrder: 15,
       keywords: [
-
         ...SOFTWARE_BUSINESS_KEYWORDS,
       ],
     },
@@ -558,7 +557,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       label: 'Seguridad y control de acceso',
       sortOrder: 30,
       keywords: [
-
         ...GAMING_SECURITY_KEYWORDS,
         'alarma',
         'control de acceso',
@@ -634,7 +632,6 @@ const CATEGORY_TAXONOMY_GROUPS: Readonly<
       label: 'Seguridad y organización',
       sortOrder: 37,
       keywords: [
-
         ...ACCESSORY_ORGANIZATION_KEYWORDS,
       ],
     },
@@ -696,7 +693,6 @@ const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
     {
       groupKey: 'gestion-facturacion-pdv',
       anyOf: [
-
         ...SOFTWARE_BUSINESS_KEYWORDS,
       ],
     },
@@ -752,7 +748,6 @@ const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
     {
       groupKey: 'seguridad-control-acceso',
       anyOf: [
-
         ...GAMING_SECURITY_KEYWORDS,
         'control de acceso',
         'alarma',
@@ -763,7 +758,6 @@ const CATEGORY_TAXONOMY_GROUP_OVERRIDE_RULES: Readonly<
     {
       groupKey: 'seguridad-organizacion',
       anyOf: [
-
         ...ACCESSORY_ORGANIZATION_KEYWORDS,
       ],
     },

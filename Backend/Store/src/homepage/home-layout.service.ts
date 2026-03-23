@@ -740,11 +740,25 @@ export class HomeLayoutService {
         )
         .map((product) => this.toProductCard(product));
 
-      return filtered
-        .filter((card) =>
-          discountOnly ? Number(card.discount_percentage || 0) > 0 : true,
-        )
-        .slice(0, limit);
+      const postFiltered = filtered.filter((card) =>
+        discountOnly ? Number(card.discount_percentage || 0) > 0 : true,
+      );
+
+      // Apply price / discount sorting after mapping to product cards (Prisma
+      // cannot reliably sort on nested price fields across SKU relations).
+      if (sortBy === 'price_asc') {
+        postFiltered.sort((a, b) => (a.price || 0) - (b.price || 0));
+      } else if (sortBy === 'price_desc') {
+        postFiltered.sort((a, b) => (b.price || 0) - (a.price || 0));
+      } else if (sortBy === 'discount_desc') {
+        postFiltered.sort(
+          (a, b) =>
+            Number(b.discount_percentage || 0) -
+            Number(a.discount_percentage || 0),
+        );
+      }
+
+      return postFiltered.slice(0, limit);
     };
 
     const loadProductsByWhere = async (where: Record<string, any>) => {
@@ -762,12 +776,9 @@ export class HomeLayoutService {
             take: 1,
           },
         },
-        orderBy:
-          sortBy === 'price_asc'
-            ? [{ skus: { _count: 'desc' } }, { created_at: 'desc' }]
-            : sortBy === 'price_desc'
-              ? [{ skus: { _count: 'desc' } }, { created_at: 'desc' }]
-              : [{ created_at: 'desc' }],
+        // Always fetch newest first; price/discount sorting is applied post-query
+        // in applyPostFilters because Prisma cannot sort on nested relation fields.
+        orderBy: [{ created_at: 'desc' }],
         take: Math.max(limit * 3, 24),
       });
       return applyPostFilters(products);
@@ -1256,8 +1267,12 @@ export class HomeLayoutService {
   }
 
   async resolveHome(locale?: string, previewLayoutId?: string) {
-    const cacheEnabled = Boolean(previewLayoutId);
-    const key = `${locale || 'default'}:${previewLayoutId || 'active'}`;
+    // Only cache the active layout (served to all storefront users); skip cache for
+    // preview requests so that admin users always see the latest unsaved state.
+    const cacheEnabled = !previewLayoutId;
+    const key = previewLayoutId
+      ? `${locale || 'default'}:preview:${previewLayoutId}`
+      : `${locale || 'default'}:active`;
 
     if (cacheEnabled) {
       const hit = this.homeCache.get(key);

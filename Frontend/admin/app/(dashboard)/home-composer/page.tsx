@@ -144,6 +144,11 @@ function byPosition(a: HomeSection, b: HomeSection) {
   return a.position - b.position;
 }
 
+/** Returns a human-readable label for a section type, falling back to the raw type string. */
+function getSectionTypeLabel(type: string, labels: Record<string, string>): string {
+  return labels[type] || type;
+}
+
 function safeJsonParse(value: string): Record<string, unknown> {
   const parsed = JSON.parse(value);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -503,9 +508,8 @@ export default function HomeComposerPage() {
         setAllCategories(categories || []);
         setAllBrands(brands || []);
       } catch (error) {
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("[home-composer] failed to load category/brand selectors", error);
-        }
+        // Log taxonomy load failures to console for debugging.
+        console.warn("[home-composer] failed to load category/brand selectors", error);
       }
     };
     void loadTaxonomy();
@@ -683,7 +687,7 @@ export default function HomeComposerPage() {
         is_enabled: true,
         title:
           newSectionTitle.trim() ||
-          (newSectionType === "HERO_CAROUSEL" ? "Banner" : newSectionType),
+          getSectionTypeLabel(newSectionType, SECTION_TYPE_LABELS),
         config: DEFAULT_CONFIG[newSectionType],
       });
       await loadSections(activeLayoutId);
@@ -719,11 +723,10 @@ export default function HomeComposerPage() {
       try {
         await homeBuilderApi.reorderSections(payload);
       } catch (error) {
-        // Fallback defensivo: algunos entornos legacy aún no aceptan reorder masivo.
+        // Fallback defensivo: algunos entornos legacy aún no aceptan reorder masivo
+        // (backend previo a la introducción del endpoint /reorder).
         await homeBuilderApi.moveSection(section.id, nextIndex + 1);
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('[home-composer] reorderSections failed, used moveSection fallback', error);
-        }
+        console.warn('[home-composer] reorderSections failed, used moveSection fallback', error);
       }
       await loadSections(activeLayoutId);
       toast.success('Bloque reordenado');
@@ -742,6 +745,7 @@ export default function HomeComposerPage() {
         is_enabled: !section.is_enabled,
       });
       await loadSections(activeLayoutId);
+      void loadActiveDiagnostics();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la sección");
     } finally {
@@ -1016,7 +1020,7 @@ export default function HomeComposerPage() {
     if (!activeLayoutId) return;
     try {
       setSaving(true);
-      const newTitle = `${section.title || SECTION_TYPE_LABELS[section.type]} (copia)`;
+      const newTitle = `${section.title || getSectionTypeLabel(section.type, SECTION_TYPE_LABELS)} (copia)`;
       await homeBuilderApi.createSection(activeLayoutId, {
         type: section.type,
         position: sections.length + 1,
@@ -1581,6 +1585,9 @@ export default function HomeComposerPage() {
             </div>
           )}
 
+          {/* sections = currently visible (may be filtered); allSections = full unfiltered
+              list passed so CanvasSections can compute the real first/last position for
+              the up/down buttons even when a filter is active. */}
           <CanvasSections
             sections={filteredSections}
             allSections={sections}
@@ -1609,7 +1616,7 @@ export default function HomeComposerPage() {
             <div className="mt-4 space-y-4">
               <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
                 <div>
-                  Editando: <span className="font-semibold text-zinc-800">{SECTION_TYPE_LABELS[selectedSection.type]}</span>
+                  Editando: <span className="font-semibold text-zinc-800">{getSectionTypeLabel(selectedSection.type, SECTION_TYPE_LABELS)}</span>
                   {isDraftDirty ? (
                     <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠️ Sin guardar</span>
                   ) : (

@@ -78,18 +78,32 @@ export class MailService {
     email: string,
     orderNumber: string,
     trackingUrl: string,
+    locale: string = 'es',
   ) {
-    await this.getTransporter().sendMail({
-      from: this.getFromAddress(),
-      to: email,
-      subject: `Order ${orderNumber} confirmed`,
-      html: `
+    const isEs = locale !== 'en';
+    const subject = isEs
+      ? `Pedido ${orderNumber} confirmado`
+      : `Order ${orderNumber} confirmed`;
+    const html = isEs
+      ? `
+        <h2>¡Gracias por tu pedido!</h2>
+        <p>Tu pedido <b>${orderNumber}</b> ha sido recibido.</p>
+        <p>Puedes hacer seguimiento de tu pedido en cualquier momento usando el enlace de abajo:</p>
+        <p><a href="${trackingUrl}" target="_blank" rel="noopener noreferrer">${trackingUrl}</a></p>
+        <p>Si no has realizado este pedido, contacta con nuestro equipo de soporte inmediatamente.</p>
+      `
+      : `
         <h2>Thank you for your order!</h2>
         <p>Your order <b>${orderNumber}</b> has been received.</p>
         <p>You can track your order at any time using the link below:</p>
         <p><a href="${trackingUrl}" target="_blank" rel="noopener noreferrer">${trackingUrl}</a></p>
         <p>If you did not place this order, please contact our support team immediately.</p>
-      `,
+      `;
+    await this.getTransporter().sendMail({
+      from: this.getFromAddress(),
+      to: email,
+      subject,
+      html,
     });
   }
 

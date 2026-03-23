@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useLocale } from "next-intl";
 import { getMe } from "../lib/auth";
 import {
   initGuestSession,
@@ -25,6 +26,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export default function ChatPage() {
+  const locale = useLocale();
   const [chatReady, setChatReady] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -298,7 +300,7 @@ export default function ChatPage() {
                     {c.subject || "Support request"}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {c.status} · {new Date(c.updated_at).toLocaleDateString()}
+                    {c.status} · {new Date(c.updated_at).toLocaleDateString(locale)}
                   </p>
                 </button>
               ))

@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { getMe, updateProfile } from "../lib/auth";
 import { getOrders, downloadInvoicePdf, Order } from "../lib/checkout";
 import { useAuth } from "../providers/AuthProvider";
 
 export default function AccountPage() {
+  const t = useTranslations("account");
+  const locale = useLocale();
   const router = useRouter();
   const { logout, refreshUser } = useAuth();
   const [user, setUser] = useState(null as any);
@@ -105,7 +108,7 @@ export default function AccountPage() {
     };
 
     if (!normalizedProfile.first_name || !normalizedProfile.last_name) {
-      setError("El nombre y apellido son obligatorios");
+      setError(t("nameRequired"));
       return;
     }
 
@@ -142,7 +145,7 @@ export default function AccountPage() {
       ];
 
       if (requiredAddressFields.some((value) => value.length === 0)) {
-        setError("Completa dirección, ciudad, código postal, región y país");
+        setError(t("addressRequired"));
         return;
       }
     }
@@ -159,7 +162,7 @@ export default function AccountPage() {
       await refreshUser();
       setEdit(false);
     } catch (err: any) {
-      setError(err?.message || "Error al guardar el perfil");
+      setError(err?.message || t("saveError"));
     } finally {
       setLoading(false);
     }
@@ -167,7 +170,7 @@ export default function AccountPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("es-ES", {
+    return new Date(dateStr).toLocaleDateString(locale, {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -175,19 +178,10 @@ export default function AccountPage() {
   };
 
   const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat("es-ES", {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: currency || "EUR",
     }).format(amount);
-  };
-
-  const statusLabels: Record<string, string> = {
-    PENDING: "Pendiente",
-    CONFIRMED: "Confirmado",
-    PROCESSING: "En proceso",
-    SHIPPED: "Enviado",
-    DELIVERED: "Entregado",
-    CANCELLED: "Cancelado",
   };
 
   if (!user) return null;
@@ -198,8 +192,8 @@ export default function AccountPage() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b pb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Mi cuenta</h1>
-            <p className="text-slate-500 text-sm mt-1">Gestiona tu perfil e información de envío.</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+            <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {!edit ? (
@@ -207,7 +201,7 @@ export default function AccountPage() {
                 onClick={() => setEdit(true)}
                 className="btn btn-primary"
               >
-                Editar perfil
+                {t("editProfile")}
               </button>
             ) : (
               <>
@@ -215,14 +209,14 @@ export default function AccountPage() {
                   onClick={() => setEdit(false)}
                   className="btn btn-outline"
                 >
-                  Cancelar
+                  {t("cancel")}
                 </button>
                 <button
                   disabled={loading}
                   onClick={handleSave}
                   className="btn btn-primary"
                 >
-                  {loading ? "Guardando..." : "Guardar cambios"}
+                  {loading ? t("saving") : t("save")}
                 </button>
               </>
             )}
@@ -230,7 +224,7 @@ export default function AccountPage() {
               onClick={() => logout().then(() => router.push("/login"))}
               className="btn btn-danger"
             >
-              Cerrar sesión
+              {t("logout")}
             </button>
           </div>
         </div>
@@ -267,11 +261,11 @@ export default function AccountPage() {
           <div className="lg:col-span-2 space-y-6">
             <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b bg-gray-50/50">
-                <h3 className="font-semibold text-slate-800">Datos personales</h3>
+                <h3 className="font-semibold text-slate-800">{t("personalData")}</h3>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="label">Nombre</label>
+                  <label className="label">{t("firstName")}</label>
                   <input
                     disabled={!edit}
                     className="input"
@@ -280,7 +274,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Apellidos</label>
+                  <label className="label">{t("lastName")}</label>
                   <input
                     disabled={!edit}
                     className="input"
@@ -289,7 +283,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="label text-slate-400">Correo electrónico (bloqueado)</label>
+                  <label className="label text-slate-400">{t("emailLocked")}</label>
                   <input disabled className="input bg-gray-50 cursor-not-allowed opacity-70" value={user.email} />
                 </div>
               </div>
@@ -297,39 +291,39 @@ export default function AccountPage() {
 
             <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b bg-gray-50/50">
-                <h3 className="font-semibold text-slate-800">Dirección de envío</h3>
+                <h3 className="font-semibold text-slate-800">{t("shippingAddress")}</h3>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="label">Empresa</label>
-                  <input disabled={!edit} className="input" placeholder="Nombre de empresa" value={address.company} onChange={(e) => setAddress({ ...address, company: e.target.value })} />
+                  <label className="label">{t("company")}</label>
+                  <input disabled={!edit} className="input" placeholder={t("companyPlaceholder")} value={address.company} onChange={(e) => setAddress({ ...address, company: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Teléfono</label>
+                  <label className="label">{t("phone")}</label>
                   <input disabled={!edit} className="input" placeholder="+34..." value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="label">Dirección</label>
-                  <input disabled={!edit} className="input" placeholder="Calle y número" value={address.address_line1} onChange={(e) => setAddress({ ...address, address_line1: e.target.value })} />
+                  <label className="label">{t("address")}</label>
+                  <input disabled={!edit} className="input" placeholder={t("addressPlaceholder")} value={address.address_line1} onChange={(e) => setAddress({ ...address, address_line1: e.target.value })} />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <input disabled={!edit} className="input" placeholder="Piso, puerta, etc. (Opcional)" value={address.address_line2} onChange={(e) => setAddress({ ...address, address_line2: e.target.value })} />
+                  <input disabled={!edit} className="input" placeholder={t("addressLine2Placeholder")} value={address.address_line2} onChange={(e) => setAddress({ ...address, address_line2: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Ciudad</label>
-                  <input disabled={!edit} className="input" placeholder="Ciudad" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
+                  <label className="label">{t("city")}</label>
+                  <input disabled={!edit} className="input" placeholder={t("city")} value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Código postal</label>
-                  <input disabled={!edit} className="input" placeholder="Código postal" value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} />
+                  <label className="label">{t("postalCode")}</label>
+                  <input disabled={!edit} className="input" placeholder={t("postalCode")} value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">Provincia / Región</label>
-                  <input disabled={!edit} className="input" placeholder="Provincia" value={address.region} onChange={(e) => setAddress({ ...address, region: e.target.value })} />
+                  <label className="label">{t("region")}</label>
+                  <input disabled={!edit} className="input" placeholder={t("region")} value={address.region} onChange={(e) => setAddress({ ...address, region: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="label">País</label>
-                  <input disabled={!edit} className="input" placeholder="País" value={address.country} onChange={(e) => setAddress({ ...address, country: e.target.value })} />
+                  <label className="label">{t("country")}</label>
+                  <input disabled={!edit} className="input" placeholder={t("country")} value={address.country} onChange={(e) => setAddress({ ...address, country: e.target.value })} />
                 </div>
               </div>
             </section>
@@ -337,13 +331,13 @@ export default function AccountPage() {
             {/* Orders & Invoices */}
             <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b bg-gray-50/50">
-                <h3 className="font-semibold text-slate-800">Pedidos y facturas</h3>
+                <h3 className="font-semibold text-slate-800">{t("ordersInvoices")}</h3>
               </div>
               <div className="p-6">
                 {ordersLoading ? (
-                  <p className="text-sm text-slate-400">Cargando pedidos...</p>
+                  <p className="text-sm text-slate-400">{t("loadingOrders")}</p>
                 ) : orders.length === 0 ? (
-                  <p className="text-sm text-slate-400">No tienes pedidos todavía.</p>
+                  <p className="text-sm text-slate-400">{t("noOrders")}</p>
                 ) : (
                   <div className="space-y-3">
                     {orders.map((order) => {
@@ -357,13 +351,13 @@ export default function AccountPage() {
                         >
                           <div className="space-y-0.5">
                             <p className="text-sm font-semibold text-slate-800">
-                              Pedido {order.order_number}
+                              {t("orderLabel", { number: order.order_number })}
                             </p>
                             <p className="text-xs text-slate-500">
                               {formatDate(order.created_at)} · {formatCurrency(order.total_amount, order.currency)}
                             </p>
                             <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                              {statusLabels[order.status] ?? order.status}
+                              {t(`status.${order.status}` as any, { defaultValue: order.status })}
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -378,12 +372,14 @@ export default function AccountPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                                 </svg>
                                 {downloadingDoc === doc.id
-                                  ? "Descargando..."
-                                  : `Descargar factura${doc.document_number ? ` ${doc.document_number}` : ""}`}
+                                  ? t("downloading")
+                                  : doc.document_number
+                                    ? t("downloadInvoice", { number: doc.document_number })
+                                    : t("downloadInvoiceNoNumber")}
                               </button>
                             ))}
                             {availableDocs.length === 0 && (
-                              <span className="text-xs text-slate-400 italic">Factura disponible al entregar</span>
+                              <span className="text-xs text-slate-400 italic">{t("invoicePending")}</span>
                             )}
                           </div>
                         </div>

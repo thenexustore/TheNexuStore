@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
   Mail,
   ArrowRight,
@@ -27,6 +28,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function ForgotPasswordPage() {
+  const t = useTranslations("auth.forgotPassword");
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -48,7 +50,7 @@ export default function ForgotPasswordPage() {
       await forgotPassword({ email });
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
     } catch (error) {
-      setError(getErrorMessage(error, "Failed to send OTP"));
+      setError(getErrorMessage(error, t("defaultError")));
     } finally {
       setLoading(false);
     }
@@ -69,28 +71,11 @@ export default function ForgotPasswordPage() {
             size={14}
             className="group-hover:-translate-x-1 transition-transform"
           />
-          Back_to_Gate
+          {t("backToLogin")}
         </Link>
-
-        {/* Header Section */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-[1000] tracking-tighter uppercase italic leading-none">
-            Recover_Access
-          </h1>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-4">
-            Requesting OTP Transmission to Node
-          </p>
-        </div>
 
         {/* The Card */}
         <div className="bg-white border-[3px] border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-          {/* Subtle Decorative Element */}
-          <div className="absolute top-0 right-0 p-2 opacity-5 font-mono text-[8px] leading-none pointer-events-none">
-            RECOVERY_PROTOCOL_v2.0
-            <br />
-            SECURE_CHANNEL_ACTIVE
-          </div>
-
           <form onSubmit={submit} className="space-y-8">
             <StoreBrandLogo
               branding={storeBranding}
@@ -108,7 +93,7 @@ export default function ForgotPasswordPage() {
 
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Registered_Email
+                {t("emailLabel")}
               </label>
               <div className="relative">
                 <Mail
@@ -120,14 +105,10 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full border-2 border-slate-100 bg-slate-50 px-12 py-4 font-bold outline-none focus:border-black focus:bg-white transition-all placeholder:text-slate-300"
-                  placeholder="verify_node@nexus.io"
+                  placeholder={t("emailPlaceholder")}
                   required
                 />
               </div>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight italic">
-                * An encrypted One-Time Password will be dispatched to this
-                address.
-              </p>
             </div>
 
             <button
@@ -138,11 +119,11 @@ export default function ForgotPasswordPage() {
               {loading ? (
                 <div className="flex items-center justify-center gap-3">
                   <RefreshCcw className="h-4 w-4 animate-spin" />
-                  <span>TRANSMITTING...</span>
+                  <span>{t("transmitting")}</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2">
-                  <span>Send OTP</span>
+                  <span>{t("submit")}</span>
                   <ArrowRight
                     size={18}
                     className="transition-transform duration-200 group-hover:translate-x-1"
@@ -151,12 +132,6 @@ export default function ForgotPasswordPage() {
               )}
             </button>
           </form>
-        </div>
-
-        {/* Support Meta */}
-        <div className="mt-12 flex justify-between items-center opacity-30 text-[9px] font-black uppercase tracking-[0.3em]">
-          <span>Ref: RC-99</span>
-          <span className="animate-pulse">Waiting_for_input...</span>
         </div>
       </div>
     </div>

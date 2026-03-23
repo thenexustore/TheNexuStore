@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { getOrder } from "@/app/lib/checkout";
 import { formatCurrency } from "@/app/lib/currency";
 
 export default function OrderConfirmationPage() {
+  const t = useTranslations("orderConfirmation");
+  const locale = useLocale();
   const params = useParams();
   const orderId = params.id as string;
 
@@ -20,7 +23,7 @@ export default function OrderConfirmationPage() {
         const data = await getOrder(orderId);
         setOrder(data);
       } catch (err: any) {
-        setError(err.message || "Failed to fetch order");
+        setError(err.message || t("notFound"));
       } finally {
         setLoading(false);
       }
@@ -41,13 +44,13 @@ export default function OrderConfirmationPage() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4 text-red-600">Error</h2>
-          <p className="text-gray-600 mb-6">{error || "Order not found"}</p>
+          <h2 className="text-2xl font-bold mb-4 text-red-600">{t("error")}</h2>
+          <p className="text-gray-600 mb-6">{error || t("notFound")}</p>
           <Link
             href="/"
             className="bg-[#0B123A] text-white px-6 py-3 rounded-lg hover:bg-[#1a245a]"
           >
-            Go to Home
+            {t("goHome")}
           </Link>
         </div>
       </div>
@@ -73,20 +76,18 @@ export default function OrderConfirmationPage() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Order Confirmed!</h1>
-          <p className="text-gray-600">
-            Thank you for your purchase. Your order has been received.
-          </p>
+          <h1 className="text-3xl font-bold mb-2">{t("title")}</h1>
+          <p className="text-gray-600">{t("subtitle")}</p>
           <p className="text-sm text-gray-500 mt-2">
-            Order #{order.order_number}
+            {t("orderNumber", { number: order.order_number })}
           </p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Order Details</h2>
+          <h2 className="text-xl font-bold mb-4">{t("details")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="font-semibold mb-2">Shipping Address</h3>
+              <h3 className="font-semibold mb-2">{t("shippingAddress")}</h3>
               <div className="text-gray-600">
                 <p>{order.shipping_address.full_name}</p>
                 <p>{order.shipping_address.address_line1}</p>
@@ -96,26 +97,26 @@ export default function OrderConfirmationPage() {
                 </p>
                 <p>{order.shipping_address.country}</p>
                 {order.shipping_address.phone && (
-                  <p>Phone: {order.shipping_address.phone}</p>
+                  <p>{t("phone", { phone: order.shipping_address.phone })}</p>
                 )}
               </div>
             </div>
 
             <div>
-              <h3 className="font-semibold mb-2">Order Summary</h3>
+              <h3 className="font-semibold mb-2">{t("summary")}</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Status:</span>
+                  <span>{t("status")}</span>
                   <span className="font-semibold capitalize">
                     {order.status.replace("_", " ")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Date:</span>
-                  <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                  <span>{t("date")}</span>
+                  <span>{new Date(order.created_at).toLocaleDateString(locale)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Total:</span>
+                  <span>{t("totalLabel")}</span>
                   <span className="font-bold text-lg">
                     {formatCurrency(order.total_amount)}
                   </span>
@@ -126,7 +127,7 @@ export default function OrderConfirmationPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Order Items</h2>
+          <h2 className="text-xl font-bold mb-4">{t("items")}</h2>
           <div className="space-y-4">
             {order.items?.map((item: any) => (
               <div
@@ -138,7 +139,7 @@ export default function OrderConfirmationPage() {
                     {item.title_snapshot || item.title}
                   </p>
                   <p className="text-sm text-gray-500">
-                    Qty: {item.qty} × {formatCurrency(item.unit_price)}
+                    {t("qty", { qty: item.qty, price: formatCurrency(item.unit_price) })}
                   </p>
                 </div>
                 <p className="font-semibold">
@@ -151,23 +152,23 @@ export default function OrderConfirmationPage() {
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span>Subtotal</span>
+                <span>{t("subtotal")}</span>
                 <span>{formatCurrency(order.subtotal_amount)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Shipping</span>
+                <span>{t("shipping")}</span>
                 <span>
                   {order.shipping_amount === 0
-                    ? "FREE"
+                    ? t("free")
                     : formatCurrency(order.shipping_amount)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Tax</span>
+                <span>{t("tax")}</span>
                 <span>{formatCurrency(order.tax_amount)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-300">
-                <span>Total</span>
+                <span>{t("total")}</span>
                 <span>{formatCurrency(order.total_amount)}</span>
               </div>
             </div>
@@ -175,22 +176,19 @@ export default function OrderConfirmationPage() {
         </div>
 
         <div className="text-center">
-          <p className="text-gray-600 mb-6">
-            We'll send you a confirmation email with tracking information once
-            your order ships.
-          </p>
+          <p className="text-gray-600 mb-6">{t("trackingNote")}</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/products"
               className="bg-[#0B123A] text-white px-6 py-3 rounded-lg hover:bg-[#1a245a]"
             >
-              Continue Shopping
+              {t("continueShopping")}
             </Link>
             <Link
               href="/orders"
               className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50"
             >
-              View All Orders
+              {t("viewOrders")}
             </Link>
           </div>
         </div>

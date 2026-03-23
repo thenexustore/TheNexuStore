@@ -854,7 +854,7 @@ export default function BillingPage() {
           description: i.description,
           qty: Number(i.qty) || 1,
           unit_price: Number(i.unit_price) || 0,
-          tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
+          tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21),
           position: idx,
         })),
       });
@@ -1272,7 +1272,7 @@ export default function BillingPage() {
   }, 0);
   const liveTax = createForm.items.reduce((s: number, i: CreateItemState) => {
     const ls = Number(i.qty || 1) * Number(i.unit_price || 0);
-    const taxRate = i.tax_rate !== "" ? Number(i.tax_rate) : 0.21;
+    const taxRate = i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21);
     return s + ls * taxRate;
   }, 0);
 
@@ -2545,7 +2545,7 @@ export default function BillingPage() {
                       description: i.description,
                       qty: Number(i.qty) || 1,
                       unit_price: Number(i.unit_price) || 0,
-                      tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
+                      tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21),
                     })),
                 }} />
               </div>
@@ -2738,7 +2738,7 @@ export default function BillingPage() {
                 <div className="space-y-2">
                   {createForm.items.map((item: CreateItemState, idx: number) => {
                     const lineBase = Number(item.qty || 1) * Number(item.unit_price || 0);
-                    const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : 0.21;
+                    const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : (settings?.default_tax_rate ?? 0.21);
                     const lineTax = lineBase * taxRate;
                     const lineTotal = lineBase + lineTax;
                     const search = itemSearches[idx] ?? { query: "", results: [], open: false, loading: false };

@@ -16,6 +16,36 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
+
+    // 1. Try staff/admin Bearer token first
+    const authHeader: string | undefined = req.headers?.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const bearer = authHeader.slice(7);
+      try {
+        const payload: any = await this.jwtService.verifyAsync(bearer);
+        const role = String(payload.role ?? '').toUpperCase();
+        const isStaffType = payload.type === 'STAFF';
+        const isAdminRole = role === 'ADMIN';
+
+        if (isStaffType && isAdminRole) {
+          req.user = {
+            id: payload.sub,
+            email: payload.email,
+            role: 'ADMIN',
+            permissions: Array.isArray(payload.permissions)
+              ? payload.permissions
+              : ['full_access'],
+            isStaffAdmin: true,
+          };
+          req.staff = payload;
+          return true;
+        }
+      } catch {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+    }
+
+    // 2. Fall back to customer cookie auth
     const token = req.cookies?.access_token;
 
     if (!token) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { toast } from "sonner";
 import { useLocale } from "next-intl";
@@ -406,6 +406,8 @@ export default function HomepageSectionsPage() {
   >("discount_desc");
   const [creatingType, setCreatingType] = useState<string | null>(null);
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
+  const [autoSavedAt, setAutoSavedAt] = useState<Date | null>(null);
+  const autoSaveRef = useRef<{ saveAll: (() => Promise<void>) | null; dirtyCount: number }>({ saveAll: null, dirtyCount: 0 });
   const locale = useLocale();
 
   const buildStoreUrl = useCallback(
@@ -1549,6 +1551,7 @@ export default function HomepageSectionsPage() {
         ),
       );
       toast.success(`${pending.length} sección(es) guardadas`);
+      setAutoSavedAt(new Date());
       await load();
     } catch (error) {
       toast.error(
@@ -1556,6 +1559,23 @@ export default function HomepageSectionsPage() {
       );
     }
   };
+
+  // Keep ref up to date so Ctrl+S sees latest state
+  autoSaveRef.current = { saveAll, dirtyCount: dirtySectionIds.size };
+
+  // Ctrl+S keyboard shortcut
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (autoSaveRef.current.dirtyCount > 0 && autoSaveRef.current.saveAll) {
+          void autoSaveRef.current.saveAll();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const discardLocalChanges = () => {
     setSections(originalSections);
@@ -2195,6 +2215,9 @@ export default function HomepageSectionsPage() {
             Cambios pendientes:{" "}
             <span className="font-semibold">{dirtySectionIds.size}</span> ·
             Mostrando: <span className="font-semibold">{filtered.length}</span>
+            {autoSavedAt && (
+              <span className="ml-2 text-xs text-slate-500">· Guardado: {autoSavedAt.toLocaleTimeString()}</span>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -2215,6 +2238,7 @@ export default function HomepageSectionsPage() {
               className="px-3 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
               disabled={!dirtySectionIds.size}
               onClick={() => void saveAll()}
+              title="Guardar cambios (Ctrl+S)"
             >
               Guardar cambios pendientes
             </button>

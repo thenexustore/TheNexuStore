@@ -341,6 +341,7 @@ export class UpdateBillingSettingsDto {
   credit_note_prefix?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   default_tax_rate?: number;

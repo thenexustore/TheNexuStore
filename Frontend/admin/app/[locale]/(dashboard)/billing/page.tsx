@@ -679,7 +679,7 @@ export default function BillingPage() {
           invoice_prefix: s.invoice_prefix,
           quote_prefix: s.quote_prefix,
           credit_note_prefix: s.credit_note_prefix,
-          default_tax_rate: s.default_tax_rate,
+          default_tax_rate: Number(s.default_tax_rate),
         });
       }).catch(() => { /* non-critical — falls back to 21% hardcoded */ });
     }
@@ -904,10 +904,7 @@ export default function BillingPage() {
         invoice_prefix: s.invoice_prefix,
         quote_prefix: s.quote_prefix,
         credit_note_prefix: s.credit_note_prefix,
-        default_tax_rate: s.default_tax_rate,
-      });
-    } catch (err: unknown) {
-      setSettingsLoadError(true);
+        default_tax_rate: Number(s.default_tax_rate),
       toast.error(
         err instanceof Error ? err.message : "Error cargando ajustes",
       );

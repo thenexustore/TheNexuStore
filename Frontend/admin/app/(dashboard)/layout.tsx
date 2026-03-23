@@ -18,6 +18,7 @@ import {
   Truck,
   Settings,
   FileText,
+  Map,
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -70,6 +71,7 @@ const navigation: NavItem[] = [
   { key: "coupons", href: "/coupons", icon: Ticket, requiredPermissions: ["full_access"] },
   { key: "pricing", href: "/pricing", icon: Tags, requiredPermissions: ["full_access"] },
   { key: "chat", href: "/chat", icon: MessageCircle, requiredPermissions: ["full_access"] },
+  { key: "siteMap", href: "/site-map", icon: Map },
   { key: "settings", href: "/settings", icon: Settings, requiredPermissions: ["full_access"] },
   {
     key: "homeContent",

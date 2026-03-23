@@ -633,7 +633,7 @@ export class CheckoutService {
     return orders.map((order) => this.serializeOrder(order));
   }
 
-  async getCustomerDocumentPdf(docId: string, customerId: string): Promise<Buffer> {
+  async getCustomerDocumentPdf(docId: string, customerId: string): Promise<{ buffer: Buffer; docRef: string }> {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id: docId },
     });
@@ -649,8 +649,7 @@ export class CheckoutService {
     if (!allowedStatuses.includes(doc.status)) {
       throw new ForbiddenException('Document is not available for download');
     }
-    const { buffer } = await this.billingService.generateDocumentPdf(docId);
-    return buffer;
+    return this.billingService.generateDocumentPdf(docId);
   }
 
   async getOrderByTrackingToken(trackingToken: string): Promise<any> {

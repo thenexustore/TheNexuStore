@@ -80,7 +80,7 @@ export class MailService {
     trackingUrl: string,
     locale: string = 'es',
   ) {
-    const isEs = locale === 'es';
+    const isEs = locale !== 'en';
     const subject = isEs
       ? `Pedido ${orderNumber} confirmado`
       : `Order ${orderNumber} confirmed`;

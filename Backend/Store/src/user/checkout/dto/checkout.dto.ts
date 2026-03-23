@@ -66,6 +66,7 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['es', 'en'])
   locale?: string = 'es';
 
   @IsOptional()

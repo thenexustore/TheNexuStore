@@ -649,7 +649,8 @@ export class CheckoutService {
     if (!allowedStatuses.includes(doc.status)) {
       throw new ForbiddenException('Document is not available for download');
     }
-    return this.billingService.generateDocumentPdf(docId);
+    const { buffer } = await this.billingService.generateDocumentPdf(docId);
+    return buffer;
   }
 
   async getOrderByTrackingToken(trackingToken: string): Promise<any> {

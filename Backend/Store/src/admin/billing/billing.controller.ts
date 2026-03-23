@@ -405,11 +405,11 @@ export class BillingController {
     @Param('id') id: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.billingService.generateDocumentPdf(id);
+    const { buffer: pdfBuffer, docRef } = await this.billingService.generateDocumentPdf(id);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="document-${id}.pdf"`,
+      `attachment; filename="${docRef}.pdf"`,
     );
     res.send(pdfBuffer);
   }

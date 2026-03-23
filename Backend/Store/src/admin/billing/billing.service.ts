@@ -1104,23 +1104,24 @@ export class BillingService {
 
   // ─── PDF Generation ───────────────────────────────────────────────────────
 
-  async generateDocumentPdf(id: string): Promise<Buffer> {
+  async generateDocumentPdf(id: string): Promise<{ buffer: Buffer; docRef: string }> {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id },
       include: { items: true },
     });
     if (!doc) throw new NotFoundException('Billing document not found');
 
-    return new Promise<Buffer>((resolve, reject) => {
+    const docRef =
+      doc.document_number ??
+      doc.id.substring(0, 8).toUpperCase();
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
       const pdf = new PDFDocument({ margin: 50, size: 'A4' });
       const chunks: Buffer[] = [];
       pdf.on('data', (chunk: Buffer) => chunks.push(chunk));
       pdf.on('end', () => resolve(Buffer.concat(chunks)));
       pdf.on('error', reject);
 
-      const docRef =
-        doc.document_number ??
-        doc.id.substring(0, 8).toUpperCase();
       const typeLabel =
         doc.type === BillingDocumentType.INVOICE
           ? 'FACTURA'
@@ -1234,6 +1235,8 @@ export class BillingService {
 
       pdf.end();
     });
+
+    return { buffer, docRef };
   }
 
   async sendDocument(id: string): Promise<{ sent: boolean; email: string }> {
@@ -1256,9 +1259,8 @@ export class BillingService {
       );
     }
 
-    const pdfBuffer = await this.generateDocumentPdf(id);
+    const { buffer: pdfBuffer, docRef } = await this.generateDocumentPdf(id);
 
-    const docRef = doc.document_number ?? id.substring(0, 8).toUpperCase();
     const typeLabel =
       doc.type === BillingDocumentType.INVOICE
         ? 'Factura'

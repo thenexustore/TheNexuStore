@@ -905,6 +905,9 @@ export default function BillingPage() {
         quote_prefix: s.quote_prefix,
         credit_note_prefix: s.credit_note_prefix,
         default_tax_rate: Number(s.default_tax_rate),
+      });
+    } catch (err: unknown) {
+      setSettingsLoadError(true);
       toast.error(
         err instanceof Error ? err.message : "Error cargando ajustes",
       );

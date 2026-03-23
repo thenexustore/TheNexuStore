@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { type ReactNode, useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Save,
@@ -171,7 +171,7 @@ function SectionCard({
 }: {
   title: string;
   icon: LucideIcon;
-  children: React.ReactNode;
+  children: ReactNode;
   collapsible?: boolean;
   defaultOpen?: boolean;
   badge?: string;
@@ -510,6 +510,19 @@ export default function FooterSettingsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Ctrl+S keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!saving && hasChanges) handleSave();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saving, hasChanges]);
 
   // ── Updater helpers ──────────────────────────────────────────────────────
   const upd = useCallback(<K extends keyof FooterSettings>(
@@ -1034,6 +1047,7 @@ export default function FooterSettingsPage() {
             type="button"
             onClick={handleSave}
             disabled={saving || !hasChanges}
+            title="Guardar (Ctrl+S)"
             className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}

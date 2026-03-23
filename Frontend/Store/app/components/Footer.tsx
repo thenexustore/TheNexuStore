@@ -7,7 +7,7 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import MailIcon from "@mui/icons-material/Mail";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import XIcon from "@mui/icons-material/X";
-import { useEffect, useState } from "react";
+import { type ComponentType, type FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   ArrowUp,
@@ -119,7 +119,7 @@ const DEFAULT_FOOTER: FooterSettings = {
 // ─── Icon maps ────────────────────────────────────────────────────────────────
 const SOCIAL_ICON_MAP: Record<
   string,
-  React.ComponentType<{ sx?: Record<string, unknown> }>
+  ComponentType<{ sx?: Record<string, unknown> }>
 > = {
   facebook: FacebookIcon,
   instagram: InstagramIcon,
@@ -169,10 +169,14 @@ export default function Footer() {
       });
   }, []);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const [subscribeStatus, setSubscribeStatus] = useState<"idle" | "success">("idle");
+
+  const handleSubscribe = (e: FormEvent) => {
     e.preventDefault();
     if (email) {
       setEmail("");
+      setSubscribeStatus("success");
+      setTimeout(() => setSubscribeStatus("idle"), 4000);
     }
   };
 
@@ -264,6 +268,12 @@ export default function Footer() {
                       {config.newsletterButtonText || t("subscribe")}
                     </button>
                   </form>
+                  {subscribeStatus === "success" && (
+                    <p className="mt-2 text-sm text-green-300 flex items-center gap-1.5">
+                      <CheckCircle2 size={14} />
+                      ¡Gracias! Te hemos apuntado a nuestra newsletter.
+                    </p>
+                  )}
                 </>
               )}
 

@@ -699,6 +699,8 @@ export default function BillingPage() {
       toast.error(
         err instanceof Error ? err.message : "Error cargando documento",
       );
+      // Close the panel so the user doesn't see an empty slide-over
+      setShowDetail(false);
     } finally {
       setDetailLoading(false);
     }

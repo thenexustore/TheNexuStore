@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
   Lock,
   Key,
@@ -28,6 +29,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 // Next.js requires useSearchParams to be wrapped in a Suspense boundary
 function ResetForm() {
+  const t = useTranslations("auth.resetPassword");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -50,7 +52,7 @@ function ResetForm() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("VALIDATION_ERROR: PASSWORDS_DO_NOT_MATCH");
+      setError(t("passwordMismatch"));
       return;
     }
 
@@ -63,7 +65,7 @@ function ResetForm() {
         router.replace("/login");
       }, 3000);
     } catch (error) {
-      setError(getErrorMessage(error, "Reset password failed"));
+      setError(getErrorMessage(error, t("defaultError")));
     } finally {
       setLoading(false);
     }
@@ -75,10 +77,10 @@ function ResetForm() {
         <div className="bg-white border-[3px] border-black p-12 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center">
           <CheckCircle2 size={64} className="text-green-500 mb-6" />
           <h2 className="text-2xl font-[1000] uppercase italic mb-2">
-            Access_Restored
+            {t("successTitle")}
           </h2>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-            Redirecting to secure login node...
+            {t("successSubtitle")}
           </p>
         </div>
       </div>
@@ -95,25 +97,10 @@ function ResetForm() {
           size={14}
           className="group-hover:-translate-x-1 transition-transform"
         />
-        Back_to_Recovery
+        {t("back")}
       </Link>
 
-      <div className="mb-10">
-        <h1 className="text-4xl font-[1000] tracking-tighter uppercase italic leading-none">
-          Update_Credentials
-        </h1>
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-4">
-          Input OTP & New Security String
-        </p>
-      </div>
-
       <div className="bg-white border-[3px] border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-2 opacity-5 font-mono text-[8px] leading-none pointer-events-none">
-          AUTH_OVERRIDE_v2.0
-          <br />
-          STATUS: PENDING_VERIFICATION
-        </div>
-
         <form onSubmit={submit} className="space-y-6">
           {error && (
             <div className="bg-red-50 border-2 border-red-500 p-4 flex items-center gap-3 text-red-600 font-black text-[10px] uppercase tracking-widest">
@@ -124,7 +111,7 @@ function ResetForm() {
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              OTP_Code
+              {t("otpLabel")}
             </label>
             <div className="relative">
               <Key
@@ -144,7 +131,7 @@ function ResetForm() {
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              New_Password
+              {t("newPasswordLabel")}
             </label>
             <div className="relative">
               <Lock
@@ -164,7 +151,7 @@ function ResetForm() {
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              Confirm_Password
+              {t("confirmPasswordLabel")}
             </label>
             <div className="relative">
               <Lock
@@ -190,11 +177,11 @@ function ResetForm() {
             {loading ? (
               <div className="flex items-center justify-center gap-3">
                 <RefreshCcw className="h-4 w-4 animate-spin" />
-                <span>SYNCING...</span>
+                <span>{t("syncing")}</span>
               </div>
             ) : (
               <div className="flex items-center justify-center gap-2">
-                <span>Commit_Changes</span>
+                <span>{t("submit")}</span>
                 <ArrowRight
                   size={18}
                   className="transition-transform group-hover:translate-x-1"
@@ -210,6 +197,7 @@ function ResetForm() {
 
 // THE DEFAULT EXPORT
 export default function ResetPasswordPage() {
+  const t = useTranslations("auth.resetPassword");
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-black selection:text-white flex items-center justify-center p-6">
       <div className="fixed inset-0 -z-10 bg-[linear-gradient(to_right,#f5f5f5_1px,transparent_1px),linear-gradient(to_bottom,#f5f5f5_1px,transparent_1px)] bg-[size:3rem_3rem]" />
@@ -218,7 +206,7 @@ export default function ResetPasswordPage() {
       <Suspense
         fallback={
           <div className="font-black animate-pulse">
-            LOADING_ENCRYPTION_LAYER...
+            {t("loading")}
           </div>
         }
       >

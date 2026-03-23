@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { getOrderByTrackingToken, type Order, type OrderItem } from "@/app/lib/checkout";
 import { formatCurrency } from "@/app/lib/currency";
 import { useOrderTrackingSocket } from "@/app/hooks/useOrderTrackingSocket";
@@ -27,44 +28,19 @@ type OrderStatus =
   | "CANCELLED"
   | "REFUNDED";
 
-type ProgressStep = {
-  key: Exclude<OrderStatus, "FAILED" | "CANCELLED" | "REFUNDED">;
-  label: string;
-  subtitle: string;
+type ProgressStepKey = Exclude<OrderStatus, "FAILED" | "CANCELLED" | "REFUNDED">;
+
+type ProgressStepDef = {
+  key: ProgressStepKey;
   Icon: typeof Clock3;
 };
 
-const PROGRESS_STEPS: ProgressStep[] = [
-  {
-    key: "PENDING_PAYMENT",
-    label: "Payment Pending",
-    subtitle: "Bank confirmation in progress",
-    Icon: CreditCard,
-  },
-  {
-    key: "PAID",
-    label: "Payment Confirmed",
-    subtitle: "Transaction approved",
-    Icon: CheckCircle2,
-  },
-  {
-    key: "PROCESSING",
-    label: "Preparing Order",
-    subtitle: "Packing started",
-    Icon: Package,
-  },
-  {
-    key: "SHIPPED",
-    label: "Shipped",
-    subtitle: "Handed to carrier",
-    Icon: Truck,
-  },
-  {
-    key: "DELIVERED",
-    label: "Delivered",
-    subtitle: "Order completed",
-    Icon: CheckCircle2,
-  },
+const PROGRESS_STEP_DEFS: ProgressStepDef[] = [
+  { key: "PENDING_PAYMENT", Icon: CreditCard },
+  { key: "PAID", Icon: CheckCircle2 },
+  { key: "PROCESSING", Icon: Package },
+  { key: "SHIPPED", Icon: Truck },
+  { key: "DELIVERED", Icon: CheckCircle2 },
 ];
 
 const formatStatus = (status: string) => {
@@ -113,6 +89,8 @@ const statusBadgeClass = (status: OrderStatus) => {
 const itemQuantity = (item: OrderItem): number => item.qty ?? item.quantity ?? 1;
 
 export default function OrderTrackingPage() {
+  const t = useTranslations("orderTracking");
+  const locale = useLocale();
   const params = useParams();
   const searchParams = useSearchParams();
   const token = params.token as string;
@@ -155,7 +133,7 @@ export default function OrderTrackingPage() {
       } catch (err: unknown) {
         if (!isMounted) return;
         const message =
-          err instanceof Error ? err.message : "Failed to fetch order";
+          err instanceof Error ? err.message : t("notFoundDesc");
         setError(message);
       } finally {
         if (!isMounted) return;
@@ -198,7 +176,7 @@ export default function OrderTrackingPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 shadow-sm">
           <RefreshCw className="h-5 w-5 animate-spin text-[#0B123A]" />
-          <p className="text-sm font-medium text-slate-600">Loading order status...</p>
+          <p className="text-sm font-medium text-slate-600">{t("loading")}</p>
         </div>
       </div>
     );
@@ -209,20 +187,20 @@ export default function OrderTrackingPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-7 text-center shadow-sm">
           <XCircle className="mx-auto mb-3 h-10 w-10 text-rose-500" />
-          <h2 className="text-2xl font-bold text-slate-900">Order Not Found</h2>
-          <p className="mt-2 text-slate-600">{error || "Unable to load this order."}</p>
+          <h2 className="text-2xl font-bold text-slate-900">{t("notFound")}</h2>
+          <p className="mt-2 text-slate-600">{error || t("notFoundDesc")}</p>
           <Link
             href="/"
             className="mt-6 inline-flex rounded-xl bg-[#0B123A] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#1a245a]"
           >
-            Go to Home
+            {t("goHome")}
           </Link>
         </div>
       </div>
     );
   }
 
-  const statusIndex = PROGRESS_STEPS.findIndex(
+  const statusIndex = PROGRESS_STEP_DEFS.findIndex(
     (step) => step.key === normalizedOrderStatus,
   );
 
@@ -234,16 +212,16 @@ export default function OrderTrackingPage() {
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-100">
-                  Order Tracking
+                  {t("trackingLabel")}
                 </p>
                 <h1 className="mt-2 text-3xl font-black sm:text-4xl">
                   {order.order_number}
                 </h1>
                 <p className="mt-3 text-sm text-blue-100">
-                  Track payment, packing, and shipment updates in real time.
+                  {t("trackingDesc")}
                 </p>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-blue-100/80">
-                  {connected ? "Live updates connected" : "Auto-refresh fallback active"}
+                  {connected ? t("liveUpdates") : t("autoRefresh")}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -263,7 +241,7 @@ export default function OrderTrackingPage() {
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
                   />
-                  Refresh
+                  {t("refresh")}
                 </button>
               </div>
             </div>
@@ -273,37 +251,34 @@ export default function OrderTrackingPage() {
             {isPaymentPending && (
               <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
                 <Clock3 className="mt-0.5 h-4 w-4 flex-none" />
-                <p className="text-sm">
-                  Bank return received. Waiting for secure server confirmation from Redsys.
-                </p>
+                <p className="text-sm">{t("paymentPendingAlert")}</p>
               </div>
             )}
             {!isPaymentPending && (paymentStatus === "success" || isOrderPaid) && (
               <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none" />
-                <p className="text-sm">Payment confirmed successfully.</p>
+                <p className="text-sm">{t("paymentConfirmedAlert")}</p>
               </div>
             )}
             {(paymentStatus === "failed" || isOrderFailed) && (
               <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
                 <XCircle className="mt-0.5 h-4 w-4 flex-none" />
-                <p className="text-sm">
-                  Payment was declined or canceled. Please retry from support/admin.
-                </p>
+                <p className="text-sm">{t("paymentFailedAlert")}</p>
               </div>
             )}
           </div>
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-bold text-slate-900">Order Progress</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t("orderProgress")}</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-5">
-            {PROGRESS_STEPS.map((step, index) => {
+            {PROGRESS_STEP_DEFS.map((stepDef, index) => {
               const reached = !isOrderFailed && statusIndex >= index;
               const current = !isOrderFailed && statusIndex === index;
+              const stepT = t.raw(`steps.${stepDef.key}`) as { label: string; subtitle: string };
               return (
                 <div
-                  key={step.key}
+                  key={stepDef.key}
                   className={`rounded-xl border p-3 transition-colors ${
                     reached
                       ? "border-[#204198] bg-blue-50"
@@ -311,14 +286,14 @@ export default function OrderTrackingPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <step.Icon
+                    <stepDef.Icon
                       className={`h-4 w-4 ${
                         reached ? "text-[#204198]" : "text-slate-400"
                       }`}
                     />
                     {current && (
                       <span className="rounded-full bg-[#0B123A] px-2 py-0.5 text-[10px] font-semibold text-white">
-                        Current
+                        {t("current")}
                       </span>
                     )}
                   </div>
@@ -327,9 +302,9 @@ export default function OrderTrackingPage() {
                       reached ? "text-slate-900" : "text-slate-500"
                     }`}
                   >
-                    {step.label}
+                    {stepT.label}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">{step.subtitle}</p>
+                  <p className="mt-1 text-xs text-slate-500">{stepT.subtitle}</p>
                 </div>
               );
             })}
@@ -338,7 +313,7 @@ export default function OrderTrackingPage() {
 
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">Shipping Address</h2>
+            <h2 className="text-lg font-bold text-slate-900">{t("shippingAddress")}</h2>
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-2 flex items-center gap-2 text-slate-700">
                 <MapPin className="h-4 w-4" />
@@ -353,43 +328,43 @@ export default function OrderTrackingPage() {
               <p className="text-sm text-slate-600">{order.shipping_address.country}</p>
               {order.shipping_address.phone && (
                 <p className="mt-2 text-sm font-medium text-slate-700">
-                  Phone: {order.shipping_address.phone}
+                  {t("phone", { phone: order.shipping_address.phone })}
                 </p>
               )}
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">Order Summary</h2>
+            <h2 className="text-lg font-bold text-slate-900">{t("orderSummary")}</h2>
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex items-center justify-between text-slate-600">
-                <span>Order Date</span>
-                <span>{new Date(order.created_at).toLocaleString("en-GB")}</span>
+                <span>{t("orderDate")}</span>
+                <span>{new Date(order.created_at).toLocaleString(locale)}</span>
               </div>
               <div className="flex items-center justify-between text-slate-600">
-                <span>Subtotal</span>
+                <span>{t("subtotal")}</span>
                 <span>{formatCurrency(order.subtotal_amount)}</span>
               </div>
               {order.discount_amount > 0 && (
                 <div className="flex items-center justify-between text-emerald-700">
-                  <span>Discount</span>
+                  <span>{t("discount")}</span>
                   <span>-{formatCurrency(order.discount_amount)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between text-slate-600">
-                <span>Shipping</span>
+                <span>{t("shipping")}</span>
                 <span>
                   {order.shipping_amount === 0
-                    ? "Free"
+                    ? t("free")
                     : formatCurrency(order.shipping_amount)}
                 </span>
               </div>
               <div className="flex items-center justify-between text-slate-600">
-                <span>Tax</span>
+                <span>{t("tax")}</span>
                 <span>{formatCurrency(order.tax_amount)}</span>
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900">
-                <span>Total</span>
+                <span>{t("total")}</span>
                 <span>{formatCurrency(order.total_amount)}</span>
               </div>
             </div>
@@ -397,7 +372,7 @@ export default function OrderTrackingPage() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900">Order Items</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t("orderItems")}</h2>
           <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
             {order.items?.map((item) => (
               <div
@@ -409,7 +384,7 @@ export default function OrderTrackingPage() {
                     {item.title_snapshot || item.title || "Item"}
                   </p>
                   <p className="text-slate-500">
-                    Qty: {itemQuantity(item)} x {formatCurrency(item.unit_price)}
+                    {t("qty", { qty: itemQuantity(item), price: formatCurrency(item.unit_price) })}
                   </p>
                 </div>
                 <p className="font-semibold text-slate-900">
@@ -421,7 +396,7 @@ export default function OrderTrackingPage() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900">Shipping & Tracking</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t("shippingTracking")}</h2>
           {order.shipments && order.shipments.length > 0 ? (
             <div className="mt-4 space-y-3">
               {order.shipments.map((shipment) => (
@@ -431,7 +406,7 @@ export default function OrderTrackingPage() {
                 >
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-semibold text-slate-900">
-                      Carrier: {shipment.carrier}
+                      {t("carrier", { carrier: shipment.carrier })}
                     </span>
                     {shipment.service_level && (
                       <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
@@ -444,7 +419,7 @@ export default function OrderTrackingPage() {
                   </div>
                   {shipment.tracking_number && (
                     <p className="mt-2 text-sm text-slate-600">
-                      Tracking Number: {shipment.tracking_number}
+                      {t("trackingNumber", { number: shipment.tracking_number })}
                     </p>
                   )}
                   {shipment.tracking_url && (
@@ -455,13 +430,13 @@ export default function OrderTrackingPage() {
                       className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#0B123A] hover:text-[#1a245a]"
                     >
                       <Truck className="h-4 w-4" />
-                      View carrier tracking
+                      {t("viewCarrierTracking")}
                     </a>
                   )}
                   {shipment.tracking_events && shipment.tracking_events.length > 0 && (
                     <div className="mt-4 space-y-2 border-t border-slate-200 pt-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Live Tracking Events
+                        {t("liveTrackingEvents")}
                       </p>
                       {shipment.tracking_events.map((event) => (
                         <div key={event.id} className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
@@ -469,7 +444,7 @@ export default function OrderTrackingPage() {
                             <span className="font-semibold text-slate-800">
                               {formatStatus(event.status)}
                             </span>
-                            <span>{new Date(event.event_time).toLocaleString("en-GB")}</span>
+                            <span>{new Date(event.event_time).toLocaleString(locale)}</span>
                           </div>
                           {event.location && <p className="mt-1">{event.location}</p>}
                           {event.details && <p className="mt-1">{event.details}</p>}
@@ -482,8 +457,7 @@ export default function OrderTrackingPage() {
             </div>
           ) : (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Shipment is not created yet. You will receive email updates as soon as your
-              package is dispatched.
+              {t("noShipmentYet")}
             </div>
           )}
         </section>
@@ -493,13 +467,13 @@ export default function OrderTrackingPage() {
             href="/products"
             className="inline-flex items-center justify-center rounded-xl bg-[#0B123A] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#1a245a]"
           >
-            Continue Shopping
+            {t("continueShopping")}
           </Link>
           <Link
             href="/"
             className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
-            Back to Home
+            {t("backToHome")}
           </Link>
         </div>
       </div>

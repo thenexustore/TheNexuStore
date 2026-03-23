@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { API_URL } from "../lib/env";
 import Image from "next/image";
 import {
@@ -29,6 +30,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations("auth.register");
   const router = useRouter();
   const [step, setStep] = useState("register");
   const [loading, setLoading] = useState(false);
@@ -85,7 +87,7 @@ export default function RegisterPage() {
       await registerUser({ ...form, profile_image });
       setStep("verify");
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Registration failed"));
+      setError(getErrorMessage(err, t("defaultError")));
     } finally {
       setLoading(false);
     }
@@ -100,7 +102,7 @@ export default function RegisterPage() {
       await verifyOtp({ email: form.email, otp });
       router.replace("/account");
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Invalid verification code"));
+      setError(getErrorMessage(err, t("invalidOtp")));
     } finally {
       setLoading(false);
     }
@@ -115,10 +117,10 @@ export default function RegisterPage() {
 
     try {
       await resendOtp({ email: form.email });
-      setNotice("A new OTP has been sent to your email.");
+      setNotice(t("otpSent"));
       setResendCooldown(30);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Unable to resend OTP"));
+      setError(getErrorMessage(err, t("resendError")));
     } finally {
       setResendLoading(false);
     }
@@ -191,7 +193,7 @@ export default function RegisterPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <input
-                    placeholder="FIRST_NAME"
+                    placeholder={t("firstNamePlaceholder")}
                     required
                     className="w-full border-2 border-slate-100 bg-slate-50 px-4 py-3 font-bold outline-none focus:border-black"
                     value={form.first_name}
@@ -200,7 +202,7 @@ export default function RegisterPage() {
                     }
                   />
                   <input
-                    placeholder="LAST_NAME"
+                    placeholder={t("lastNamePlaceholder")}
                     required
                     className="w-full border-2 border-slate-100 bg-slate-50 px-4 py-3 font-bold outline-none focus:border-black"
                     value={form.last_name}
@@ -217,7 +219,7 @@ export default function RegisterPage() {
                   />
                   <input
                     type="email"
-                    placeholder="NODE_EMAIL"
+                    placeholder={t("emailPlaceholder")}
                     required
                     className="w-full border-2 border-slate-100 bg-slate-50 px-12 py-4 font-bold outline-none focus:border-black"
                     value={form.email}
@@ -234,7 +236,7 @@ export default function RegisterPage() {
                   />
                   <input
                     type="password"
-                    placeholder="ACCESS_KEY"
+                    placeholder={t("passwordPlaceholder")}
                     required
                     className="w-full border-2 border-slate-100 bg-slate-50 px-12 py-4 font-bold outline-none focus:border-black"
                     value={form.password}
@@ -258,10 +260,10 @@ flex items-center justify-center gap-2
 "
                 >
                   {loading ? (
-                    "INITIALIZING..."
+                    t("initializing")
                   ) : (
                     <>
-                      Register <ArrowRight size={20} />
+                      {t("submit")} <ArrowRight size={20} />
                     </>
                   )}
                 </button>
@@ -270,7 +272,7 @@ flex items-center justify-center gap-2
               <div className="flex items-center gap-4 my-8">
                 <div className="flex-1 h-px bg-slate-100" />
                 <span className="text-[10px] font-black text-slate-300">
-                  OR
+                  {t("or")}
                 </span>
                 <div className="flex-1 h-px bg-slate-100" />
               </div>
@@ -285,7 +287,7 @@ flex items-center justify-center gap-2
                   width={18}
                   height={18}
                 />
-                Continue_with_Google
+                {t("continueWithGoogle")}
               </a>
             </>
           ) : (
@@ -295,10 +297,10 @@ flex items-center justify-center gap-2
                   <ShieldCheck size={40} />
                 </div>
                 <h1 className="text-3xl font-[1000] tracking-tighter uppercase italic">
-                  Verify_Identity
+                  {t("verifyTitle")}
                 </h1>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mt-4 italic">
-                  Sent to:{" "}
+                  {t("sentTo")}{" "}
                   <span className="text-black not-italic">{form.email}</span>
                 </p>
               </div>
@@ -327,10 +329,10 @@ flex items-center justify-center gap-2
                   className="text-slate-500 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {resendLoading
-                    ? "Resending..."
+                    ? t("resending")
                     : resendCooldown > 0
-                      ? `Resend in ${resendCooldown}s`
-                      : "Resend OTP"}
+                      ? t("resendIn", { seconds: resendCooldown })
+                      : t("resendOtp")}
                 </button>
                 {notice && <span className="text-green-600">{notice}</span>}
               </div>
@@ -340,7 +342,7 @@ flex items-center justify-center gap-2
                 disabled={loading}
                 className="w-full bg-indigo-600 text-white py-5 font-black uppercase tracking-widest hover:bg-black transition-all active:scale-95 disabled:opacity-50"
               >
-                {loading ? "VERIFYING..." : "Complete_Auth"}
+                {loading ? t("verifying") : t("completeAuth")}
               </button>
             </form>
           )}
@@ -350,9 +352,9 @@ flex items-center justify-center gap-2
               href="/login"
               className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-black"
             >
-              Already have an account?{" "}
+              {t("alreadyHaveAccount")}{" "}
               <span className="underline underline-offset-4">
-                Back to Login
+                {t("backToLogin")}
               </span>
             </Link>
           </div>

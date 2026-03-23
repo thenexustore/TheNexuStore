@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { API_URL } from "../lib/env";
 import { Mail, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
 import { loginUser } from "../lib/auth";
@@ -10,6 +11,7 @@ import { loadStoreBranding, subscribeStoreBranding, type StoreBranding } from ".
 import StoreBrandLogo from "../components/StoreBrandLogo";
 
 export default function LoginPage() {
+  const t = useTranslations("auth.login");
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +34,7 @@ export default function LoginPage() {
       await loginUser({ email, password });
       router.replace("/store");
     } catch (err: any) {
-      setError(err?.message || "Invalid email or password");
+      setError(err?.message || t("defaultError"));
     } finally {
       setLoading(false);
     }
@@ -51,9 +53,9 @@ export default function LoginPage() {
               height={40}
             />
             <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
-              Welcome back
+              {t("title")}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">Sign in to your account</p>
+            <p className="mt-1 text-sm text-slate-500">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -69,7 +71,7 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">
-                Email address
+                {t("email")}
               </label>
               <div className="relative">
                 <Mail
@@ -92,13 +94,13 @@ export default function LoginPage() {
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
                 <label className="block text-sm font-medium text-slate-700">
-                  Password
+                  {t("password")}
                 </label>
                 <Link
                   href="/forgot-password"
                   className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
                 >
-                  Forgot password?
+                  {t("forgotPassword")}
                 </Link>
               </div>
               <div className="relative">
@@ -117,7 +119,7 @@ export default function LoginPage() {
                 />
                 <button
                   type="button"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
                 >
@@ -131,7 +133,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-[#0B123A] hover:bg-[#1a245a] text-white py-3 rounded-xl text-sm font-semibold tracking-wide cursor-pointer transition-all duration-200 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? t("signingIn") : t("submit")}
               {!loading && <ArrowRight size={16} />}
             </button>
           </form>
@@ -146,13 +148,13 @@ export default function LoginPage() {
                 alt="Google"
                 className="h-4 w-4"
               />
-              Continue with Google
+              {t("continueWithGoogle")}
             </a>
 
             <p className="text-sm text-slate-500 text-center">
-              Don&apos;t have an account?{" "}
+              {t("noAccount")}{" "}
               <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
-                Create one
+                {t("createOne")}
               </Link>
             </p>
           </div>

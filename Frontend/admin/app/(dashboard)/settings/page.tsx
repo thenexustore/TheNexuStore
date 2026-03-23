@@ -95,6 +95,7 @@ export default function SettingsPage() {
   const deployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const logsEndRef = useRef<HTMLDivElement | null>(null);
+  const autoSaveRef = useRef<{ onSave: (() => Promise<void>) | null; hasChanges: boolean }>({ onSave: null, hasChanges: false });
 
   const hasChanges = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(savedSnapshot),
@@ -338,6 +339,19 @@ export default function SettingsPage() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [hasChanges, settings, settingsSaving, onSave]);
+
+  // Keep ref up to date so the auto-save interval sees latest state
+  autoSaveRef.current = { onSave, hasChanges };
+
+  // Auto-save every 10 minutes when there are pending changes
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (autoSaveRef.current.hasChanges && autoSaveRef.current.onSave) {
+        void autoSaveRef.current.onSave();
+      }
+    }, 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   async function onReset() {
     const brandingPayload = {

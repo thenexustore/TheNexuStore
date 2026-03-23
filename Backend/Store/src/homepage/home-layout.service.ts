@@ -206,6 +206,8 @@ export class HomeLayoutService {
       next.interval_ms = this.clampRange(next.interval_ms, 2000, 15000, 4500);
       next.items_mobile = this.clampRange(next.items_mobile, 1, 3, 2);
       next.items_desktop = this.clampRange(next.items_desktop, 2, 6, 4);
+      next.rows_mobile = this.clampRange(next.rows_mobile, 1, 4, 1);
+      next.rows_desktop = this.clampRange(next.rows_desktop, 1, 4, 1);
       next.view_all_href = String(next.view_all_href || '').trim() || null;
       next.view_all_label = String(next.view_all_label || '').trim() || null;
     }
@@ -234,12 +236,11 @@ export class HomeLayoutService {
       next.interval_ms = this.clampRange(next.interval_ms, 2000, 15000, 4500);
       next.items_mobile = this.clampRange(next.items_mobile, 2, 4, 2);
       next.items_desktop = this.clampRange(next.items_desktop, 2, 8, 6);
+      next.rows_mobile = this.clampRange(next.rows_mobile, 1, 4, 1);
+      next.rows_desktop = this.clampRange(next.rows_desktop, 1, 4, 1);
     }
 
-    if (
-      type === HomeSectionType.VALUE_PROPS ||
-      type === HomeSectionType.TRENDING_CHIPS
-    ) {
+    if (type === HomeSectionType.VALUE_PROPS) {
       next.items = Array.isArray(next.items) ? next.items : [];
     }
 
@@ -1285,8 +1286,7 @@ export class HomeLayoutService {
     }
 
     if (
-      section.type === HomeSectionType.VALUE_PROPS ||
-      section.type === HomeSectionType.TRENDING_CHIPS
+      section.type === HomeSectionType.VALUE_PROPS
     ) {
       return Array.isArray(config.items) ? config.items : [];
     }

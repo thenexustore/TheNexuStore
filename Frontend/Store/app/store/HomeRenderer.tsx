@@ -544,6 +544,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const list = rawList.slice(0, effectiveLimit);
   const mobileItems = Math.max(1, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
   const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
+  const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
+  const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
   const mobileCardPx = Math.max(176, Math.floor(380 / mobileItems));
   const desktopCardPx = Math.max(228, Math.floor(1240 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
@@ -679,7 +681,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     return () => window.clearInterval(id);
   }, [autoplayEnabled, autoplayIntervalMs, isPaused, isMobileViewport, list.length, reduceMotion]);
 
-  const renderCard = (product: Record<string, unknown>, idx: number) => {
+  const renderCard = (product: Record<string, unknown>, idx: number, gridMode = false) => {
     const hasDeal = Number(product.compare_at_price || 0) > Number(product.price || 0);
     const pct = Number(product.discount_percentage || product.discount_pct || 0);
     const stock = Number(product.stock_quantity || 0);
@@ -688,52 +690,52 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       <ActionLink
         key={asText(product.id, `prod-${idx}`)}
         href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-        className="group relative flex min-h-[26rem] w-[var(--card-mobile)] shrink-0 flex-none snap-start flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg md:min-h-[27rem] md:w-[var(--card-desktop)]"
-        style={{
+        className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full min-h-[18rem]' : 'min-h-[22rem] w-[var(--card-mobile)] shrink-0 flex-none snap-start md:min-h-[23rem] md:w-[var(--card-desktop)]'}`}
+        style={gridMode ? undefined : {
           ['--card-mobile' as string]: `${mobileCardPx}px`,
           ['--card-desktop' as string]: `${desktopCardPx}px`,
         }}
       >
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 opacity-70" />
-        <div className="relative mb-3 aspect-[1/1] overflow-hidden rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100">
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 opacity-60" />
+        <div className="relative mb-2.5 aspect-[4/3] overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100">
           {!isLikelyMissingImage(product.thumbnail) ? (
             <SmartImage
               src={asSrc(product.thumbnail)}
               alt={asText(product.title, 'Product')}
-              className="object-contain p-3 transition duration-300 group-hover:scale-105"
+              className="object-contain p-2 transition duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 44vw, 210px"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-center text-xs font-medium text-slate-400">Imagen pendiente</div>
           )}
           {hasDeal && pct ? (
-            <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow">-{pct}%</span>
+            <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white shadow">-{pct}%</span>
           ) : null}
         </div>
 
         <div className="flex flex-1 flex-col">
-          <p className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
+          <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
 
-          <div className="mt-3 flex items-end gap-2">
-            <span className={`text-xl font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
+          <div className="mt-2 flex items-end gap-2">
+            <span className={`text-lg font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
               {formatCurrency(Number(product.price || 0))}
             </span>
             {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{formatCurrency(Number(product.compare_at_price || 0))}</span> : null}
           </div>
 
-          <div className="mt-2 min-h-[3rem]">
+          <div className="mt-1.5">
             {stock <= 0 ? (
-              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">Sin stock temporal</span>
+              <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Sin stock temporal</span>
             ) : stock <= 8 ? (
-              <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">¡Solo quedan {stock}!</span>
+              <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">¡Solo {stock}!</span>
             ) : (
-              <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">En stock · envío rápido</span>
+              <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">En stock</span>
             )}
           </div>
 
-          <div className="mt-auto pt-4">
-            <div className="flex min-h-[3rem] w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-semibold text-slate-700 transition group-hover:border-indigo-200 group-hover:bg-indigo-50 group-hover:text-indigo-700">
+          <div className="mt-auto pt-3">
+            <div className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-700 transition group-hover:border-indigo-200 group-hover:bg-indigo-50 group-hover:text-indigo-700">
               Ver producto <span aria-hidden className="ml-1">→</span>
             </div>
           </div>
@@ -742,59 +744,68 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     );
   };
 
+  const currentRows = isMobileViewport ? rowsMobile : rowsDesktop;
+  const currentCols = isMobileViewport ? mobileItems : desktopItems;
+  const useMultiRowGrid = currentRows > 1;
+
   return (
     <SectionShell title={title} subtitle={subtitle}>
-      <div className="rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-3 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-2">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1.5">
             <div className="flex flex-wrap gap-1.5">
               {carouselMeta.contextualChips.map((chip, idx) => (
-                <span key={`${chip}-${idx}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">{chip}</span>
+                <span key={`${chip}-${idx}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">{chip}</span>
               ))}
             </div>
             <p className="text-xs text-slate-500">{list.length ? `${list.length} productos cargados` : 'Sin productos por ahora. Revisa filtros o categorías.'}</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <ActionLink href={collectionHref} className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">
+            <ActionLink href={collectionHref} className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700">
               {viewAllLabel} <span aria-hidden className="ml-1">→</span>
             </ActionLink>
-            {list.length > 1 && showArrows && !carouselMeta.useGridFallback ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+            {list.length > 1 && showArrows && !carouselMeta.useGridFallback && !useMultiRowGrid ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
           </div>
         </div>
 
         {!list.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, idx) => (
-              <div key={`empty-${idx}`} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-3">
-                <div className="mb-3 aspect-square rounded-xl bg-slate-100" />
+              <div key={`empty-${idx}`} className="animate-pulse rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-3 aspect-[4/3] rounded-lg bg-slate-100" />
                 <div className="h-3 w-4/5 rounded bg-slate-100" />
                 <div className="mt-2 h-3 w-2/5 rounded bg-slate-100" />
-                <div className="mt-4 h-8 rounded-full bg-slate-100" />
+                <div className="mt-4 h-7 rounded-lg bg-slate-100" />
               </div>
             ))}
           </div>
+        ) : useMultiRowGrid ? (
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: `repeat(${currentCols}, minmax(0, 1fr))` }}
+          >
+            {list.slice(0, currentCols * currentRows).map((product, idx) => renderCard(product, idx, true))}
+          </div>
         ) : carouselMeta.useGridFallback ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((product, idx) => renderCard(product, idx))}
+            {list.map((product, idx) => renderCard(product, idx, false))}
           </div>
         ) : (
           <>
-            <div className="-mx-1 px-1">
-              <div
-                ref={railRef}
-                onScroll={syncRailState}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
-                onTouchStart={() => setIsPaused(true)}
-                onTouchEnd={() => setIsPaused(false)}
-                onFocusCapture={() => setIsPaused(true)}
-                onBlurCapture={() => setIsPaused(false)}
-                onWheel={handleRailWheel}
-                className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-4 pt-2 [scrollbar-width:thin] [scroll-padding-inline:8px] active:cursor-grabbing"
-              >
-                {list.map((product, idx) => renderCard(product, idx))}
-              </div>
+            <div
+              ref={railRef}
+              onScroll={syncRailState}
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
+              onTouchStart={() => setIsPaused(true)}
+              onTouchEnd={() => setIsPaused(false)}
+              onFocusCapture={() => setIsPaused(true)}
+              onBlurCapture={() => setIsPaused(false)}
+              onWheel={handleRailWheel}
+              className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin] [scroll-padding-inline:4px] active:cursor-grabbing"
+            >
+              {list.map((product, idx) => renderCard(product, idx, false))}
             </div>
 
             {list.length > 1 && showDots ? (
@@ -809,7 +820,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
                       const targetLeft = idx * Math.max(rail.clientWidth * 0.62, 220);
                       rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
                     }}
-                    className={`h-2.5 rounded-full transition-all ${activeDot === idx ? 'w-6 bg-indigo-600' : 'w-2.5 bg-slate-300 hover:bg-slate-400'}`}
+                    className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
                     aria-label={`ir a producto ${idx + 1}`}
                   />
                 ))}
@@ -826,6 +837,8 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const list = toArray<Record<string, unknown>>(brands);
   const mobileItems = Math.max(2, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
   const desktopItems = Math.max(2, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 6));
+  const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
+  const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
   const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
   const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
@@ -839,6 +852,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const [canNext, setCanNext] = useState(false);
   const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   const syncRailState = () => {
     const rail = railRef.current;
@@ -857,6 +871,14 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
     const onResize = () => syncRailState();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const sync = () => setIsMobileViewport(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
   }, []);
 
   const step = () => {
@@ -884,56 +906,94 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
     return () => window.clearInterval(id);
   }, [autoplayEnabled, autoplayIntervalMs, isPaused, list.length]);
 
+  const currentRows = isMobileViewport ? rowsMobile : rowsDesktop;
+  const currentCols = isMobileViewport ? mobileItems : desktopItems;
+  const useGridLayout = currentRows > 1;
+
+  const renderBrandCard = (brand: Record<string, unknown>, idx: number, gridMode = false) => (
+    <ActionLink
+      key={asText(brand.id, `brand-${idx}`)}
+      href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
+      className={`group flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full' : 'snap-start shrink-0 flex-none min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]'}`}
+      style={gridMode ? undefined : {
+        ['--brand-mobile' as string]: `${mobileItemPx}px`,
+        ['--brand-desktop' as string]: `${itemPx}px`,
+      }}
+    >
+      <div className="mb-2 flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-50 p-1.5 transition group-hover:bg-indigo-50/40">
+        {!isLikelyMissingImage(brand.image_url || brand.logo_url || brand.image) ? (
+          <SmartImage
+            src={asSrc(brand.image_url || brand.logo_url || brand.image)}
+            alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
+            className="object-contain transition duration-200 group-hover:scale-105"
+            sizes="150px"
+          />
+        ) : (
+          <span className="text-[11px] uppercase tracking-wide text-slate-400">Logo</span>
+        )}
+      </div>
+      <span className="line-clamp-1 text-[12px] font-semibold text-slate-700 group-hover:text-indigo-700 transition-colors">
+        {asText(brand.item_label) || asText(brand.name, 'Brand')}
+      </span>
+    </ActionLink>
+  );
+
   return (
     <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        {viewAllHref ? (
-          <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">
-            {viewAllLabel} <span aria-hidden className="ml-1">→</span>
-          </ActionLink>
-        ) : <span />}
-        {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
-      </div>
+      {useGridLayout ? (
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: `repeat(${currentCols}, minmax(0, 1fr))` }}
+        >
+          {list.slice(0, currentCols * currentRows).map((brand, idx) => renderBrandCard(brand, idx, true))}
+        </div>
+      ) : (
+        <>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            {viewAllHref ? (
+              <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">
+                {viewAllLabel} <span aria-hidden className="ml-1">→</span>
+              </ActionLink>
+            ) : <span />}
+            {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+          </div>
 
-      <div
-        ref={railRef}
-        onScroll={syncRailState}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-        onFocusCapture={() => setIsPaused(true)}
-        onBlurCapture={() => setIsPaused(false)}
-        onWheel={handleRailWheel}
-        className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin]"
-      >
-        {list.map((brand, idx) => (
-          <ActionLink
-            key={asText(brand.id, `brand-${idx}`)}
-            href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-            className="snap-start shrink-0 flex-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]"
-            style={{
-              ['--brand-mobile' as string]: `${mobileItemPx}px`,
-              ['--brand-desktop' as string]: `${itemPx}px`,
-            }}
+          <div
+            ref={railRef}
+            onScroll={syncRailState}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            onTouchStart={() => setIsPaused(true)}
+            onTouchEnd={() => setIsPaused(false)}
+            onFocusCapture={() => setIsPaused(true)}
+            onBlurCapture={() => setIsPaused(false)}
+            onWheel={handleRailWheel}
+            className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]"
           >
-            <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
-              {!isLikelyMissingImage(brand.image_url || brand.logo_url || brand.image) ? (
-                <SmartImage
-                  src={asSrc(brand.image_url || brand.logo_url || brand.image)}
-                  alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
-                  className="object-contain"
-                  sizes="150px"
+            {list.map((brand, idx) => renderBrandCard(brand, idx, false))}
+          </div>
+
+          {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
+
+          {list.length > 1 && showDots ? (
+            <div className="mt-2 flex items-center justify-center gap-1.5">
+              {list.slice(0, Math.min(list.length, 8)).map((_, idx) => (
+                <button
+                  type="button"
+                  key={`brand-dot-${idx}`}
+                  onClick={() => {
+                    const rail = railRef.current;
+                    if (!rail) return;
+                    rail.scrollTo({ left: idx * Math.max(rail.clientWidth * 0.7, 180), behavior: 'smooth' });
+                  }}
+                  className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
+                  aria-label={`ir a marca ${idx + 1}`}
                 />
-              ) : (
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">Logo</span>
-              )}
+              ))}
             </div>
-            {asText(brand.item_label) || asText(brand.name, 'Brand')}
-          </ActionLink>
-        ))}
-      </div>
-      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
+          ) : null}
+        </>
+      )}
     </SectionShell>
   );
 }

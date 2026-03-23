@@ -1171,6 +1171,12 @@ export default function BillingPage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Factura emitida pero error al enviar email");
+      // Still reload the list + detail panel to reflect the ISSUED state
+      await loadDocs(page);
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
     } finally {
       setSendingId(null);
     }

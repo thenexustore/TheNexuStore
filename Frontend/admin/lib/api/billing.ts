@@ -373,7 +373,10 @@ export async function downloadBillingDocumentPdf(id: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `document-${id}.pdf`;
+  // Use the filename from the server's Content-Disposition header when available
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  a.download = match?.[1] ?? `document-${id}.pdf`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

@@ -1560,18 +1560,8 @@ export default function HomepageSectionsPage() {
     }
   };
 
-  // Keep refs up to date so the auto-save interval sees latest state
+  // Keep ref up to date so Ctrl+S sees latest state
   autoSaveRef.current = { saveAll, dirtyCount: dirtySectionIds.size };
-
-  // Auto-save every 10 minutes when there are pending changes
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (autoSaveRef.current.dirtyCount > 0 && autoSaveRef.current.saveAll) {
-        void autoSaveRef.current.saveAll();
-      }
-    }, 10 * 60 * 1000);
-    return () => clearInterval(id);
-  }, []);
 
   // Ctrl+S keyboard shortcut
   useEffect(() => {

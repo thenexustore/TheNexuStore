@@ -229,7 +229,6 @@ export default function HomeComposerPage() {
   const renameCancelledRef = useRef(false);
   const [sectionFilter, setSectionFilter] = useState("");
   const [jsonExpanded, setJsonExpanded] = useState(false);
-  const autoSaveRef = useRef<{ saveInspector: (() => Promise<void>) | null; isDirty: boolean }>({ saveInspector: null, isDirty: false });
 
   const activeLayout = useMemo(
     () => layouts.find((l) => l.id === activeLayoutId) || null,
@@ -638,19 +637,6 @@ export default function HomeComposerPage() {
     // saveInspector is defined below but used here - this is fine for keyboard shortcut
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDraftDirty, parsedDraftConfig, saving]);
-
-  // Keep ref up to date so the auto-save interval sees latest state
-  autoSaveRef.current = { saveInspector, isDirty: isDraftDirty && !saving && !!parsedDraftConfig };
-
-  // Auto-save every 10 minutes when the inspector has unsaved changes
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (autoSaveRef.current.isDirty && autoSaveRef.current.saveInspector) {
-        void autoSaveRef.current.saveInspector();
-      }
-    }, 10 * 60 * 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const createLayout = async () => {
     const defaultName = `Home ${new Date().toLocaleDateString(locale)}`;

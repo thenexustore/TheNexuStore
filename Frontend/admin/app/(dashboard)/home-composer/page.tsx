@@ -88,7 +88,6 @@ const SECTION_TYPES: HomeSectionType[] = [
   "PRODUCT_CAROUSEL",
   "BRAND_STRIP",
   "VALUE_PROPS",
-  "TRENDING_CHIPS",
   "CUSTOM_HTML",
 ];
 
@@ -143,6 +142,11 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
 
 function byPosition(a: HomeSection, b: HomeSection) {
   return a.position - b.position;
+}
+
+/** Returns a human-readable label for a section type, falling back to the raw type string. */
+function getSectionTypeLabel(type: string, labels: Record<string, string>): string {
+  return labels[type] || type;
 }
 
 function safeJsonParse(value: string): Record<string, unknown> {
@@ -504,9 +508,8 @@ export default function HomeComposerPage() {
         setAllCategories(categories || []);
         setAllBrands(brands || []);
       } catch (error) {
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("[home-composer] failed to load category/brand selectors", error);
-        }
+        // Log taxonomy load failures to console for debugging.
+        console.warn("[home-composer] failed to load category/brand selectors", error);
       }
     };
     void loadTaxonomy();
@@ -684,7 +687,7 @@ export default function HomeComposerPage() {
         is_enabled: true,
         title:
           newSectionTitle.trim() ||
-          (newSectionType === "HERO_CAROUSEL" ? "Banner" : newSectionType),
+          getSectionTypeLabel(newSectionType, SECTION_TYPE_LABELS),
         config: DEFAULT_CONFIG[newSectionType],
       });
       await loadSections(activeLayoutId);
@@ -720,11 +723,10 @@ export default function HomeComposerPage() {
       try {
         await homeBuilderApi.reorderSections(payload);
       } catch (error) {
-        // Fallback defensivo: algunos entornos legacy aún no aceptan reorder masivo.
+        // Fallback defensivo: algunos entornos legacy aún no aceptan reorder masivo
+        // (backend previo a la introducción del endpoint /reorder).
         await homeBuilderApi.moveSection(section.id, nextIndex + 1);
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('[home-composer] reorderSections failed, used moveSection fallback', error);
-        }
+        console.warn('[home-composer] reorderSections failed, used moveSection fallback', error);
       }
       await loadSections(activeLayoutId);
       toast.success('Bloque reordenado');
@@ -743,6 +745,7 @@ export default function HomeComposerPage() {
         is_enabled: !section.is_enabled,
       });
       await loadSections(activeLayoutId);
+      void loadActiveDiagnostics();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la sección");
     } finally {
@@ -1017,7 +1020,7 @@ export default function HomeComposerPage() {
     if (!activeLayoutId) return;
     try {
       setSaving(true);
-      const newTitle = `${section.title || SECTION_TYPE_LABELS[section.type]} (copia)`;
+      const newTitle = `${section.title || getSectionTypeLabel(section.type, SECTION_TYPE_LABELS)} (copia)`;
       await homeBuilderApi.createSection(activeLayoutId, {
         type: section.type,
         position: sections.length + 1,
@@ -1208,7 +1211,7 @@ export default function HomeComposerPage() {
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Página Principal</span>
+          <span className="rounded-lg bg-black px-3 py-2 font-medium text-white">Página Principal / Home Page</span>
           <a href="#composer-banners-panel" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-700 hover:bg-zinc-50">
             ↓ Banners integrados
           </a>
@@ -1224,9 +1227,9 @@ export default function HomeComposerPage() {
       <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900"><Sparkles className="h-5 w-5 text-indigo-500" />Página Principal</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900"><Sparkles className="h-5 w-5 text-indigo-500" />Página Principal / Home Page</h1>
             <p className="text-sm text-zinc-500">
-              Gestiona diseños de inicio, secciones y publicación por idioma desde un flujo más visual.
+              Gestiona diseños de inicio, secciones y publicación por idioma desde un flujo más visual. / Manage home layouts, sections and publishing by locale from a visual flow.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1358,43 +1361,6 @@ export default function HomeComposerPage() {
           ) : null}
         </div>
 
-        {activeDiagnostics?.activeLayout ? (
-          <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold">Diagnóstico layout activo (runtime)</span>
-              <button
-                onClick={() => void loadActiveDiagnostics()}
-                className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] hover:bg-indigo-50"
-              >
-                <RefreshCw className="inline h-3 w-3 mr-0.5" /> Actualizar
-              </button>
-            </div>
-            <div className="mt-1">
-              Layout activo en API: <span className="font-mono">{activeDiagnostics.activeLayout.id}</span>
-              {activeDiagnostics.activeLayout.locale ? ` · ${activeDiagnostics.activeLayout.locale}` : " · global"}
-            </div>
-            <div className="mt-1">Secciones diagnosticadas: {activeDiagnostics.sections.length}</div>
-            <div className="mt-2 max-h-36 overflow-auto space-y-1">
-              {activeDiagnostics.sections.map((section) => (
-                <div key={section.id} className="rounded border border-indigo-200 bg-white px-2 py-1">
-                  <span className="font-semibold">{section.type}</span>
-                  <span className="ml-1">• resolved: {section.resolved_count}</span>
-                  {section.fallback_reason ? (
-                    <span className="ml-1 text-amber-700">• fallback: {section.fallback_reason}</span>
-                  ) : null}
-                  {section.warnings.length ? (
-                    <div className="mt-1 text-amber-700">{section.warnings.join(" ")}</div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-            Sin datos de diagnóstico. Publica un diseño para ver el estado en tiempo real.
-          </div>
-        )}
-
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><LayoutTemplate className="h-3.5 w-3.5" /> Diseña por bloques</span>
         <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700"><Eye className="h-3.5 w-3.5" /> Previsualiza antes de publicar</span>
@@ -1404,10 +1370,138 @@ export default function HomeComposerPage() {
 
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                🖼️ Banners del carrusel / Carousel banners
+              </h3>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                {integratedBanners.length > 0
+                  ? `${integratedBanners.filter((b) => b.is_active).length} activo${integratedBanners.filter((b) => b.is_active).length !== 1 ? "s" : ""} de ${integratedBanners.length} total`
+                  : "Panel integrado en Página Principal"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void loadIntegratedModules()}
+                disabled={integratedLoading}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+              >
+                <RefreshCw className={`inline h-3 w-3 mr-0.5 ${integratedLoading ? "animate-spin" : ""}`} /> Refrescar
+              </button>
+              <a
+                href={`/${locale}/banners`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Gestionar ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-1.5 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="py-4 text-center text-xs text-zinc-500">
+                <RefreshCw className="inline h-3 w-3 animate-spin mr-1" /> Cargando banners…
+              </div>
+            ) : integratedBanners.length === 0 ? (
+              <div className="py-4 text-center text-xs text-zinc-500">
+                No hay banners configurados. <a href={`/${locale}/banners`} className="text-indigo-600 hover:underline">Crea uno ↗</a>
+              </div>
+            ) : (
+              integratedBanners.slice(0, 8).map((banner) => (
+                <div key={banner.id} className={`flex items-center justify-between rounded-lg border px-2 py-2 transition ${banner.is_active ? "border-emerald-200 bg-emerald-50/40" : "border-zinc-200"}`}>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{banner.title_text || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-400">Orden #{banner.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => void toggleIntegratedBanner(banner.id)}
+                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                      banner.is_active
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                    }`}
+                    title={banner.is_active ? "Desactivar banner" : "Activar banner"}
+                  >
+                    {banner.is_active ? "✓ Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+                ⭐ Productos destacados / Featured products
+              </h3>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                {integratedFeatured.length > 0
+                  ? `${integratedFeatured.filter((f) => f.is_active).length} activo${integratedFeatured.filter((f) => f.is_active).length !== 1 ? "s" : ""} de ${integratedFeatured.length} total`
+                  : "Panel integrado en Página Principal"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void loadIntegratedModules()}
+                disabled={integratedLoading}
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
+              >
+                <RefreshCw className={`inline h-3 w-3 mr-0.5 ${integratedLoading ? "animate-spin" : ""}`} /> Refrescar
+              </button>
+              <a
+                href={`/${locale}/featured-products`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              >
+                Gestionar ↗
+              </a>
+            </div>
+          </div>
+          <div className="space-y-1.5 rounded-xl border border-zinc-200 p-2">
+            {integratedLoading ? (
+              <div className="py-4 text-center text-xs text-zinc-500">
+                <RefreshCw className="inline h-3 w-3 animate-spin mr-1" /> Cargando destacados…
+              </div>
+            ) : integratedFeatured.length === 0 ? (
+              <div className="py-4 text-center text-xs text-zinc-500">
+                No hay productos destacados. <a href={`/${locale}/featured-products`} className="text-indigo-600 hover:underline">Añade uno ↗</a>
+              </div>
+            ) : (
+              integratedFeatured.slice(0, 8).map((item) => (
+                <div key={item.id} className={`flex items-center justify-between rounded-lg border px-2 py-2 transition ${item.is_active ? "border-emerald-200 bg-emerald-50/40" : "border-zinc-200"}`}>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-zinc-900">{item.title || item.product?.title || "Sin título"}</div>
+                    <div className="text-[11px] text-zinc-400">Orden #{item.sort_order}</div>
+                  </div>
+                  <button
+                    onClick={() => void toggleIntegratedFeatured(item.id)}
+                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                      item.is_active
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                    }`}
+                    title={item.is_active ? "Desactivar destacado" : "Activar destacado"}
+                  >
+                    {item.is_active ? "✓ Activo" : "Inactivo"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Añadir bloque</h2>
+        <h2 className="text-lg font-semibold">Añadir bloque / Add block</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Selecciona el tipo de bloque, ponle un título y añádelo al lienzo. Después podrás ajustarlo desde el inspector.
+          Selecciona el tipo de bloque, ponle un título y añádelo al lienzo. / Select the block type, give it a title and add it to the canvas.
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <select
@@ -1442,8 +1536,8 @@ export default function HomeComposerPage() {
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold">Lienzo de secciones</h2>
-              <p className="mt-1 text-xs text-zinc-500">Selecciona, reordena, oculta o elimina bloques. Duplica para crear variantes.</p>
+              <h2 className="text-lg font-semibold">Lienzo de secciones / Sections canvas</h2>
+              <p className="mt-1 text-xs text-zinc-500">Selecciona, reordena, oculta o elimina bloques. / Select, reorder, hide or delete blocks.</p>
             </div>
             {sections.length > 0 && (
               <div className="flex gap-1.5 flex-shrink-0">
@@ -1491,8 +1585,12 @@ export default function HomeComposerPage() {
             </div>
           )}
 
+          {/* sections = currently visible (may be filtered); allSections = full unfiltered
+              list passed so CanvasSections can compute the real first/last position for
+              the up/down buttons even when a filter is active. */}
           <CanvasSections
             sections={filteredSections}
+            allSections={sections}
             selectedSectionId={selectedSectionId}
             saving={saving}
             sectionTypeLabels={SECTION_TYPE_LABELS}
@@ -1505,20 +1603,20 @@ export default function HomeComposerPage() {
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Inspector del bloque</h2>
-          <p className="mt-1 text-xs text-zinc-500">Edita contenido, comportamiento y configuración avanzada.</p>
+          <h2 className="text-lg font-semibold">Inspector del bloque / Block inspector</h2>
+          <p className="mt-1 text-xs text-zinc-500">Edita contenido, comportamiento y configuración avanzada. / Edit content, behaviour and advanced settings.</p>
 
           {!selectedSection || !draft ? (
             <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center text-sm text-zinc-500">
               <div className="text-3xl mb-2">👆</div>
-              <div>Selecciona un bloque en el lienzo para editarlo.</div>
-              <div className="mt-1 text-xs text-zinc-400">Haz clic en cualquier sección de la lista.</div>
+              <div>Selecciona un bloque en el lienzo para editarlo. / Select a block in the canvas to edit it.</div>
+              <div className="mt-1 text-xs text-zinc-400">Haz clic en cualquier sección de la lista. / Click any section in the list.</div>
             </div>
           ) : (
             <div className="mt-4 space-y-4">
               <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
                 <div>
-                  Editando: <span className="font-semibold text-zinc-800">{SECTION_TYPE_LABELS[selectedSection.type]}</span>
+                  Editando: <span className="font-semibold text-zinc-800">{getSectionTypeLabel(selectedSection.type, SECTION_TYPE_LABELS)}</span>
                   {isDraftDirty ? (
                     <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠️ Sin guardar</span>
                   ) : (
@@ -2633,132 +2731,43 @@ export default function HomeComposerPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section id="composer-banners-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
-                🖼️ Banners del carrusel
-              </h3>
-              <p className="mt-0.5 text-xs text-zinc-500">
-                {integratedBanners.length > 0
-                  ? `${integratedBanners.filter((b) => b.is_active).length} activo${integratedBanners.filter((b) => b.is_active).length !== 1 ? "s" : ""} de ${integratedBanners.length} total`
-                  : "Panel integrado en Página Principal"}
-              </p>
+      <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h3 className="text-sm font-semibold text-indigo-900">🔍 Diagnóstico layout activo (runtime) / Active layout diagnostics</h3>
+          <button
+            onClick={() => void loadActiveDiagnostics()}
+            className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] hover:bg-indigo-50"
+          >
+            <RefreshCw className="inline h-3 w-3 mr-0.5" /> Actualizar / Refresh
+          </button>
+        </div>
+        {activeDiagnostics?.activeLayout ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
+            <div className="mt-1">
+              Layout activo en API: <span className="font-mono">{activeDiagnostics.activeLayout.id}</span>
+              {activeDiagnostics.activeLayout.locale ? ` · ${activeDiagnostics.activeLayout.locale}` : " · global"}
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => void loadIntegratedModules()}
-                disabled={integratedLoading}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-              >
-                <RefreshCw className={`inline h-3 w-3 mr-0.5 ${integratedLoading ? "animate-spin" : ""}`} /> Refrescar
-              </button>
-              <a
-                href={`/${locale}/banners`}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
-              >
-                Gestionar ↗
-              </a>
-            </div>
-          </div>
-          <div className="space-y-1.5 rounded-xl border border-zinc-200 p-2">
-            {integratedLoading ? (
-              <div className="py-4 text-center text-xs text-zinc-500">
-                <RefreshCw className="inline h-3 w-3 animate-spin mr-1" /> Cargando banners…
-              </div>
-            ) : integratedBanners.length === 0 ? (
-              <div className="py-4 text-center text-xs text-zinc-500">
-                No hay banners configurados. <a href={`/${locale}/banners`} className="text-indigo-600 hover:underline">Crea uno ↗</a>
-              </div>
-            ) : (
-              integratedBanners.slice(0, 8).map((banner) => (
-                <div key={banner.id} className={`flex items-center justify-between rounded-lg border px-2 py-2 transition ${banner.is_active ? "border-emerald-200 bg-emerald-50/40" : "border-zinc-200"}`}>
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-medium text-zinc-900">{banner.title_text || "Sin título"}</div>
-                    <div className="text-[11px] text-zinc-400">Orden #{banner.sort_order}</div>
-                  </div>
-                  <button
-                    onClick={() => void toggleIntegratedBanner(banner.id)}
-                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                      banner.is_active
-                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                    }`}
-                    title={banner.is_active ? "Desactivar banner" : "Activar banner"}
-                  >
-                    {banner.is_active ? "✓ Activo" : "Inactivo"}
-                  </button>
+            <div className="mt-1">Secciones diagnosticadas: {activeDiagnostics.sections.length}</div>
+            <div className="mt-2 max-h-36 overflow-auto space-y-1">
+              {activeDiagnostics.sections.map((section) => (
+                <div key={section.id} className="rounded border border-indigo-200 bg-white px-2 py-1">
+                  <span className="font-semibold">{section.type}</span>
+                  <span className="ml-1">• resolved: {section.resolved_count}</span>
+                  {section.fallback_reason ? (
+                    <span className="ml-1 text-amber-700">• fallback: {section.fallback_reason}</span>
+                  ) : null}
+                  {section.warnings.length ? (
+                    <div className="mt-1 text-amber-700">{section.warnings.join(" ")}</div>
+                  ) : null}
                 </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section id="composer-featured-panel" className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
-                ⭐ Productos destacados
-              </h3>
-              <p className="mt-0.5 text-xs text-zinc-500">
-                {integratedFeatured.length > 0
-                  ? `${integratedFeatured.filter((f) => f.is_active).length} activo${integratedFeatured.filter((f) => f.is_active).length !== 1 ? "s" : ""} de ${integratedFeatured.length} total`
-                  : "Panel integrado en Página Principal"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => void loadIntegratedModules()}
-                disabled={integratedLoading}
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-60"
-              >
-                <RefreshCw className={`inline h-3 w-3 mr-0.5 ${integratedLoading ? "animate-spin" : ""}`} /> Refrescar
-              </button>
-              <a
-                href={`/${locale}/featured-products`}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
-              >
-                Gestionar ↗
-              </a>
+              ))}
             </div>
           </div>
-          <div className="space-y-1.5 rounded-xl border border-zinc-200 p-2">
-            {integratedLoading ? (
-              <div className="py-4 text-center text-xs text-zinc-500">
-                <RefreshCw className="inline h-3 w-3 animate-spin mr-1" /> Cargando destacados…
-              </div>
-            ) : integratedFeatured.length === 0 ? (
-              <div className="py-4 text-center text-xs text-zinc-500">
-                No hay productos destacados. <a href={`/${locale}/featured-products`} className="text-indigo-600 hover:underline">Añade uno ↗</a>
-              </div>
-            ) : (
-              integratedFeatured.slice(0, 8).map((item) => (
-                <div key={item.id} className={`flex items-center justify-between rounded-lg border px-2 py-2 transition ${item.is_active ? "border-emerald-200 bg-emerald-50/40" : "border-zinc-200"}`}>
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-medium text-zinc-900">{item.title || item.product?.title || "Sin título"}</div>
-                    <div className="text-[11px] text-zinc-400">Orden #{item.sort_order}</div>
-                  </div>
-                  <button
-                    onClick={() => void toggleIntegratedFeatured(item.id)}
-                    className={`ml-2 flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                      item.is_active
-                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                    }`}
-                    title={item.is_active ? "Desactivar destacado" : "Activar destacado"}
-                  >
-                    {item.is_active ? "✓ Activo" : "Inactivo"}
-                  </button>
-                </div>
-              ))
-            )}
+        ) : (
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+            Sin datos de diagnóstico. Publica un diseño para ver el estado en tiempo real. / No diagnostics data. Publish a layout to see the runtime status.
           </div>
-        </section>
+        )}
       </div>
     </div>
   );

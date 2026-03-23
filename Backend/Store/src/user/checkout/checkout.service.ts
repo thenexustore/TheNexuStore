@@ -562,7 +562,7 @@ export class CheckoutService {
     };
   }
 
-  async getOrder(orderId: string, customerId: string): Promise<any> {
+  async getOrder(orderId: string, customerId: string, isAdmin = false): Promise<any> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -591,16 +591,16 @@ export class CheckoutService {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.customer_id !== customerId) {
+    if (!isAdmin && order.customer_id !== customerId) {
       throw new ForbiddenException('You are not authorized to view this order');
     }
 
     return this.serializeOrder(order);
   }
 
-  async getCustomerOrders(customerId: string): Promise<any[]> {
+  async getCustomerOrders(customerId: string, isAdmin = false): Promise<any[]> {
     const orders = await this.prisma.order.findMany({
-      where: { customer_id: customerId },
+      where: isAdmin ? {} : { customer_id: customerId },
       orderBy: { created_at: 'desc' },
       include: {
         items: {
@@ -634,12 +634,12 @@ export class CheckoutService {
     return orders.map((order) => this.serializeOrder(order));
   }
 
-  async getCustomerDocumentPdf(docId: string, customerId: string): Promise<{ buffer: Buffer; docRef: string }> {
+  async getCustomerDocumentPdf(docId: string, customerId: string, isAdmin = false): Promise<{ buffer: Buffer; docRef: string }> {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id: docId },
     });
     if (!doc) throw new NotFoundException('Billing document not found');
-    if (doc.customer_id !== customerId) {
+    if (!isAdmin && doc.customer_id !== customerId) {
       throw new ForbiddenException('Access denied');
     }
     const allowedStatuses: BillingDocumentStatus[] = [
@@ -647,7 +647,7 @@ export class CheckoutService {
       BillingDocumentStatus.SENT,
       BillingDocumentStatus.PAID,
     ];
-    if (!allowedStatuses.includes(doc.status)) {
+    if (!isAdmin && !allowedStatuses.includes(doc.status)) {
       throw new ForbiddenException('Document is not available for download');
     }
     return this.billingService.generateDocumentPdf(docId);

@@ -32,13 +32,15 @@ export class CheckoutController {
   @Get('orders')
   @UseGuards(AuthGuard)
   async getOrders(@Request() req) {
-    return this.checkoutService.getCustomerOrders(req.user.id);
+    const isAdmin = Boolean(req.user?.isStaffAdmin);
+    return this.checkoutService.getCustomerOrders(req.user.id, isAdmin);
   }
 
   @Get('order/:id')
   @UseGuards(AuthGuard)
   async getOrder(@Request() req, @Param('id') orderId: string) {
-    return this.checkoutService.getOrder(orderId, req.user.id);
+    const isAdmin = Boolean(req.user?.isStaffAdmin);
+    return this.checkoutService.getOrder(orderId, req.user.id, isAdmin);
   }
 
   @Get('track/:token')
@@ -53,7 +55,8 @@ export class CheckoutController {
     @Param('id') docId: string,
     @Res() res: Response,
   ) {
-    const { buffer: pdfBuffer, docRef } = await this.checkoutService.getCustomerDocumentPdf(docId, req.user.id);
+    const isAdmin = Boolean(req.user?.isStaffAdmin);
+    const { buffer: pdfBuffer, docRef } = await this.checkoutService.getCustomerDocumentPdf(docId, req.user.id, isAdmin);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${docRef}.pdf"`,

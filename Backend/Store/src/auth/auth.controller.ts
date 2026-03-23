@@ -98,6 +98,18 @@ export class AuthController {
   @UseGuards(AuthGuard)
   me(@Req() req: Request) {
     const user = (req as any).user;
+    if (user?.isStaffAdmin) {
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: (user as any).firstName ?? (req as any).staff?.name ?? 'Staff',
+        lastName: (user as any).lastName ?? '',
+        role: 'ADMIN',
+        profile_image: null,
+        createdAt: new Date(),
+        address: null,
+      };
+    }
     return this.auth.getMe(user?.id);
   }
 

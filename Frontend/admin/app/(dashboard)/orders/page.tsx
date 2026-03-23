@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "@/i18n/navigation";
 import {
   Search,
   Download,
@@ -771,12 +772,12 @@ export default function OrdersPage() {
                             Facturación
                           </h4>
                           <div className="flex items-center gap-2">
-                            <a
+                            <Link
                               href="/billing"
                               className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
                             >
                               Ver en facturación <ExternalLink className="w-3 h-3" />
-                            </a>
+                            </Link>
                           </div>
                         </div>
 

@@ -82,6 +82,19 @@ const navigation: NavItem[] = [
   },
 ];
 
+function loadStoredStaffUser(): StaffUser | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = localStorage.getItem("admin_user");
+    return raw ? (JSON.parse(raw) as StaffUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -94,19 +107,9 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [dashboardSettings, setDashboardSettings] = useState<AdminSettings>(() => loadAdminSettings());
-  const [staffUser, setStaffUser] = useState<StaffUser | null>(null);
+  const [staffUser] = useState<StaffUser | null>(() => loadStoredStaffUser());
 
   useEffect(() => subscribeAdminSettings(setDashboardSettings), []);
-
-  // Load logged-in user info from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("admin_user");
-      if (raw) setStaffUser(JSON.parse(raw) as StaffUser);
-    } catch {
-      // ignore
-    }
-  }, []);
 
   useEffect(() => {
     if (dashboardSettings.adminLanguage !== locale) {
@@ -114,19 +117,9 @@ export default function DashboardLayout({
     }
   }, [dashboardSettings.adminLanguage, locale, pathname, router]);
 
-  const userPermissions = (() => {
-    try {
-      const rawUser = localStorage.getItem("admin_user");
-      if (!rawUser) return null;
-
-      const parsed = JSON.parse(rawUser) as { permissions?: unknown };
-      return Array.isArray(parsed.permissions)
-        ? parsed.permissions.map((permission) => String(permission))
-        : null;
-    } catch {
-      return null;
-    }
-  })() as string[] | null;
+  const userPermissions = Array.isArray(staffUser?.permissions)
+    ? staffUser.permissions.map((permission) => String(permission))
+    : null;
 
   const hasAccess = (requiredPermissions?: string[]) => {
     if (!userPermissions) {

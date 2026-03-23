@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { createElement, useEffect, useRef, useState, useCallback } from "react";
 import {
   ExternalLink,
   Pencil,
@@ -173,6 +173,16 @@ function iconForPath(path: string): LucideIcon {
   return FileText;
 }
 
+function PathIcon({
+  path,
+  className,
+}: {
+  path: string;
+  className?: string;
+}) {
+  return createElement(iconForPath(path), { className });
+}
+
 /** Icon background color by group */
 function iconBgForGroup(group: "primary" | "secondary"): string {
   return group === "primary"
@@ -238,8 +248,6 @@ function EditModal({ entry, isNew = false, onSave, onClose }: EditModalProps) {
     onSave({ ...entry, name: trimmedName, path: trimmedPath, visibleToCustomer: visible, group });
   };
 
-  const PreviewIcon = iconForPath(path);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -252,7 +260,7 @@ function EditModal({ entry, isNew = false, onSave, onClose }: EditModalProps) {
         <div className="p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgForGroup(group)}`}>
-              <PreviewIcon className="w-5 h-5" />
+              <PathIcon path={path} className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-semibold text-zinc-900 leading-tight">
@@ -415,7 +423,6 @@ function EntryCard({ entry, onEdit, onMove, onDelete }: EntryCardProps) {
   const siteUrl = (SITE_URL ?? "").replace(/\/$/, "");
   const isDynamic = DYNAMIC_SEGMENT_RE.test(entry.path);
   const [copied, setCopied] = useState(false);
-  const EntryIcon = iconForPath(entry.path);
 
   const handleCopy = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
@@ -444,7 +451,7 @@ function EntryCard({ entry, onEdit, onMove, onDelete }: EntryCardProps) {
 
       {/* Icon */}
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconBg} ${dimmed ? "opacity-50" : ""}`}>
-        <EntryIcon className="w-4 h-4" />
+        <PathIcon path={entry.path} className="w-4 h-4" />
       </div>
 
       {/* Text */}
@@ -609,18 +616,13 @@ type ModalState =
 type FilterTab = "all" | "visible" | "hidden" | "dynamic";
 
 export default function SiteMapPage() {
-  const [entries, setEntries] = useState<SiteMapEntry[]>([]);
+  const [entries, setEntries] = useState<SiteMapEntry[]>(() => loadEntries());
   const [modal, setModal]     = useState<ModalState>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [query, setQuery]     = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [toasts, setToasts]   = useState<Toast[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
-
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    setEntries(loadEntries());
-  }, []);
 
   // Keyboard shortcuts: N = new page, / = focus search, Escape = close modals
   useEffect(() => {

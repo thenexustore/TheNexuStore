@@ -294,6 +294,11 @@ function FooterPreview({
 }) {
   const year = new Date().getFullYear();
   const copyright = settings.copyrightText.replace("{year}", String(year));
+  const [previewLogoFailed, setPreviewLogoFailed] = useState(false);
+
+  useEffect(() => {
+    setPreviewLogoFailed(false);
+  }, [settings.logoUrl]);
 
   const getSocialIcon = (platform: string) => {
     const IconComp = SOCIAL_ICONS[platform] || Globe;
@@ -331,18 +336,15 @@ function FooterPreview({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Col 1 – Branding + Newsletter */}
           <div className="md:col-span-2">
-            {settings.logoUrl && (
+            {settings.logoUrl && !previewLogoFailed ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={settings.logoUrl}
                 alt={settings.logoAlt}
                 className="mb-4 h-8 w-auto max-w-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
+                onError={() => setPreviewLogoFailed(true)}
               />
-            )}
-            {!settings.logoUrl && (
+            ) : (
               <div className="mb-4 h-8 flex items-center">
                 <span className="font-bold text-lg text-white">
                   {settings.logoAlt || "TheNexuStore"}
@@ -483,8 +485,14 @@ export default function FooterSettingsPage() {
   const [resetting, setResetting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [layout, setLayout] = useState<"split" | "editor" | "preview">("split");
+  const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
 
   const hasChanges = !deepEqual(settings, savedSnapshot);
+
+  // Reset logo preview failed state when URL changes
+  useEffect(() => {
+    setLogoPreviewFailed(false);
+  }, [settings.logoUrl]);
 
   // Load settings on mount
   useEffect(() => {
@@ -624,13 +632,19 @@ export default function FooterSettingsPage() {
           />
           {settings.logoUrl && (
             <div className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={settings.logoUrl}
-                alt={settings.logoAlt}
-                className="h-8 w-auto object-contain"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
+              {!logoPreviewFailed ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.logoAlt}
+                  className="h-8 w-auto object-contain"
+                  onError={() => setLogoPreviewFailed(true)}
+                />
+              ) : (
+                <span className="text-xs text-white/50 italic">
+                  No se pudo cargar la imagen
+                </span>
+              )}
               <span className="text-xs text-zinc-400">Vista previa del logo</span>
             </div>
           )}

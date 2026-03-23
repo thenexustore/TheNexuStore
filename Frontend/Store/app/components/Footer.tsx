@@ -155,7 +155,10 @@ export default function Footer() {
   // Fetch footer config from API
   useEffect(() => {
     fetch(`${API_URL}/footer/settings`, { cache: "no-store" })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch footer settings");
+        return r.json();
+      })
       .then((payload) => {
         if (payload?.success && payload?.data) {
           setConfig(payload.data as FooterSettings);

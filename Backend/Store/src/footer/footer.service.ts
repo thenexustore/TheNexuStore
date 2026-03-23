@@ -123,7 +123,7 @@ export class FooterService {
     if (envPath) {
       if (!envPath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(envPath)) {
         throw new Error(
-          `FOOTER_STORAGE_DIR must be an absolute path, got: ${envPath}`,
+          `FOOTER_STORAGE_DIR must be an absolute path (starting with '/' on Unix or 'C:\\' on Windows), got: ${envPath}`,
         );
       }
       this.storageDir = envPath;

@@ -633,7 +633,7 @@ export class CheckoutService {
     return orders.map((order) => this.serializeOrder(order));
   }
 
-  async getCustomerDocumentPdf(docId: string, customerId: string): Promise<Buffer> {
+  async getCustomerDocumentPdf(docId: string, customerId: string): Promise<{ buffer: Buffer; docRef: string }> {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id: docId },
     });

@@ -373,7 +373,10 @@ export async function downloadBillingDocumentPdf(id: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `document-${id}.pdf`;
+  // Use the filename from the server's Content-Disposition header when available
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  a.download = match?.[1] ?? `document-${id}.pdf`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -398,6 +401,17 @@ export async function createBillingDocumentFromOrder(
   orderId: string,
 ): Promise<{ billing_document: BillingDocument; created: boolean }> {
   return fetchWithAuth(`/admin/billing/orders/${orderId}/create-document`, {
+    method: "POST",
+  });
+}
+
+export async function backfillPaidOrderBillingDocs(): Promise<{
+  processed: number;
+  created: number;
+  skipped: number;
+  errors: string[];
+}> {
+  return fetchWithAuth(`/admin/billing/backfill-paid-orders`, {
     method: "POST",
   });
 }

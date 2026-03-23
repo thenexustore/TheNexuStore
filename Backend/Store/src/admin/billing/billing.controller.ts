@@ -405,11 +405,11 @@ export class BillingController {
     @Param('id') id: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.billingService.generateDocumentPdf(id);
+    const { buffer: pdfBuffer, docRef } = await this.billingService.generateDocumentPdf(id);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="document-${id}.pdf"`,
+      `attachment; filename="${docRef}.pdf"`,
     );
     res.send(pdfBuffer);
   }
@@ -433,5 +433,29 @@ export class BillingController {
       metadata: { email: data.email },
     });
     return { success: true, data, message: `Documento enviado a ${data.email}` };
+  }
+
+  // ─── Backfill ─────────────────────────────────────────────────────────────
+
+  @Post('backfill-paid-orders')
+  async backfillPaidOrders(@Req() req: Request) {
+    const data = await this.billingService.backfillPaidOrders();
+    await this.auditLogService.logAction({
+      actor: req.user as any,
+      action: 'BILLING_BACKFILL_PAID_ORDERS',
+      resource: 'BILLING_DOCUMENT',
+      resourceId: 'bulk',
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
+      metadata: { created: data.created, skipped: data.skipped, errors: data.errors.length },
+    });
+    return {
+      success: true,
+      data,
+      message: `Backfill completado: ${data.created} facturas creadas, ${data.skipped} omitidas.`,
+    };
   }
 }

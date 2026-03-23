@@ -383,7 +383,7 @@ export class BillingService {
         ...(items !== undefined && {
           subtotal_amount: subtotal,
           tax_amount: taxAmount,
-          total_amount: total,
+          total_amount: Math.max(0, total - Number(doc.discount_amount)),
         }),
       },
       include: { items: { orderBy: { position: 'asc' } } },
@@ -917,7 +917,7 @@ export class BillingService {
         subtotal_amount: subtotal,
         tax_amount: taxTotal,
         discount_amount: Number(order.discount_amount),
-        total_amount: total,
+        total_amount: Math.max(0, total - Number(order.discount_amount)),
         items: { create: lineItems },
       },
       include: { items: true },
@@ -1093,7 +1093,7 @@ export class BillingService {
         subtotal_amount: subtotal,
         tax_amount: taxTotal,
         discount_amount: Number(order.discount_amount),
-        total_amount: total,
+        total_amount: Math.max(0, total - Number(order.discount_amount)),
         items: { create: lineItems },
       },
       include: { items: true },
@@ -1104,23 +1104,24 @@ export class BillingService {
 
   // ─── PDF Generation ───────────────────────────────────────────────────────
 
-  async generateDocumentPdf(id: string): Promise<Buffer> {
+  async generateDocumentPdf(id: string): Promise<{ buffer: Buffer; docRef: string }> {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id },
       include: { items: true },
     });
     if (!doc) throw new NotFoundException('Billing document not found');
 
-    return new Promise<Buffer>((resolve, reject) => {
+    const docRef =
+      doc.document_number ??
+      doc.id.substring(0, 8).toUpperCase();
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
       const pdf = new PDFDocument({ margin: 50, size: 'A4' });
       const chunks: Buffer[] = [];
       pdf.on('data', (chunk: Buffer) => chunks.push(chunk));
       pdf.on('end', () => resolve(Buffer.concat(chunks)));
       pdf.on('error', reject);
 
-      const docRef =
-        doc.document_number ??
-        doc.id.substring(0, 8).toUpperCase();
       const typeLabel =
         doc.type === BillingDocumentType.INVOICE
           ? 'FACTURA'
@@ -1188,7 +1189,7 @@ export class BillingService {
           { width: 50 },
         );
         pdf.text(
-          `${Number(item.tax_rate).toFixed(0)}%`,
+          `${Math.round(Number(item.tax_rate) * 100)}%`,
           colTax,
           rowY,
           { width: 50 },
@@ -1234,6 +1235,8 @@ export class BillingService {
 
       pdf.end();
     });
+
+    return { buffer, docRef };
   }
 
   async sendDocument(id: string): Promise<{ sent: boolean; email: string }> {
@@ -1256,9 +1259,8 @@ export class BillingService {
       );
     }
 
-    const pdfBuffer = await this.generateDocumentPdf(id);
+    const { buffer: pdfBuffer, docRef } = await this.generateDocumentPdf(id);
 
-    const docRef = doc.document_number ?? id.substring(0, 8).toUpperCase();
     const typeLabel =
       doc.type === BillingDocumentType.INVOICE
         ? 'Factura'
@@ -1290,5 +1292,61 @@ export class BillingService {
 
     this.logger.log(`Billing document ${docRef} sent to ${doc.customer_email}`);
     return { sent: true, email: doc.customer_email };
+  }
+
+  // ─── Backfill ─────────────────────────────────────────────────────────────
+
+  /**
+   * Creates draft billing documents for all confirmed paid orders that do not
+   * yet have an existing billing document. Safe to call multiple times
+   * (idempotent per order via createDocumentFromOrder).
+   */
+  async backfillPaidOrders(): Promise<{
+    processed: number;
+    created: number;
+    skipped: number;
+    errors: string[];
+  }> {
+    this.logger.log('backfillPaidOrders: starting');
+
+    // All orders in a confirmed-payment state
+    const confirmedOrders = await this.prisma.order.findMany({
+      where: {
+        status: {
+          in: [
+            OrderStatus.PAID,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+          ],
+        },
+      },
+      select: { id: true, order_number: true },
+    });
+
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const order of confirmedOrders) {
+      try {
+        const result = await this.createDocumentFromOrder(order.id);
+        if (result.created) {
+          created++;
+          this.logger.log(`backfillPaidOrders: created draft for order ${order.order_number}`);
+        } else {
+          skipped++;
+        }
+      } catch (err) {
+        const msg = `Order ${order.order_number ?? order.id}: ${err instanceof Error ? err.message : String(err)}`;
+        this.logger.warn(`backfillPaidOrders error — ${msg}`);
+        errors.push(msg);
+      }
+    }
+
+    this.logger.log(
+      `backfillPaidOrders: done — processed=${confirmedOrders.length} created=${created} skipped=${skipped} errors=${errors.length}`,
+    );
+    return { processed: confirmedOrders.length, created, skipped, errors };
   }
 }

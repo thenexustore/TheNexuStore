@@ -53,10 +53,10 @@ export class CheckoutController {
     @Param('id') docId: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.checkoutService.getCustomerDocumentPdf(docId, req.user.id);
+    const { buffer: pdfBuffer, docRef } = await this.checkoutService.getCustomerDocumentPdf(docId, req.user.id);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="factura-${docId}.pdf"`,
+      'Content-Disposition': `attachment; filename="${docRef}.pdf"`,
       'Content-Length': pdfBuffer.length,
     });
     res.end(pdfBuffer);

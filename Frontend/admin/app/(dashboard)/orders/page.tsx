@@ -24,6 +24,7 @@ import {
   updateOrderShipment,
   fetchBillingDocumentsByOrder,
   createBillingDocumentFromOrder,
+  downloadBillingDocumentPdf,
   type Order,
   type OrderDetail,
   type OrderShipment,
@@ -112,6 +113,7 @@ export default function OrdersPage() {
   const [orderBillingDocs, setOrderBillingDocs] = useState<BillingDocument[]>([]);
   const [billingDocsLoading, setBillingDocsLoading] = useState(false);
   const [generatingBillingDoc, setGeneratingBillingDoc] = useState(false);
+  const [downloadingBillingDocId, setDownloadingBillingDocId] = useState<string | null>(null);
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
 
@@ -282,6 +284,17 @@ export default function OrdersPage() {
       toast.error(err.message || "Error al generar factura");
     } finally {
       setGeneratingBillingDoc(false);
+    }
+  };
+
+  const handleDownloadBillingDocPdf = async (docId: string) => {
+    setDownloadingBillingDocId(docId);
+    try {
+      await downloadBillingDocumentPdf(docId);
+    } catch (err: any) {
+      toast.error(err.message || "Error al descargar el PDF");
+    } finally {
+      setDownloadingBillingDocId(null);
     }
   };
 
@@ -799,9 +812,24 @@ export default function OrdersPage() {
                                     </span>
                                   </div>
                                 </div>
-                                <span className="text-zinc-500 font-medium tabular-nums ml-2">
-                                  {Number(doc.total_amount ?? 0).toLocaleString("es-ES", { style: "currency", currency: doc.currency ?? "EUR" })}
-                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-zinc-500 font-medium tabular-nums">
+                                    {Number(doc.total_amount ?? 0).toLocaleString("es-ES", { style: "currency", currency: doc.currency ?? "EUR" })}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadBillingDocPdf(doc.id)}
+                                    disabled={downloadingBillingDocId === doc.id}
+                                    className="p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 disabled:opacity-50 transition"
+                                    title="Descargar PDF"
+                                  >
+                                    {downloadingBillingDocId === doc.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Download className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>

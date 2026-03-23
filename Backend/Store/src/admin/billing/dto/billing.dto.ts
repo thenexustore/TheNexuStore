@@ -26,20 +26,24 @@ export class BillingDocumentItemDto {
   @IsNotEmpty()
   description: string = '';
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   qty: number = 1;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   unit_price: number = 0;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   tax_rate?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   position?: number;
@@ -341,6 +345,7 @@ export class UpdateBillingSettingsDto {
   credit_note_prefix?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   default_tax_rate?: number;

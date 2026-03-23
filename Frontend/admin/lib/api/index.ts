@@ -153,6 +153,7 @@ export {
   sendBillingDocument,
   fetchBillingDocumentsByOrder,
   createBillingDocumentFromOrder,
+  backfillPaidOrderBillingDocs,
   type BillingDocument,
   type BillingDocumentItem,
   type BillingDocumentsResponse,

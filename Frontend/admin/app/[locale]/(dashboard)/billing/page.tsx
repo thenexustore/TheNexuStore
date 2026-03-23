@@ -56,6 +56,7 @@ import {
   updateBillingTemplate,
   deleteBillingTemplate,
   uploadBillingTemplateBackground,
+  backfillPaidOrderBillingDocs,
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
@@ -503,6 +504,7 @@ export default function BillingPage() {
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showCreatePreview, setShowCreatePreview] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   // Per-row product search state for line items autocomplete
   type ItemSearchState = { query: string; results: Product[]; open: boolean; loading: boolean };
@@ -659,6 +661,28 @@ export default function BillingPage() {
   // Pre-load templates once on mount so openCreateForm can auto-select the default
   useEffect(() => {
     loadTemplates();
+    // Pre-load settings silently on mount so openCreateForm can use the configured default_tax_rate
+    if (!settings) {
+      fetchBillingSettings().then((s) => {
+        setSettings(s);
+        setSettingsForm({
+          legal_name: s.legal_name,
+          trade_name: s.trade_name,
+          nif: s.nif,
+          address_real: s.address_real,
+          address_virtual: s.address_virtual,
+          iban_caixabank: s.iban_caixabank,
+          iban_bbva: s.iban_bbva,
+          website_com: s.website_com,
+          website_es: s.website_es,
+          default_currency: s.default_currency,
+          invoice_prefix: s.invoice_prefix,
+          quote_prefix: s.quote_prefix,
+          credit_note_prefix: s.credit_note_prefix,
+          default_tax_rate: Number(s.default_tax_rate),
+        });
+      }).catch(() => { /* non-critical — falls back to 21% hardcoded */ });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -675,6 +699,8 @@ export default function BillingPage() {
       toast.error(
         err instanceof Error ? err.message : "Error cargando documento",
       );
+      // Close the panel so the user doesn't see an empty slide-over
+      setShowDetail(false);
     } finally {
       setDetailLoading(false);
     }
@@ -693,8 +719,12 @@ export default function BillingPage() {
     try {
       const doc = await issueBillingDocument(id);
       toast.success(`Documento emitido: ${doc.document_number}`);
-      if (selectedDoc?.id === id) setSelectedDoc(doc as BillingDocumentWithAudits);
       await loadDocs(page);
+      // Refresh the detail panel with full document (including number_audits)
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
     } catch (err: unknown) {
       toast.error(
         err instanceof Error ? err.message : "Error emitiendo documento",
@@ -762,8 +792,11 @@ export default function BillingPage() {
       );
       toast.success("Número actualizado");
       setEditNumberDoc(null);
-      if (selectedDoc?.id === updated.id)
-        setSelectedDoc(updated as BillingDocumentWithAudits);
+      // Fetch full doc with updated number_audits for the detail panel
+      if (selectedDoc?.id === updated.id) {
+        const refreshed = await fetchBillingDocumentById(updated.id);
+        setSelectedDoc(refreshed);
+      }
       await loadDocs(page);
     } catch (err: unknown) {
       toast.error(
@@ -777,6 +810,9 @@ export default function BillingPage() {
   // ─── Create document ───────────────────────────────────────────────────────
 
   const openCreateForm = (type: BillingDocumentType) => {
+    const defaultTaxRate = settings?.default_tax_rate != null
+      ? String(settings.default_tax_rate)
+      : "0.21";
     setCreateType(type);
     setCreateForm({
       notes: "",
@@ -788,7 +824,7 @@ export default function BillingPage() {
       customer_email: "",
       customer_tax_id: "",
       customer_address: "",
-      items: [{ description: "", qty: "1", unit_price: "", tax_rate: "0.21" }],
+      items: [{ description: "", qty: "1", unit_price: "", tax_rate: defaultTaxRate }],
       template_id: templates.find((t) => t.is_default)?.id ?? "",
     });
     setItemSearches([{ query: "", results: [], open: false, loading: false }]);
@@ -823,7 +859,7 @@ export default function BillingPage() {
           description: i.description,
           qty: Number(i.qty) || 1,
           unit_price: Number(i.unit_price) || 0,
-          tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
+          tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21),
           position: idx,
         })),
       });
@@ -868,7 +904,7 @@ export default function BillingPage() {
         invoice_prefix: s.invoice_prefix,
         quote_prefix: s.quote_prefix,
         credit_note_prefix: s.credit_note_prefix,
-        default_tax_rate: s.default_tax_rate,
+        default_tax_rate: Number(s.default_tax_rate),
       });
     } catch (err: unknown) {
       setSettingsLoadError(true);
@@ -1056,6 +1092,31 @@ export default function BillingPage() {
     }
   };
 
+  // ─── Backfill paid orders ──────────────────────────────────────────────────
+
+  const handleBackfillPaidOrders = async () => {
+    setBackfilling(true);
+    try {
+      const result = await backfillPaidOrderBillingDocs();
+      if (result.created > 0) {
+        toast.success(
+          `Backfill completado: ${result.created} factura(s) en borrador creada(s), ${result.skipped} omitida(s).`,
+        );
+      } else {
+        toast.info(`Todos los pedidos pagados ya tenían factura (${result.skipped} omitidos).`);
+      }
+      if (result.errors.length > 0) {
+        toast.warning(`${result.errors.length} error(es) durante el backfill. Revisa los logs.`);
+      }
+      // Reload document list to show newly created drafts (also updates totalPages)
+      await loadDocs(1);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al ejecutar el backfill");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   // ─── PDF download ──────────────────────────────────────────────────────────
 
   const handleDownloadPdf = async (id: string) => {
@@ -1085,6 +1146,42 @@ export default function BillingPage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error enviando documento");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  // ─── Issue + send in one action ────────────────────────────────────────────
+
+  const handleIssueAndSend = async (id: string) => {
+    setIssuingId(id);
+    try {
+      const issuedDoc = await issueBillingDocument(id);
+      toast.success(`Documento emitido: ${issuedDoc.document_number}`);
+      if (selectedDoc?.id === id) setSelectedDoc(issuedDoc as BillingDocumentWithAudits);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error emitiendo documento");
+      setIssuingId(null);
+      return;
+    }
+    setIssuingId(null);
+    setSendingId(id);
+    try {
+      const result = await sendBillingDocument(id);
+      toast.success(`Factura enviada por email a ${result.email}`);
+      await loadDocs(page);
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Factura emitida pero error al enviar email");
+      // Still reload the list + detail panel to reflect the ISSUED state
+      await loadDocs(page);
+      if (selectedDoc?.id === id) {
+        const refreshed = await fetchBillingDocumentById(id);
+        setSelectedDoc(refreshed);
+      }
     } finally {
       setSendingId(null);
     }
@@ -1151,11 +1248,14 @@ export default function BillingPage() {
   // ─── Create item helpers ───────────────────────────────────────────────────
 
   const addCreateItem = () => {
+    const defaultTaxRate = settings?.default_tax_rate != null
+      ? String(settings.default_tax_rate)
+      : "0.21";
     setCreateForm((f: CreateFormState) => ({
       ...f,
       items: [
         ...f.items,
-        { description: "", qty: "1", unit_price: "", tax_rate: "0.21" },
+        { description: "", qty: "1", unit_price: "", tax_rate: defaultTaxRate },
       ],
     }));
   };
@@ -1183,7 +1283,7 @@ export default function BillingPage() {
   }, 0);
   const liveTax = createForm.items.reduce((s: number, i: CreateItemState) => {
     const ls = Number(i.qty || 1) * Number(i.unit_price || 0);
-    const taxRate = i.tax_rate !== "" ? Number(i.tax_rate) : 0.21;
+    const taxRate = i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21);
     return s + ls * taxRate;
   }, 0);
 
@@ -1257,6 +1357,19 @@ export default function BillingPage() {
           >
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">Ajustes</span>
+          </button>
+          <button
+            onClick={handleBackfillPaidOrders}
+            disabled={backfilling}
+            title="Crear facturas en borrador para todos los pedidos pagados sin factura"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-amber-300 bg-amber-50 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50 transition shadow-sm"
+          >
+            {backfilling ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Receipt className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">{backfilling ? "Generando..." : "Recuperar pedidos"}</span>
           </button>
         </div>
       </div>
@@ -2097,7 +2210,7 @@ export default function BillingPage() {
                   {selectedDoc.status === "DRAFT" && (
                     <button
                       onClick={() => handleIssue(selectedDoc.id)}
-                      disabled={issuingId === selectedDoc.id}
+                      disabled={issuingId === selectedDoc.id || sendingId === selectedDoc.id}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition shadow-sm"
                     >
                       {issuingId === selectedDoc.id ? (
@@ -2106,6 +2219,21 @@ export default function BillingPage() {
                         <Send className="w-4 h-4" />
                       )}
                       Emitir documento
+                    </button>
+                  )}
+                  {/* Emit + send in one click (only for INVOICE drafts with customer email) */}
+                  {selectedDoc.status === "DRAFT" && selectedDoc.type === "INVOICE" && selectedDoc.customer_email && (
+                    <button
+                      onClick={() => handleIssueAndSend(selectedDoc.id)}
+                      disabled={issuingId === selectedDoc.id || sendingId === selectedDoc.id}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
+                    >
+                      {issuingId === selectedDoc.id || sendingId === selectedDoc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Emitir y enviar factura
                     </button>
                   )}
                   {/* Convert quote to invoice */}
@@ -2428,7 +2556,7 @@ export default function BillingPage() {
                       description: i.description,
                       qty: Number(i.qty) || 1,
                       unit_price: Number(i.unit_price) || 0,
-                      tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : 0.21,
+                      tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21),
                     })),
                 }} />
               </div>
@@ -2621,7 +2749,7 @@ export default function BillingPage() {
                 <div className="space-y-2">
                   {createForm.items.map((item: CreateItemState, idx: number) => {
                     const lineBase = Number(item.qty || 1) * Number(item.unit_price || 0);
-                    const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : 0.21;
+                    const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : (settings?.default_tax_rate ?? 0.21);
                     const lineTax = lineBase * taxRate;
                     const lineTotal = lineBase + lineTax;
                     const search = itemSearches[idx] ?? { query: "", results: [], open: false, loading: false };

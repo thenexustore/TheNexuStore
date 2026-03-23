@@ -221,5 +221,30 @@
     "freeShippingLeft": "Faltan {amount}",
     "customsDuty": "Arancel aduanero",
     "shippingUnavailable": "Envío no disponible para este destino. Contacta con soporte."
+  },
+  "orderConfirmation": {
+    "title": "¡Pedido confirmado!",
+    "subtitle": "Gracias por tu compra. Tu pedido ha sido recibido.",
+    "orderNumber": "Pedido #{number}",
+    "details": "Detalles del pedido",
+    "shippingAddress": "Dirección de envío",
+    "phone": "Teléfono: {phone}",
+    "summary": "Resumen del pedido",
+    "status": "Estado:",
+    "date": "Fecha:",
+    "totalLabel": "Total:",
+    "items": "Artículos del pedido",
+    "qty": "Cant.: {qty} × {price}",
+    "subtotal": "Subtotal",
+    "shipping": "Envío",
+    "free": "GRATIS",
+    "tax": "Impuestos",
+    "total": "Total",
+    "trackingNote": "Te enviaremos un correo de confirmación con información de seguimiento cuando tu pedido sea enviado.",
+    "continueShopping": "Seguir comprando",
+    "viewOrders": "Ver todos los pedidos",
+    "error": "Error",
+    "notFound": "Pedido no encontrado",
+    "goHome": "Ir al inicio"
   }
 }

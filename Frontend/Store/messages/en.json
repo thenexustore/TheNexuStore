@@ -221,5 +221,30 @@
     "freeShippingLeft": "{amount} left",
     "customsDuty": "Customs duty",
     "shippingUnavailable": "Shipping not available for this destination. Contact support."
+  },
+  "orderConfirmation": {
+    "title": "Order Confirmed!",
+    "subtitle": "Thank you for your purchase. Your order has been received.",
+    "orderNumber": "Order #{number}",
+    "details": "Order Details",
+    "shippingAddress": "Shipping Address",
+    "phone": "Phone: {phone}",
+    "summary": "Order Summary",
+    "status": "Status:",
+    "date": "Date:",
+    "totalLabel": "Total:",
+    "items": "Order Items",
+    "qty": "Qty: {qty} × {price}",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "free": "FREE",
+    "tax": "Tax",
+    "total": "Total",
+    "trackingNote": "We'll send you a confirmation email with tracking information once your order ships.",
+    "continueShopping": "Continue Shopping",
+    "viewOrders": "View All Orders",
+    "error": "Error",
+    "notFound": "Order not found",
+    "goHome": "Go to Home"
   }
 }

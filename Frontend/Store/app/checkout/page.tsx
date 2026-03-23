@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useAuth } from "../providers/AuthProvider";
 import { useCart } from "../../context/CartContext";
 import { createOrder, createRedsysPayment } from "../lib/checkout";
@@ -19,6 +19,7 @@ type RedsysRedirectFormData = {
 
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
+  const locale = useLocale();
   const router = useRouter();
   const { user, getSessionId } = useAuth();
   const { cart, isLoading: cartLoading, refreshCartWithDestination } = useCart();
@@ -203,6 +204,7 @@ export default function CheckoutPage() {
             },
         payment_method: paymentMethod,
         notes: formData.notes || undefined,
+        locale,
       };
 
       const response = await createOrder(orderData, getSessionId());

@@ -300,6 +300,7 @@ export class CheckoutService {
         dto.email,
         result.order.order_number,
         trackingUrl,
+        dto.locale,
       );
     } catch (error) {
       this.logger.warn(

@@ -65,6 +65,10 @@ export class CreateOrderDto {
   notes?: string = '';
 
   @IsOptional()
+  @IsString()
+  locale?: string = 'es';
+
+  @IsOptional()
   @IsIn(['REDSYS', 'BIZUM', 'COD'])
   payment_method?: 'REDSYS' | 'BIZUM' | 'COD' = 'REDSYS';
 }

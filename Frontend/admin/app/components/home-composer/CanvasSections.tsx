@@ -89,7 +89,7 @@ export default function CanvasSections({
                 selectedSectionId === section.id
                   ? "border-black bg-zinc-50 shadow-sm"
                   : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/70"
-              }"}
+              }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex items-start gap-2 min-w-0">

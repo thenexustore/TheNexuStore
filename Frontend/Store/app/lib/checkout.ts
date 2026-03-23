@@ -208,7 +208,10 @@ export const downloadInvoicePdf = async (docId: string): Promise<void> => {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `factura-${docId}.pdf`;
+  // Use filename from server Content-Disposition when available
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  a.download = match?.[1] ?? `factura-${docId}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

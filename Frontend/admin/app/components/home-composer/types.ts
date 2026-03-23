@@ -4,7 +4,6 @@ export type HomeSectionType =
   | "PRODUCT_CAROUSEL"
   | "BRAND_STRIP"
   | "VALUE_PROPS"
-  | "TRENDING_CHIPS"
   | "CUSTOM_HTML";
 
 export type HomeSection = {

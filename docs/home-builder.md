@@ -15,7 +15,7 @@ The homepage is now controlled by **Home Layouts** and **Sections**.
 - PRODUCT_CAROUSEL
 - BRAND_STRIP
 - VALUE_PROPS
-- TRENDING_CHIPS
+- CUSTOM_HTML
 
 ## API
 - `GET /home`

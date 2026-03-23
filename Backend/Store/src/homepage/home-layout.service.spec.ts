@@ -1167,15 +1167,13 @@ describe('HomeLayoutService section ordering integrity', () => {
     expect(prisma.homePageSection.delete).toHaveBeenCalledWith({
       where: { id: 'sec-2' },
     });
-    expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
-      1,
+    expect(prisma.homePageSection.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'sec-1' },
         data: { position: 1 },
       }),
     );
-    expect(prisma.homePageSection.update).toHaveBeenNthCalledWith(
-      2,
+    expect(prisma.homePageSection.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'sec-3' },
         data: { position: 2 },

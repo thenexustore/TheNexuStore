@@ -97,7 +97,6 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
   PRODUCT_CAROUSEL: "Carrusel de productos",
   BRAND_STRIP: "Carrusel de marcas",
   VALUE_PROPS: "Beneficios / confianza",
-  TRENDING_CHIPS: "Chips de tendencias",
   CUSTOM_HTML: "Bloque HTML personalizado",
 };
 
@@ -136,7 +135,6 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
       { icon: "shield", text: "Pago seguro" },
     ],
   },
-  TRENDING_CHIPS: { items: [{ text: "Gaming" }, { text: "Portátiles" }] },
   CUSTOM_HTML: { html: "" },
 };
 
@@ -2562,10 +2560,10 @@ export default function HomeComposerPage() {
                 />
               ) : null}
 
-              {(selectedSection.type === "VALUE_PROPS" || selectedSection.type === "TRENDING_CHIPS") && parsedDraftConfig ? (
+              {selectedSection.type === "VALUE_PROPS" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
                   <div className="mb-3 text-sm font-medium">
-                    Controles rápidos: {selectedSection.type === "VALUE_PROPS" ? "Beneficios / confianza" : "Chips de tendencias"}
+                    Controles rápidos: Beneficios / confianza
                   </div>
                   <div className="space-y-2">
                     {chipsItems.map((item, index) => (

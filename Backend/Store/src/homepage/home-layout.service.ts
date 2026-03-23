@@ -405,6 +405,18 @@ export class HomeLayoutService {
       select: { id: true },
     });
 
+    // Two-pass update to avoid unique-constraint (layout_id, position) conflicts:
+    // Pass 1 — shift all positions to a safe range above any realistic value.
+    const OFFSET = 1_000_000;
+    await this.prisma.$transaction(
+      sections.map((section, index) =>
+        this.prisma.homePageSection.update({
+          where: { id: section.id },
+          data: { position: OFFSET + index + 1 },
+        }),
+      ),
+    );
+    // Pass 2 — assign the final sequential positions.
     await this.prisma.$transaction(
       sections.map((section, index) =>
         this.prisma.homePageSection.update({
@@ -477,6 +489,16 @@ export class HomeLayoutService {
       section,
     );
 
+    // Two-pass update to avoid unique-constraint (layout_id, position) conflicts.
+    const OFFSET = 1_000_000;
+    await this.prisma.$transaction(
+      reordered.map((x, idx) =>
+        this.prisma.homePageSection.update({
+          where: { id: x.id },
+          data: { position: OFFSET + idx + 1 },
+        }),
+      ),
+    );
     await this.prisma.$transaction(
       reordered.map((x, idx) =>
         this.prisma.homePageSection.update({
@@ -543,6 +565,16 @@ export class HomeLayoutService {
       .map((item) => ({ ...item, position: Math.floor(item.position) }))
       .sort((a, b) => a.position - b.position);
 
+    // Two-pass update to avoid unique-constraint (layout_id, position) conflicts.
+    const OFFSET = 1_000_000;
+    await this.prisma.$transaction(
+      normalizedItems.map((item) =>
+        this.prisma.homePageSection.update({
+          where: { id: item.id },
+          data: { position: item.position + OFFSET },
+        }),
+      ),
+    );
     await this.prisma.$transaction(
       normalizedItems.map((item) =>
         this.prisma.homePageSection.update({

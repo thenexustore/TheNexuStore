@@ -27,7 +27,6 @@ const SECTION_TYPE_LABEL: Record<string, string> = {
   PRODUCT_CAROUSEL: 'Novedades',
   BRAND_STRIP: 'Marcas populares',
   VALUE_PROPS: '¿Por qué elegirnos?',
-  TRENDING_CHIPS: 'Tendencias',
 };
 
 
@@ -1003,7 +1002,7 @@ export default function HomeRenderer({ payload }: { payload: HomePayload }) {
         if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={displayTitle} subtitle={section.subtitle} categories={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={displayTitle} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={displayTitle} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
-        if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;
+        if (section?.type === 'VALUE_PROPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;
         if (section?.type === 'CUSTOM_HTML') return <CustomHtmlSection key={key} title={displayTitle} subtitle={section.subtitle} content={section.resolved} />;
         return null;
       })}

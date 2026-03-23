@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { getOrder } from "@/app/lib/checkout";
 import { formatCurrency } from "@/app/lib/currency";
 
 export default function OrderConfirmationPage() {
   const t = useTranslations("orderConfirmation");
+  const locale = useLocale();
   const params = useParams();
   const orderId = params.id as string;
 
@@ -112,7 +113,7 @@ export default function OrderConfirmationPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>{t("date")}</span>
-                  <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                  <span>{new Date(order.created_at).toLocaleDateString(locale)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t("totalLabel")}</span>

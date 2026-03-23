@@ -790,8 +790,11 @@ export default function BillingPage() {
       );
       toast.success("Número actualizado");
       setEditNumberDoc(null);
-      if (selectedDoc?.id === updated.id)
-        setSelectedDoc(updated as BillingDocumentWithAudits);
+      // Fetch full doc with updated number_audits for the detail panel
+      if (selectedDoc?.id === updated.id) {
+        const refreshed = await fetchBillingDocumentById(updated.id);
+        setSelectedDoc(refreshed);
+      }
       await loadDocs(page);
     } catch (err: unknown) {
       toast.error(

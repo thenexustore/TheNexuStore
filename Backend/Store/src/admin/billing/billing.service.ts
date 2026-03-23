@@ -1189,7 +1189,7 @@ export class BillingService {
           { width: 50 },
         );
         pdf.text(
-          `${Number(item.tax_rate).toFixed(0)}%`,
+          `${Math.round(Number(item.tax_rate) * 100)}%`,
           colTax,
           rowY,
           { width: 50 },

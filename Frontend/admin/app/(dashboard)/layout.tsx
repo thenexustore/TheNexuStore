@@ -78,6 +78,7 @@ const navigation: NavItem[] = [
     icon: LayoutTemplate,
     children: [
       { key: "homeComposer", href: "/home-composer", requiredPermissions: ["full_access"] },
+      { key: "footer", href: "/footer", requiredPermissions: ["full_access"] },
     ],
   },
 ];

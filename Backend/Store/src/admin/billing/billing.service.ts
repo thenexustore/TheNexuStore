@@ -383,7 +383,7 @@ export class BillingService {
         ...(items !== undefined && {
           subtotal_amount: subtotal,
           tax_amount: taxAmount,
-          total_amount: total,
+          total_amount: Math.max(0, total - Number(doc.discount_amount)),
         }),
       },
       include: { items: { orderBy: { position: 'asc' } } },

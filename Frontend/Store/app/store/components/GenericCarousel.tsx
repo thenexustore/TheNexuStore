@@ -103,6 +103,8 @@ export default function GenericCarousel({
   const [isHovering, setIsHovering] = useState(false);
   const [page, setPage] = useState(0);
   const [perView, setPerView] = useState(itemsPerView.mobile);
+  // Gap mirrors the CSS: gap-3 (12px) on mobile, sm:gap-4 (16px) on tablet, lg:gap-5 (20px) on desktop
+  const [currentGap, setCurrentGap] = useState(12);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -167,10 +169,13 @@ export default function GenericCarousel({
     const updatePerView = () => {
       if (window.innerWidth >= 1024) {
         setPerView(itemsPerView.desktop);
+        setCurrentGap(20); // lg:gap-5
       } else if (window.innerWidth >= 768) {
         setPerView(itemsPerView.tablet);
+        setCurrentGap(16); // sm:gap-4
       } else {
         setPerView(itemsPerView.mobile);
+        setCurrentGap(12); // gap-3
       }
     };
 
@@ -197,13 +202,15 @@ export default function GenericCarousel({
     (nextPage: number) => {
       if (!scrollRef.current) return;
       const safePage = ((nextPage % pageCount) + pageCount) % pageCount;
+      // Each page starts at: page * (clientWidth + gap)
+      // because: item_width = (W - (N-1)*gap)/N, so page_width = W + gap
       scrollRef.current.scrollTo({
-        left: safePage * scrollRef.current.clientWidth,
+        left: safePage * (scrollRef.current.clientWidth + currentGap),
         behavior: "smooth",
       });
       setPage(safePage);
     },
-    [pageCount],
+    [pageCount, currentGap],
   );
 
   useEffect(() => {
@@ -212,13 +219,14 @@ export default function GenericCarousel({
     const onScroll = () => {
       const width = node.clientWidth;
       if (!width) return;
-      const nextPage = Math.round(node.scrollLeft / width);
+      const pageWidth = width + currentGap;
+      const nextPage = Math.round(node.scrollLeft / pageWidth);
       if (nextPage !== page) setPage(nextPage);
     };
 
     node.addEventListener("scroll", onScroll, { passive: true });
     return () => node.removeEventListener("scroll", onScroll);
-  }, [page]);
+  }, [page, currentGap]);
 
   useEffect(() => {
     if (!autoplay || pageCount <= 1 || isHovering) return;
@@ -278,7 +286,7 @@ export default function GenericCarousel({
                       href={`/products/${product.slug}`}
                       className="snap-start rounded-xl border bg-white p-3"
                       style={{
-                        flexBasis: `calc((100% - ${(perView - 1) * 12}px) / ${perView})`,
+                        flexBasis: `calc((100% - ${(perView - 1) * currentGap}px) / ${perView})`,
                         flexShrink: 0,
                       }}
                     >
@@ -306,7 +314,7 @@ export default function GenericCarousel({
                       href={`/products?brand=${encodeURIComponent(brand.slug || brand.id)}`}
                       className="snap-start rounded-xl border bg-white p-3 text-center"
                       style={{
-                        flexBasis: `calc((100% - ${(perView - 1) * 12}px) / ${perView})`,
+                        flexBasis: `calc((100% - ${(perView - 1) * currentGap}px) / ${perView})`,
                         flexShrink: 0,
                       }}
                     >
@@ -336,7 +344,7 @@ export default function GenericCarousel({
                       href={`/products?categories=${encodeURIComponent(category.slug)}`}
                       className="snap-start rounded-xl border bg-white px-4 py-6 text-center text-sm font-semibold"
                       style={{
-                        flexBasis: `calc((100% - ${(perView - 1) * 12}px) / ${perView})`,
+                        flexBasis: `calc((100% - ${(perView - 1) * currentGap}px) / ${perView})`,
                         flexShrink: 0,
                       }}
                     >

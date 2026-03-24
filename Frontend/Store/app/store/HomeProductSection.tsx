@@ -45,13 +45,22 @@ export default function HomeProductSection({
   const autoplayIntervalMs = Math.max(2000, Number(carouselConfig?.autoplayIntervalMs || 5000));
   const mobileItems = Math.min(3, Math.max(1, Number(carouselConfig?.itemsPerViewMobile || 2)));
   const desktopItems = Math.min(6, Math.max(2, Number(carouselConfig?.itemsPerViewDesktop || 4)));
+  // Gap mirrors the responsive CSS: gap-3 (12px) mobile, sm:gap-4 (16px) tablet, lg:gap-5 (20px) desktop
+  const [currentGap, setCurrentGap] = useState(12);
 
   useEffect(() => {
     if (!carouselEnabled) return;
 
     const updateItemsPerView = () => {
-      const next = window.innerWidth >= 1024 ? desktopItems : mobileItems;
-      setItemsPerView(next);
+      // Items per view: >= 1024px → desktopItems, otherwise → mobileItems
+      // Gap mirrors responsive CSS: gap-3 (12px) < 640px, sm:gap-4 (16px) 640-1024px, lg:gap-5 (20px) >= 1024px
+      if (window.innerWidth >= 1024) {
+        setItemsPerView(desktopItems);
+        setCurrentGap(20); // lg:gap-5
+      } else {
+        setItemsPerView(mobileItems);
+        setCurrentGap(window.innerWidth >= 640 ? 16 : 12); // sm:gap-4 or gap-3
+      }
     };
 
     updateItemsPerView();
@@ -82,10 +91,12 @@ export default function HomeProductSection({
   const scrollToPage = useCallback((page: number) => {
     if (!scrollRef.current) return;
     const targetPage = ((page % pageCount) + pageCount) % pageCount;
-    const pageWidth = scrollRef.current.clientWidth;
+    // Each page starts at: page * (clientWidth + gap)
+    // because item_width = (W - (N-1)*gap)/N, so page_width = W + gap
+    const pageWidth = scrollRef.current.clientWidth + currentGap;
     scrollRef.current.scrollTo({ left: targetPage * pageWidth, behavior: "smooth" });
     setCurrentPage(targetPage);
-  }, [pageCount]);
+  }, [pageCount, currentGap]);
 
   useEffect(() => {
     if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || isFocusWithin || !isPageVisible) return;
@@ -99,14 +110,14 @@ export default function HomeProductSection({
     if (!carouselEnabled || !scrollRef.current) return;
     const el = scrollRef.current;
     const onScroll = () => {
-      const pageWidth = el.clientWidth;
+      const pageWidth = el.clientWidth + currentGap;
       if (!pageWidth) return;
       const page = Math.round(el.scrollLeft / pageWidth);
       if (page !== currentPage) setCurrentPage(page);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [carouselEnabled, currentPage]);
+  }, [carouselEnabled, currentPage, currentGap]);
 
   const card = (product: Product) => {
     const hasDeal =
@@ -210,7 +221,7 @@ export default function HomeProductSection({
               <div
                 key={product.id}
                 className="snap-start shrink-0"
-                style={{ flexBasis: `calc((100% - ${(itemsPerView - 1) * 12}px) / ${itemsPerView})` }}
+                style={{ flexBasis: `calc((100% - ${(itemsPerView - 1) * currentGap}px) / ${itemsPerView})` }}
               >
                 {card(product)}
               </div>

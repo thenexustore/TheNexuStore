@@ -135,27 +135,37 @@ function buildFiltersFromSearchParams(
   searchParams: ReturnType<typeof useSearchParams>,
 ): ProductFilters {
   const sortByParam = searchParams.get("sort_by") as ProductFilters["sort_by"];
+
+  // Fix 4: Guard against NaN values from malformed query params
+  const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
+  const rawMinPrice = parseInt(searchParams.get("min_price") ?? "", 10);
+  const rawMaxPrice = parseInt(searchParams.get("max_price") ?? "", 10);
+
   const filters: ProductFilters = {
-    page: parseInt(searchParams.get("page") || "1"),
+    page: Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage,
     limit: 20,
     search: searchParams.get("search") || undefined,
     category: searchParams.get("category") || undefined,
     brand: searchParams.get("brand") || undefined,
     sort_by: sortByParam || "newest",
-    min_price: searchParams.get("min_price")
-      ? parseInt(searchParams.get("min_price")!)
-      : undefined,
-    max_price: searchParams.get("max_price")
-      ? parseInt(searchParams.get("max_price")!)
-      : undefined,
+    min_price: Number.isNaN(rawMinPrice) ? undefined : rawMinPrice,
+    max_price: Number.isNaN(rawMaxPrice) ? undefined : rawMaxPrice,
     in_stock_only: true,
-    featured_only: searchParams.get("featured_only") === "true",
-    attributes: searchParams.get("attributes")?.split(","),
+    // Return undefined instead of false so the param is omitted when inactive
+    featured_only: searchParams.get("featured_only") === "true" ? true : undefined,
+    // Fix 4: Filter out empty strings produced by splitting an empty param
+    attributes: searchParams.get("attributes")
+      ? searchParams.get("attributes")!.split(",").filter((s) => s.length > 0)
+      : undefined,
   };
 
   const categoriesParam = searchParams.get("categories");
   if (categoriesParam) {
-    filters.categories = categoriesParam.split(",");
+    // Fix 4: Filter out empty strings (e.g. trailing comma: "a,b,")
+    const cats = categoriesParam.split(",").filter((s) => s.length > 0);
+    if (cats.length > 0) {
+      filters.categories = cats;
+    }
   }
 
   return filters;

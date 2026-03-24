@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FilterOptions, ProductFilters } from "../lib/products";
 
 interface SidebarFiltersProps {
@@ -18,6 +18,15 @@ type FilterListItem = {
   parent_name?: string | null;
   display_name?: string;
 };
+
+/** Shallow array equality check (same length, same elements in same order). */
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
 function SearchableCheckboxList({
   title,
@@ -158,6 +167,17 @@ export function SidebarFilters({
   const minPrice = filterOptions.price_range.min;
   const maxPrice = filterOptions.price_range.max;
 
+  // Refs to always read the latest external values inside async callbacks,
+  // avoiding stale-closure bugs without adding them as effect dependencies.
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const onFilterChangeRef = useRef(onFilterChange);
+  onFilterChangeRef.current = onFilterChange;
+  const minPriceRef = useRef(minPrice);
+  minPriceRef.current = minPrice;
+  const maxPriceRef = useRef(maxPrice);
+  maxPriceRef.current = maxPrice;
+
   const [price, setPrice] = useState<[number, number]>([
     filters.min_price ?? minPrice,
     filters.max_price ?? maxPrice,
@@ -166,31 +186,62 @@ export function SidebarFilters({
   const [categories, setCategories] = useState<string[]>(
     filters.categories ?? []
   );
-  const [brands, setBrands] = useState<string[]>(
-    filters.brand ? [filters.brand] : []
-  );
+  // Fix 3: single-select string (API only accepts one brand via `brand` field)
+  const [brand, setBrand] = useState<string>(filters.brand ?? "");
   const [attributes, setAttributes] = useState<string[]>(
     filters.attributes ?? []
   );
-  const inStock = true;
   const [featured, setFeatured] = useState(!!filters.featured_only);
 
+  // Fix 1: Re-sync local state when the external `filters` prop changes
+  // (URL navigation, quick-filter chips, etc.).  Functional updaters with
+  // stable-reference checks prevent spurious re-renders that would
+  // re-trigger the apply effect below.
   useEffect(() => {
+    setPrice((prev) => {
+      const next: [number, number] = [
+        filters.min_price ?? minPrice,
+        filters.max_price ?? maxPrice,
+      ];
+      return prev[0] === next[0] && prev[1] === next[1] ? prev : next;
+    });
+    setCategories((prev) => {
+      const next = filters.categories ?? [];
+      return arraysEqual(prev, next) ? prev : next;
+    });
+    setBrand((prev) => {
+      const next = filters.brand ?? "";
+      return prev === next ? prev : next;
+    });
+    setAttributes((prev) => {
+      const next = filters.attributes ?? [];
+      return arraysEqual(prev, next) ? prev : next;
+    });
+    setFeatured(!!filters.featured_only);
+  }, [filters, minPrice, maxPrice]);
+
+  // Fix 2: Apply filter changes triggered by user interactions.
+  // Uses refs for external values (filters, min/maxPrice, onFilterChange)
+  // so the debounced callback always reads the current values without
+  // those variables being effect dependencies (which would cause infinite loops).
+  useEffect(() => {
+    const min = minPriceRef.current;
+    const max = maxPriceRef.current;
     const t = setTimeout(() => {
-      onFilterChange({
-        ...filters,
-        min_price: price[0] !== minPrice ? price[0] : undefined,
-        max_price: price[1] !== maxPrice ? price[1] : undefined,
+      onFilterChangeRef.current({
+        ...filtersRef.current,
+        min_price: price[0] !== min ? price[0] : undefined,
+        max_price: price[1] !== max ? price[1] : undefined,
         categories: categories.length ? categories : undefined,
-        brand: brands.length ? brands[0] : undefined,
+        brand: brand || undefined,
         attributes: attributes.length ? attributes : undefined,
-        in_stock_only: inStock || undefined,
+        in_stock_only: true,
         featured_only: featured || undefined,
         page: 1,
       });
     }, 300);
     return () => clearTimeout(t);
-  }, [price, categories, brands, attributes, featured]);
+  }, [price, categories, brand, attributes, featured]);
 
   const toggleArrayValue = (
     value: string,
@@ -202,10 +253,15 @@ export function SidebarFilters({
     );
   };
 
+  // Fix 3: Toggle that replaces the current brand (single-select)
+  const toggleBrand = (slug: string) => {
+    setBrand((prev) => (prev === slug ? "" : slug));
+  };
+
   const clearAll = () => {
     setPrice([minPrice, maxPrice]);
     setCategories([]);
-    setBrands([]);
+    setBrand("");
     setAttributes([]);
     setFeatured(false);
     onFilterChange({
@@ -218,7 +274,7 @@ export function SidebarFilters({
 
   const active =
     categories.length ||
-    brands.length ||
+    brand ||
     attributes.length ||
     featured ||
     price[0] !== minPrice ||
@@ -247,8 +303,8 @@ export function SidebarFilters({
         <SearchableCheckboxList
           title="Brands"
           items={filterOptions.brands}
-          selected={brands}
-          onToggle={(v) => toggleArrayValue(v, brands, setBrands)}
+          selected={brand ? [brand] : []}
+          onToggle={toggleBrand}
         />
       )}
 

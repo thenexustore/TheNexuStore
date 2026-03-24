@@ -64,7 +64,7 @@ function toApiImage(url?: string) {
   ) {
     return raw;
   }
-  return `${API_URL}/${raw.replace(/^\/+/, "")}`;
+  return `${API_URL}/${raw.replace(/^\/+/,'')}`;
 }
 
 function parseApiList(payload: unknown): unknown[] {
@@ -276,7 +276,7 @@ export default function GenericCarousel({
         <>
           <div
             ref={scrollRef}
-            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 lg:gap-5 [scrollbar-width:thin]"
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 lg:gap-5 [scrollbar-width:thin] lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >

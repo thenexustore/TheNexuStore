@@ -97,7 +97,6 @@ const SECTION_TYPE_LABELS: Record<HomeSectionType, string> = {
   PRODUCT_CAROUSEL: "Carrusel de productos",
   BRAND_STRIP: "Carrusel de marcas",
   VALUE_PROPS: "Beneficios / confianza",
-  TRENDING_CHIPS: "Chips de tendencias",
   CUSTOM_HTML: "Bloque HTML personalizado",
 };
 
@@ -119,6 +118,8 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
     interval_ms: 4500,
     items_mobile: 2,
     items_desktop: 4,
+    rows_mobile: 1,
+    rows_desktop: 1,
     view_all_label: "Ver todo",
     view_all_href: "/products",
   },
@@ -129,6 +130,8 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
     interval_ms: 4500,
     items_mobile: 2,
     items_desktop: 6,
+    rows_mobile: 1,
+    rows_desktop: 1,
   },
   VALUE_PROPS: {
     items: [
@@ -136,7 +139,6 @@ const DEFAULT_CONFIG: Record<HomeSectionType, Record<string, unknown>> = {
       { icon: "shield", text: "Pago seguro" },
     ],
   },
-  TRENDING_CHIPS: { items: [{ text: "Gaming" }, { text: "Portátiles" }] },
   CUSTOM_HTML: { html: "" },
 };
 
@@ -2018,6 +2020,42 @@ export default function HomeComposerPage() {
                     </label>
 
                     <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Filas en desktop</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={4}
+                        value={asNumber(config.rows_desktop, 1)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            rows_desktop: Math.max(1, Math.min(4, Number(event.target.value) || 1)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                      <p className="mt-1 text-xs text-zinc-400">1 = carrusel. 2+ = cuadrícula multi-fila.</p>
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Filas en móvil</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={4}
+                        value={asNumber(config.rows_mobile, 1)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            rows_mobile: Math.max(1, Math.min(4, Number(event.target.value) || 1)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                      <p className="mt-1 text-xs text-zinc-400">1 = carrusel. 2+ = cuadrícula multi-fila.</p>
+                    </label>
+
+                    <label className="text-sm">
                       <span className="mb-1 block text-zinc-500">Alcance categoría</span>
                       <select
                         value={String(config.category_scope || "parent_and_descendants")}
@@ -2401,6 +2439,42 @@ export default function HomeComposerPage() {
                         className="w-full rounded-lg border border-zinc-300 px-3 py-2"
                       />
                     </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Filas en desktop</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={4}
+                        value={asNumber(config.rows_desktop, 1)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            rows_desktop: Math.max(1, Math.min(4, Number(event.target.value) || 1)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                      <p className="mt-1 text-xs text-zinc-400">1 = carrusel. 2+ = cuadrícula multi-fila.</p>
+                    </label>
+
+                    <label className="text-sm">
+                      <span className="mb-1 block text-zinc-500">Filas en móvil</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={4}
+                        value={asNumber(config.rows_mobile, 1)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            rows_mobile: Math.max(1, Math.min(4, Number(event.target.value) || 1)),
+                          })
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+                      />
+                      <p className="mt-1 text-xs text-zinc-400">1 = carrusel. 2+ = cuadrícula multi-fila.</p>
+                    </label>
                   </div>
 
                   {/* Typography */}
@@ -2755,10 +2829,10 @@ export default function HomeComposerPage() {
                 />
               ) : null}
 
-              {(selectedSection.type === "VALUE_PROPS" || selectedSection.type === "TRENDING_CHIPS") && parsedDraftConfig ? (
+              {selectedSection.type === "VALUE_PROPS" && parsedDraftConfig ? (
                 <div className="rounded-xl border border-zinc-200 p-3">
                   <div className="mb-3 text-sm font-medium">
-                    Controles rápidos: {selectedSection.type === "VALUE_PROPS" ? "Beneficios / confianza" : "Chips de tendencias"}
+                    Controles rápidos: Beneficios / confianza
                   </div>
                   <div className="space-y-2">
                     {chipsItems.map((item, index) => (

@@ -6,7 +6,6 @@ const SECTION_TYPE_ICONS: Record<HomeSectionType, string> = {
   PRODUCT_CAROUSEL: "🛍️",
   BRAND_STRIP: "🏷️",
   VALUE_PROPS: "✅",
-  TRENDING_CHIPS: "🔥",
   CUSTOM_HTML: "💻",
 };
 

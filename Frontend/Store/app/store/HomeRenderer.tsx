@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { formatCurrency } from '../lib/currency';
@@ -267,24 +267,24 @@ function RailControls({
   onNext: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center justify-end gap-2">
       <button
         type="button"
         onClick={onPrev}
         disabled={!canPrev}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-35"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Anterior"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="15 18 9 12 15 6"/></svg>
+        ←
       </button>
       <button
         type="button"
         onClick={onNext}
         disabled={!canNext}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-35"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Siguiente"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="9 18 15 12 9 6"/></svg>
+        →
       </button>
     </div>
   );
@@ -312,19 +312,9 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           const bannerSlide = {
             id: banner.id,
             title_text: banner.title_text,
-            title_color: banner.title_color,
-            title_font: banner.title_font,
-            title_size: banner.title_size,
-            title_weight: banner.title_weight,
             subtitle_text: banner.subtitle_text,
-            subtitle_color: banner.subtitle_color,
-            subtitle_size: banner.subtitle_size,
             button_text: banner.button_text,
             button_link: banner.button_link,
-            button_bg: banner.button_bg,
-            button_color: banner.button_color,
-            button_radius: banner.button_radius,
-            button_padding: banner.button_padding,
             label: banner.label,
             image: banner.image,
             image_url: banner.image_url,
@@ -368,7 +358,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   const goNext = () => setIndex((prev) => (prev + 1) % slides.length);
 
   return (
-    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
+    <SectionShell title={title} subtitle={subtitle}>
       <div
         className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px] lg:h-[500px] xl:h-[560px]"
         onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
@@ -413,25 +403,6 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
                 });
               }
             }
-
-            // Build per-slide styles from banner fields (sanitized)
-            const slideAlign = asText(slide.align).trim() as 'left' | 'center' | 'right';
-            const textAlign = slideAlign === 'center' ? 'items-center text-center' : slideAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
-            const overlayColor = sanitizeCssValue(slide.overlay);
-            const titleStyle: React.CSSProperties = {};
-            if (sanitizeCssValue(slide.title_color)) titleStyle.color = sanitizeCssValue(slide.title_color);
-            if (sanitizeCssValue(slide.title_font)) titleStyle.fontFamily = sanitizeCssValue(slide.title_font);
-            if (sanitizeCssValue(slide.title_size)) titleStyle.fontSize = sanitizeCssValue(slide.title_size);
-            if (sanitizeCssValue(slide.title_weight)) titleStyle.fontWeight = sanitizeCssValue(slide.title_weight);
-            const subtitleStyle: React.CSSProperties = {};
-            if (sanitizeCssValue(slide.subtitle_color)) subtitleStyle.color = sanitizeCssValue(slide.subtitle_color);
-            if (sanitizeCssValue(slide.subtitle_size)) subtitleStyle.fontSize = sanitizeCssValue(slide.subtitle_size);
-            const btnStyle: React.CSSProperties = {};
-            if (sanitizeCssValue(slide.button_bg)) btnStyle.backgroundColor = sanitizeCssValue(slide.button_bg);
-            if (sanitizeCssValue(slide.button_color)) btnStyle.color = sanitizeCssValue(slide.button_color);
-            if (sanitizeCssValue(slide.button_radius)) btnStyle.borderRadius = sanitizeCssValue(slide.button_radius);
-            if (sanitizeCssValue(slide.button_padding)) btnStyle.padding = sanitizeCssValue(slide.button_padding);
-
             return (
             <div
               key={slideId}
@@ -451,33 +422,13 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800" />
               )}
-              {overlayColor ? (
-                <div className="absolute inset-0" style={{ background: overlayColor }} />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
-              )}
-              <div className={`absolute inset-0 flex max-w-2xl flex-col justify-end gap-3 p-4 text-white sm:p-10 ${textAlign}`}>
+              <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
+              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-3 p-4 text-white sm:p-10">
                 {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
-                <h3
-                  className="w-fit max-w-full rounded-xl bg-black/25 px-3 py-2 text-xl font-bold leading-tight backdrop-blur-[1px] sm:text-4xl"
-                  style={Object.keys(titleStyle).length ? titleStyle : undefined}
-                >
-                  {asText(slide.title_text, 'Top tech deals')}
-                </h3>
-                {slide.subtitle_text ? (
-                  <p
-                    className="w-fit max-w-full rounded-lg bg-black/20 px-3 py-1.5 text-sm text-slate-100 backdrop-blur-[1px] sm:text-base"
-                    style={Object.keys(subtitleStyle).length ? subtitleStyle : undefined}
-                  >
-                    {asText(slide.subtitle_text)}
-                  </p>
-                ) : null}
+                <h3 className="w-fit max-w-full rounded-xl bg-black/25 px-3 py-2 text-xl font-bold leading-tight backdrop-blur-[1px] sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
+                {slide.subtitle_text ? <p className="w-fit max-w-full rounded-lg bg-black/20 px-3 py-1.5 text-sm text-slate-100 backdrop-blur-[1px] sm:text-base">{asText(slide.subtitle_text)}</p> : null}
                 {slide.button_text ? (
-                  <ActionLink
-                    href={asText(slide.button_link, '/products')}
-                    className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-                    style={Object.keys(btnStyle).length ? btnStyle : undefined}
-                  >
+                  <ActionLink href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
                     {asText(slide.button_text)}
                   </ActionLink>
                 ) : null}
@@ -548,76 +499,45 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   });
   const mobileCols = Math.max(2, Math.min(4, Number(config?.items_mobile || 2)));
   const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
-  const CAT_GAP = 12; // gap-3 = 0.75rem = 12px
   const showNames = config?.show_names !== false;
-  const showArrows = config?.show_arrows !== false;
   const imageFitClass = String(config?.image_fit || 'contain') === 'cover' ? 'object-cover' : 'object-contain';
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
   const showTopBadges = config?.show_top_badges === true;
   const ctaText = (asText(config?.cta_text, 'Explorar').trim() || 'Explorar').slice(0, 24);
+  const mobileCardPx = Math.max(176, Math.floor(360 / mobileCols));
+  const desktopCardPx = Math.max(198, Math.floor(1240 / desktopCols));
   const cardToneClass = elevatedCards
     ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
-  const [isMobile, setIsMobile] = useState(false);
-  const [canPrev, setCanPrev] = useState(false);
-  const [canNext, setCanNext] = useState(false);
-  const railRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 768px)');
-    const sync = () => setIsMobile(media.matches);
-    sync();
-    media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
-  }, []);
-
-  const currentCols = isMobile ? mobileCols : desktopCols;
-
-  const syncCatRail = useCallback(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    setCanPrev(rail.scrollLeft > 4);
-    setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-  }, []);
-
-  useEffect(() => {
-    syncCatRail();
-    window.addEventListener('resize', syncCatRail);
-    return () => window.removeEventListener('resize', syncCatRail);
-  }, [syncCatRail, list.length, isMobile]);
-
-  const catStep = () => {
-    const rail = railRef.current;
-    if (!rail) return 240;
-    return rail.clientWidth + CAT_GAP;
-  };
-
-  const typography = extractTypography(config);
 
   return (
-    <SectionShell title={title || 'Top Categories'} subtitle={subtitle} typography={typography}>
-      {list.length > 0 && showArrows ? (
-        <div className="mb-3 flex items-center justify-end">
-          <RailControls canPrev={canPrev} canNext={canNext} onPrev={() => railRef.current?.scrollBy({ left: -catStep(), behavior: 'smooth' })} onNext={() => railRef.current?.scrollBy({ left: catStep(), behavior: 'smooth' })} />
-        </div>
-      ) : null}
+    <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
       <div
-        ref={railRef}
-        onScroll={syncCatRail}
+        className="-mx-1 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
         onWheel={handleRailWheel}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
       >
-        {list.map((cat, idx) => {
+        <div className="flex min-w-max gap-3 px-1 sm:gap-4">
+          {list.map((cat, idx) => {
             const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
             const imageValue = cat.image_url || cat.image || cat.banner_image;
             const hasVisual = !isLikelyMissingImage(imageValue);
+            if (!hasVisual) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn('[store-home][category-strip] Missing category image', {
+                  categoryId: asText(cat.id, `cat-${idx}`),
+                  slug: asText(cat.slug),
+                  name,
+                });
+              }
+            }
             return (
               <ActionLink
                 key={asText(cat.id, `cat-${idx}`)}
                 href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-                className={`group relative flex min-h-[224px] shrink-0 flex-none snap-start flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
+                className={`group relative flex min-h-[224px] w-[var(--card-mobile)] shrink-0 flex-none flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:w-[var(--card-desktop)] ${cardToneClass}`}
                 style={{
-                  width: `calc((100% - ${(currentCols - 1) * CAT_GAP}px) / ${currentCols})`,
+                  ['--card-mobile' as string]: `${mobileCardPx}px`,
+                  ['--card-desktop' as string]: `${desktopCardPx}px`,
                 }}
               >
                 {showTopBadges && idx < 3 ? (
@@ -648,6 +568,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               </ActionLink>
             );
           })}
+        </div>
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
     </SectionShell>
@@ -666,7 +587,10 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const list = rawList.slice(0, effectiveLimit);
   const mobileItems = Math.max(1, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
   const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
-  const CARD_GAP = 12; // gap-3 = 0.75rem = 12px
+  const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
+  const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
+  const mobileCardPx = Math.max(176, Math.floor(380 / mobileItems));
+  const desktopCardPx = Math.max(228, Math.floor(1240 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -708,8 +632,6 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  // Keep a ref to always-fresh mobile flag for event handlers (avoids stale closures).
-  const isMobileRef = useRef(false);
 
   const carouselMeta = useMemo(() => {
     const sourceLabel = {
@@ -739,34 +661,31 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     };
   }, [brandIds.length, categoryIds.length, categoryScope, desktopItems, list.length, source]);
 
-  const syncRailState = useCallback(() => {
+  const syncRailState = () => {
     const rail = railRef.current;
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-    // Track the current page index (not item index) for page-based dot navigation.
-    const approxPage = Math.round(rail.scrollLeft / Math.max(rail.clientWidth + CARD_GAP, 1));
-    setActiveDot(Math.max(0, approxPage));
-  }, []);
+    const approxIndex = Math.round(rail.scrollLeft / Math.max(rail.clientWidth * 0.6, 220));
+    setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
+  };
 
   useEffect(() => {
     syncRailState();
-    // Also re-sync when list or viewport changes so arrows/dots reflect the new state.
-  }, [syncRailState, list.length, isMobileViewport]);
+  }, [list.length]);
 
   useEffect(() => {
-    window.addEventListener('resize', syncRailState);
-    return () => window.removeEventListener('resize', syncRailState);
-  }, [syncRailState]);
+    const onResize = () => syncRailState();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
     const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const sync = () => {
-      const mobile = media.matches;
-      isMobileRef.current = mobile;
-      setIsMobileViewport(mobile);
+      setIsMobileViewport(media.matches);
       setReduceMotion(motionMedia.matches);
     };
 
@@ -782,11 +701,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 260;
-    // Scroll exactly one full page (N items) using the calc-based item width formula:
-    // item_width = (clientWidth - (N-1)*gap) / N
-    // page_width = N * item_width + (N-1)*gap = clientWidth
-    // So scrolling by clientWidth + gap moves to the exact start of the next page.
-    return rail.clientWidth + CARD_GAP;
+    return Math.max(220, Math.floor(rail.clientWidth * 0.82));
   };
 
   const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
@@ -809,61 +724,61 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     return () => window.clearInterval(id);
   }, [autoplayEnabled, autoplayIntervalMs, isPaused, isMobileViewport, list.length, reduceMotion]);
 
-  const renderCard = (product: Record<string, unknown>, idx: number) => {
+  const renderCard = (product: Record<string, unknown>, idx: number, gridMode = false) => {
     const hasDeal = Number(product.compare_at_price || 0) > Number(product.price || 0);
     const pct = Number(product.discount_percentage || product.discount_pct || 0);
     const stock = Number(product.stock_quantity || 0);
-    const currentPerView = isMobileViewport ? mobileItems : desktopItems;
 
     return (
       <ActionLink
         key={asText(product.id, `prod-${idx}`)}
         href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-        className="group relative flex min-h-[26rem] shrink-0 flex-none snap-start flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg md:min-h-[27rem]"
-        style={{
-          width: `calc((100% - ${(currentPerView - 1) * CARD_GAP}px) / ${currentPerView})`,
+        className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full min-h-[18rem]' : 'min-h-[22rem] w-[var(--card-mobile)] shrink-0 flex-none snap-start md:min-h-[23rem] md:w-[var(--card-desktop)]'}`}
+        style={gridMode ? undefined : {
+          ['--card-mobile' as string]: `${mobileCardPx}px`,
+          ['--card-desktop' as string]: `${desktopCardPx}px`,
         }}
       >
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 opacity-70" />
-        <div className="relative mb-3 aspect-[1/1] overflow-hidden rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100">
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 opacity-60" />
+        <div className="relative mb-2.5 aspect-[4/3] overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100">
           {!isLikelyMissingImage(product.thumbnail) ? (
             <SmartImage
               src={asSrc(product.thumbnail)}
               alt={asText(product.title, 'Product')}
-              className="object-contain p-3 transition duration-300 group-hover:scale-105"
+              className="object-contain p-2 transition duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 44vw, 210px"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-center text-xs font-medium text-slate-400">Imagen pendiente</div>
           )}
           {hasDeal && pct ? (
-            <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow">-{pct}%</span>
+            <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white shadow">-{pct}%</span>
           ) : null}
         </div>
 
         <div className="flex flex-1 flex-col">
-          <p className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
-          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
+          <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
 
-          <div className="mt-3 flex items-end gap-2">
-            <span className={`text-xl font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
+          <div className="mt-2 flex items-end gap-2">
+            <span className={`text-lg font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
               {formatCurrency(Number(product.price || 0))}
             </span>
             {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{formatCurrency(Number(product.compare_at_price || 0))}</span> : null}
           </div>
 
-          <div className="mt-2 min-h-[3rem]">
+          <div className="mt-1.5">
             {stock <= 0 ? (
-              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">Sin stock temporal</span>
+              <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Sin stock temporal</span>
             ) : stock <= 8 ? (
-              <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">¡Solo quedan {stock}!</span>
+              <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">¡Solo {stock}!</span>
             ) : (
-              <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">En stock · envío rápido</span>
+              <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">En stock</span>
             )}
           </div>
 
-          <div className="mt-auto pt-4">
-            <div className="flex min-h-[3rem] w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-semibold text-slate-700 transition group-hover:border-indigo-200 group-hover:bg-indigo-50 group-hover:text-indigo-700">
+          <div className="mt-auto pt-3">
+            <div className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-700 transition group-hover:border-indigo-200 group-hover:bg-indigo-50 group-hover:text-indigo-700">
               Ver producto <span aria-hidden className="ml-1">→</span>
             </div>
           </div>
@@ -872,80 +787,86 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     );
   };
 
+  const currentRows = isMobileViewport ? rowsMobile : rowsDesktop;
+  const currentCols = isMobileViewport ? mobileItems : desktopItems;
+  const useMultiRowGrid = currentRows > 1;
+
   return (
-    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
-      <div className="rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-3 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-2">
+    <SectionShell title={title} subtitle={subtitle}>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1.5">
             <div className="flex flex-wrap gap-1.5">
               {carouselMeta.contextualChips.map((chip, idx) => (
-                <span key={`${chip}-${idx}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">{chip}</span>
+                <span key={`${chip}-${idx}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">{chip}</span>
               ))}
             </div>
             <p className="text-xs text-slate-500">{list.length ? `${list.length} productos cargados` : 'Sin productos por ahora. Revisa filtros o categorías.'}</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <ActionLink href={collectionHref} className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">
+            <ActionLink href={collectionHref} className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700">
               {viewAllLabel} <span aria-hidden className="ml-1">→</span>
             </ActionLink>
-            {list.length > 1 && showArrows && !carouselMeta.useGridFallback ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+            {list.length > 1 && showArrows && !carouselMeta.useGridFallback && !useMultiRowGrid ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
           </div>
         </div>
 
         {!list.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, idx) => (
-              <div key={`empty-${idx}`} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-3">
-                <div className="mb-3 aspect-square rounded-xl bg-slate-100" />
+              <div key={`empty-${idx}`} className="animate-pulse rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-3 aspect-[4/3] rounded-lg bg-slate-100" />
                 <div className="h-3 w-4/5 rounded bg-slate-100" />
                 <div className="mt-2 h-3 w-2/5 rounded bg-slate-100" />
-                <div className="mt-4 h-8 rounded-full bg-slate-100" />
+                <div className="mt-4 h-7 rounded-lg bg-slate-100" />
               </div>
             ))}
           </div>
+        ) : useMultiRowGrid ? (
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: `repeat(${currentCols}, minmax(0, 1fr))` }}
+          >
+            {list.slice(0, currentCols * currentRows).map((product, idx) => renderCard(product, idx, true))}
+          </div>
         ) : carouselMeta.useGridFallback ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((product, idx) => renderCard(product, idx))}
+            {list.map((product, idx) => renderCard(product, idx, false))}
           </div>
         ) : (
           <>
-            <div className="-mx-1 px-1">
-              <div
-                ref={railRef}
-                onScroll={syncRailState}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
-                onTouchStart={() => setIsPaused(true)}
-                onTouchEnd={() => setIsPaused(false)}
-                onFocusCapture={() => setIsPaused(true)}
-                onBlurCapture={() => setIsPaused(false)}
-                onWheel={handleRailWheel}
-                className="flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto pb-4 pt-2 [scrollbar-width:thin] [scroll-padding-inline:8px] active:cursor-grabbing"
-              >
-                {list.map((product, idx) => renderCard(product, idx))}
-              </div>
+            <div
+              ref={railRef}
+              onScroll={syncRailState}
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
+              onTouchStart={() => setIsPaused(true)}
+              onTouchEnd={() => setIsPaused(false)}
+              onFocusCapture={() => setIsPaused(true)}
+              onBlurCapture={() => setIsPaused(false)}
+              onWheel={handleRailWheel}
+              className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin] [scroll-padding-inline:4px] active:cursor-grabbing"
+            >
+              {list.map((product, idx) => renderCard(product, idx, false))}
             </div>
 
             {list.length > 1 && showDots ? (
               <div className="mt-2 flex items-center justify-center gap-1.5">
-                {(() => {
-                  const currentPV = isMobileViewport ? mobileItems : desktopItems;
-                  const totalPages = Math.max(1, Math.ceil(list.length / Math.max(1, currentPV)));
-                  return Array.from({ length: Math.min(totalPages, 8) }).map((_, pageIdx) => (
-                    <button
-                      type="button"
-                      key={`dot-${pageIdx}`}
-                      onClick={() => {
-                        const rail = railRef.current;
-                        if (!rail) return;
-                        rail.scrollTo({ left: pageIdx * (rail.clientWidth + CARD_GAP), behavior: 'smooth' });
-                      }}
-                      className={`h-2.5 rounded-full transition-all ${activeDot === pageIdx ? 'w-6 bg-indigo-600' : 'w-2.5 bg-slate-300 hover:bg-slate-400'}`}
-                      aria-label={`ir a página ${pageIdx + 1}`}
-                    />
-                  ));
-                })()}
+                {list.slice(0, Math.min(list.length, 8)).map((_, idx) => (
+                  <button
+                    type="button"
+                    key={`dot-${idx}`}
+                    onClick={() => {
+                      const rail = railRef.current;
+                      if (!rail) return;
+                      const targetLeft = idx * Math.max(rail.clientWidth * 0.62, 220);
+                      rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
+                    }}
+                    className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
+                    aria-label={`ir a producto ${idx + 1}`}
+                  />
+                ))}
               </div>
             ) : null}
           </>
@@ -959,7 +880,10 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const list = toArray<Record<string, unknown>>(brands);
   const mobileItems = Math.max(2, Number(config?.carousel_items_mobile ?? config?.items_mobile ?? 2));
   const desktopItems = Math.max(2, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 6));
-  const BRAND_GAP = 12; // gap-3 = 0.75rem = 12px
+  const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
+  const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
+  const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
+  const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -969,52 +893,41 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const [activePage, setActivePage] = useState(0);
+  const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  // Keep a ref to always-fresh mobile flag for event handlers (avoids stale closures).
-  const isMobileRef = useRef(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  const syncRailState = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    setCanPrev(rail.scrollLeft > 4);
+    setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
+    const approxIndex = Math.round(rail.scrollLeft / Math.max(rail.clientWidth * 0.72, 220));
+    setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
+  };
+
+  useEffect(() => {
+    syncRailState();
+  }, [list.length]);
+
+  useEffect(() => {
+    const onResize = () => syncRailState();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
-    const sync = () => {
-      const mobile = media.matches;
-      isMobileRef.current = mobile;
-      setIsMobile(mobile);
-    };
+    const sync = () => setIsMobileViewport(media.matches);
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
   }, []);
 
-  const currentPerView = isMobile ? mobileItems : desktopItems;
-
-  const syncRailState = useCallback(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    setCanPrev(rail.scrollLeft > 4);
-    setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-    const approxPage = Math.round(rail.scrollLeft / Math.max(rail.clientWidth + BRAND_GAP, 1));
-    setActivePage(Math.max(0, approxPage));
-  }, []);
-
-  useEffect(() => {
-    syncRailState();
-  }, [syncRailState, list.length, currentPerView]);
-
-  useEffect(() => {
-    window.addEventListener('resize', syncRailState);
-    return () => window.removeEventListener('resize', syncRailState);
-  }, [syncRailState]);
-
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 220;
-    // Scroll exactly one full page of N items:
-    // item_width = (clientWidth - (N-1)*gap) / N
-    // page_width = N * item_width + (N-1)*gap = clientWidth
-    // Next page starts at clientWidth + gap from the current page start.
-    return rail.clientWidth + BRAND_GAP;
+    return Math.max(180, Math.floor(rail.clientWidth * 0.7));
   };
 
   const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
@@ -1036,75 +949,94 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
     return () => window.clearInterval(id);
   }, [autoplayEnabled, autoplayIntervalMs, isPaused, list.length]);
 
-  return (
-    <SectionShell title={title || 'Top Brands'} subtitle={subtitle} typography={extractTypography(config)}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        {viewAllHref ? (
-          <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">
-            {viewAllLabel} <span aria-hidden className="ml-1">→</span>
-          </ActionLink>
-        ) : <span />}
-        {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
-      </div>
+  const currentRows = isMobileViewport ? rowsMobile : rowsDesktop;
+  const currentCols = isMobileViewport ? mobileItems : desktopItems;
+  const useGridLayout = currentRows > 1;
 
-      <div
-        ref={railRef}
-        onScroll={syncRailState}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-        onFocusCapture={() => setIsPaused(true)}
-        onBlurCapture={() => setIsPaused(false)}
-        onWheel={handleRailWheel}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin]"
-      >
-        {list.map((brand, idx) => (
-          <ActionLink
-            key={asText(brand.id, `brand-${idx}`)}
-            href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-            className="snap-start shrink-0 flex-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
-            style={{
-              width: `calc((100% - ${(currentPerView - 1) * BRAND_GAP}px) / ${currentPerView})`,
-            }}
-          >
-            <div className="mx-auto mb-2 flex h-10 w-full items-center justify-center overflow-hidden rounded bg-slate-50">
-              {!isLikelyMissingImage(brand.image_url || brand.logo_url || brand.image) ? (
-                <SmartImage
-                  src={asSrc(brand.image_url || brand.logo_url || brand.image)}
-                  alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
-                  className="object-contain"
-                  sizes="150px"
-                />
-              ) : (
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">Logo</span>
-              )}
-            </div>
-            {asText(brand.item_label) || asText(brand.name, 'Brand')}
-          </ActionLink>
-        ))}
+  const renderBrandCard = (brand: Record<string, unknown>, idx: number, gridMode = false) => (
+    <ActionLink
+      key={asText(brand.id, `brand-${idx}`)}
+      href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
+      className={`group flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full' : 'snap-start shrink-0 flex-none min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]'}`}
+      style={gridMode ? undefined : {
+        ['--brand-mobile' as string]: `${mobileItemPx}px`,
+        ['--brand-desktop' as string]: `${itemPx}px`,
+      }}
+    >
+      <div className="mb-2 flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-50 p-1.5 transition group-hover:bg-indigo-50/40">
+        {!isLikelyMissingImage(brand.image_url || brand.logo_url || brand.image) ? (
+          <SmartImage
+            src={asSrc(brand.image_url || brand.logo_url || brand.image)}
+            alt={asText(brand.item_label) || asText(brand.name, 'Brand')}
+            className="object-contain transition duration-200 group-hover:scale-105"
+            sizes="150px"
+          />
+        ) : (
+          <span className="text-[11px] uppercase tracking-wide text-slate-400">Logo</span>
+        )}
       </div>
-      {showDots && list.length > desktopItems ? (
-        <div className="mt-2 flex items-center justify-center gap-1.5">
-          {(() => {
-            const totalPages = Math.max(1, Math.ceil(list.length / Math.max(1, isMobile ? mobileItems : desktopItems)));
-            return Array.from({ length: Math.min(totalPages, 8) }).map((_, pageIdx) => (
-              <button
-                type="button"
-                key={`brand-dot-${pageIdx}`}
-                onClick={() => {
-                  const rail = railRef.current;
-                  if (!rail) return;
-                  rail.scrollTo({ left: pageIdx * (rail.clientWidth + BRAND_GAP), behavior: 'smooth' });
-                }}
-                className={`h-2.5 rounded-full transition-all ${activePage === pageIdx ? 'w-6 bg-indigo-600' : 'w-2.5 bg-slate-300 hover:bg-slate-400'}`}
-                aria-label={`ir a página ${pageIdx + 1}`}
-              />
-            ));
-          })()}
+      <span className="line-clamp-1 text-[12px] font-semibold text-slate-700 group-hover:text-indigo-700 transition-colors">
+        {asText(brand.item_label) || asText(brand.name, 'Brand')}
+      </span>
+    </ActionLink>
+  );
+
+  return (
+    <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
+      {useGridLayout ? (
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: `repeat(${currentCols}, minmax(0, 1fr))` }}
+        >
+          {list.slice(0, currentCols * currentRows).map((brand, idx) => renderBrandCard(brand, idx, true))}
         </div>
-      ) : null}
-      {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
+      ) : (
+        <>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            {viewAllHref ? (
+              <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">
+                {viewAllLabel} <span aria-hidden className="ml-1">→</span>
+              </ActionLink>
+            ) : <span />}
+            {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
+          </div>
+
+          <div
+            ref={railRef}
+            onScroll={syncRailState}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            onTouchStart={() => setIsPaused(true)}
+            onTouchEnd={() => setIsPaused(false)}
+            onFocusCapture={() => setIsPaused(true)}
+            onBlurCapture={() => setIsPaused(false)}
+            onWheel={handleRailWheel}
+            className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]"
+          >
+            {list.map((brand, idx) => renderBrandCard(brand, idx, false))}
+          </div>
+
+          {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
+
+          {list.length > 1 && showDots ? (
+            <div className="mt-2 flex items-center justify-center gap-1.5">
+              {list.slice(0, Math.min(list.length, 8)).map((_, idx) => (
+                <button
+                  type="button"
+                  key={`brand-dot-${idx}`}
+                  onClick={() => {
+                    const rail = railRef.current;
+                    if (!rail) return;
+                    rail.scrollTo({ left: idx * Math.max(rail.clientWidth * 0.7, 180), behavior: 'smooth' });
+                  }}
+                  className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
+                  aria-label={`ir a marca ${idx + 1}`}
+                />
+              ))}
+            </div>
+          ) : null}
+        </>
+      )}
     </SectionShell>
   );
 }
@@ -1173,7 +1105,7 @@ export default function HomeRenderer({ payload }: { payload: HomePayload }) {
         if (section?.type === 'CATEGORY_STRIP') return <CategoryStrip key={key} title={displayTitle} subtitle={section.subtitle} categories={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'PRODUCT_CAROUSEL') return <ProductCarousel key={key} title={displayTitle} subtitle={section.subtitle} products={toArray(section.resolved)} config={section.config} />;
         if (section?.type === 'BRAND_STRIP') return <BrandStrip key={key} title={displayTitle} subtitle={section.subtitle} brands={toArray(section.resolved)} config={section.config} />;
-        if (section?.type === 'VALUE_PROPS' || section?.type === 'TRENDING_CHIPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;
+        if (section?.type === 'VALUE_PROPS') return <ChipsLike key={key} title={displayTitle} subtitle={section.subtitle} items={toArray(section.resolved)} />;
         if (section?.type === 'CUSTOM_HTML') return <CustomHtmlSection key={key} title={displayTitle} subtitle={section.subtitle} content={section.resolved} />;
         return null;
       })}

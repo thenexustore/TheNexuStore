@@ -214,7 +214,7 @@ export default function HomeProductSection({
           >
           <div
             ref={scrollRef}
-            className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 sm:gap-4 lg:gap-5"
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 sm:gap-4 lg:gap-5 lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
             onTouchStart={() => setIsInteracting(true)}

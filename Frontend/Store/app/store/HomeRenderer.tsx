@@ -21,6 +21,24 @@ type HomePayload = {
 
 const FALLBACK_IMG = '/No_Image_Available.png';
 
+/** Gap sizes that mirror the Tailwind classes: gap-3 / sm:gap-4 / lg:gap-5 */
+const GAP_MOBILE = 12;   // gap-3
+const GAP_TABLET = 16;   // sm:gap-4
+const GAP_DESKTOP = 20;  // lg:gap-5
+
+/** Returns the responsive gap in px for the current viewport width. */
+const resolveGap = (): number => {
+  if (typeof window === 'undefined') return GAP_MOBILE;
+  if (window.innerWidth >= 1024) return GAP_DESKTOP;
+  if (window.innerWidth >= 768) return GAP_TABLET;
+  return GAP_MOBILE;
+};
+
+/** Inline style that makes a flex child fill exactly 1/cols of the rail. */
+const colBasis = (cols: number, gapPx: number): React.CSSProperties => ({
+  flexBasis: `calc((100% - ${(cols - 1) * gapPx}px) / ${cols})`,
+});
+
 const SECTION_TYPE_LABEL: Record<string, string> = {
   HERO_CAROUSEL: '',
   CATEGORY_STRIP: 'Categorías TOP',
@@ -503,19 +521,30 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
   const showTopBadges = config?.show_top_badges === true;
   const ctaText = (asText(config?.cta_text, 'Explorar').trim() || 'Explorar').slice(0, 24);
-  const mobileCardPx = Math.max(176, Math.floor(360 / mobileCols));
-  const desktopCardPx = Math.max(198, Math.floor(1240 / desktopCols));
   const cardToneClass = elevatedCards
     ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
 
+  const [currentGap, setCurrentGap] = useState(GAP_MOBILE);
+  const [currentCols, setCurrentCols] = useState(mobileCols);
+
+  useEffect(() => {
+    const update = () => {
+      const gap = resolveGap();
+      setCurrentGap(gap);
+      setCurrentCols(gap === GAP_MOBILE ? mobileCols : desktopCols);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [mobileCols, desktopCols]);
+
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle} typography={extractTypography(config)}>
       <div
-        className="-mx-1 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 pt-1 sm:gap-4 lg:gap-5 [scrollbar-width:thin] lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
         onWheel={handleRailWheel}
       >
-        <div className="flex min-w-max gap-3 px-1 sm:gap-4">
           {list.map((cat, idx) => {
             const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
             const imageValue = cat.image_url || cat.image || cat.banner_image;
@@ -533,11 +562,8 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               <ActionLink
                 key={asText(cat.id, `cat-${idx}`)}
                 href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-                className={`group relative flex min-h-[224px] w-[var(--card-mobile)] shrink-0 flex-none flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:w-[var(--card-desktop)] ${cardToneClass}`}
-                style={{
-                  ['--card-mobile' as string]: `${mobileCardPx}px`,
-                  ['--card-desktop' as string]: `${desktopCardPx}px`,
-                }}
+                className={`group relative flex min-h-[224px] shrink-0 snap-start flex-none flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
+                style={colBasis(currentCols, currentGap)}
               >
                 {showTopBadges && idx < 3 ? (
                   <span className="absolute right-2 top-2 rounded-full border border-indigo-200 bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
@@ -567,7 +593,6 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               </ActionLink>
             );
           })}
-        </div>
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
     </SectionShell>
@@ -588,8 +613,6 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
   const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
   const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
-  const mobileCardPx = Math.max(176, Math.floor(380 / mobileItems));
-  const desktopCardPx = Math.max(228, Math.floor(1240 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -631,6 +654,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [currentGap, setCurrentGap] = useState(GAP_MOBILE);
 
   const carouselMeta = useMemo(() => {
     const sourceLabel = {
@@ -665,7 +689,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-    const approxIndex = Math.round(rail.scrollLeft / Math.max(rail.clientWidth * 0.6, 220));
+    const pageWidth = rail.clientWidth + currentGap;
+    const approxIndex = Math.round(rail.scrollLeft / Math.max(pageWidth, 1));
     setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
   };
 
@@ -686,6 +711,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     const sync = () => {
       setIsMobileViewport(media.matches);
       setReduceMotion(motionMedia.matches);
+      setCurrentGap(resolveGap());
     };
 
     sync();
@@ -700,7 +726,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 260;
-    return Math.max(220, Math.floor(rail.clientWidth * 0.82));
+    return rail.clientWidth + currentGap;
   };
 
   const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
@@ -732,11 +758,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       <ActionLink
         key={asText(product.id, `prod-${idx}`)}
         href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-        className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full min-h-[18rem]' : 'min-h-[22rem] w-[var(--card-mobile)] shrink-0 flex-none snap-start md:min-h-[23rem] md:w-[var(--card-desktop)]'}`}
-        style={gridMode ? undefined : {
-          ['--card-mobile' as string]: `${mobileCardPx}px`,
-          ['--card-desktop' as string]: `${desktopCardPx}px`,
-        }}
+        className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full min-h-[18rem]' : 'min-h-[22rem] shrink-0 flex-none snap-start md:min-h-[23rem]'}`}
+        style={gridMode ? undefined : colBasis(currentCols, currentGap)}
       >
         <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 opacity-60" />
         <div className="relative mb-2.5 aspect-[4/3] overflow-hidden rounded-xl bg-gradient-to-b from-slate-50 to-slate-100">
@@ -845,7 +868,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
               onFocusCapture={() => setIsPaused(true)}
               onBlurCapture={() => setIsPaused(false)}
               onWheel={handleRailWheel}
-              className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin] [scroll-padding-inline:4px] active:cursor-grabbing"
+              className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 sm:gap-4 lg:gap-5 [scrollbar-width:thin] [scroll-padding-inline:4px] active:cursor-grabbing lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
             >
               {list.map((product, idx) => renderCard(product, idx, false))}
             </div>
@@ -859,8 +882,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
                     onClick={() => {
                       const rail = railRef.current;
                       if (!rail) return;
-                      const targetLeft = idx * Math.max(rail.clientWidth * 0.62, 220);
-                      rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
+                      rail.scrollTo({ left: idx * (rail.clientWidth + currentGap), behavior: 'smooth' });
                     }}
                     className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
                     aria-label={`ir a producto ${idx + 1}`}
@@ -881,8 +903,6 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const desktopItems = Math.max(2, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 6));
   const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
   const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
-  const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
-  const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -895,13 +915,15 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [currentGap, setCurrentGap] = useState(GAP_MOBILE);
 
   const syncRailState = () => {
     const rail = railRef.current;
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-    const approxIndex = Math.round(rail.scrollLeft / Math.max(rail.clientWidth * 0.72, 220));
+    const pageWidth = rail.clientWidth + currentGap;
+    const approxIndex = Math.round(rail.scrollLeft / Math.max(pageWidth, 1));
     setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
   };
 
@@ -917,7 +939,10 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
-    const sync = () => setIsMobileViewport(media.matches);
+    const sync = () => {
+      setIsMobileViewport(media.matches);
+      setCurrentGap(resolveGap());
+    };
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
@@ -926,7 +951,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const step = () => {
     const rail = railRef.current;
     if (!rail) return 220;
-    return Math.max(180, Math.floor(rail.clientWidth * 0.7));
+    return rail.clientWidth + currentGap;
   };
 
   const goPrev = () => railRef.current?.scrollBy({ left: -step(), behavior: 'smooth' });
@@ -957,11 +982,8 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
     <ActionLink
       key={asText(brand.id, `brand-${idx}`)}
       href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-      className={`group flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full' : 'snap-start shrink-0 flex-none min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]'}`}
-      style={gridMode ? undefined : {
-        ['--brand-mobile' as string]: `${mobileItemPx}px`,
-        ['--brand-desktop' as string]: `${itemPx}px`,
-      }}
+      className={`group flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full' : 'snap-start shrink-0 flex-none'}`}
+      style={gridMode ? undefined : colBasis(currentCols, currentGap)}
     >
       <div className="mb-2 flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-50 p-1.5 transition group-hover:bg-indigo-50/40">
         {!isLikelyMissingImage(brand.image_url || brand.logo_url || brand.image) ? (
@@ -1012,7 +1034,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
             onFocusCapture={() => setIsPaused(true)}
             onBlurCapture={() => setIsPaused(false)}
             onWheel={handleRailWheel}
-            className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]"
+            className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-2 pt-1 sm:gap-4 lg:gap-5 [scrollbar-width:thin] lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
           >
             {list.map((brand, idx) => renderBrandCard(brand, idx, false))}
           </div>
@@ -1028,7 +1050,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
                   onClick={() => {
                     const rail = railRef.current;
                     if (!rail) return;
-                    rail.scrollTo({ left: idx * Math.max(rail.clientWidth * 0.7, 180), behavior: 'smooth' });
+                    rail.scrollTo({ left: idx * (rail.clientWidth + currentGap), behavior: 'smooth' });
                   }}
                   className={`h-2 rounded-full transition-all ${activeDot === idx ? 'w-5 bg-indigo-600' : 'w-2 bg-slate-300 hover:bg-slate-400'}`}
                   aria-label={`ir a marca ${idx + 1}`}

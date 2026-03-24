@@ -112,12 +112,13 @@ export default function HomeProductSection({
     const onScroll = () => {
       const pageWidth = el.clientWidth + currentGap;
       if (!pageWidth) return;
-      const page = Math.round(el.scrollLeft / pageWidth);
-      if (page !== currentPage) setCurrentPage(page);
+      // React bails out of re-render if value hasn't changed.
+      setCurrentPage(Math.round(el.scrollLeft / pageWidth));
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [carouselEnabled, currentPage, currentGap]);
+    // Only re-register when gap or enabled state changes, not on every page update.
+  }, [carouselEnabled, currentGap]);
 
   const card = (product: Product) => {
     const hasDeal =

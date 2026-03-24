@@ -220,13 +220,15 @@ export default function GenericCarousel({
       const width = node.clientWidth;
       if (!width) return;
       const pageWidth = width + currentGap;
-      const nextPage = Math.round(node.scrollLeft / pageWidth);
-      if (nextPage !== page) setPage(nextPage);
+      // React bails out of re-render automatically if value hasn't changed,
+      // so the explicit !== check is not needed here.
+      setPage(Math.round(node.scrollLeft / pageWidth));
     };
 
     node.addEventListener("scroll", onScroll, { passive: true });
     return () => node.removeEventListener("scroll", onScroll);
-  }, [page, currentGap]);
+    // Only re-register when the gap changes (breakpoint change), not on every page update.
+  }, [currentGap]);
 
   useEffect(() => {
     if (!autoplay || pageCount <= 1 || isHovering) return;
@@ -273,7 +275,7 @@ export default function GenericCarousel({
         <>
           <div
             ref={scrollRef}
-            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 lg:gap-5"
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4 lg:gap-5 [scrollbar-width:thin]"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >

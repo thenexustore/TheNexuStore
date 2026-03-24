@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { formatCurrency } from '../lib/currency';
@@ -594,6 +594,8 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  // Keep a ref to always-fresh mobile flag for event handlers (avoids stale closures).
+  const isMobileRef = useRef(false);
 
   const carouselMeta = useMemo(() => {
     const sourceLabel = {
@@ -623,33 +625,34 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     };
   }, [brandIds.length, categoryIds.length, categoryScope, desktopItems, list.length, source]);
 
-  const syncRailState = () => {
+  const syncRailState = useCallback(() => {
     const rail = railRef.current;
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-    const currentPerView = isMobileViewport ? mobileItems : desktopItems;
-    const pageWidth = rail.clientWidth + CARD_GAP;
-    const approxIndex = Math.round(rail.scrollLeft / Math.max(pageWidth / currentPerView, 100));
-    setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
-  };
+    // Track the current page index (not item index) for page-based dot navigation.
+    const approxPage = Math.round(rail.scrollLeft / Math.max(rail.clientWidth + CARD_GAP, 1));
+    setActiveDot(Math.max(0, approxPage));
+  }, []);
 
   useEffect(() => {
     syncRailState();
-  }, [list.length]);
+    // Also re-sync when list or viewport changes so arrows/dots reflect the new state.
+  }, [syncRailState, list.length, isMobileViewport]);
 
   useEffect(() => {
-    const onResize = () => syncRailState();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+    window.addEventListener('resize', syncRailState);
+    return () => window.removeEventListener('resize', syncRailState);
+  }, [syncRailState]);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
     const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const sync = () => {
-      setIsMobileViewport(media.matches);
+      const mobile = media.matches;
+      isMobileRef.current = mobile;
+      setIsMobileViewport(mobile);
       setReduceMotion(motionMedia.matches);
     };
 
@@ -804,7 +807,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
                 onFocusCapture={() => setIsPaused(true)}
                 onBlurCapture={() => setIsPaused(false)}
                 onWheel={handleRailWheel}
-                className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-4 pt-2 [scrollbar-width:thin] [scroll-padding-inline:8px] active:cursor-grabbing"
+                className="flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto pb-4 pt-2 [scrollbar-width:thin] [scroll-padding-inline:8px] active:cursor-grabbing"
               >
                 {list.map((product, idx) => renderCard(product, idx))}
               </div>
@@ -812,20 +815,23 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
 
             {list.length > 1 && showDots ? (
               <div className="mt-2 flex items-center justify-center gap-1.5">
-                {list.slice(0, Math.min(list.length, 8)).map((_, idx) => (
-                  <button
-                    type="button"
-                    key={`dot-${idx}`}
-                    onClick={() => {
-                      const rail = railRef.current;
-                      if (!rail) return;
-                      const targetLeft = idx * Math.max(rail.clientWidth * 0.62, 220);
-                      rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
-                    }}
-                    className={`h-2.5 rounded-full transition-all ${activeDot === idx ? 'w-6 bg-indigo-600' : 'w-2.5 bg-slate-300 hover:bg-slate-400'}`}
-                    aria-label={`ir a producto ${idx + 1}`}
-                  />
-                ))}
+                {(() => {
+                  const currentPV = isMobileViewport ? mobileItems : desktopItems;
+                  const totalPages = Math.max(1, Math.ceil(list.length / Math.max(1, currentPV)));
+                  return Array.from({ length: Math.min(totalPages, 8) }).map((_, pageIdx) => (
+                    <button
+                      type="button"
+                      key={`dot-${pageIdx}`}
+                      onClick={() => {
+                        const rail = railRef.current;
+                        if (!rail) return;
+                        rail.scrollTo({ left: pageIdx * (rail.clientWidth + CARD_GAP), behavior: 'smooth' });
+                      }}
+                      className={`h-2.5 rounded-full transition-all ${activeDot === pageIdx ? 'w-6 bg-indigo-600' : 'w-2.5 bg-slate-300 hover:bg-slate-400'}`}
+                      aria-label={`ir a página ${pageIdx + 1}`}
+                    />
+                  ));
+                })()}
               </div>
             ) : null}
           </>
@@ -849,13 +855,19 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const [activeDot, setActiveDot] = useState(0);
+  const [activePage, setActivePage] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  // Keep a ref to always-fresh mobile flag for event handlers (avoids stale closures).
+  const isMobileRef = useRef(false);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
-    const sync = () => setIsMobile(media.matches);
+    const sync = () => {
+      const mobile = media.matches;
+      isMobileRef.current = mobile;
+      setIsMobile(mobile);
+    };
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
@@ -863,25 +875,23 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
 
   const currentPerView = isMobile ? mobileItems : desktopItems;
 
-  const syncRailState = () => {
+  const syncRailState = useCallback(() => {
     const rail = railRef.current;
     if (!rail) return;
     setCanPrev(rail.scrollLeft > 4);
     setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
-    const pageWidth = rail.clientWidth + BRAND_GAP;
-    const approxIndex = Math.round(rail.scrollLeft / Math.max(pageWidth / currentPerView, 80));
-    setActiveDot(Math.max(0, Math.min(list.length - 1, approxIndex)));
-  };
+    const approxPage = Math.round(rail.scrollLeft / Math.max(rail.clientWidth + BRAND_GAP, 1));
+    setActivePage(Math.max(0, approxPage));
+  }, []);
 
   useEffect(() => {
     syncRailState();
-  }, [list.length, currentPerView]);
+  }, [syncRailState, list.length, currentPerView]);
 
   useEffect(() => {
-    const onResize = () => syncRailState();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+    window.addEventListener('resize', syncRailState);
+    return () => window.removeEventListener('resize', syncRailState);
+  }, [syncRailState]);
 
   const step = () => {
     const rail = railRef.current;
@@ -960,6 +970,26 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
           </ActionLink>
         ))}
       </div>
+      {showDots && list.length > desktopItems ? (
+        <div className="mt-2 flex items-center justify-center gap-1.5">
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(list.length / Math.max(1, isMobile ? mobileItems : desktopItems)));
+            return Array.from({ length: Math.min(totalPages, 8) }).map((_, pageIdx) => (
+              <button
+                type="button"
+                key={`brand-dot-${pageIdx}`}
+                onClick={() => {
+                  const rail = railRef.current;
+                  if (!rail) return;
+                  rail.scrollTo({ left: pageIdx * (rail.clientWidth + BRAND_GAP), behavior: 'smooth' });
+                }}
+                className={`h-2.5 rounded-full transition-all ${activePage === pageIdx ? 'w-6 bg-indigo-600' : 'w-2.5 bg-slate-300 hover:bg-slate-400'}`}
+                aria-label={`ir a página ${pageIdx + 1}`}
+              />
+            ));
+          })()}
+        </div>
+      ) : null}
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">No hay marcas configuradas para esta sección.</div> : null}
     </SectionShell>
   );

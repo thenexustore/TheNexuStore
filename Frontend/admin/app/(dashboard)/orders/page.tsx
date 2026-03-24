@@ -477,8 +477,8 @@ export default function OrdersPage() {
 
       {selectedOrderId && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden border shadow-lg">
-            <div className="p-4 border-b flex items-center justify-between">
+          <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden border shadow-lg flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between shrink-0">
               <h2 className="text-lg font-semibold">Order detail & support timeline</h2>
               <button onClick={() => setSelectedOrderId(null)} className="text-gray-500">✕</button>
             </div>
@@ -486,6 +486,7 @@ export default function OrdersPage() {
             {detailLoading ? (
               <div className="p-6 text-sm text-gray-500">Loading order detail...</div>
             ) : (
+              <div className="flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                 <div className="p-4 border-r space-y-3">
                   <h3 className="font-semibold">Order summary</h3>
@@ -896,6 +897,7 @@ export default function OrdersPage() {
                     )}
                   </div>
                 </div>
+              </div>
               </div>
             )}
           </div>

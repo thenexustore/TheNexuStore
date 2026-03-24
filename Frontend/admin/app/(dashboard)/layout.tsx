@@ -278,7 +278,7 @@ export default function DashboardLayout({
   );
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden">
+    <div className="h-screen bg-white flex overflow-hidden max-w-[100vw]">
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 bg-white border-b z-30">
         <AdminBrandLogo settings={dashboardSettings} className="w-auto" height={26} />
@@ -421,7 +421,7 @@ export default function DashboardLayout({
             )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-zinc-50">{children}</div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 bg-zinc-50">{children}</div>
       </main>
     </div>
   );

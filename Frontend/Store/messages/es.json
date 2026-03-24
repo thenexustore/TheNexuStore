@@ -428,5 +428,29 @@
       "FAILED": "Fallido",
       "REFUNDED": "Reembolsado"
     }
+  },
+  "filters": {
+    "title": "Filtros",
+    "clearAll": "Limpiar todo",
+    "seeResults": "Ver resultados",
+    "price": "Precio",
+    "categories": "Categorías",
+    "brands": "Marcas",
+    "special": "Especiales",
+    "featuredOnly": "Solo productos destacados",
+    "searchCategories": "Buscar categorías...",
+    "searchBrands": "Buscar marcas...",
+    "searchAttr": "Buscar {attr}...",
+    "showMore": "Ver {count} más",
+    "showLess": "Ver menos",
+    "expand": "Expandir",
+    "collapse": "Contraer",
+    "priceMin": "Mín",
+    "priceMax": "Máx",
+    "minPrice": "Precio mínimo",
+    "maxPrice": "Precio máximo",
+    "closeFilters": "Cerrar filtros",
+    "inStockOnly": "Solo en stock",
+    "noResults": "No hay opciones que coincidan con tu búsqueda"
   }
 }

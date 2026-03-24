@@ -353,15 +353,15 @@ export default function CartPage() {
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6 lg:sticky lg:top-8">
               <h2 className="text-xl font-bold mb-6">{t("orderSummary")}</h2>
 
-              <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 p-3 sm:p-4">
-                <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              <div className="mb-6 rounded-xl border border-[#0B123A]/10 bg-[#0B123A]/5 p-3 sm:p-4">
+                <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-[#0B123A]">
                   <span>{t("freeShippingProgress")}</span>
                   <span>{freeShippingRemaining === 0 ? t("freeShippingUnlocked") : t("freeShippingLeft", {amount: formatCurrency(freeShippingRemaining, locale)})}</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[#0B123A]/15">
                   <div
-                    className="h-full rounded-full bg-indigo-600 transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.round(((cart?.summary.subtotal || 0) / 100) * 100))}%` }}
+                    className="h-full rounded-full bg-[#0B123A] transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.round((cart?.summary.subtotal || 0)))}%` }}
                   />
                 </div>
               </div>
@@ -435,7 +435,10 @@ export default function CartPage() {
                           if (couponError) setCouponError(null);
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleApplyCoupon();
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleApplyCoupon();
+                          }
                         }}
                         placeholder={t("enterCoupon")}
                         className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm transition focus:border-[#0B123A] focus:outline-none focus:ring-1 focus:ring-[#0B123A]"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { FilterOptions, ProductFilters } from "../lib/products";
 import { formatCurrency } from "../lib/currency";
 
@@ -86,6 +87,7 @@ function FilterSection({
 
 // ─────────────────────────────────────────────────────
 // PriceRangeSlider — dual-handle price range picker
+// with direct numeric inputs
 // ─────────────────────────────────────────────────────
 function PriceRangeSlider({
   min,
@@ -98,20 +100,79 @@ function PriceRangeSlider({
   value: [number, number];
   onChange: (v: [number, number]) => void;
 }) {
+  const t = useTranslations("filters");
   const range = max - min || 1;
   const leftPct = Math.round(((value[0] - min) / range) * 100);
   const rightPct = Math.round(((value[1] - min) / range) * 100);
 
+  // Local string state so user can freely type without being hijacked mid-keystroke
+  const [minInput, setMinInput] = useState(String(value[0]));
+  const [maxInput, setMaxInput] = useState(String(value[1]));
+
+  // Keep input strings in sync when external value changes
+  useEffect(() => {
+    setMinInput(String(value[0]));
+    setMaxInput(String(value[1]));
+  }, [value[0], value[1]]);
+
+  const commitMin = () => {
+    const parsed = parseInt(minInput, 10);
+    if (!Number.isNaN(parsed)) {
+      const clamped = Math.max(min, Math.min(parsed, value[1] - 1));
+      setMinInput(String(clamped));
+      onChange([clamped, value[1]]);
+    } else {
+      setMinInput(String(value[0]));
+    }
+  };
+
+  const commitMax = () => {
+    const parsed = parseInt(maxInput, 10);
+    if (!Number.isNaN(parsed)) {
+      const clamped = Math.min(max, Math.max(parsed, value[0] + 1));
+      setMaxInput(String(clamped));
+      onChange([value[0], clamped]);
+    } else {
+      setMaxInput(String(value[1]));
+    }
+  };
+
   return (
-    <div className="space-y-4 px-1">
-      {/* Current value badges */}
+    <div className="space-y-3 px-1">
+      {/* Direct numeric inputs */}
       <div className="flex items-center gap-2">
-        <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-1.5 text-center text-sm font-semibold text-slate-700">
-          {formatCurrency(value[0])}
+        <div className="flex-1">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            {t("priceMin")}
+          </label>
+          <input
+            type="number"
+            min={min}
+            max={value[1] - 1}
+            value={minInput}
+            onChange={(e) => setMinInput(e.target.value)}
+            onBlur={commitMin}
+            onKeyDown={(e) => e.key === "Enter" && commitMin()}
+            aria-label={t("minPrice")}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-sm font-semibold text-slate-700 transition focus:border-[#0B123A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
+          />
         </div>
-        <div className="h-px w-3 flex-shrink-0 bg-slate-300" />
-        <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-1.5 text-center text-sm font-semibold text-slate-700">
-          {formatCurrency(value[1])}
+        <div className="mt-5 h-px w-3 flex-shrink-0 bg-slate-300" />
+        <div className="flex-1">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            {t("priceMax")}
+          </label>
+          <input
+            type="number"
+            min={value[0] + 1}
+            max={max}
+            value={maxInput}
+            onChange={(e) => setMaxInput(e.target.value)}
+            onBlur={commitMax}
+            onKeyDown={(e) => e.key === "Enter" && commitMax()}
+            aria-label={t("maxPrice")}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-sm font-semibold text-slate-700 transition focus:border-[#0B123A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
+          />
         </div>
       </div>
 
@@ -124,46 +185,34 @@ function PriceRangeSlider({
       </div>
 
       {/* Min slider */}
-      <div className="space-y-0.5">
-        <div className="flex justify-between text-[10px] text-slate-400">
-          <span>Min</span>
-          <span>{formatCurrency(value[0])}</span>
-        </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={1}
-          value={value[0]}
-          onChange={(e) => {
-            const v = Math.max(min, Math.min(Number(e.target.value), value[1] - 1));
-            onChange([v, value[1]]);
-          }}
-          className="w-full cursor-pointer accent-[#0B123A]"
-          aria-label="Minimum price"
-        />
-      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={value[0]}
+        onChange={(e) => {
+          const v = Math.max(min, Math.min(Number(e.target.value), value[1] - 1));
+          onChange([v, value[1]]);
+        }}
+        className="w-full cursor-pointer accent-[#0B123A]"
+        aria-label={t("minPrice")}
+      />
 
       {/* Max slider */}
-      <div className="space-y-0.5">
-        <div className="flex justify-between text-[10px] text-slate-400">
-          <span>Max</span>
-          <span>{formatCurrency(value[1])}</span>
-        </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={1}
-          value={value[1]}
-          onChange={(e) => {
-            const v = Math.min(max, Math.max(Number(e.target.value), value[0] + 1));
-            onChange([value[0], v]);
-          }}
-          className="w-full cursor-pointer accent-[#0B123A]"
-          aria-label="Maximum price"
-        />
-      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={value[1]}
+        onChange={(e) => {
+          const v = Math.min(max, Math.max(Number(e.target.value), value[0] + 1));
+          onChange([value[0], v]);
+        }}
+        className="w-full cursor-pointer accent-[#0B123A]"
+        aria-label={t("maxPrice")}
+      />
 
       {/* Boundary labels */}
       <div className="flex justify-between text-[10px] text-slate-400">
@@ -179,6 +228,7 @@ function PriceRangeSlider({
 // ─────────────────────────────────────────────────────
 function SearchableCheckboxList({
   title,
+  searchPlaceholder,
   items,
   selected,
   onToggle,
@@ -186,12 +236,14 @@ function SearchableCheckboxList({
   singleSelect = false,
 }: {
   title: string;
+  searchPlaceholder: string;
   items: FilterListItem[];
   selected: string[];
   onToggle: (slug: string) => void;
   initialVisible?: number;
   singleSelect?: boolean;
 }) {
+  const t = useTranslations("filters");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
 
@@ -228,77 +280,81 @@ function SearchableCheckboxList({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${title.toLowerCase()}...`}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-sm placeholder-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            placeholder={searchPlaceholder}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-sm placeholder-slate-400 focus:border-[#0B123A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
           />
         </div>
       )}
 
-      <div className="max-h-60 space-y-0.5 overflow-auto pr-1">
-        {visibleItems.map((item) => {
-          const isSelected = selected.includes(item.slug);
-          return (
-            <label
-              key={item.id}
-              className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-slate-50 ${
-                isSelected ? "bg-indigo-50 text-indigo-700" : "text-slate-700"
-              }`}
-            >
-              {/* Custom checkbox / radio indicator */}
-              <span
-                className={`flex h-4 w-4 flex-shrink-0 items-center justify-center border-2 transition-colors ${
-                  singleSelect ? "rounded-full" : "rounded"
-                } ${
-                  isSelected
-                    ? "border-[#0B123A] bg-[#0B123A]"
-                    : "border-slate-300 bg-white"
+      {filtered.length === 0 && query ? (
+        <p className="px-2 py-3 text-xs text-slate-400">{t("noResults")}</p>
+      ) : (
+        <div className="max-h-60 space-y-0.5 overflow-auto pr-1">
+          {visibleItems.map((item) => {
+            const isSelected = selected.includes(item.slug);
+            return (
+              <label
+                key={item.id}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-slate-50 ${
+                  isSelected ? "bg-[#0B123A]/5 text-[#0B123A]" : "text-slate-700"
                 }`}
               >
-                {isSelected &&
-                  (singleSelect ? (
-                    <span className="h-2 w-2 rounded-full bg-white" />
-                  ) : (
-                    <svg
-                      className="h-2.5 w-2.5 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={3}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ))}
-              </span>
-              <input
-                type={singleSelect ? "radio" : "checkbox"}
-                checked={isSelected}
-                onChange={() => onToggle(item.slug)}
-                className="sr-only"
-              />
-              <span className="flex-1 truncate">
-                {item.display_name || item.name}
-              </span>
-              <span className="ml-auto flex-shrink-0 text-xs text-slate-400">
-                {item.count}
-              </span>
-            </label>
-          );
-        })}
-      </div>
+                {/* Custom checkbox / radio indicator */}
+                <span
+                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center border-2 transition-colors ${
+                    singleSelect ? "rounded-full" : "rounded"
+                  } ${
+                    isSelected
+                      ? "border-[#0B123A] bg-[#0B123A]"
+                      : "border-slate-300 bg-white"
+                  }`}
+                >
+                  {isSelected &&
+                    (singleSelect ? (
+                      <span className="h-2 w-2 rounded-full bg-white" />
+                    ) : (
+                      <svg
+                        className="h-2.5 w-2.5 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    ))}
+                </span>
+                <input
+                  type={singleSelect ? "radio" : "checkbox"}
+                  checked={isSelected}
+                  onChange={() => onToggle(item.slug)}
+                  className="sr-only"
+                />
+                <span className="flex-1 truncate">
+                  {item.display_name || item.name}
+                </span>
+                <span className="ml-auto flex-shrink-0 text-xs text-slate-400">
+                  {item.count}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
 
       {filtered.length > initialVisible && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+          className="mt-2 text-xs font-medium text-[#0B123A] hover:text-[#1a245a] hover:underline underline-offset-2"
         >
           {expanded
-            ? "Show less ↑"
-            : `Show ${filtered.length - initialVisible} more ↓`}
+            ? t("showLess")
+            : t("showMore", { count: filtered.length - initialVisible })}
         </button>
       )}
     </FilterSection>
@@ -317,6 +373,7 @@ function CategoryTreeFilter({
   selected: string[];
   onToggle: (slug: string) => void;
 }) {
+  const t = useTranslations("filters");
   const [nodeExpanded, setNodeExpanded] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
 
@@ -352,7 +409,7 @@ function CategoryTreeFilter({
       <div key={node.id} className="space-y-0.5">
         <div
           className={`flex items-center gap-1 rounded-md py-1.5 pr-2 transition-colors hover:bg-slate-50 ${
-            isSelected ? "bg-indigo-50" : ""
+            isSelected ? "bg-[#0B123A]/5" : ""
           }`}
           style={{ paddingLeft: `${depth * 14 + 8}px` }}
         >
@@ -366,7 +423,7 @@ function CategoryTreeFilter({
                   [node.id]: !open,
                 }))
               }
-              aria-label={open ? "Collapse" : "Expand"}
+              aria-label={open ? t("collapse") : t("expand")}
             >
               <svg
                 className={`h-3 w-3 transition-transform ${
@@ -384,7 +441,7 @@ function CategoryTreeFilter({
 
           <label
             className={`flex flex-1 cursor-pointer items-center gap-2 text-sm ${
-              isSelected ? "text-indigo-700" : "text-slate-700"
+              isSelected ? "text-[#0B123A]" : "text-slate-700"
             }`}
           >
             <span
@@ -431,7 +488,7 @@ function CategoryTreeFilter({
   };
 
   return (
-    <FilterSection title="Categories" badge={selected.length || undefined}>
+    <FilterSection title={t("categories")} badge={selected.length || undefined}>
       {items.length > 8 && (
         <div className="relative mb-3">
           <svg
@@ -451,8 +508,8 @@ function CategoryTreeFilter({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search categories..."
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-sm placeholder-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            placeholder={t("searchCategories")}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-sm placeholder-slate-400 focus:border-[#0B123A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
           />
         </div>
       )}
@@ -474,12 +531,12 @@ function ActiveFilterChip({
   onRemove: () => void;
 }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-[#0B123A]/8 px-2.5 py-1 text-xs font-medium text-[#0B123A] ring-1 ring-inset ring-[#0B123A]/20">
       <span className="truncate">{label}</span>
       <button
         type="button"
         onClick={onRemove}
-        className="ml-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full text-indigo-500 transition-colors hover:bg-indigo-200 hover:text-indigo-700"
+        className="ml-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full text-[#0B123A]/60 transition-colors hover:bg-[#0B123A]/15 hover:text-[#0B123A]"
         aria-label={`Remove ${label} filter`}
       >
         <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -498,6 +555,7 @@ export function SidebarFilters({
   filters,
   onFilterChange,
 }: SidebarFiltersProps) {
+  const t = useTranslations("filters");
   const minPrice = filterOptions.price_range.min;
   const maxPrice = filterOptions.price_range.max;
 
@@ -526,7 +584,6 @@ export function SidebarFilters({
   const [featured, setFeatured] = useState(!!filters.featured_only);
 
   // Re-sync local state when the external `filters` prop changes (URL nav, quick filters).
-  // Functional updaters with stable-reference guards avoid triggering the apply effect.
   useEffect(() => {
     setPrice((prev) => {
       const next: [number, number] = [
@@ -550,8 +607,7 @@ export function SidebarFilters({
     setFeatured(!!filters.featured_only);
   }, [filters, minPrice, maxPrice]);
 
-  // Debounced apply — reads external values via refs to avoid stale closures and
-  // infinite-loop deps; local state changes are the only deps.
+  // Debounced apply — reads external values via refs to avoid stale closures.
   useEffect(() => {
     const min = minPriceRef.current;
     const max = maxPriceRef.current;
@@ -648,7 +704,7 @@ export function SidebarFilters({
   if (featured) {
     activeChips.push({
       key: "featured",
-      label: "Featured",
+      label: t("featuredOnly"),
       onRemove: () => setFeatured(false),
     });
   }
@@ -658,7 +714,7 @@ export function SidebarFilters({
       {/* ── Header ── */}
       <div className="mb-4 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
-          Filters
+          {t("title")}
           {activeCount > 0 && (
             <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#0B123A] px-1 text-[10px] font-bold text-white leading-none">
               {activeCount}
@@ -671,7 +727,7 @@ export function SidebarFilters({
             onClick={clearAll}
             className="text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-[#0B123A] hover:underline"
           >
-            Clear all
+            {t("clearAll")}
           </button>
         )}
       </div>
@@ -694,7 +750,7 @@ export function SidebarFilters({
 
       {/* ── Price range ── */}
       {minPrice !== maxPrice && (
-        <FilterSection title="Price">
+        <FilterSection title={t("price")}>
           <PriceRangeSlider
             min={minPrice}
             max={maxPrice}
@@ -716,7 +772,8 @@ export function SidebarFilters({
       {/* ── Brands — single-select ── */}
       {filterOptions.brands.length > 0 && (
         <SearchableCheckboxList
-          title="Brands"
+          title={t("brands")}
+          searchPlaceholder={t("searchBrands")}
           items={filterOptions.brands}
           selected={brand ? [brand] : []}
           onToggle={toggleBrand}
@@ -729,6 +786,7 @@ export function SidebarFilters({
         <SearchableCheckboxList
           key={attr.key}
           title={attr.name}
+          searchPlaceholder={t("searchAttr", { attr: attr.name.toLowerCase() })}
           items={attr.values.map((v) => ({
             id: `${attr.key}-${v.value}`,
             name: v.value,
@@ -741,7 +799,7 @@ export function SidebarFilters({
       ))}
 
       {/* ── Featured-only toggle ── */}
-      <FilterSection title="Special" defaultOpen={false}>
+      <FilterSection title={t("special")} defaultOpen={false}>
         <label className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors hover:bg-slate-50">
           <span
             className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border-2 transition-colors ${
@@ -762,7 +820,7 @@ export function SidebarFilters({
             onChange={(e) => setFeatured(e.target.checked)}
             className="sr-only"
           />
-          <span className="text-slate-700">Featured products only</span>
+          <span className="text-slate-700">{t("featuredOnly")}</span>
         </label>
       </FilterSection>
     </div>

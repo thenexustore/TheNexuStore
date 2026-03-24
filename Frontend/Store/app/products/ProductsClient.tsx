@@ -334,6 +334,10 @@ export default function ProductsPage() {
                 className="w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-black outline-none ring-indigo-500 transition focus:ring-2 sm:w-auto"
               >
                 <option value="newest">{t("newest")}</option>
+                <option value="price_low_to_high">{t("priceLowHigh")}</option>
+                <option value="price_high_to_low">{t("priceHighLow")}</option>
+                <option value="best_selling">{t("bestSelling")}</option>
+                <option value="highest_rated">{t("highestRated")}</option>
                 <option value="name_a_to_z">{t("nameAZ")}</option>
                 <option value="name_z_to_a">{t("nameZA")}</option>
               </select>

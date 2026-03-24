@@ -2736,8 +2736,9 @@ export default function BillingPage() {
                   </button>
                 </div>
 
+                <div className="overflow-x-auto -mx-1 px-1">
                 {/* Column headers */}
-                <div className="grid grid-cols-12 gap-2 mb-1 px-0.5">
+                <div className="grid grid-cols-12 gap-2 mb-1 px-0.5 min-w-[480px]">
                   <span className="col-span-4 text-xs font-medium text-zinc-500">Descripción</span>
                   <span className="col-span-1 text-xs font-medium text-zinc-500 text-center">Cant.</span>
                   <span className="col-span-2 text-xs font-medium text-zinc-500 text-right">Precio unit.</span>
@@ -2746,7 +2747,7 @@ export default function BillingPage() {
                   <span className="col-span-1" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-[480px]">
                   {createForm.items.map((item: CreateItemState, idx: number) => {
                     const lineBase = Number(item.qty || 1) * Number(item.unit_price || 0);
                     const taxRate = item.tax_rate !== "" ? Number(item.tax_rate) : (settings?.default_tax_rate ?? 0.21);
@@ -2866,6 +2867,7 @@ export default function BillingPage() {
                     );
                   })}
                 </div>
+                </div>{/* end overflow-x-auto */}
               </div>
 
               {/* Live totals — always visible */}

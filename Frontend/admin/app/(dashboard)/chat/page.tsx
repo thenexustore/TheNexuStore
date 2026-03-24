@@ -182,8 +182,9 @@ export default function ChatPage() {
         </button>
       </div>
 
-      <div className="flex-1 flex gap-4 min-h-0">
-        <div className="w-80 flex-shrink-0 bg-white border border-zinc-200 rounded-xl overflow-hidden flex flex-col">
+      <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
+        {/* Conversation list — full width on mobile (hidden when chat open), sidebar on md+ */}
+        <div className={`${selected ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 md:flex-shrink-0 bg-white border border-zinc-200 rounded-xl overflow-hidden`}>
           <div className="p-3 border-b border-zinc-100 flex gap-2">
             <select
               value={statusFilter}
@@ -242,7 +243,7 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="flex-1 flex flex-col bg-white border border-zinc-200 rounded-xl overflow-hidden min-h-0">
+        <div className={`${selected ? "flex" : "hidden md:flex"} flex-1 flex-col bg-white border border-zinc-200 rounded-xl overflow-hidden min-h-0`}>
           {selected ? (
             <>
               <div className="p-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

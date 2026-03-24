@@ -1189,7 +1189,7 @@ export default function HomeComposerPage() {
     : sections;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Floating save bar */}
       {isDraftDirty && (
         <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg text-sm text-amber-900">

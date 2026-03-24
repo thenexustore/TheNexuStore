@@ -238,7 +238,7 @@ export default function BannersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
+    <div className="bg-[#f8fafc]">
       <div className="max-w-6xl mx-auto">
         {/* Header Section */}
         <div className="pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">

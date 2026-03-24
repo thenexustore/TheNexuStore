@@ -202,11 +202,53 @@ function SmartImage({
   );
 }
 
-function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
+interface TypographyConfig {
+  titleColor?: string;
+  titleFont?: string;
+  titleSize?: string;
+  titleWeight?: string;
+  subtitleColor?: string;
+  subtitleSize?: string;
+}
+
+/** Strip characters that have no place in a safe CSS value (semicolons, braces, etc.). */
+function sanitizeCssValue(raw: unknown): string | undefined {
+  const v = asText(raw).trim();
+  if (!v) return undefined;
+  // Allow alphanumeric, spaces, hyphens, underscores, commas, dots, %, #, px/rem/em units
+  // and typical CSS function chars like ()
+  // Reject anything with ; {} \ " ' < > which could break out of an inline style.
+  if (/[;{}\\'"<>]/.test(v)) return undefined;
+  return v;
+}
+
+function extractTypography(config?: Record<string, unknown>): TypographyConfig {
+  if (!config) return {};
+  return {
+    titleColor: sanitizeCssValue(config.title_color),
+    titleFont: sanitizeCssValue(config.title_font),
+    titleSize: sanitizeCssValue(config.title_size),
+    titleWeight: sanitizeCssValue(config.title_weight),
+    subtitleColor: sanitizeCssValue(config.subtitle_color),
+    subtitleSize: sanitizeCssValue(config.subtitle_size),
+  };
+}
+
+function SectionShell({ title, subtitle, children, typography }: { title?: string; subtitle?: string; children: React.ReactNode; typography?: TypographyConfig }) {
+  const titleStyle: React.CSSProperties = {};
+  if (typography?.titleColor) titleStyle.color = typography.titleColor;
+  if (typography?.titleFont) titleStyle.fontFamily = typography.titleFont;
+  if (typography?.titleSize) titleStyle.fontSize = typography.titleSize;
+  if (typography?.titleWeight) titleStyle.fontWeight = typography.titleWeight;
+
+  const subtitleStyle: React.CSSProperties = {};
+  if (typography?.subtitleColor) subtitleStyle.color = typography.subtitleColor;
+  if (typography?.subtitleSize) subtitleStyle.fontSize = typography.subtitleSize;
+
   return (
     <section className="w-full mx-auto max-w-7xl px-0 sm:px-0">
-      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">{title}</h2> : null}
-      {subtitle ? <p className="mb-5 text-sm text-slate-600">{subtitle}</p> : null}
+      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl" style={Object.keys(titleStyle).length ? titleStyle : undefined}>{title}</h2> : null}
+      {subtitle ? <p className="mb-5 text-sm text-slate-600" style={Object.keys(subtitleStyle).length ? subtitleStyle : undefined}>{subtitle}</p> : null}
       {children}
     </section>
   );
@@ -315,7 +357,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   const goNext = () => setIndex((prev) => (prev + 1) % slides.length);
 
   return (
-    <SectionShell title={title} subtitle={subtitle}>
+    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
       <div
         className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px] lg:h-[500px] xl:h-[560px]"
         onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
@@ -468,7 +510,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
 
   return (
-    <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
+    <SectionShell title={title || 'Top Categories'} subtitle={subtitle} typography={extractTypography(config)}>
       <div
         className="-mx-1 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
         onWheel={handleRailWheel}
@@ -749,7 +791,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const useMultiRowGrid = currentRows > 1;
 
   return (
-    <SectionShell title={title} subtitle={subtitle}>
+    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1.5">
@@ -910,6 +952,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const currentCols = isMobileViewport ? mobileItems : desktopItems;
   const useGridLayout = currentRows > 1;
 
+
   const renderBrandCard = (brand: Record<string, unknown>, idx: number, gridMode = false) => (
     <ActionLink
       key={asText(brand.id, `brand-${idx}`)}
@@ -939,7 +982,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   );
 
   return (
-    <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
+    <SectionShell title={title || 'Top Brands'} subtitle={subtitle} typography={extractTypography(config)}>
       {useGridLayout ? (
         <div
           className="grid gap-3"
@@ -957,6 +1000,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
             ) : <span />}
             {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
           </div>
+
 
           <div
             ref={railRef}

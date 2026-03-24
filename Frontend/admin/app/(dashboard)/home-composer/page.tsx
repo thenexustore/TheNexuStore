@@ -1748,6 +1748,51 @@ export default function HomeComposerPage() {
                       />
                     </label>
                   </div>
+
+                  {/* Typography */}
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipografía del título de sección</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del título</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.title_color || "#0f172a")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.title_color || "")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} placeholder="#0f172a" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del subtítulo</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.subtitle_color || "#475569")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.subtitle_color || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} placeholder="#475569" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Fuente del título</span>
+                        <input type="text" value={String(config.title_font || "")} onChange={(e) => updateDraftConfig({ ...config, title_font: e.target.value })} placeholder="inherit" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del título</span>
+                        <input type="text" value={String(config.title_size || "")} onChange={(e) => updateDraftConfig({ ...config, title_size: e.target.value })} placeholder="ej: 2rem, 32px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Peso del título</span>
+                        <select value={String(config.title_weight || "")} onChange={(e) => updateDraftConfig({ ...config, title_weight: e.target.value })} className="w-full rounded-lg border border-zinc-300 px-3 py-2">
+                          <option value="">Por defecto</option>
+                          <option value="400">Normal (400)</option>
+                          <option value="500">Medium (500)</option>
+                          <option value="600">Semi-negrita (600)</option>
+                          <option value="700">Negrita (700)</option>
+                          <option value="800">Extra-negrita (800)</option>
+                          <option value="900">Negro (900)</option>
+                        </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del subtítulo</span>
+                        <input type="text" value={String(config.subtitle_size || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_size: e.target.value })} placeholder="ej: 0.875rem, 14px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
@@ -2233,6 +2278,51 @@ export default function HomeComposerPage() {
                       />
                     </label>
                   </div>
+
+                  {/* Typography */}
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipografía del título</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del título</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.title_color || "#0f172a")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.title_color || "")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} placeholder="#0f172a" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del subtítulo</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.subtitle_color || "#475569")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.subtitle_color || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} placeholder="#475569" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Fuente del título</span>
+                        <input type="text" value={String(config.title_font || "")} onChange={(e) => updateDraftConfig({ ...config, title_font: e.target.value })} placeholder="inherit" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del título</span>
+                        <input type="text" value={String(config.title_size || "")} onChange={(e) => updateDraftConfig({ ...config, title_size: e.target.value })} placeholder="ej: 2rem, 32px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Peso del título</span>
+                        <select value={String(config.title_weight || "")} onChange={(e) => updateDraftConfig({ ...config, title_weight: e.target.value })} className="w-full rounded-lg border border-zinc-300 px-3 py-2">
+                          <option value="">Por defecto</option>
+                          <option value="400">Normal (400)</option>
+                          <option value="500">Medium (500)</option>
+                          <option value="600">Semi-negrita (600)</option>
+                          <option value="700">Negrita (700)</option>
+                          <option value="800">Extra-negrita (800)</option>
+                          <option value="900">Negro (900)</option>
+                        </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del subtítulo</span>
+                        <input type="text" value={String(config.subtitle_size || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_size: e.target.value })} placeholder="ej: 0.875rem, 14px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
@@ -2385,6 +2475,53 @@ export default function HomeComposerPage() {
                       />
                       <p className="mt-1 text-xs text-zinc-400">1 = carrusel. 2+ = cuadrícula multi-fila.</p>
                     </label>
+
+                  </div>
+
+                  {/* Typography */}
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipografía del título</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del título</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.title_color || "#0f172a")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.title_color || "")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} placeholder="#0f172a" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del subtítulo</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.subtitle_color || "#475569")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.subtitle_color || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} placeholder="#475569" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Fuente del título</span>
+                        <input type="text" value={String(config.title_font || "")} onChange={(e) => updateDraftConfig({ ...config, title_font: e.target.value })} placeholder="inherit" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del título</span>
+                        <input type="text" value={String(config.title_size || "")} onChange={(e) => updateDraftConfig({ ...config, title_size: e.target.value })} placeholder="ej: 2rem, 32px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Peso del título</span>
+                        <select value={String(config.title_weight || "")} onChange={(e) => updateDraftConfig({ ...config, title_weight: e.target.value })} className="w-full rounded-lg border border-zinc-300 px-3 py-2">
+                          <option value="">Por defecto</option>
+                          <option value="400">Normal (400)</option>
+                          <option value="500">Medium (500)</option>
+                          <option value="600">Semi-negrita (600)</option>
+                          <option value="700">Negrita (700)</option>
+                          <option value="800">Extra-negrita (800)</option>
+                          <option value="900">Negro (900)</option>
+                        </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del subtítulo</span>
+                        <input type="text" value={String(config.subtitle_size || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_size: e.target.value })} placeholder="ej: 0.875rem, 14px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                    </div>
+
                   </div>
                 </div>
               ) : null}
@@ -2551,6 +2688,64 @@ export default function HomeComposerPage() {
                       />
                       Mostrar badges Top 1/2/3
                     </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700 md:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(config.show_arrows ?? true)}
+                        onChange={(event) =>
+                          updateDraftConfig({
+                            ...config,
+                            show_arrows: event.target.checked,
+                          })
+                        }
+                      />
+                      Mostrar flechas de navegación
+                    </label>
+                  </div>
+
+                  {/* Typography */}
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipografía del título</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del título</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.title_color || "#0f172a")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.title_color || "")} onChange={(e) => updateDraftConfig({ ...config, title_color: e.target.value })} placeholder="#0f172a" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Color del subtítulo</span>
+                        <div className="flex items-center gap-2">
+                          <input type="color" value={String(config.subtitle_color || "#475569")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} className="h-8 w-8 cursor-pointer rounded border border-zinc-300" />
+                          <input type="text" value={String(config.subtitle_color || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_color: e.target.value })} placeholder="#475569" className="flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm" />
+                        </div>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Fuente del título</span>
+                        <input type="text" value={String(config.title_font || "")} onChange={(e) => updateDraftConfig({ ...config, title_font: e.target.value })} placeholder="inherit" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del título</span>
+                        <input type="text" value={String(config.title_size || "")} onChange={(e) => updateDraftConfig({ ...config, title_size: e.target.value })} placeholder="ej: 2rem, 32px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Peso del título</span>
+                        <select value={String(config.title_weight || "")} onChange={(e) => updateDraftConfig({ ...config, title_weight: e.target.value })} className="w-full rounded-lg border border-zinc-300 px-3 py-2">
+                          <option value="">Por defecto</option>
+                          <option value="400">Normal (400)</option>
+                          <option value="500">Medium (500)</option>
+                          <option value="600">Semi-negrita (600)</option>
+                          <option value="700">Negrita (700)</option>
+                          <option value="800">Extra-negrita (800)</option>
+                          <option value="900">Negro (900)</option>
+                        </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-zinc-500">Tamaño del subtítulo</span>
+                        <input type="text" value={String(config.subtitle_size || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_size: e.target.value })} placeholder="ej: 0.875rem, 14px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
+                      </label>
+                    </div>
                   </div>
                 </div>
               ) : null}

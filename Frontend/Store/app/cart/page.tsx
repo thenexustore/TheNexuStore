@@ -35,12 +35,12 @@ export default function CartPage() {
 
   useEffect(() => {
     const handleLegacyUpdate = () => {
-      window.location.reload(); 
+      router.refresh();
     };
 
     window.addEventListener("cart-update", handleLegacyUpdate);
     return () => window.removeEventListener("cart-update", handleLegacyUpdate);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (cart) {
@@ -266,7 +266,8 @@ export default function CartPage() {
                             </div>
                             <button
                               onClick={() => handleRemoveItem(item.id)}
-                              className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                              aria-label={`Remove ${item.product_title} from cart`}
+                              className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
                             >
                               <svg
                                 className="w-5 h-5 text-gray-400"
@@ -359,8 +360,8 @@ export default function CartPage() {
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
                   <div
-                    className="h-full rounded-full bg-indigo-600 transition-all"
-                    style={{ width: `${Math.min(100, cart?.summary.subtotal || 0)}%` }}
+                    className="h-full rounded-full bg-indigo-600 transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.round(((cart?.summary.subtotal || 0) / 100) * 100))}%` }}
                   />
                 </div>
               </div>
@@ -429,20 +430,27 @@ export default function CartPage() {
                       <input
                         type="text"
                         value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value)}
+                        onChange={(e) => {
+                          setCouponCode(e.target.value);
+                          if (couponError) setCouponError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleApplyCoupon();
+                        }}
                         placeholder={t("enterCoupon")}
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm transition focus:border-[#0B123A] focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
+                        aria-label={t("coupon")}
                       />
                       <button
                         onClick={handleApplyCoupon}
                         disabled={isApplyingCoupon}
-                        className="px-4 py-2 rounded-lg bg-[#0B123A] text-white text-sm font-semibold hover:bg-[#1a245a] disabled:opacity-50"
+                        className="px-4 py-2 rounded-lg bg-[#0B123A] text-white text-sm font-semibold hover:bg-[#1a245a] disabled:opacity-50 transition-colors"
                       >
                         {isApplyingCoupon ? t("applying") : t("apply")}
                       </button>
                     </div>
                     {couponError && (
-                      <p className="text-xs text-red-500 mt-1">
+                      <p className="mt-1 text-xs text-red-500" role="alert">
                         {couponError}
                       </p>
                     )}

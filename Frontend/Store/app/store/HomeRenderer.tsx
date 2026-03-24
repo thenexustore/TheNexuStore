@@ -503,19 +503,37 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
   const showTopBadges = config?.show_top_badges === true;
   const ctaText = (asText(config?.cta_text, 'Explorar').trim() || 'Explorar').slice(0, 24);
-  const mobileCardPx = Math.max(176, Math.floor(360 / mobileCols));
-  const desktopCardPx = Math.max(198, Math.floor(1240 / desktopCols));
   const cardToneClass = elevatedCards
     ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
 
+  const [currentGap, setCurrentGap] = useState(12);
+  const [currentCols, setCurrentCols] = useState(mobileCols);
+
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth >= 1024) {
+        setCurrentGap(20);
+        setCurrentCols(desktopCols);
+      } else if (window.innerWidth >= 768) {
+        setCurrentGap(16);
+        setCurrentCols(desktopCols);
+      } else {
+        setCurrentGap(12);
+        setCurrentCols(mobileCols);
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [mobileCols, desktopCols]);
+
   return (
     <SectionShell title={title || 'Top Categories'} subtitle={subtitle} typography={extractTypography(config)}>
       <div
-        className="-mx-1 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 pt-1 sm:gap-4 lg:gap-5 [scrollbar-width:thin] lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
         onWheel={handleRailWheel}
       >
-        <div className="flex min-w-max gap-3 px-1 sm:gap-4">
           {list.map((cat, idx) => {
             const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
             const imageValue = cat.image_url || cat.image || cat.banner_image;
@@ -533,10 +551,9 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               <ActionLink
                 key={asText(cat.id, `cat-${idx}`)}
                 href={asText(cat.href) || (asText(cat.slug) ? `/products?categories=${encodeURIComponent(asText(cat.slug))}` : '/products')}
-                className={`group relative flex min-h-[224px] w-[var(--card-mobile)] shrink-0 flex-none flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:w-[var(--card-desktop)] ${cardToneClass}`}
+                className={`group relative flex min-h-[224px] shrink-0 snap-start flex-none flex-col overflow-hidden rounded-2xl border bg-white px-3 pb-3 pt-2 text-center transition duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${cardToneClass}`}
                 style={{
-                  ['--card-mobile' as string]: `${mobileCardPx}px`,
-                  ['--card-desktop' as string]: `${desktopCardPx}px`,
+                  flexBasis: `calc((100% - ${(currentCols - 1) * currentGap}px) / ${currentCols})`,
                 }}
               >
                 {showTopBadges && idx < 3 ? (
@@ -567,7 +584,6 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
               </ActionLink>
             );
           })}
-        </div>
       </div>
       {!list.length ? <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Configura categorías desde admin.</div> : null}
     </SectionShell>
@@ -588,8 +604,6 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const desktopItems = Math.max(mobileItems, Math.min(6, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 4)));
   const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
   const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
-  const mobileCardPx = Math.max(176, Math.floor(380 / mobileItems));
-  const desktopCardPx = Math.max(228, Math.floor(1240 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -631,6 +645,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [currentGap, setCurrentGap] = useState(12);
 
   const carouselMeta = useMemo(() => {
     const sourceLabel = {
@@ -686,6 +701,9 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
     const sync = () => {
       setIsMobileViewport(media.matches);
       setReduceMotion(motionMedia.matches);
+      if (window.innerWidth >= 1024) setCurrentGap(20);
+      else if (window.innerWidth >= 768) setCurrentGap(16);
+      else setCurrentGap(12);
     };
 
     sync();
@@ -732,10 +750,9 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
       <ActionLink
         key={asText(product.id, `prod-${idx}`)}
         href={asText(product.slug) ? `/products/${asText(product.slug)}` : '/products'}
-        className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full min-h-[18rem]' : 'min-h-[22rem] w-[var(--card-mobile)] shrink-0 flex-none snap-start md:min-h-[23rem] md:w-[var(--card-desktop)]'}`}
+        className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full min-h-[18rem]' : 'min-h-[22rem] shrink-0 flex-none snap-start md:min-h-[23rem]'}`}
         style={gridMode ? undefined : {
-          ['--card-mobile' as string]: `${mobileCardPx}px`,
-          ['--card-desktop' as string]: `${desktopCardPx}px`,
+          flexBasis: `calc((100% - ${(currentCols - 1) * currentGap}px) / ${currentCols})`,
         }}
       >
         <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 opacity-60" />
@@ -845,7 +862,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
               onFocusCapture={() => setIsPaused(true)}
               onBlurCapture={() => setIsPaused(false)}
               onWheel={handleRailWheel}
-              className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 [scrollbar-width:thin] [scroll-padding-inline:4px] active:cursor-grabbing"
+              className="flex cursor-grab snap-x snap-proximity gap-3 overflow-x-auto pb-3 pt-1 sm:gap-4 lg:gap-5 [scrollbar-width:thin] [scroll-padding-inline:4px] active:cursor-grabbing lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
             >
               {list.map((product, idx) => renderCard(product, idx, false))}
             </div>
@@ -881,8 +898,6 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const desktopItems = Math.max(2, Number(config?.carousel_items_desktop ?? config?.items_desktop ?? 6));
   const rowsDesktop = Math.max(1, Math.min(4, Number(config?.rows_desktop ?? 1)));
   const rowsMobile = Math.max(1, Math.min(4, Number(config?.rows_mobile ?? 1)));
-  const mobileItemPx = Math.max(120, Math.floor(360 / mobileItems));
-  const itemPx = Math.max(130, Math.floor(1000 / desktopItems));
   const autoplayEnabled = config?.autoplay !== false;
   const showArrows = config?.show_arrows !== false;
   const showDots = config?.show_dots === true;
@@ -895,6 +910,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const [activeDot, setActiveDot] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [currentGap, setCurrentGap] = useState(12);
 
   const syncRailState = () => {
     const rail = railRef.current;
@@ -917,7 +933,12 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
-    const sync = () => setIsMobileViewport(media.matches);
+    const sync = () => {
+      setIsMobileViewport(media.matches);
+      if (window.innerWidth >= 1024) setCurrentGap(20);
+      else if (window.innerWidth >= 768) setCurrentGap(16);
+      else setCurrentGap(12);
+    };
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
@@ -957,10 +978,9 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
     <ActionLink
       key={asText(brand.id, `brand-${idx}`)}
       href={asText(brand.href) || (asText(brand.slug) ? `/products?brand=${encodeURIComponent(asText(brand.slug))}` : '/products')}
-      className={`group flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full' : 'snap-start shrink-0 flex-none min-w-[var(--brand-mobile)] md:min-w-[var(--brand-desktop)]'}`}
+      className={`group flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-medium text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md ${gridMode ? 'w-full' : 'snap-start shrink-0 flex-none'}`}
       style={gridMode ? undefined : {
-        ['--brand-mobile' as string]: `${mobileItemPx}px`,
-        ['--brand-desktop' as string]: `${itemPx}px`,
+        flexBasis: `calc((100% - ${(currentCols - 1) * currentGap}px) / ${currentCols})`,
       }}
     >
       <div className="mb-2 flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-50 p-1.5 transition group-hover:bg-indigo-50/40">
@@ -1012,7 +1032,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
             onFocusCapture={() => setIsPaused(true)}
             onBlurCapture={() => setIsPaused(false)}
             onWheel={handleRailWheel}
-            className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]"
+            className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-2 pt-1 sm:gap-4 lg:gap-5 [scrollbar-width:thin] lg:[scrollbar-width:none] lg:[-ms-overflow-style:none] lg:[&::-webkit-scrollbar]:hidden"
           >
             {list.map((brand, idx) => renderBrandCard(brand, idx, false))}
           </div>

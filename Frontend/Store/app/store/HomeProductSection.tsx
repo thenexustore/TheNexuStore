@@ -112,8 +112,9 @@ export default function HomeProductSection({
     const onScroll = () => {
       const pageWidth = el.clientWidth + currentGap;
       if (!pageWidth) return;
-      // React bails out of re-render if value hasn't changed.
-      setCurrentPage(Math.round(el.scrollLeft / pageWidth));
+      // The explicit !== guard avoids the setter call overhead on every scroll event.
+      const next = Math.round(el.scrollLeft / pageWidth);
+      if (next !== currentPage) setCurrentPage(next);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);

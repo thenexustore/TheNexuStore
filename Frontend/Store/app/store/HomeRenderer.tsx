@@ -203,11 +203,53 @@ function SmartImage({
   );
 }
 
-function SectionShell({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
+interface TypographyConfig {
+  titleColor?: string;
+  titleFont?: string;
+  titleSize?: string;
+  titleWeight?: string;
+  subtitleColor?: string;
+  subtitleSize?: string;
+}
+
+/** Strip characters that have no place in a safe CSS value (semicolons, braces, etc.). */
+function sanitizeCssValue(raw: unknown): string | undefined {
+  const v = asText(raw).trim();
+  if (!v) return undefined;
+  // Allow alphanumeric, spaces, hyphens, underscores, commas, dots, %, #, px/rem/em units
+  // and typical CSS function chars like ()
+  // Reject anything with ; {} \ " ' < > which could break out of an inline style.
+  if (/[;{}\\'"<>]/.test(v)) return undefined;
+  return v;
+}
+
+function extractTypography(config?: Record<string, unknown>): TypographyConfig {
+  if (!config) return {};
+  return {
+    titleColor: sanitizeCssValue(config.title_color),
+    titleFont: sanitizeCssValue(config.title_font),
+    titleSize: sanitizeCssValue(config.title_size),
+    titleWeight: sanitizeCssValue(config.title_weight),
+    subtitleColor: sanitizeCssValue(config.subtitle_color),
+    subtitleSize: sanitizeCssValue(config.subtitle_size),
+  };
+}
+
+function SectionShell({ title, subtitle, children, typography }: { title?: string; subtitle?: string; children: React.ReactNode; typography?: TypographyConfig }) {
+  const titleStyle: React.CSSProperties = {};
+  if (typography?.titleColor) titleStyle.color = typography.titleColor;
+  if (typography?.titleFont) titleStyle.fontFamily = typography.titleFont;
+  if (typography?.titleSize) titleStyle.fontSize = typography.titleSize;
+  if (typography?.titleWeight) titleStyle.fontWeight = typography.titleWeight;
+
+  const subtitleStyle: React.CSSProperties = {};
+  if (typography?.subtitleColor) subtitleStyle.color = typography.subtitleColor;
+  if (typography?.subtitleSize) subtitleStyle.fontSize = typography.subtitleSize;
+
   return (
     <section className="w-full mx-auto max-w-7xl px-0 sm:px-0">
-      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">{title}</h2> : null}
-      {subtitle ? <p className="mb-5 text-sm text-slate-600">{subtitle}</p> : null}
+      {title ? <h2 className="mb-3 break-words text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl" style={Object.keys(titleStyle).length ? titleStyle : undefined}>{title}</h2> : null}
+      {subtitle ? <p className="mb-5 text-sm text-slate-600" style={Object.keys(subtitleStyle).length ? subtitleStyle : undefined}>{subtitle}</p> : null}
       {children}
     </section>
   );
@@ -225,24 +267,24 @@ function RailControls({
   onNext: () => void;
 }) {
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center gap-1.5">
       <button
         type="button"
         onClick={onPrev}
         disabled={!canPrev}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-35"
         aria-label="Anterior"
       >
-        ←
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <button
         type="button"
         onClick={onNext}
         disabled={!canNext}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-35"
         aria-label="Siguiente"
       >
-        →
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
   );
@@ -459,6 +501,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
   const desktopCols = Math.max(mobileCols, Math.min(8, Number(config?.items_desktop || 6)));
   const CAT_GAP = 12; // gap-3 = 0.75rem = 12px
   const showNames = config?.show_names !== false;
+  const showArrows = config?.show_arrows !== false;
   const imageFitClass = String(config?.image_fit || 'contain') === 'cover' ? 'object-cover' : 'object-contain';
   const elevatedCards = String(config?.card_style || 'minimal') === 'elevated';
   const showTopBadges = config?.show_top_badges === true;
@@ -467,6 +510,9 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
     ? 'border-slate-200 shadow-md hover:shadow-xl hover:border-indigo-300'
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
   const [isMobile, setIsMobile] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const railRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
@@ -478,25 +524,44 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
 
   const currentCols = isMobile ? mobileCols : desktopCols;
 
+  const syncCatRail = useCallback(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    setCanPrev(rail.scrollLeft > 4);
+    setCanNext(rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    syncCatRail();
+    window.addEventListener('resize', syncCatRail);
+    return () => window.removeEventListener('resize', syncCatRail);
+  }, [syncCatRail, list.length, isMobile]);
+
+  const catStep = () => {
+    const rail = railRef.current;
+    if (!rail) return 240;
+    return rail.clientWidth + CAT_GAP;
+  };
+
+  const typography = extractTypography(config);
+
   return (
-    <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
+    <SectionShell title={title || 'Top Categories'} subtitle={subtitle} typography={typography}>
+      {list.length > 0 && showArrows ? (
+        <div className="mb-3 flex items-center justify-end">
+          <RailControls canPrev={canPrev} canNext={canNext} onPrev={() => railRef.current?.scrollBy({ left: -catStep(), behavior: 'smooth' })} onNext={() => railRef.current?.scrollBy({ left: catStep(), behavior: 'smooth' })} />
+        </div>
+      ) : null}
       <div
-        className="flex snap-x snap-proximity gap-3 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
+        ref={railRef}
+        onScroll={syncCatRail}
         onWheel={handleRailWheel}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
       >
         {list.map((cat, idx) => {
             const name = normalizeCategoryLabel(asText(cat.item_label) || asText(cat.name, 'Category'));
             const imageValue = cat.image_url || cat.image || cat.banner_image;
             const hasVisual = !isLikelyMissingImage(imageValue);
-            if (!hasVisual) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.warn('[store-home][category-strip] Missing category image', {
-                  categoryId: asText(cat.id, `cat-${idx}`),
-                  slug: asText(cat.slug),
-                  name,
-                });
-              }
-            }
             return (
               <ActionLink
                 key={asText(cat.id, `cat-${idx}`)}
@@ -759,7 +824,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   };
 
   return (
-    <SectionShell title={title} subtitle={subtitle}>
+    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
       <div className="rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-3 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-2">
@@ -923,7 +988,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   }, [autoplayEnabled, autoplayIntervalMs, isPaused, list.length]);
 
   return (
-    <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
+    <SectionShell title={title || 'Top Brands'} subtitle={subtitle} typography={extractTypography(config)}>
       <div className="mb-2 flex items-center justify-between gap-2">
         {viewAllHref ? (
           <ActionLink href={viewAllHref} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">

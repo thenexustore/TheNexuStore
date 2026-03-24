@@ -220,9 +220,10 @@ export default function GenericCarousel({
       const width = node.clientWidth;
       if (!width) return;
       const pageWidth = width + currentGap;
-      // React bails out of re-render automatically if value hasn't changed,
-      // so the explicit !== check is not needed here.
-      setPage(Math.round(node.scrollLeft / pageWidth));
+      // React bails out of re-render if value hasn't changed, but the explicit guard
+      // avoids the setter call overhead on every scroll event.
+      const next = Math.round(node.scrollLeft / pageWidth);
+      if (next !== page) setPage(next);
     };
 
     node.addEventListener("scroll", onScroll, { passive: true });

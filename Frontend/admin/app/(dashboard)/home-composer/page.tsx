@@ -2475,6 +2475,7 @@ export default function HomeComposerPage() {
                       />
                       <p className="mt-1 text-xs text-zinc-400">1 = carrusel. 2+ = cuadrícula multi-fila.</p>
                     </label>
+
                   </div>
 
                   {/* Typography */}
@@ -2520,6 +2521,7 @@ export default function HomeComposerPage() {
                         <input type="text" value={String(config.subtitle_size || "")} onChange={(e) => updateDraftConfig({ ...config, subtitle_size: e.target.value })} placeholder="ej: 0.875rem, 14px" className="w-full rounded-lg border border-zinc-300 px-3 py-2" />
                       </label>
                     </div>
+
                   </div>
                 </div>
               ) : null}

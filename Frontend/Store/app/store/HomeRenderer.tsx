@@ -27,7 +27,6 @@ const SECTION_TYPE_LABEL: Record<string, string> = {
   PRODUCT_CAROUSEL: 'Novedades',
   BRAND_STRIP: 'Marcas populares',
   VALUE_PROPS: '¿Por qué elegirnos?',
-  TRENDING_CHIPS: 'Tendencias',
 };
 
 
@@ -953,6 +952,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   const currentCols = isMobileViewport ? mobileItems : desktopItems;
   const useGridLayout = currentRows > 1;
 
+
   const renderBrandCard = (brand: Record<string, unknown>, idx: number, gridMode = false) => (
     <ActionLink
       key={asText(brand.id, `brand-${idx}`)}
@@ -1000,6 +1000,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
             ) : <span />}
             {list.length > 1 && showArrows ? <RailControls canPrev={canPrev} canNext={canNext} onPrev={goPrev} onNext={goNext} /> : null}
           </div>
+
 
           <div
             ref={railRef}

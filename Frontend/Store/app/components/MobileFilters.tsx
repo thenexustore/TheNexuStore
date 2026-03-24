@@ -167,10 +167,7 @@ export function MobileFilters({
               <SidebarFilters
                 filterOptions={filterOptions}
                 filters={filters}
-                onFilterChange={(newFilters) => {
-                  onFilterChange(newFilters);
-                  close();
-                }}
+                onFilterChange={onFilterChange}
               />
             </div>
 

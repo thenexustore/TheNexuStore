@@ -266,9 +266,9 @@ export default function ProductsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6 lg:px-8">
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-800 p-5 text-white shadow-sm sm:p-8">
+      <div className="mb-6 rounded-2xl border border-[#0B123A]/20 bg-gradient-to-r from-slate-900 via-[#0B123A] to-slate-800 p-5 text-white shadow-sm sm:p-8">
         <h1 className="break-words text-2xl font-bold sm:text-3xl lg:text-4xl">{t("all")}</h1>
-        <p className="mt-2 text-sm text-indigo-100 sm:text-base">
+        <p className="mt-2 text-sm text-white/70 sm:text-base">
           {t("found", {count: productsResponse?.total || 0})}
         </p>
         {activeSearchTerm && (
@@ -331,7 +331,7 @@ export default function ProductsPage() {
               <select
                 value={filters.sort_by}
                 onChange={(e) => handleSortChange(e.target.value)}
-                className="w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-black outline-none ring-indigo-500 transition focus:ring-2 sm:w-auto"
+                className="w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-black outline-none ring-[#0B123A] transition focus:ring-2 sm:w-auto"
               >
                 <option value="newest">{t("newest")}</option>
                 <option value="price_low_to_high">{t("priceLowHigh")}</option>

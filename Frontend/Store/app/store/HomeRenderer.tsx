@@ -312,9 +312,19 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
           const bannerSlide = {
             id: banner.id,
             title_text: banner.title_text,
+            title_color: banner.title_color,
+            title_font: banner.title_font,
+            title_size: banner.title_size,
+            title_weight: banner.title_weight,
             subtitle_text: banner.subtitle_text,
+            subtitle_color: banner.subtitle_color,
+            subtitle_size: banner.subtitle_size,
             button_text: banner.button_text,
             button_link: banner.button_link,
+            button_bg: banner.button_bg,
+            button_color: banner.button_color,
+            button_radius: banner.button_radius,
+            button_padding: banner.button_padding,
             label: banner.label,
             image: banner.image,
             image_url: banner.image_url,
@@ -358,7 +368,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   const goNext = () => setIndex((prev) => (prev + 1) % slides.length);
 
   return (
-    <SectionShell title={title} subtitle={subtitle}>
+    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
       <div
         className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px] lg:h-[500px] xl:h-[560px]"
         onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
@@ -403,6 +413,25 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
                 });
               }
             }
+
+            // Build per-slide styles from banner fields (sanitized)
+            const slideAlign = asText(slide.align).trim() as 'left' | 'center' | 'right';
+            const textAlign = slideAlign === 'center' ? 'items-center text-center' : slideAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
+            const overlayColor = sanitizeCssValue(slide.overlay);
+            const titleStyle: React.CSSProperties = {};
+            if (sanitizeCssValue(slide.title_color)) titleStyle.color = sanitizeCssValue(slide.title_color);
+            if (sanitizeCssValue(slide.title_font)) titleStyle.fontFamily = sanitizeCssValue(slide.title_font);
+            if (sanitizeCssValue(slide.title_size)) titleStyle.fontSize = sanitizeCssValue(slide.title_size);
+            if (sanitizeCssValue(slide.title_weight)) titleStyle.fontWeight = sanitizeCssValue(slide.title_weight);
+            const subtitleStyle: React.CSSProperties = {};
+            if (sanitizeCssValue(slide.subtitle_color)) subtitleStyle.color = sanitizeCssValue(slide.subtitle_color);
+            if (sanitizeCssValue(slide.subtitle_size)) subtitleStyle.fontSize = sanitizeCssValue(slide.subtitle_size);
+            const btnStyle: React.CSSProperties = {};
+            if (sanitizeCssValue(slide.button_bg)) btnStyle.backgroundColor = sanitizeCssValue(slide.button_bg);
+            if (sanitizeCssValue(slide.button_color)) btnStyle.color = sanitizeCssValue(slide.button_color);
+            if (sanitizeCssValue(slide.button_radius)) btnStyle.borderRadius = sanitizeCssValue(slide.button_radius);
+            if (sanitizeCssValue(slide.button_padding)) btnStyle.padding = sanitizeCssValue(slide.button_padding);
+
             return (
             <div
               key={slideId}
@@ -422,13 +451,33 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
-              <div className="absolute inset-0 flex max-w-2xl flex-col justify-end gap-3 p-4 text-white sm:p-10">
+              {overlayColor ? (
+                <div className="absolute inset-0" style={{ background: overlayColor }} />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/20 to-transparent" />
+              )}
+              <div className={`absolute inset-0 flex max-w-2xl flex-col justify-end gap-3 p-4 text-white sm:p-10 ${textAlign}`}>
                 {slide.label ? <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold uppercase">{asText(slide.label)}</span> : null}
-                <h3 className="w-fit max-w-full rounded-xl bg-black/25 px-3 py-2 text-xl font-bold leading-tight backdrop-blur-[1px] sm:text-4xl">{asText(slide.title_text, 'Top tech deals')}</h3>
-                {slide.subtitle_text ? <p className="w-fit max-w-full rounded-lg bg-black/20 px-3 py-1.5 text-sm text-slate-100 backdrop-blur-[1px] sm:text-base">{asText(slide.subtitle_text)}</p> : null}
+                <h3
+                  className="w-fit max-w-full rounded-xl bg-black/25 px-3 py-2 text-xl font-bold leading-tight backdrop-blur-[1px] sm:text-4xl"
+                  style={Object.keys(titleStyle).length ? titleStyle : undefined}
+                >
+                  {asText(slide.title_text, 'Top tech deals')}
+                </h3>
+                {slide.subtitle_text ? (
+                  <p
+                    className="w-fit max-w-full rounded-lg bg-black/20 px-3 py-1.5 text-sm text-slate-100 backdrop-blur-[1px] sm:text-base"
+                    style={Object.keys(subtitleStyle).length ? subtitleStyle : undefined}
+                  >
+                    {asText(slide.subtitle_text)}
+                  </p>
+                ) : null}
                 {slide.button_text ? (
-                  <ActionLink href={asText(slide.button_link, '/products')} className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                  <ActionLink
+                    href={asText(slide.button_link, '/products')}
+                    className="mt-2 w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                    style={Object.keys(btnStyle).length ? btnStyle : undefined}
+                  >
                     {asText(slide.button_text)}
                   </ActionLink>
                 ) : null}

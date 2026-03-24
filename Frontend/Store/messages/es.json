@@ -126,7 +126,18 @@
     "premiumDesc": "Producto de alta calidad con excelentes características y rendimiento.",
     "description": "Descripción",
     "relatedProducts": "Productos relacionados",
-    "mobileRefineLabel": "Refinado móvil"
+    "mobileRefineLabel": "Refinado móvil",
+    "writeReview": "Escribe una reseña",
+    "reviewRating": "Valoración",
+    "reviewTitle": "Título (opcional)",
+    "reviewTitlePlaceholder": "Resume tu experiencia",
+    "reviewComment": "Reseña (opcional)",
+    "reviewCommentPlaceholder": "Comparte los detalles de tu experiencia con este producto",
+    "reviewSubmit": "Enviar reseña",
+    "reviewSubmitting": "Enviando...",
+    "reviewSuccess": "¡Gracias por tu reseña! Será visible tras su aprobación.",
+    "reviewFailed": "Error al enviar la reseña. Por favor, inténtalo de nuevo.",
+    "reviewRatingRequired": "Por favor, selecciona una valoración entre 1 y 5 estrellas."
   },
   "cart": {
     "emptyTitle": "Tu carrito está vacío",
@@ -267,11 +278,26 @@
     "orderProgress": "Progreso del pedido",
     "current": "Actual",
     "steps": {
-      "PENDING_PAYMENT": { "label": "Pago pendiente", "subtitle": "Confirmación bancaria en proceso" },
-      "PAID": { "label": "Pago confirmado", "subtitle": "Transacción aprobada" },
-      "PROCESSING": { "label": "Preparando pedido", "subtitle": "Empaquetado iniciado" },
-      "SHIPPED": { "label": "Enviado", "subtitle": "Entregado al transportista" },
-      "DELIVERED": { "label": "Entregado", "subtitle": "Pedido completado" }
+      "PENDING_PAYMENT": {
+        "label": "Pago pendiente",
+        "subtitle": "Confirmación bancaria en proceso"
+      },
+      "PAID": {
+        "label": "Pago confirmado",
+        "subtitle": "Transacción aprobada"
+      },
+      "PROCESSING": {
+        "label": "Preparando pedido",
+        "subtitle": "Empaquetado iniciado"
+      },
+      "SHIPPED": {
+        "label": "Enviado",
+        "subtitle": "Entregado al transportista"
+      },
+      "DELIVERED": {
+        "label": "Entregado",
+        "subtitle": "Pedido completado"
+      }
     },
     "shippingAddress": "Dirección de envío",
     "phone": "Teléfono: {phone}",

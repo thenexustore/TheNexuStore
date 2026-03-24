@@ -487,6 +487,10 @@ export default function ProductPage() {
         </button>
       </div>
 
+      <div className="mt-12 mb-8">
+        <ReviewForm onSubmit={handleReviewSubmit} productId={product.id} />
+      </div>
+
       {relatedProducts.length > 0 && (
         <div>
           <h2 className="mb-6 text-2xl font-bold lg:text-3xl">{t("relatedProducts")}</h2>

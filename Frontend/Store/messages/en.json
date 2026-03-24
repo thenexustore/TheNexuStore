@@ -126,7 +126,18 @@
     "premiumDesc": "Premium quality product with excellent features and performance.",
     "description": "Description",
     "relatedProducts": "Related Products",
-    "mobileRefineLabel": "Mobile refine"
+    "mobileRefineLabel": "Mobile refine",
+    "writeReview": "Write a Review",
+    "reviewRating": "Rating",
+    "reviewTitle": "Title (optional)",
+    "reviewTitlePlaceholder": "Summarize your experience",
+    "reviewComment": "Review (optional)",
+    "reviewCommentPlaceholder": "Share details of your experience with this product",
+    "reviewSubmit": "Submit Review",
+    "reviewSubmitting": "Submitting...",
+    "reviewSuccess": "Thank you for your review! It will be visible after approval.",
+    "reviewFailed": "Failed to submit review. Please try again.",
+    "reviewRatingRequired": "Please select a rating between 1 and 5 stars."
   },
   "cart": {
     "emptyTitle": "Your Cart is Empty",
@@ -267,11 +278,26 @@
     "orderProgress": "Order Progress",
     "current": "Current",
     "steps": {
-      "PENDING_PAYMENT": { "label": "Payment Pending", "subtitle": "Bank confirmation in progress" },
-      "PAID": { "label": "Payment Confirmed", "subtitle": "Transaction approved" },
-      "PROCESSING": { "label": "Preparing Order", "subtitle": "Packing started" },
-      "SHIPPED": { "label": "Shipped", "subtitle": "Handed to carrier" },
-      "DELIVERED": { "label": "Delivered", "subtitle": "Order completed" }
+      "PENDING_PAYMENT": {
+        "label": "Payment Pending",
+        "subtitle": "Bank confirmation in progress"
+      },
+      "PAID": {
+        "label": "Payment Confirmed",
+        "subtitle": "Transaction approved"
+      },
+      "PROCESSING": {
+        "label": "Preparing Order",
+        "subtitle": "Packing started"
+      },
+      "SHIPPED": {
+        "label": "Shipped",
+        "subtitle": "Handed to carrier"
+      },
+      "DELIVERED": {
+        "label": "Delivered",
+        "subtitle": "Order completed"
+      }
     },
     "shippingAddress": "Shipping Address",
     "phone": "Phone: {phone}",

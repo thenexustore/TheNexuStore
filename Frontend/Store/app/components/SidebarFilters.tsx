@@ -21,6 +21,8 @@ type FilterListItem = {
   display_name?: string;
 };
 
+type TreeNode = FilterListItem & { children: TreeNode[] };
+
 /** Shallow array equality — stable references prevent spurious re-renders. */
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -110,10 +112,13 @@ function PriceRangeSlider({
   const [maxInput, setMaxInput] = useState(String(value[1]));
 
   // Keep input strings in sync when external value changes
+  const curMin = value[0];
+  const curMax = value[1];
   useEffect(() => {
-    setMinInput(String(value[0]));
-    setMaxInput(String(value[1]));
-  }, [value[0], value[1]]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMinInput(String(curMin));
+    setMaxInput(String(curMax));
+  }, [curMin, curMax]);
 
   const commitMin = () => {
     const parsed = parseInt(minInput, 10);
@@ -379,9 +384,9 @@ function CategoryTreeFilter({
 
   const tree = useMemo(() => {
     const byId = new Map(
-      items.map((item) => [item.id, { ...item, children: [] as any[] }])
+      items.map((item) => [item.id, { ...item, children: [] as TreeNode[] }])
     );
-    const roots: any[] = [];
+    const roots: TreeNode[] = [];
     for (const item of byId.values()) {
       const pid = item.parent_id as string | null | undefined;
       if (pid && byId.has(pid)) {
@@ -393,14 +398,14 @@ function CategoryTreeFilter({
     return roots;
   }, [items]);
 
-  const matchesQuery = (node: any): boolean => {
+  const matchesQuery = (node: TreeNode): boolean => {
     if (!query) return true;
     const name = (node.display_name || node.name || "").toLowerCase();
     if (name.includes(query.toLowerCase())) return true;
-    return node.children?.some((c: any) => matchesQuery(c)) ?? false;
+    return node.children?.some((c) => matchesQuery(c)) ?? false;
   };
 
-  const renderNode = (node: any, depth: number): React.ReactNode => {
+  const renderNode = (node: TreeNode, depth: number): React.ReactNode => {
     if (!matchesQuery(node)) return null;
     const open = nodeExpanded[node.id] ?? depth < 1;
     const isSelected = selected.includes(node.slug);
@@ -481,7 +486,7 @@ function CategoryTreeFilter({
         </div>
 
         {open
-          ? node.children.map((child: any) => renderNode(child, depth + 1))
+          ? node.children.map((child) => renderNode(child, depth + 1))
           : null}
       </div>
     );
@@ -561,13 +566,16 @@ export function SidebarFilters({
 
   // Refs so debounced callback always reads current values without stale closures.
   const filtersRef = useRef(filters);
-  filtersRef.current = filters;
   const onFilterChangeRef = useRef(onFilterChange);
-  onFilterChangeRef.current = onFilterChange;
   const minPriceRef = useRef(minPrice);
-  minPriceRef.current = minPrice;
   const maxPriceRef = useRef(maxPrice);
-  maxPriceRef.current = maxPrice;
+  // Keep refs up-to-date after every render
+  useEffect(() => {
+    filtersRef.current = filters;
+    onFilterChangeRef.current = onFilterChange;
+    minPriceRef.current = minPrice;
+    maxPriceRef.current = maxPrice;
+  });
 
   const [price, setPrice] = useState<[number, number]>([
     filters.min_price ?? minPrice,
@@ -584,6 +592,7 @@ export function SidebarFilters({
   const [featured, setFeatured] = useState(!!filters.featured_only);
 
   // Re-sync local state when the external `filters` prop changes (URL nav, quick filters).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setPrice((prev) => {
       const next: [number, number] = [
@@ -606,6 +615,7 @@ export function SidebarFilters({
     });
     setFeatured(!!filters.featured_only);
   }, [filters, minPrice, maxPrice]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Debounced apply — reads external values via refs to avoid stale closures.
   useEffect(() => {

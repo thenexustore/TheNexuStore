@@ -358,7 +358,7 @@ function Hero({ title, subtitle, items, config }: { title?: string; subtitle?: s
   const goNext = () => setIndex((prev) => (prev + 1) % slides.length);
 
   return (
-    <SectionShell title={title} subtitle={subtitle}>
+    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
       <div
         className="relative h-56 overflow-hidden rounded-3xl bg-slate-200 shadow-sm ring-1 ring-slate-200 sm:h-[420px] lg:h-[500px] xl:h-[560px]"
         onMouseEnter={() => { if (pauseOnHover) setIsPaused(true); }}
@@ -511,7 +511,7 @@ function CategoryStrip({ title, subtitle, categories, config }: { title?: string
     : 'border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-200';
 
   return (
-    <SectionShell title={title || 'Top Categories'} subtitle={subtitle}>
+    <SectionShell title={title || 'Top Categories'} subtitle={subtitle} typography={extractTypography(config)}>
       <div
         className="-mx-1 overflow-x-auto pb-4 pt-1 [scrollbar-width:thin]"
         onWheel={handleRailWheel}
@@ -792,7 +792,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
   const useMultiRowGrid = currentRows > 1;
 
   return (
-    <SectionShell title={title} subtitle={subtitle}>
+    <SectionShell title={title} subtitle={subtitle} typography={extractTypography(config)}>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1.5">
@@ -982,7 +982,7 @@ function BrandStrip({ title, subtitle, brands, config }: { title?: string; subti
   );
 
   return (
-    <SectionShell title={title || 'Top Brands'} subtitle={subtitle}>
+    <SectionShell title={title || 'Top Brands'} subtitle={subtitle} typography={extractTypography(config)}>
       {useGridLayout ? (
         <div
           className="grid gap-3"

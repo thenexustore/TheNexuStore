@@ -15,7 +15,7 @@ The homepage is now controlled by **Home Layouts** and **Sections**.
 - PRODUCT_CAROUSEL
 - BRAND_STRIP
 - VALUE_PROPS
-- TRENDING_CHIPS
+- CUSTOM_HTML
 
 ## API
 - `GET /home`
@@ -37,7 +37,17 @@ The homepage is now controlled by **Home Layouts** and **Sections**.
 - `GET /admin/home/preview?layoutId=...`
 
 
-## Preview URL
+## Section config: rows
+
+`PRODUCT_CAROUSEL` and `BRAND_STRIP` support multi-row grid layout via:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `rows_desktop` | int 1–4 | 1 | Rows visible on desktop. 1 = horizontal carousel. 2+ = responsive grid. |
+| `rows_mobile`  | int 1–4 | 1 | Rows visible on mobile.  1 = horizontal carousel. 2+ = responsive grid. |
+
+When `rows > 1`, the section switches from a horizontal scroll carousel to a CSS grid showing `cols × rows` items.
+
 - Open `/store?previewLayoutId=<layout-id>` to preview a draft layout without publishing.
 
 ## Utilities added

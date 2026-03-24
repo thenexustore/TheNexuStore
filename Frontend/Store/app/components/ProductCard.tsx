@@ -117,10 +117,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
     try {
       await addItem(product.sku_code, 1);
-
-      setTimeout(() => {
-        router.push("/cart");
-      }, 500);
+      router.push("/cart");
     } catch (error) {
       console.error("Failed to buy now:", error);
       setBuyNowLoading(false);
@@ -192,7 +189,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               />
             </svg>
             <span className="text-sm font-semibold text-gray-700">
-              {buyNowLoading ? t("adding") : "Loading..."}
+              {t("adding")}
             </span>
           </div>
         </div>
@@ -239,6 +236,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           <button
             onClick={toggleFavorite}
+            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            aria-pressed={isFavorite}
             className="absolute top-2 right-2 z-10 rounded-full bg-white/90 p-2 shadow-md transition-colors hover:bg-white focus-ring"
             style={{ right: "0.5rem" }}
           >
@@ -312,7 +311,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     {formatCurrency(product.compare_at_price)}
                   </span>
                   <span className="text-xs font-semibold text-red-600 sm:text-sm">
-                    Save {formatCurrency(product.compare_at_price - product.price)}
+                    {t("save", { amount: formatCurrency(product.compare_at_price - product.price) })}
                   </span>
                 </>
               )}

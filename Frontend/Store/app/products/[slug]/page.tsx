@@ -118,16 +118,29 @@ export default function ProductPage() {
 
   if (error || !product) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-500">
+      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-red-100 bg-red-50 p-10 text-center">
+          <svg
+            className="h-12 w-12 text-red-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
+          </svg>
+          <h2 className="text-xl font-bold text-red-700">
             {error || t("notFound")}
           </h2>
           <Link
             href="/products"
-            className="mt-4 inline-block text-blue-600 hover:underline"
+            className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#0B123A] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a245a]"
           >
-            {t("backToProducts")}
+            ← {t("backToProducts")}
           </Link>
         </div>
       </div>
@@ -204,7 +217,7 @@ export default function ProductPage() {
                   aria-label={`View image ${index + 1}`}
                   className={`h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                     selectedImage === index
-                      ? "border-blue-500 ring-2 ring-blue-200"
+                      ? "border-[#0B123A] ring-2 ring-[#0B123A]/30"
                       : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
@@ -300,10 +313,12 @@ export default function ProductPage() {
                   <button
                     key={variant.id}
                     onClick={() => setSelectedVariant(variant.id)}
-                    className={`rounded border px-4 py-2 ${
+                    aria-pressed={selectedVariant === variant.id}
+                    aria-label={`Select variant: ${variant.variant_name || variant.attributes.map((a) => a.value).join(" / ")}`}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
                       selectedVariant === variant.id
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-gray-300 hover:border-gray-400"
+                        ? "border-[#0B123A] bg-[#0B123A] text-white shadow-sm"
+                        : "border-gray-300 text-gray-700 hover:border-[#0B123A] hover:text-[#0B123A]"
                     } ${
                       variant.stock_status === "OUT_OF_STOCK"
                         ? "opacity-50 cursor-not-allowed"
@@ -470,6 +485,10 @@ export default function ProductPage() {
         >
           {addingToCart ? t("adding") : isOutOfStock ? t("outOfStock") : t("addToCart")}
         </button>
+      </div>
+
+      <div className="mt-12 mb-8">
+        <ReviewForm onSubmit={handleReviewSubmit} productId={product.id} />
       </div>
 
       {relatedProducts.length > 0 && (

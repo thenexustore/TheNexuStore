@@ -135,27 +135,37 @@ function buildFiltersFromSearchParams(
   searchParams: ReturnType<typeof useSearchParams>,
 ): ProductFilters {
   const sortByParam = searchParams.get("sort_by") as ProductFilters["sort_by"];
+
+  // Fix 4: Guard against NaN values from malformed query params
+  const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
+  const rawMinPrice = parseInt(searchParams.get("min_price") ?? "", 10);
+  const rawMaxPrice = parseInt(searchParams.get("max_price") ?? "", 10);
+
   const filters: ProductFilters = {
-    page: parseInt(searchParams.get("page") || "1"),
+    page: Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage,
     limit: 20,
     search: searchParams.get("search") || undefined,
     category: searchParams.get("category") || undefined,
     brand: searchParams.get("brand") || undefined,
     sort_by: sortByParam || "newest",
-    min_price: searchParams.get("min_price")
-      ? parseInt(searchParams.get("min_price")!)
-      : undefined,
-    max_price: searchParams.get("max_price")
-      ? parseInt(searchParams.get("max_price")!)
-      : undefined,
+    min_price: Number.isNaN(rawMinPrice) ? undefined : rawMinPrice,
+    max_price: Number.isNaN(rawMaxPrice) ? undefined : rawMaxPrice,
     in_stock_only: true,
-    featured_only: searchParams.get("featured_only") === "true",
-    attributes: searchParams.get("attributes")?.split(","),
+    // Return undefined instead of false so the param is omitted when inactive
+    featured_only: searchParams.get("featured_only") === "true" ? true : undefined,
+    // Fix 4: Filter out empty strings produced by splitting an empty param
+    attributes: searchParams.get("attributes")
+      ? searchParams.get("attributes")!.split(",").filter((s) => s.length > 0)
+      : undefined,
   };
 
   const categoriesParam = searchParams.get("categories");
   if (categoriesParam) {
-    filters.categories = categoriesParam.split(",");
+    // Fix 4: Filter out empty strings (e.g. trailing comma: "a,b,")
+    const cats = categoriesParam.split(",").filter((s) => s.length > 0);
+    if (cats.length > 0) {
+      filters.categories = cats;
+    }
   }
 
   return filters;
@@ -256,9 +266,9 @@ export default function ProductsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6 lg:px-8">
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-800 p-5 text-white shadow-sm sm:p-8">
+      <div className="mb-6 rounded-2xl border border-[#0B123A]/20 bg-gradient-to-r from-slate-900 via-[#0B123A] to-slate-800 p-5 text-white shadow-sm sm:p-8">
         <h1 className="break-words text-2xl font-bold sm:text-3xl lg:text-4xl">{t("all")}</h1>
-        <p className="mt-2 text-sm text-indigo-100 sm:text-base">
+        <p className="mt-2 text-sm text-white/70 sm:text-base">
           {t("found", {count: productsResponse?.total || 0})}
         </p>
         {activeSearchTerm && (
@@ -321,9 +331,13 @@ export default function ProductsPage() {
               <select
                 value={filters.sort_by}
                 onChange={(e) => handleSortChange(e.target.value)}
-                className="w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-black outline-none ring-indigo-500 transition focus:ring-2 sm:w-auto"
+                className="w-full min-w-0 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-black outline-none ring-[#0B123A] transition focus:ring-2 sm:w-auto"
               >
                 <option value="newest">{t("newest")}</option>
+                <option value="price_low_to_high">{t("priceLowHigh")}</option>
+                <option value="price_high_to_low">{t("priceHighLow")}</option>
+                <option value="best_selling">{t("bestSelling")}</option>
+                <option value="highest_rated">{t("highestRated")}</option>
                 <option value="name_a_to_z">{t("nameAZ")}</option>
                 <option value="name_z_to_a">{t("nameZA")}</option>
               </select>

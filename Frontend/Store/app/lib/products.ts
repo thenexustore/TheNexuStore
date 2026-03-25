@@ -393,7 +393,7 @@ class ProductAPI {
         } else {
           uniqueBrands.set(product.brand_slug, {
             id: product.brand_slug,
-            name: product.brand_name,
+            name: product.brand_name || product.brand_slug,
             slug: product.brand_slug,
             count: 1,
           });

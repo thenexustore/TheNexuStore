@@ -50,7 +50,8 @@
     "currentCategory": "Current category",
     "openCurrentCategory": "Open current category",
     "searchEmptyHint": "No results found. Try a different search term.",
-    "viewAllSearchResults": "View all results for \"{query}\""
+    "viewAllSearchResults": "View all results for \"{query}\"",
+    "outOfStock": "Out of stock"
   },
   "footer": {
     "title": "Be the first to know.",

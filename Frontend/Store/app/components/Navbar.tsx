@@ -1006,6 +1006,21 @@ export default function Navbar() {
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
               </div>
+            ) : categorySearch.trim().length >= 2 && categorySearchLoading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 px-3 py-2.5"
+                  >
+                    <div className="h-10 w-10 flex-shrink-0 animate-pulse rounded-lg bg-slate-200" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 w-3/4 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : visibleMobileCategoryCount > 0 ? (
               categorySearch.trim().length >= 2 ? (
                 <div className="space-y-4">
@@ -1022,14 +1037,28 @@ export default function Navbar() {
                             onClick={() => handleDrawerProductClick(product.slug)}
                             className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
                           >
-                            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                              {product.thumbnail ? (
-                                <img
-                                  src={product.thumbnail}
-                                  alt={product.title}
-                                  className="h-full w-full object-cover"
-                                />
+                            <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                              {product.compare_at_price &&
+                              product.compare_at_price > product.price ? (
+                                <span className="absolute left-0.5 top-0.5 z-10 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
+                                  -
+                                  {Math.round(
+                                    ((product.compare_at_price - product.price) /
+                                      product.compare_at_price) *
+                                      100,
+                                  )}
+                                  %
+                                </span>
                               ) : null}
+                              <img
+                                src={product.thumbnail || "/No_Image_Available.png"}
+                                alt={product.title}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src =
+                                    "/No_Image_Available.png";
+                                }}
+                              />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium text-slate-800">
@@ -1038,6 +1067,24 @@ export default function Navbar() {
                               <p className="truncate text-xs text-slate-500">
                                 {product.brand_name}
                               </p>
+                            </div>
+                            <div className="flex-shrink-0 text-right">
+                              <p
+                                className={`text-sm font-bold ${
+                                  product.compare_at_price &&
+                                  product.compare_at_price > product.price
+                                    ? "text-red-600"
+                                    : "text-[#0B123A]"
+                                }`}
+                              >
+                                {formatCurrency(product.price)}
+                              </p>
+                              {product.compare_at_price &&
+                              product.compare_at_price > product.price ? (
+                                <p className="text-xs text-slate-400 line-through">
+                                  {formatCurrency(product.compare_at_price)}
+                                </p>
+                              ) : null}
                             </div>
                           </button>
                         ))}
@@ -1055,14 +1102,17 @@ export default function Navbar() {
                             key={brand.id}
                             type="button"
                             onClick={() => handleDrawerBrandClick(brand.slug)}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
+                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
                           >
-                            <p className="truncate font-semibold text-slate-800">
-                              {brand.name}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {t("brandProductsCount", { count: brand.count })}
-                            </p>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-800">
+                                {brand.name}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {t("brandProductsCount", { count: brand.count })}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
                           </button>
                         ))}
                       </div>
@@ -1088,9 +1138,10 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleViewAllDrawerSearchResults(categorySearch)}
-                    className="w-full rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
                   >
                     {t("viewAllSearchResults", { query: categorySearch })}
+                    <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               ) : (

@@ -154,7 +154,7 @@ export function CategoryDrawer({
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[96vw] max-w-[1180px] flex-col bg-white shadow-2xl transition-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[96vw] max-w-[1180px] flex-col bg-white shadow-2xl transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-base font-semibold text-slate-900">
@@ -171,7 +171,13 @@ export function CategoryDrawer({
 
         <div className="border-b px-4 py-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            {searchLoading ? (
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#0B123A]" />
+              </div>
+            ) : (
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            )}
             <input
               ref={searchInputRef}
               value={query}
@@ -194,127 +200,220 @@ export function CategoryDrawer({
 
         <div className="min-h-0 flex-1">
           {query.trim().length >= 2 ? (
-            <div className="h-full overflow-y-auto overscroll-contain p-4">
+            <div className="h-full overflow-y-auto overscroll-contain">
               {searchLoading ? (
-                <p className="text-sm text-slate-500">{t("searching")}</p>
-              ) : null}
-              {!searchLoading &&
-              !productResults.length &&
-              !brandResults.length &&
-              !searchResults.length ? (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                  {t("searchEmptyHint")}
+                <div className="space-y-6 p-4">
+                  <section>
+                    <div className="mb-2 h-3 w-20 animate-pulse rounded bg-slate-200" />
+                    <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="flex items-center gap-3 px-3 py-3">
+                          <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded-lg bg-slate-200" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3.5 w-3/4 animate-pulse rounded bg-slate-200" />
+                            <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
+                          </div>
+                          <div className="h-4 w-12 animate-pulse rounded bg-slate-200" />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                  <section>
+                    <div className="mb-2 h-3 w-16 animate-pulse rounded bg-slate-200" />
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {[0, 1].map((i) => (
+                        <div
+                          key={i}
+                          className="space-y-1.5 rounded-xl border border-slate-200 px-4 py-3"
+                        >
+                          <div className="h-3.5 w-2/3 animate-pulse rounded bg-slate-200" />
+                          <div className="h-3 w-1/3 animate-pulse rounded bg-slate-200" />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 </div>
-              ) : null}
-
-              {!searchLoading && productResults.length > 0 ? (
-                <section className="mb-5">
-                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    {t("productsSection")}
+              ) : !productResults.length &&
+                !brandResults.length &&
+                !searchResults.length ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                  <div className="rounded-full bg-slate-100 p-4">
+                    <Search className="h-7 w-7 text-slate-400" />
+                  </div>
+                  <p className="font-semibold text-slate-700">{t("noResults")}</p>
+                  <p className="max-w-xs text-sm text-slate-400">
+                    {t("searchEmptyHint")}
                   </p>
-                  <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
-                    {productResults.map((product) => (
-                      <button
-                        key={product.id}
-                        type="button"
-                        onClick={() => onProductClick(product.slug)}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
-                      >
-                        <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                          {product.thumbnail ? (
-                            <img
-                              src={product.thumbnail}
-                              alt={product.title}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : null}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-800">
-                            {product.title}
-                          </p>
-                          <p className="truncate text-xs text-slate-500">
-                            {product.brand_name}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0 text-right">
-                          <p
-                            className={`text-sm font-bold ${
-                              product.compare_at_price &&
-                              product.compare_at_price > product.price
-                                ? "text-red-600"
-                                : "text-[#0B123A]"
-                            }`}
+                </div>
+              ) : (
+                <div className="p-4">
+                  <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                    {productResults.length > 0 && (
+                      <span>
+                        <span className="font-semibold text-slate-700">
+                          {productResults.length}
+                        </span>{" "}
+                        {t("productsSection").toLowerCase()}
+                      </span>
+                    )}
+                    {brandResults.length > 0 && (
+                      <span>
+                        <span className="font-semibold text-slate-700">
+                          {brandResults.length}
+                        </span>{" "}
+                        {t("brandsSection").toLowerCase()}
+                      </span>
+                    )}
+                    {searchResults.length > 0 && (
+                      <span>
+                        <span className="font-semibold text-slate-700">
+                          {searchResults.length}
+                        </span>{" "}
+                        {t("categoriesSection").toLowerCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  {productResults.length > 0 ? (
+                    <section className="mb-5">
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("productsSection")}
+                      </p>
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
+                        {productResults.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => onProductClick(product.slug)}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
                           >
-                            {formatCurrency(product.price)}
-                          </p>
-                          {product.compare_at_price &&
-                          product.compare_at_price > product.price ? (
-                            <p className="text-xs text-slate-400 line-through">
-                              {formatCurrency(product.compare_at_price)}
-                            </p>
-                          ) : null}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+                            <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                              {product.compare_at_price &&
+                              product.compare_at_price > product.price ? (
+                                <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
+                                  -
+                                  {Math.round(
+                                    ((product.compare_at_price - product.price) /
+                                      product.compare_at_price) *
+                                      100,
+                                  )}
+                                  %
+                                </span>
+                              ) : null}
+                              {product.stock_status === "out_of_stock" ? (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+                                  <span className="text-[8px] font-bold uppercase leading-tight text-white">
+                                    {t("outOfStock")}
+                                  </span>
+                                </div>
+                              ) : null}
+                              <img
+                                src={product.thumbnail || "/No_Image_Available.png"}
+                                alt={product.title}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src =
+                                    "/No_Image_Available.png";
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-slate-800">
+                                {product.title}
+                              </p>
+                              <div className="mt-0.5 flex items-center gap-1.5">
+                                <p className="truncate text-xs text-slate-500">
+                                  {product.brand_name}
+                                </p>
+                                {product.rating_avg && product.rating_count > 0 ? (
+                                  <span className="flex items-center gap-0.5 text-[11px]">
+                                    <span className="text-amber-400">★</span>
+                                    <span className="text-slate-500">
+                                      {product.rating_avg.toFixed(1)}
+                                    </span>
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0 text-right">
+                              <p
+                                className={`text-sm font-bold ${
+                                  product.compare_at_price &&
+                                  product.compare_at_price > product.price
+                                    ? "text-red-600"
+                                    : "text-[#0B123A]"
+                                }`}
+                              >
+                                {formatCurrency(product.price)}
+                              </p>
+                              {product.compare_at_price &&
+                              product.compare_at_price > product.price ? (
+                                <p className="text-xs text-slate-400 line-through">
+                                  {formatCurrency(product.compare_at_price)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
 
-              {!searchLoading && brandResults.length > 0 ? (
-                <section className="mb-5">
-                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    {t("brandsSection")}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {brandResults.map((brand) => (
-                      <button
-                        key={brand.id}
-                        type="button"
-                        onClick={() => onBrandClick(brand.slug)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
-                      >
-                        <p className="truncate font-semibold text-slate-800">
-                          {brand.name}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {t("brandProductsCount", { count: brand.count })}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+                  {brandResults.length > 0 ? (
+                    <section className="mb-5">
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("brandsSection")}
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {brandResults.map((brand) => (
+                          <button
+                            key={brand.id}
+                            type="button"
+                            onClick={() => onBrandClick(brand.slug)}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-800">
+                                {brand.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {t("brandProductsCount", { count: brand.count })}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
 
-              {!searchLoading && searchResults.length > 0 ? (
-                <section className="mb-5">
-                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    {t("categoriesSection")}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {searchResults.map((item) => (
-                      <CategorySearchResultCard
-                        key={item.id}
-                        item={item}
-                        onClick={onNavigate}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+                  {searchResults.length > 0 ? (
+                    <section className="mb-5">
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("categoriesSection")}
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {searchResults.map((item) => (
+                          <CategorySearchResultCard
+                            key={item.id}
+                            item={item}
+                            onClick={onNavigate}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
 
-              {!searchLoading &&
-              (productResults.length > 0 ||
-                brandResults.length > 0 ||
-                searchResults.length > 0) ? (
-                <button
-                  type="button"
-                  onClick={() => onViewAllSearchResults(query)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
-                >
-                  {t("viewAllSearchResults", { query })}
-                </button>
-              ) : null}
+                  <button
+                    type="button"
+                    onClick={() => onViewAllSearchResults(query)}
+                    className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                  >
+                    {t("viewAllSearchResults", { query })}
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex h-full min-h-0 flex-col">

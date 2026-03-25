@@ -1040,7 +1040,7 @@ export default function Navbar() {
                             <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
                               {product.compare_at_price &&
                               product.compare_at_price > product.price ? (
-                                <span className="absolute left-0.5 top-0.5 z-10 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
+                                <span className="absolute left-0.5 top-0.5 z-20 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
                                   -
                                   {Math.round(
                                     ((product.compare_at_price - product.price) /
@@ -1055,8 +1055,9 @@ export default function Navbar() {
                                 alt={product.title}
                                 className="h-full w-full object-cover"
                                 onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).src =
-                                    "/No_Image_Available.png";
+                                  const img = e.currentTarget as HTMLImageElement;
+                                  img.onerror = null;
+                                  img.src = "/No_Image_Available.png";
                                 }}
                               />
                             </div>
@@ -1269,10 +1270,18 @@ export default function Navbar() {
                 </div>
               )
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                {categorySearch
-                  ? t("searchEmptyHint")
-                  : t("noCategoriesAvailable")}
+              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <div className="rounded-full bg-slate-100 p-4">
+                  <Search className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="font-semibold text-slate-700">
+                  {categorySearch ? t("noResults") : t("noCategoriesAvailable")}
+                </p>
+                {categorySearch ? (
+                  <p className="max-w-xs text-sm text-slate-400">
+                    {t("searchEmptyHint")}
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

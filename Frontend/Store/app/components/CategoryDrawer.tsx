@@ -290,7 +290,7 @@ export function CategoryDrawer({
                             <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
                               {product.compare_at_price &&
                               product.compare_at_price > product.price ? (
-                                <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
+                                <span className="absolute left-1 top-1 z-20 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
                                   -
                                   {Math.round(
                                     ((product.compare_at_price - product.price) /
@@ -312,8 +312,9 @@ export function CategoryDrawer({
                                 alt={product.title}
                                 className="h-full w-full object-cover"
                                 onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).src =
-                                    "/No_Image_Available.png";
+                                  const img = e.currentTarget as HTMLImageElement;
+                                  img.onerror = null;
+                                  img.src = "/No_Image_Available.png";
                                 }}
                               />
                             </div>

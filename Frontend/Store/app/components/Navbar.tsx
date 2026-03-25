@@ -152,6 +152,10 @@ export default function Navbar() {
     CategorySearchResult[]
   >([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
+  const [drawerProductResults, setDrawerProductResults] = useState<Product[]>([]);
+  const [drawerBrandResults, setDrawerBrandResults] = useState<
+    BrandSearchResult[]
+  >([]);
   const [mobileCategoryPath, setMobileCategoryPath] = useState<string[]>([]);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() =>
     loadStoreBranding(),
@@ -195,7 +199,7 @@ export default function Navbar() {
     activeMobileNode?.children ?? filteredCategories;
   const visibleMobileCategoryCount =
     categorySearch.trim().length >= 2
-      ? categorySearchResults.length
+      ? categorySearchResults.length + drawerProductResults.length + drawerBrandResults.length
       : visibleMobileTreeCategories.length;
 
   // Use context providers
@@ -372,8 +376,25 @@ export default function Navbar() {
     setShowSearchResults(false);
     setCategorySearch("");
     setCategorySearchResults([]);
+    setDrawerProductResults([]);
+    setDrawerBrandResults([]);
     setCategorySearchLoading(false);
     setMobileCategoryPath([]);
+  };
+
+  const handleDrawerProductClick = (slug: string) => {
+    router.push(`/products/${slug}`);
+    closeMobilePanels();
+  };
+
+  const handleDrawerBrandClick = (slug: string) => {
+    router.push(`/products?brand=${encodeURIComponent(slug)}`);
+    closeMobilePanels();
+  };
+
+  const handleViewAllDrawerSearchResults = (query: string) => {
+    router.push(`/products?search=${encodeURIComponent(query.trim())}`);
+    closeMobilePanels();
   };
 
   const handleProductClick = (product: Product) => {
@@ -436,6 +457,8 @@ export default function Navbar() {
   useEffect(() => {
     if (categorySearch.trim().length < 2) {
       setCategorySearchResults([]);
+      setDrawerProductResults([]);
+      setDrawerBrandResults([]);
       setCategorySearchLoading(false);
       return;
     }
@@ -443,15 +466,19 @@ export default function Navbar() {
     const timer = setTimeout(async () => {
       setCategorySearchLoading(true);
       try {
-        const results = await productAPI.searchCategories(categorySearch, 5);
-        setCategorySearchResults(results);
+        const results = await productAPI.universalSearch(categorySearch, 5);
+        setCategorySearchResults(results.categories);
+        setDrawerProductResults(results.products);
+        setDrawerBrandResults(results.brands);
       } catch (error) {
-        console.warn("Failed to search categories:", error);
+        console.warn("Failed to search:", error);
         setCategorySearchResults([]);
+        setDrawerProductResults([]);
+        setDrawerBrandResults([]);
       } finally {
         setCategorySearchLoading(false);
       }
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [categorySearch]);
@@ -914,10 +941,15 @@ export default function Navbar() {
         query={categorySearch}
         searchResults={categorySearchResults}
         searchLoading={categorySearchLoading}
+        productResults={drawerProductResults}
+        brandResults={drawerBrandResults}
         onQueryChange={setCategorySearch}
         onClose={closeMobilePanels}
         onNavigate={handleCategoryClick}
         onBrowseAllProducts={handleAllProductsClick}
+        onProductClick={handleDrawerProductClick}
+        onBrandClick={handleDrawerBrandClick}
+        onViewAllSearchResults={handleViewAllDrawerSearchResults}
         activeCategorySlug={activeCategorySlug}
       />
 
@@ -952,7 +984,7 @@ export default function Navbar() {
               type="text"
               value={categorySearch}
               onChange={(e) => setCategorySearch(e.target.value)}
-              placeholder={t("searchCategories")}
+              placeholder={t("searchPlaceholder")}
               className="w-full pl-10 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
             />
             {categorySearch ? (
@@ -976,15 +1008,90 @@ export default function Navbar() {
               </div>
             ) : visibleMobileCategoryCount > 0 ? (
               categorySearch.trim().length >= 2 ? (
-                <div className="space-y-2">
-                  {categorySearchResults.map((category) => (
-                    <CategorySearchResultCard
-                      key={category.id}
-                      item={category}
-                      onClick={handleCategoryClick}
-                      compact
-                    />
-                  ))}
+                <div className="space-y-4">
+                  {drawerProductResults.length > 0 ? (
+                    <section>
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("productsSection")}
+                      </p>
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
+                        {drawerProductResults.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => handleDrawerProductClick(product.slug)}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                          >
+                            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                              {product.thumbnail ? (
+                                <img
+                                  src={product.thumbnail}
+                                  alt={product.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-slate-800">
+                                {product.title}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {product.brand_name}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  {drawerBrandResults.length > 0 ? (
+                    <section>
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("brandsSection")}
+                      </p>
+                      <div className="space-y-2">
+                        {drawerBrandResults.map((brand) => (
+                          <button
+                            key={brand.id}
+                            type="button"
+                            onClick={() => handleDrawerBrandClick(brand.slug)}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
+                          >
+                            <p className="truncate font-semibold text-slate-800">
+                              {brand.name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {t("brandProductsCount", { count: brand.count })}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  {categorySearchResults.length > 0 ? (
+                    <section>
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("categoriesSection")}
+                      </p>
+                      <div className="space-y-2">
+                        {categorySearchResults.map((category) => (
+                          <CategorySearchResultCard
+                            key={category.id}
+                            item={category}
+                            onClick={handleCategoryClick}
+                            compact
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleViewAllDrawerSearchResults(categorySearch)}
+                    className="w-full rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                  >
+                    {t("viewAllSearchResults", { query: categorySearch })}
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1113,7 +1220,7 @@ export default function Navbar() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 {categorySearch
-                  ? t("noCategoriesFound")
+                  ? t("searchEmptyHint")
                   : t("noCategoriesAvailable")}
               </div>
             )}

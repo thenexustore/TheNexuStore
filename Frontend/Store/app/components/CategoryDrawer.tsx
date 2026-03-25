@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { CategorySearchResult, CategoryTreeNode } from "../lib/products";
+import { CategorySearchResult, CategoryTreeNode, Product } from "../lib/products";
 import {
   canNavigateCategoryDirectly,
   findCategoryTrailBySlug,
 } from "../lib/category-navigation";
 import { getCategoryIcon } from "../lib/category-icons";
 import { CategorySearchResultCard } from "./CategorySearchResultCard";
+import { formatCurrency } from "../lib/currency";
+
+type BrandResult = { id: string; name: string; slug: string; count: number };
 
 type Props = {
   open: boolean;
@@ -18,10 +21,15 @@ type Props = {
   query: string;
   searchResults: CategorySearchResult[];
   searchLoading: boolean;
+  productResults: Product[];
+  brandResults: BrandResult[];
   onQueryChange: (value: string) => void;
   onClose: () => void;
   onNavigate: (slug: string) => void;
   onBrowseAllProducts: () => void;
+  onProductClick: (slug: string) => void;
+  onBrandClick: (slug: string) => void;
+  onViewAllSearchResults: (query: string) => void;
   activeCategorySlug?: string | null;
 };
 
@@ -32,10 +40,15 @@ export function CategoryDrawer({
   query,
   searchResults,
   searchLoading,
+  productResults,
+  brandResults,
   onQueryChange,
   onClose,
   onNavigate,
   onBrowseAllProducts,
+  onProductClick,
+  onBrandClick,
+  onViewAllSearchResults,
   activeCategorySlug,
 }: Props) {
   const t = useTranslations("nav");
@@ -164,7 +177,7 @@ export function CategoryDrawer({
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-10 text-sm outline-none focus:border-[#0B123A] focus:ring-2 focus:ring-[#0B123A]/15"
-              placeholder={t("searchCategories")}
+              placeholder={t("searchPlaceholder")}
             />
             {query ? (
               <button
@@ -185,20 +198,123 @@ export function CategoryDrawer({
               {searchLoading ? (
                 <p className="text-sm text-slate-500">{t("searching")}</p>
               ) : null}
-              {!searchLoading && !searchResults.length ? (
+              {!searchLoading &&
+              !productResults.length &&
+              !brandResults.length &&
+              !searchResults.length ? (
                 <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                  {t("searchCategoriesEmptyHint")}
+                  {t("searchEmptyHint")}
                 </div>
               ) : null}
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {searchResults.map((item) => (
-                  <CategorySearchResultCard
-                    key={item.id}
-                    item={item}
-                    onClick={onNavigate}
-                  />
-                ))}
-              </div>
+
+              {!searchLoading && productResults.length > 0 ? (
+                <section className="mb-5">
+                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {t("productsSection")}
+                  </p>
+                  <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
+                    {productResults.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => onProductClick(product.slug)}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                      >
+                        <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                          {product.thumbnail ? (
+                            <img
+                              src={product.thumbnail}
+                              alt={product.title}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {product.title}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">
+                            {product.brand_name}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 text-right">
+                          <p
+                            className={`text-sm font-bold ${
+                              product.compare_at_price &&
+                              product.compare_at_price > product.price
+                                ? "text-red-600"
+                                : "text-[#0B123A]"
+                            }`}
+                          >
+                            {formatCurrency(product.price)}
+                          </p>
+                          {product.compare_at_price &&
+                          product.compare_at_price > product.price ? (
+                            <p className="text-xs text-slate-400 line-through">
+                              {formatCurrency(product.compare_at_price)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {!searchLoading && brandResults.length > 0 ? (
+                <section className="mb-5">
+                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {t("brandsSection")}
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {brandResults.map((brand) => (
+                      <button
+                        key={brand.id}
+                        type="button"
+                        onClick={() => onBrandClick(brand.slug)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
+                      >
+                        <p className="truncate font-semibold text-slate-800">
+                          {brand.name}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {t("brandProductsCount", { count: brand.count })}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {!searchLoading && searchResults.length > 0 ? (
+                <section className="mb-5">
+                  <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {t("categoriesSection")}
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {searchResults.map((item) => (
+                      <CategorySearchResultCard
+                        key={item.id}
+                        item={item}
+                        onClick={onNavigate}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {!searchLoading &&
+              (productResults.length > 0 ||
+                brandResults.length > 0 ||
+                searchResults.length > 0) ? (
+                <button
+                  type="button"
+                  onClick={() => onViewAllSearchResults(query)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                >
+                  {t("viewAllSearchResults", { query })}
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="flex h-full min-h-0 flex-col">

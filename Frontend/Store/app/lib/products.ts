@@ -363,6 +363,52 @@ class ProductAPI {
     return apiRequest(`/user/categories/search?q=${encodeURIComponent(query)}&maxDepth=${maxDepth}`);
   }
 
+  async universalSearch(
+    query: string,
+    limit: number = 5,
+  ): Promise<{
+    products: Product[];
+    categories: CategorySearchResult[];
+    brands: Array<{ id: string; name: string; slug: string; count: number }>;
+  }> {
+    const [productResponse, categories] = await Promise.all([
+      this.getProducts({ search: query, limit }),
+      this.searchCategories(query, limit),
+    ]);
+
+    const brandsFromFilters = productResponse.filters?.brands ?? [];
+    let brands: Array<{ id: string; name: string; slug: string; count: number }>;
+    if (brandsFromFilters.length > 0) {
+      brands = brandsFromFilters.slice(0, limit);
+    } else {
+      const uniqueBrands = new Map<
+        string,
+        { id: string; name: string; slug: string; count: number }
+      >();
+      for (const product of productResponse.products ?? []) {
+        if (!product.brand_slug) continue;
+        const existing = uniqueBrands.get(product.brand_slug);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          uniqueBrands.set(product.brand_slug, {
+            id: product.brand_slug,
+            name: product.brand_name,
+            slug: product.brand_slug,
+            count: 1,
+          });
+        }
+      }
+      brands = Array.from(uniqueBrands.values()).slice(0, limit);
+    }
+
+    return {
+      products: productResponse.products ?? [],
+      categories,
+      brands,
+    };
+  }
+
   async getCategories(): Promise<Category[]> {
     try {
       const response = await apiRequest("/user/products?limit=1");

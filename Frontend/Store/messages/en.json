@@ -48,7 +48,9 @@
     "chooseLowerLevelHint": "You can open this full level or go deeper into a more specific category.",
     "mobileBrowseHint": "Tap the name to explore and use \"View\" to open products directly.",
     "currentCategory": "Current category",
-    "openCurrentCategory": "Open current category"
+    "openCurrentCategory": "Open current category",
+    "searchEmptyHint": "No results found. Try a different search term.",
+    "viewAllSearchResults": "View all results for \"{query}\""
   },
   "footer": {
     "title": "Be the first to know.",

@@ -172,7 +172,7 @@ export default function ProductPage() {
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
           {/* MAIN IMAGE */}
-          <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+          <div className="aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
             {images.length > 0 ? (
               <div className="relative h-full w-full bg-gray-100">
                 {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price && (
@@ -248,6 +248,12 @@ export default function ProductPage() {
 
         <div>
           <h1 className="mb-2 break-words text-2xl font-bold sm:text-3xl">{product.title}</h1>
+
+          {product.brand_name && (
+            <span className="mb-4 inline-block rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {product.brand_name}
+            </span>
+          )}
 
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center">
@@ -336,12 +342,17 @@ export default function ProductPage() {
 
           {product.attributes.length > 0 && (
             <div className="mb-6">
-              <h3 className="mb-2 font-medium">{t("specifications")}</h3>
-              <div className="space-y-1">
-                {product.attributes.map((attr) => (
-                  <div key={attr.key} className="flex gap-2">
-                    <span className="w-28 shrink-0 text-gray-600">{attr.name}:</span>
-                    <span className="min-w-0 break-words">{attr.values.join(", ")}</span>
+              <h3 className="mb-3 font-semibold text-slate-800">{t("specifications")}</h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                {product.attributes.map((attr, idx) => (
+                  <div
+                    key={attr.key}
+                    className={`flex gap-3 px-4 py-2.5 text-sm ${
+                      idx % 2 === 0 ? "bg-slate-50" : "bg-white"
+                    }`}
+                  >
+                    <span className="w-32 shrink-0 font-medium text-slate-500">{attr.name}</span>
+                    <span className="min-w-0 break-words text-slate-800">{attr.values.join(", ")}</span>
                   </div>
                 ))}
               </div>
@@ -350,7 +361,7 @@ export default function ProductPage() {
 
           <div className="mb-8 md:mb-4">
             <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="flex w-fit items-center rounded border border-gray-300">
+              <div className="flex w-fit items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                 <button
                   onClick={async () => {
                     if (!currentVariant) return;
@@ -363,7 +374,7 @@ export default function ProductPage() {
                       }
                     }
                   }}
-                  className="px-3 py-2 hover:bg-gray-100"
+                  className="px-4 py-2.5 text-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   disabled={isOutOfStock || cartLoading}
                 >
                   -
@@ -382,7 +393,7 @@ export default function ProductPage() {
                       ),
                     )
                   }
-                  className="w-14 bg-transparent text-center sm:w-16"
+                  className="w-14 bg-transparent text-center font-semibold sm:w-16"
                   disabled={isOutOfStock || cartLoading}
                 />
                 <button
@@ -395,7 +406,7 @@ export default function ProductPage() {
                       await addItem(currentVariant.sku_code, 1);
                     }
                   }}
-                  className="px-3 py-2 hover:bg-gray-100"
+                  className="px-4 py-2.5 text-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   disabled={
                     isOutOfStock ||
                     cartLoading ||
@@ -473,18 +484,34 @@ export default function ProductPage() {
       </div>
 
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 fixed-bottom-bar backdrop-blur md:hidden">
-        <button
-          onClick={handleAddToCart}
-          disabled={isOutOfStock || addingToCart || cartLoading}
-          className={`w-full rounded-xl px-6 py-3 text-sm font-semibold transition-all ${
-            isOutOfStock || addingToCart || cartLoading
-              ? "cursor-not-allowed bg-gray-300 text-gray-500"
-              : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
-          }`}
-        >
-          {addingToCart ? t("adding") : isOutOfStock ? t("outOfStock") : t("addToCart")}
-        </button>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 fixed-bottom-bar backdrop-blur md:hidden">
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col">
+            <span className={`text-lg font-extrabold leading-tight ${
+              currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price
+                ? "text-red-600"
+                : "text-slate-900"
+            }`}>
+              {formatCurrency(currentVariant.price)}
+            </span>
+            {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price && (
+              <span className="text-xs text-slate-400 line-through leading-none">
+                {formatCurrency(currentVariant.compare_at_price)}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleAddToCart}
+            disabled={isOutOfStock || addingToCart || cartLoading}
+            className={`flex-1 rounded-xl px-6 py-3 text-sm font-semibold transition-all ${
+              isOutOfStock || addingToCart || cartLoading
+                ? "cursor-not-allowed bg-gray-300 text-gray-500"
+                : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
+            }`}
+          >
+            {addingToCart ? t("adding") : isOutOfStock ? t("outOfStock") : t("addToCart")}
+          </button>
+        </div>
       </div>
 
       <div className="mt-12 mb-8">

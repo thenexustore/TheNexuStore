@@ -203,7 +203,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             fill
             unoptimized
             sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
-            className="p-0.5 object-contain transition-transform duration-300 group-hover:scale-105"
+            className="p-2 object-contain transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               const target = e.currentTarget as HTMLImageElement;
               if (target.src.endsWith("/No_Image_Available.png")) return;
@@ -258,7 +258,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         <div className="flex justify-between items-center mb-3">
-          <span className="text-xs font-semibold uppercase text-gray-500 tracking-wide">
+          <span className="truncate text-xs font-semibold uppercase text-gray-500 tracking-wide">
             {product.brand_name}
           </span>
           {cartItem && (
@@ -383,7 +383,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               {cartLoading ? t("adding") : t("addToCart")}
             </button>
           ) : (
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-3">
               <button
                 onClick={handleDecreaseQuantity}
                 disabled={cartLoading}

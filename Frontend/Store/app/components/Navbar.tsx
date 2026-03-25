@@ -152,6 +152,10 @@ export default function Navbar() {
     CategorySearchResult[]
   >([]);
   const [categorySearchLoading, setCategorySearchLoading] = useState(false);
+  const [drawerProductResults, setDrawerProductResults] = useState<Product[]>([]);
+  const [drawerBrandResults, setDrawerBrandResults] = useState<
+    BrandSearchResult[]
+  >([]);
   const [mobileCategoryPath, setMobileCategoryPath] = useState<string[]>([]);
   const [storeBranding, setStoreBranding] = useState<StoreBranding>(() =>
     loadStoreBranding(),
@@ -195,7 +199,7 @@ export default function Navbar() {
     activeMobileNode?.children ?? filteredCategories;
   const visibleMobileCategoryCount =
     categorySearch.trim().length >= 2
-      ? categorySearchResults.length
+      ? categorySearchResults.length + drawerProductResults.length + drawerBrandResults.length
       : visibleMobileTreeCategories.length;
 
   // Use context providers
@@ -372,8 +376,25 @@ export default function Navbar() {
     setShowSearchResults(false);
     setCategorySearch("");
     setCategorySearchResults([]);
+    setDrawerProductResults([]);
+    setDrawerBrandResults([]);
     setCategorySearchLoading(false);
     setMobileCategoryPath([]);
+  };
+
+  const handleDrawerProductClick = (slug: string) => {
+    router.push(`/products/${slug}`);
+    closeMobilePanels();
+  };
+
+  const handleDrawerBrandClick = (slug: string) => {
+    router.push(`/products?brand=${encodeURIComponent(slug)}`);
+    closeMobilePanels();
+  };
+
+  const handleViewAllDrawerSearchResults = (query: string) => {
+    router.push(`/products?search=${encodeURIComponent(query.trim())}`);
+    closeMobilePanels();
   };
 
   const handleProductClick = (product: Product) => {
@@ -436,6 +457,8 @@ export default function Navbar() {
   useEffect(() => {
     if (categorySearch.trim().length < 2) {
       setCategorySearchResults([]);
+      setDrawerProductResults([]);
+      setDrawerBrandResults([]);
       setCategorySearchLoading(false);
       return;
     }
@@ -443,15 +466,19 @@ export default function Navbar() {
     const timer = setTimeout(async () => {
       setCategorySearchLoading(true);
       try {
-        const results = await productAPI.searchCategories(categorySearch, 5);
-        setCategorySearchResults(results);
+        const results = await productAPI.universalSearch(categorySearch, 5);
+        setCategorySearchResults(results.categories);
+        setDrawerProductResults(results.products);
+        setDrawerBrandResults(results.brands);
       } catch (error) {
-        console.warn("Failed to search categories:", error);
+        console.warn("Failed to search:", error);
         setCategorySearchResults([]);
+        setDrawerProductResults([]);
+        setDrawerBrandResults([]);
       } finally {
         setCategorySearchLoading(false);
       }
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [categorySearch]);
@@ -914,10 +941,15 @@ export default function Navbar() {
         query={categorySearch}
         searchResults={categorySearchResults}
         searchLoading={categorySearchLoading}
+        productResults={drawerProductResults}
+        brandResults={drawerBrandResults}
         onQueryChange={setCategorySearch}
         onClose={closeMobilePanels}
         onNavigate={handleCategoryClick}
         onBrowseAllProducts={handleAllProductsClick}
+        onProductClick={handleDrawerProductClick}
+        onBrandClick={handleDrawerBrandClick}
+        onViewAllSearchResults={handleViewAllDrawerSearchResults}
         activeCategorySlug={activeCategorySlug}
       />
 
@@ -952,7 +984,7 @@ export default function Navbar() {
               type="text"
               value={categorySearch}
               onChange={(e) => setCategorySearch(e.target.value)}
-              placeholder={t("searchCategories")}
+              placeholder={t("searchPlaceholder")}
               className="w-full pl-10 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B123A]/20 focus:border-[#0B123A] text-black placeholder:text-gray-500"
             />
             {categorySearch ? (
@@ -974,17 +1006,144 @@ export default function Navbar() {
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B123A]"></div>
               </div>
+            ) : categorySearch.trim().length >= 2 && categorySearchLoading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 px-3 py-2.5"
+                  >
+                    <div className="h-10 w-10 flex-shrink-0 animate-pulse rounded-lg bg-slate-200" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 w-3/4 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : visibleMobileCategoryCount > 0 ? (
               categorySearch.trim().length >= 2 ? (
-                <div className="space-y-2">
-                  {categorySearchResults.map((category) => (
-                    <CategorySearchResultCard
-                      key={category.id}
-                      item={category}
-                      onClick={handleCategoryClick}
-                      compact
-                    />
-                  ))}
+                <div className="space-y-4">
+                  {drawerProductResults.length > 0 ? (
+                    <section>
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("productsSection")}
+                      </p>
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
+                        {drawerProductResults.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => handleDrawerProductClick(product.slug)}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                          >
+                            <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                              {product.compare_at_price &&
+                              product.compare_at_price > product.price ? (
+                                <span className="absolute left-0.5 top-0.5 z-20 rounded bg-red-600 px-1 py-px text-[9px] font-extrabold leading-tight text-white">
+                                  -
+                                  {Math.round(
+                                    ((product.compare_at_price - product.price) /
+                                      product.compare_at_price) *
+                                      100,
+                                  )}
+                                  %
+                                </span>
+                              ) : null}
+                              <img
+                                src={product.thumbnail || "/No_Image_Available.png"}
+                                alt={product.title}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  const img = e.currentTarget as HTMLImageElement;
+                                  img.onerror = null;
+                                  img.src = "/No_Image_Available.png";
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-slate-800">
+                                {product.title}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">
+                                {product.brand_name}
+                              </p>
+                            </div>
+                            <div className="flex-shrink-0 text-right">
+                              <p
+                                className={`text-sm font-bold ${
+                                  product.compare_at_price &&
+                                  product.compare_at_price > product.price
+                                    ? "text-red-600"
+                                    : "text-[#0B123A]"
+                                }`}
+                              >
+                                {formatCurrency(product.price)}
+                              </p>
+                              {product.compare_at_price &&
+                              product.compare_at_price > product.price ? (
+                                <p className="text-xs text-slate-400 line-through">
+                                  {formatCurrency(product.compare_at_price)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  {drawerBrandResults.length > 0 ? (
+                    <section>
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("brandsSection")}
+                      </p>
+                      <div className="space-y-2">
+                        {drawerBrandResults.map((brand) => (
+                          <button
+                            key={brand.id}
+                            type="button"
+                            onClick={() => handleDrawerBrandClick(brand.slug)}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left transition-all hover:border-[#0B123A] hover:bg-slate-50"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-800">
+                                {brand.name}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {t("brandProductsCount", { count: brand.count })}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  {categorySearchResults.length > 0 ? (
+                    <section>
+                      <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t("categoriesSection")}
+                      </p>
+                      <div className="space-y-2">
+                        {categorySearchResults.map((category) => (
+                          <CategorySearchResultCard
+                            key={category.id}
+                            item={category}
+                            onClick={handleCategoryClick}
+                            compact
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleViewAllDrawerSearchResults(categorySearch)}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-center text-sm font-medium text-[#0B123A] transition-colors hover:border-[#0B123A] hover:bg-[#0B123A] hover:text-white"
+                  >
+                    {t("viewAllSearchResults", { query: categorySearch })}
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1111,10 +1270,18 @@ export default function Navbar() {
                 </div>
               )
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                {categorySearch
-                  ? t("noCategoriesFound")
-                  : t("noCategoriesAvailable")}
+              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <div className="rounded-full bg-slate-100 p-4">
+                  <Search className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="font-semibold text-slate-700">
+                  {categorySearch ? t("noResults") : t("noCategoriesAvailable")}
+                </p>
+                {categorySearch ? (
+                  <p className="max-w-xs text-sm text-slate-400">
+                    {t("searchEmptyHint")}
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

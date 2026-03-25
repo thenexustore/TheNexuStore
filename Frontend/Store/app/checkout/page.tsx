@@ -316,8 +316,8 @@ export default function CheckoutPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-3 ${
-                      errors.email ? "border-red-500" : "border-gray-300"
+                    className={`w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:ring-1 focus:ring-[#0B123A] ${
+                      errors.email ? "border-red-500" : "border-slate-200 focus:border-[#0B123A]"
                     }`}
                   />
                   {errors.email && (
@@ -338,10 +338,10 @@ export default function CheckoutPage() {
                       name="shipping_full_name"
                       value={formData.shipping_address.full_name}
                       onChange={handleChange}
-                      className={`w-full border rounded-lg px-4 py-3 ${
+                      className={`w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:ring-1 focus:ring-[#0B123A] ${
                         errors.shipping_full_name
                           ? "border-red-500"
-                          : "border-gray-300"
+                          : "border-slate-200 focus:border-[#0B123A]"
                       }`}
                     />
                     {errors.shipping_full_name && (
@@ -360,10 +360,10 @@ export default function CheckoutPage() {
                       name="shipping_address_line1"
                       value={formData.shipping_address.address_line1}
                       onChange={handleChange}
-                      className={`w-full border rounded-lg px-4 py-3 ${
+                      className={`w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:ring-1 focus:ring-[#0B123A] ${
                         errors.shipping_address_line1
                           ? "border-red-500"
-                          : "border-gray-300"
+                          : "border-slate-200 focus:border-[#0B123A]"
                       }`}
                     />
                     {errors.shipping_address_line1 && (
@@ -383,10 +383,10 @@ export default function CheckoutPage() {
                         name="shipping_city"
                         value={formData.shipping_address.city}
                         onChange={handleChange}
-                        className={`w-full border rounded-lg px-4 py-3 ${
+                        className={`w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:ring-1 focus:ring-[#0B123A] ${
                           errors.shipping_city
                             ? "border-red-500"
-                            : "border-gray-300"
+                            : "border-slate-200 focus:border-[#0B123A]"
                         }`}
                       />
                       {errors.shipping_city && (
@@ -405,10 +405,10 @@ export default function CheckoutPage() {
                         name="shipping_postal_code"
                         value={formData.shipping_address.postal_code}
                         onChange={handleChange}
-                        className={`w-full border rounded-lg px-4 py-3 ${
+                        className={`w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:ring-1 focus:ring-[#0B123A] ${
                           errors.shipping_postal_code
                             ? "border-red-500"
-                            : "border-gray-300"
+                            : "border-slate-200 focus:border-[#0B123A]"
                         }`}
                       />
                       {errors.shipping_postal_code && (
@@ -428,10 +428,10 @@ export default function CheckoutPage() {
                       name="shipping_phone"
                       value={formData.shipping_address.phone}
                       onChange={handleChange}
-                      className={`w-full border rounded-lg px-4 py-3 ${
+                      className={`w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:ring-1 focus:ring-[#0B123A] ${
                         errors.shipping_phone
                           ? "border-red-500"
-                          : "border-gray-300"
+                          : "border-slate-200 focus:border-[#0B123A]"
                       }`}
                     />
                     {errors.shipping_phone && (
@@ -476,7 +476,7 @@ export default function CheckoutPage() {
                         name="billing_full_name"
                         value={formData.billing_address.full_name}
                         onChange={handleChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 transition focus:border-[#0B123A] focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
                       />
                     </div>
 
@@ -489,7 +489,7 @@ export default function CheckoutPage() {
                         name="billing_vat_id"
                         value={formData.billing_address.vat_id}
                         onChange={handleChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 transition focus:border-[#0B123A] focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
                       />
                     </div>
                   </div>
@@ -499,7 +499,7 @@ export default function CheckoutPage() {
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-4">{t("paymentMethod")}</h2>
                 <div className="space-y-3">
-                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                  <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors has-[:checked]:border-[#0B123A] has-[:checked]:bg-[#0B123A]/5">
                     <input
                       type="radio"
                       name="payment_method"
@@ -513,7 +513,7 @@ export default function CheckoutPage() {
                       <p className="text-sm text-gray-500">{t("payByCardHint")}</p>
                     </div>
                   </label>
-                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                  <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors has-[:checked]:border-[#0B123A] has-[:checked]:bg-[#0B123A]/5">
                     <input
                       type="radio"
                       name="payment_method"
@@ -527,7 +527,7 @@ export default function CheckoutPage() {
                       <p className="text-sm text-gray-500">{t("payByBizumHint")}</p>
                     </div>
                   </label>
-                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+                  <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors has-[:checked]:border-[#0B123A] has-[:checked]:bg-[#0B123A]/5">
                     <input
                       type="radio"
                       name="payment_method"
@@ -557,7 +557,7 @@ export default function CheckoutPage() {
                     value={formData.notes}
                     onChange={handleChange}
                     rows={4}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 transition focus:border-[#0B123A] focus:outline-none focus:ring-1 focus:ring-[#0B123A]"
                     placeholder={t("orderNotesPlaceholder")}
                   />
                 </div>
@@ -663,7 +663,7 @@ export default function CheckoutPage() {
                   {cart.summary.shipping === 0
                     ? t("freeShippingApplied")
                     : t("addForFreeShipping", {
-                        amount: freeShippingRemaining.toFixed(2),
+                        amount: formatCurrency(freeShippingRemaining),
                       })}
                 </p>
               </div>

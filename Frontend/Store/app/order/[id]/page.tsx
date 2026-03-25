@@ -108,7 +108,7 @@ export default function OrderConfirmationPage() {
                 <div className="flex justify-between">
                   <span>{t("status")}</span>
                   <span className="font-semibold capitalize">
-                    {order.status.replace("_", " ")}
+                    {order.status.replace(/_/g, " ")}
                   </span>
                 </div>
                 <div className="flex justify-between">

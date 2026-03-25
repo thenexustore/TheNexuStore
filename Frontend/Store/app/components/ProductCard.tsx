@@ -239,7 +239,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
             aria-pressed={isFavorite}
             className="absolute top-2 right-2 z-10 rounded-full bg-white/90 p-2 shadow-md transition-colors hover:bg-white focus-ring"
-            style={{ right: "0.5rem" }}
           >
             <svg
               className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
@@ -274,8 +273,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </h3>
 
           <p className="text-sm text-gray-600 line-clamp-3 min-h-[3.75rem] leading-relaxed">
-            {product.short_description ||
-              t("premiumDesc")}
+            {product.short_description}
           </p>
 
           {rating > 0 && reviewCount > 0 && (
@@ -366,7 +364,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full rounded-lg bg-gray-400 py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
+              className="w-full rounded-xl bg-gray-400 py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
             >
               {t("outOfStock")}
             </button>

@@ -7,6 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { formatCurrency } from "../../lib/currency";
 import Image from "next/image";
+import { ChevronRight, Star } from "lucide-react";
 import ProductCard from "../../components/ProductCard";
 import ReviewForm from "../../components/ReviewForm";
 import { productAPI, ProductDetail, Product } from "../../lib/products";
@@ -157,24 +158,24 @@ export default function ProductPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip bg-white px-4 pb-24 pt-6 text-black sm:px-6 sm:pb-6 lg:px-8">
-      <div className="mb-6 flex flex-wrap items-center text-sm text-gray-600">
-        <Link href="/" className="hover:underline">
+      <nav aria-label="breadcrumb" className="mb-6 flex flex-wrap items-center gap-1 text-sm text-gray-600">
+        <Link href="/" className="hover:text-[#0B123A] hover:underline">
           {t("home")}
         </Link>
-        <span className="mx-2">/</span>
-        <Link href="/products" className="hover:underline">
+        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+        <Link href="/products" className="hover:text-[#0B123A] hover:underline">
           {t("all")}
         </Link>
-        <span className="mx-2">/</span>
-        <span className="max-w-full break-words">{product.title}</span>
-      </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+        <span className="max-w-[16rem] truncate font-medium text-gray-900 sm:max-w-none sm:overflow-visible sm:whitespace-normal sm:break-words">{product.title}</span>
+      </nav>
 
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
           {/* MAIN IMAGE */}
           <div className="aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
             {images.length > 0 ? (
-              <div className="relative h-full w-full bg-gray-100">
+              <div className="relative h-full w-full bg-slate-50">
                 {currentVariant.compare_at_price && currentVariant.compare_at_price > currentVariant.price && (
                   <span className="absolute left-3 top-3 z-10 rounded-md bg-red-600 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow">
                     -{Math.round(((currentVariant.compare_at_price - currentVariant.price) / currentVariant.compare_at_price) * 100)}%
@@ -200,7 +201,7 @@ export default function ProductPage() {
                 />
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center bg-gray-100">
+              <div className="flex h-full items-center justify-center bg-slate-50">
                 <span className="text-gray-400">{t("noImage")}</span>
               </div>
             )}
@@ -221,7 +222,7 @@ export default function ProductPage() {
                       : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
-                  <div className="relative h-full w-full bg-gray-100">
+                  <div className="relative h-full w-full bg-slate-50">
                     <Image
                       src={
                         imagesError[index]
@@ -281,13 +282,12 @@ export default function ProductPage() {
             )}
 
             {product.rating_avg && (
-              <div className="flex items-center">
-                <span className="mr-1 text-yellow-400">★</span>
-                <span className="font-medium">
-                  {product.rating_avg.toFixed(1)}
-                </span>
-                <span className="ml-1 text-gray-600">
-                  ({product.rating_count} reviews)
+              <div className="flex items-center gap-1">
+                <Star size={16} className="fill-amber-400 text-amber-400" aria-hidden="true" />
+                <span className="font-semibold">{product.rating_avg.toFixed(1)}</span>
+                <span className="text-xs text-gray-500">/ 5</span>
+                <span className="text-xs text-gray-400">
+                  ({product.rating_count} {product.rating_count === 1 ? t("review") : t("reviews")})
                 </span>
               </div>
             )}
@@ -313,7 +313,7 @@ export default function ProductPage() {
 
           {product.variants.length > 1 && (
             <div className="mb-6">
-              <h3 className="mb-2 font-medium">{t("options")}</h3>
+              <h3 className="mb-2 font-semibold text-slate-800">{t("options")}</h3>
               <div className="flex flex-wrap gap-2">
                 {product.variants.map((variant) => (
                   <button
@@ -374,10 +374,11 @@ export default function ProductPage() {
                       }
                     }
                   }}
+                  aria-label="Disminuir cantidad"
                   className="px-4 py-2.5 text-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   disabled={isOutOfStock || cartLoading}
                 >
-                  -
+                  −
                 </button>
                 <input
                   type="number"
@@ -393,6 +394,7 @@ export default function ProductPage() {
                       ),
                     )
                   }
+                  aria-label="Cantidad"
                   className="w-14 bg-transparent text-center font-semibold sm:w-16"
                   disabled={isOutOfStock || cartLoading}
                 />
@@ -406,6 +408,7 @@ export default function ProductPage() {
                       await addItem(currentVariant.sku_code, 1);
                     }
                   }}
+                  aria-label="Aumentar cantidad"
                   className="px-4 py-2.5 text-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   disabled={
                     isOutOfStock ||
@@ -460,13 +463,23 @@ export default function ProductPage() {
 
             {addToCartMessage && (
               <div
-                className={`p-3 rounded-lg text-sm font-medium ${
+                className={`flex items-start gap-3 rounded-xl border p-3 text-sm font-medium ${
                   addToCartError
-                    ? "bg-red-100 text-red-700"
-                    : "bg-green-100 text-green-700"
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-green-200 bg-green-50 text-green-700"
                 }`}
+                role="alert"
               >
-                {addToCartMessage}
+                {addToCartError ? (
+                  <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                <span>{addToCartMessage}</span>
               </div>
             )}
           </div>
@@ -509,7 +522,15 @@ export default function ProductPage() {
                 : "bg-[#0B123A] text-white hover:bg-[#1a245a] active:scale-95"
             }`}
           >
-            {addingToCart ? t("adding") : isOutOfStock ? t("outOfStock") : t("addToCart")}
+            {addingToCart ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {t("adding")}
+              </span>
+            ) : isOutOfStock ? t("outOfStock") : t("addToCart")}
           </button>
         </div>
       </div>

@@ -147,7 +147,7 @@ export default function HomeProductSection({
           ) : null}
         </div>
 
-        <p className="line-clamp-2 min-h-10 break-words text-sm font-medium text-slate-800">{product.title}</p>
+        <p className="line-clamp-3 min-h-[4.5rem] break-words text-sm font-medium text-slate-800">{product.title}</p>
         <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{product.brand_name}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">

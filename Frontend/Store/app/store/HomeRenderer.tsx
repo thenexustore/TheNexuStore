@@ -779,7 +779,7 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
         </div>
 
         <div className="flex flex-1 flex-col">
-          <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
+          <p className="line-clamp-3 text-[14px] font-semibold leading-5 text-slate-900">{asText(product.title, 'Producto')}</p>
           <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
 
           <div className="mt-2 flex items-end gap-2">

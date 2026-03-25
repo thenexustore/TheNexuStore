@@ -127,12 +127,20 @@ export default function CartPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-white p-6">
         <div className="w-full max-w-sm text-center">
-          <div className="relative w-full aspect-square mb-8">
-            <img
-              src="https://www.svgrepo.com/show/17356/empty-cart.svg"
-              alt={t("secureAlt")}
-              className="w-full h-full object-cover rounded-3xl opacity-80"
-            />
+          <div className="relative flex items-center justify-center w-48 h-48 mx-auto mb-8">
+            <svg
+              viewBox="0 0 200 200"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              className="w-full h-full opacity-60"
+            >
+              <circle cx="100" cy="100" r="96" fill="#EEF2FF" stroke="#C7D2FE" strokeWidth="2" />
+              <path d="M60 70h10l16 56h48l12-40H76" stroke="#6366F1" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="90" cy="142" r="7" fill="#6366F1" />
+              <circle cx="126" cy="142" r="7" fill="#6366F1" />
+              <path d="M54 70H44" stroke="#A5B4FC" strokeWidth="4" strokeLinecap="round" />
+            </svg>
           </div>
           <h2 className="text-3xl font-bold text-black mb-3">
             {t("emptyTitle")}
@@ -225,7 +233,7 @@ export default function CartPage() {
                       className="p-4 transition-colors hover:bg-gray-50 sm:p-6"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row">
-                        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-32 sm:w-32">
+                        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-slate-50 sm:h-32 sm:w-32">
                           <img
                             src={
                               item.thumbnail?.trim() ||
@@ -286,7 +294,7 @@ export default function CartPage() {
                           </div>
 
                           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center border border-gray-200 rounded-lg">
+                            <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                               <button
                                 onClick={() =>
                                   handleUpdateQty(
@@ -295,11 +303,12 @@ export default function CartPage() {
                                   )
                                 }
                                 disabled={item.quantity <= 1}
-                                className="px-3 py-1 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label="Disminuir cantidad"
+                                className="px-3 py-1.5 text-base font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                -
+                                −
                               </button>
-                              <span className="px-4 py-1 font-medium">
+                              <span className="px-4 py-1 font-semibold text-slate-900">
                                 {item.quantity}
                               </span>
                               <button
@@ -310,7 +319,8 @@ export default function CartPage() {
                                   )
                                 }
                                 disabled={item.quantity >= maxQty}
-                                className="px-3 py-1 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label="Aumentar cantidad"
+                                className="px-3 py-1.5 text-base font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 +
                               </button>
@@ -480,7 +490,7 @@ export default function CartPage() {
                   {cart.summary.shipping === 0
                     ? t("freeShippingOver100")
                     : t("addForFreeShipping", {
-                        amount: freeShippingRemaining.toFixed(2),
+                        amount: formatCurrency(freeShippingRemaining, locale),
                       })}
                 </p>
               </div>

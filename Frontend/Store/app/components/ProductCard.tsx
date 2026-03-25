@@ -203,7 +203,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             fill
             unoptimized
             sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
-            className="p-0.5 object-contain transition-transform duration-300 group-hover:scale-105"
+            className="p-2 object-contain transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               const target = e.currentTarget as HTMLImageElement;
               if (target.src.endsWith("/No_Image_Available.png")) return;
@@ -239,7 +239,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
             aria-pressed={isFavorite}
             className="absolute top-2 right-2 z-10 rounded-full bg-white/90 p-2 shadow-md transition-colors hover:bg-white focus-ring"
-            style={{ right: "0.5rem" }}
           >
             <svg
               className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
@@ -258,7 +257,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         <div className="flex justify-between items-center mb-3">
-          <span className="text-xs font-semibold uppercase text-gray-500 tracking-wide">
+          <span className="truncate text-xs font-semibold uppercase text-gray-500 tracking-wide">
             {product.brand_name}
           </span>
           {cartItem && (
@@ -269,17 +268,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         <div className="space-y-3 min-w-0">
-          <h3 className="line-clamp-2 min-h-12 break-words text-base font-bold leading-tight text-gray-900 sm:text-lg">
+          <h3 className="line-clamp-3 min-h-[4.5rem] sm:min-h-[5rem] break-words text-base font-bold leading-tight text-gray-900 sm:text-lg">
             {product.title}
           </h3>
 
-          <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-            {product.short_description ||
-              t("premiumDesc")}
+          <p className="text-sm text-gray-600 line-clamp-3 min-h-[3.75rem] leading-relaxed">
+            {product.short_description}
           </p>
 
           {rating > 0 && reviewCount > 0 && (
-            <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <div className="flex items-center">
                 <Star size={16} className="fill-amber-400 text-amber-400" />
                 <span className="ml-1 text-sm font-semibold">
@@ -293,27 +291,31 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          <div className="flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1">
-            <span
-              className={`text-xl font-bold sm:text-2xl ${
-                product.compare_at_price && product.compare_at_price > product.price
-                  ? "text-red-600"
-                  : "text-gray-900"
-              }`}
-            >
-              {formatCurrency(product.price)}
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span
+                className={`text-xl font-bold sm:text-2xl ${
+                  product.compare_at_price && product.compare_at_price > product.price
+                    ? "text-red-600"
+                    : "text-gray-900"
+                }`}
+              >
+                {formatCurrency(product.price)}
+              </span>
 
-            {product.compare_at_price &&
-              product.compare_at_price > product.price && (
-                <>
+              {product.compare_at_price &&
+                product.compare_at_price > product.price && (
                   <span className="text-sm text-gray-500 line-through sm:text-base">
                     {formatCurrency(product.compare_at_price)}
                   </span>
-                  <span className="text-xs font-semibold text-red-600 sm:text-sm">
-                    {t("save", { amount: formatCurrency(product.compare_at_price - product.price) })}
-                  </span>
-                </>
+                )}
+            </div>
+
+            {product.compare_at_price &&
+              product.compare_at_price > product.price && (
+                <span className="text-xs font-semibold text-red-600 sm:text-sm">
+                  {t("save", { amount: formatCurrency(product.compare_at_price - product.price) })}
+                </span>
               )}
           </div>
         </div>
@@ -324,7 +326,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`focus-ring w-full rounded-xl py-3 text-xs font-bold text-white transition-all duration-200 sm:text-sm ${
+            className={`focus-ring w-full rounded-xl py-2.5 text-xs font-bold leading-tight text-white whitespace-normal transition-all duration-200 sm:py-3 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -362,7 +364,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full rounded-lg bg-gray-400 py-3 text-xs font-semibold text-white cursor-not-allowed sm:text-sm"
+              className="w-full rounded-xl bg-gray-400 py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
             >
               {t("outOfStock")}
             </button>
@@ -370,7 +372,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`focus-ring w-full rounded-xl py-3 text-xs font-semibold text-white transition-colors duration-200 active:scale-95 sm:text-sm ${
+              className={`focus-ring w-full rounded-xl py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
@@ -379,7 +381,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               {cartLoading ? t("adding") : t("addToCart")}
             </button>
           ) : (
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-3">
               <button
                 onClick={handleDecreaseQuantity}
                 disabled={cartLoading}

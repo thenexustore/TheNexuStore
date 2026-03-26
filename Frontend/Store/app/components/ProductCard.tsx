@@ -308,7 +308,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          <div className="flex flex-col gap-0.5">
+          <div className="mt-auto flex flex-col gap-0.5">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span
                 className={`text-xl font-bold sm:text-2xl ${

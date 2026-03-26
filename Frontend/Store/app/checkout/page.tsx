@@ -620,11 +620,11 @@ export default function CheckoutPage() {
                     {formatCurrency(cart.summary.subtotal)}
                   </span>
                 </div>
-                {cart.summary.discount && cart.summary.discount > 0 && (
+                {(Number(cart.summary.discount) || 0) > 0 && (
                   <div className="flex justify-between text-green-700">
                     <span className="text-gray-600">{t("discount")}</span>
                     <span className="font-medium">
-                      -{formatCurrency(cart.summary.discount)}
+                      -{formatCurrency(Number(cart.summary.discount) || 0)}
                     </span>
                   </div>
                 )}

@@ -383,11 +383,11 @@ export default function CartPage() {
                     {formatCurrency(cart.summary.subtotal, locale)}
                   </span>
                 </div>
-                {cart.summary.discount && cart.summary.discount > 0 && (
+                {(Number(cart.summary.discount) || 0) > 0 && (
                   <div className="flex justify-between text-green-700">
                     <span className="text-gray-600">{t("discount")}</span>
                     <span className="font-medium">
-                      -{formatCurrency(cart.summary.discount, locale)}
+                      -{formatCurrency(Number(cart.summary.discount) || 0, locale)}
                     </span>
                   </div>
                 )}

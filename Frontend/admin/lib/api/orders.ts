@@ -81,6 +81,22 @@ export interface OrderDetail {
     redsys_payment_method?: string | null;
   }>;
   shipments?: OrderShipment[];
+  billing_state?: {
+    has_draft_invoice: boolean;
+    has_issued_invoice: boolean;
+    latest_document?: {
+      id: string;
+      status: string;
+      document_number?: string | null;
+      source?: string;
+    } | null;
+  };
+  admin_notes?: Array<{
+    id: string;
+    note: string;
+    author_staff_email?: string | null;
+    created_at: string;
+  }>;
 }
 
 export interface OrdersResponse {
@@ -152,6 +168,27 @@ export async function updateOrderShipment(
 ): Promise<OrderShipment> {
   return fetchWithAuth(`/admin/orders/${orderId}/shipments/${shipmentId}`, {
     method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type AdminOrderAction =
+  | "PUT_ON_HOLD"
+  | "RELEASE_HOLD"
+  | "CANCEL"
+  | "MARK_SHIPPED";
+
+export async function performOrderAction(
+  orderId: string,
+  payload: {
+    action: AdminOrderAction;
+    tracking_number?: string;
+    tracking_url?: string;
+    reason?: string;
+  }
+): Promise<{ id: string; status: string }> {
+  return fetchWithAuth(`/admin/orders/${orderId}/actions`, {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }

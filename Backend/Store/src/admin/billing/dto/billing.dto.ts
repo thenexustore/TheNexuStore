@@ -17,6 +17,7 @@ import { Type } from 'class-transformer';
 import {
   BillingDocumentType,
   BillingDocumentStatus,
+  BillingDocumentSource,
   BillingLanguage,
   BillingPaymentMethod,
 } from '@prisma/client';
@@ -219,6 +220,18 @@ export class BillingDocumentsQueryDto {
   @IsOptional()
   @IsString()
   order_id?: string;
+
+  @IsOptional()
+  @IsEnum(BillingDocumentSource)
+  source?: BillingDocumentSource;
+
+  @IsOptional()
+  @IsString()
+  customer_email?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_name?: string;
 }
 
 export class IssueBillingDocumentDto {

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import {
+  BillingDocumentSource,
   BillingDocumentStatus,
   BillingDocumentType,
   BillingLanguage,
@@ -152,8 +153,22 @@ export class BillingService {
   // ─── Documents ────────────────────────────────────────────────────────────────
 
   async listDocuments(query: BillingDocumentsQueryDto) {
-    const { page, limit, type, status, search, from, to, order_id } = query;
+    const {
+      page,
+      limit,
+      type,
+      status,
+      search,
+      from,
+      to,
+      order_id,
+      source,
+      customer_email,
+      customer_name,
+    } = query;
     const skip = (page - 1) * limit;
+
+    await this.ensureLatestPaidOrderHasDraft();
 
     const dateRange =
       from || to
@@ -186,6 +201,7 @@ export class BillingService {
           { customer_name: { contains: search, mode: 'insensitive' } },
           { customer_email: { contains: search, mode: 'insensitive' } },
           { customer_tax_id: { contains: search, mode: 'insensitive' } },
+          { order: { order_number: { contains: search, mode: 'insensitive' } } },
         ],
       });
     }
@@ -193,7 +209,14 @@ export class BillingService {
     const where: Prisma.BillingDocumentWhereInput = {
       ...(type && { type }),
       ...(status && { status }),
+      ...(source && { source }),
       ...(order_id && { order_id }),
+      ...(customer_email && {
+        customer_email: { contains: customer_email, mode: 'insensitive' },
+      }),
+      ...(customer_name && {
+        customer_name: { contains: customer_name, mode: 'insensitive' },
+      }),
       ...(andConditions.length > 0 && { AND: andConditions }),
     };
 
@@ -214,6 +237,47 @@ export class BillingService {
       limit,
       pages: Math.ceil(total / limit),
     };
+  }
+
+  private async ensureLatestPaidOrderHasDraft(): Promise<void> {
+    const latestPaidOrder = await this.prisma.order.findFirst({
+      where: {
+        status: {
+          in: [
+            OrderStatus.PAID,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+          ],
+        },
+      },
+      orderBy: [{ paid_at: 'desc' }, { created_at: 'desc' }],
+      select: { id: true, order_number: true },
+    });
+
+    if (!latestPaidOrder) return;
+
+    const existing = await this.prisma.billingDocument.findFirst({
+      where: {
+        order_id: latestPaidOrder.id,
+        type: BillingDocumentType.INVOICE,
+        status: { not: BillingDocumentStatus.VOID },
+      },
+      select: { id: true },
+    });
+
+    if (existing) return;
+
+    try {
+      await this.createDocumentFromOrder(latestPaidOrder.id);
+      this.logger.log(
+        `Auto-created billing draft for latest paid order ${latestPaidOrder.order_number ?? latestPaidOrder.id}`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Could not auto-create draft for latest paid order ${latestPaidOrder.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async getDocumentById(id: string) {
@@ -261,6 +325,7 @@ export class BillingService {
       data: {
         type: docData.type,
         status: docData.status ?? BillingDocumentStatus.DRAFT,
+        source: BillingDocumentSource.MANUAL,
         order_id: docData.order_id,
         customer_id: docData.customer_id,
         language: docData.language ?? BillingLanguage.ES,
@@ -412,6 +477,17 @@ export class BillingService {
     dto: IssueBillingDocumentDto,
     actorEmail?: string,
   ) {
+    return this.issueDocumentInternal(id, dto, actorEmail, {
+      allowOrderLinkedIssue: false,
+    });
+  }
+
+  private async issueDocumentInternal(
+    id: string,
+    dto: IssueBillingDocumentDto,
+    actorEmail: string | undefined,
+    options: { allowOrderLinkedIssue: boolean },
+  ) {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id },
       include: { items: true },
@@ -419,6 +495,26 @@ export class BillingService {
     if (!doc) throw new NotFoundException('Billing document not found');
     if (doc.status !== BillingDocumentStatus.DRAFT) {
       throw new BadRequestException('Only DRAFT documents can be issued');
+    }
+
+    if (doc.order_id) {
+      const linkedOrder = await this.prisma.order.findUnique({
+        where: { id: doc.order_id },
+        select: { id: true, status: true },
+      });
+      if (!linkedOrder) {
+        throw new BadRequestException('Linked order no longer exists');
+      }
+      if (!options.allowOrderLinkedIssue) {
+        throw new BadRequestException(
+          'Order-linked invoices must be issued from delivery confirmation',
+        );
+      }
+      if (linkedOrder.status !== OrderStatus.DELIVERED) {
+        throw new BadRequestException(
+          'Order-linked invoices can only be issued when the order is DELIVERED',
+        );
+      }
     }
 
     const { number, seriesId } = await this.assignNextNumber(doc.type);
@@ -454,6 +550,15 @@ export class BillingService {
     return updated;
   }
 
+  private async issueDocumentFromDelivery(
+    id: string,
+    actorEmail?: string,
+  ) {
+    return this.issueDocumentInternal(id, {}, actorEmail, {
+      allowOrderLinkedIssue: true,
+    });
+  }
+
   async convertQuoteToInvoice(
     quoteId: string,
     dto: ConvertQuoteToInvoiceDto,
@@ -469,6 +574,11 @@ export class BillingService {
     }
     if (quote.status === BillingDocumentStatus.VOID) {
       throw new BadRequestException('Cannot convert a void quote');
+    }
+    if (quote.order_id) {
+      throw new BadRequestException(
+        'Order-linked invoices must be issued from delivery confirmation',
+      );
     }
 
     // Prevent converting the same quote twice
@@ -496,6 +606,7 @@ export class BillingService {
         id: invoiceId,
         type: BillingDocumentType.INVOICE,
         status: BillingDocumentStatus.ISSUED,
+        source: quote.source,
         document_number: number,
         series_id: seriesId,
         source_document_id: quoteId,
@@ -789,7 +900,7 @@ export class BillingService {
       let finalDoc = existingDoc;
       if (existingDoc.status === BillingDocumentStatus.DRAFT) {
         // Issue the draft (assigns number + issue_date)
-        finalDoc = await this.issueDocument(existingDoc.id, {}, 'system');
+        finalDoc = await this.issueDocumentFromDelivery(existingDoc.id, 'system');
         // Send email (transitions ISSUED → SENT)
         try {
           await this.sendDocument(finalDoc.id);
@@ -899,6 +1010,7 @@ export class BillingService {
       data: {
         type: BillingDocumentType.INVOICE,
         status: BillingDocumentStatus.DRAFT,
+        source: BillingDocumentSource.ECOMMERCE,
         order_id: orderId,
         customer_id: order.customer_id ?? undefined,
         language: BillingLanguage.ES,
@@ -926,7 +1038,7 @@ export class BillingService {
     // Issue the newly created draft and send email
     let finalDoc: typeof billingDoc = billingDoc;
     try {
-      finalDoc = await this.issueDocument(billingDoc.id, {}, 'system');
+      finalDoc = await this.issueDocumentFromDelivery(billingDoc.id, 'system');
     } catch (err) {
       this.logger.warn(`Could not issue billing document for order ${orderId}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1075,6 +1187,7 @@ export class BillingService {
       data: {
         type: BillingDocumentType.INVOICE,
         status: BillingDocumentStatus.DRAFT,
+        source: BillingDocumentSource.ECOMMERCE,
         order_id: orderId,
         customer_id: order.customer_id ?? undefined,
         language: BillingLanguage.ES,

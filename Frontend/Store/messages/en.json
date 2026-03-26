@@ -279,6 +279,7 @@
     "refresh": "Refresh",
     "paymentPendingAlert": "Bank return received. Waiting for secure server confirmation from Redsys.",
     "paymentConfirmedAlert": "Payment confirmed successfully.",
+    "onHoldAlert": "Your order is temporarily on hold while our team validates shipment details.",
     "paymentFailedAlert": "Payment was declined or canceled. Please retry from support/admin.",
     "orderProgress": "Order Progress",
     "current": "Current",
@@ -290,6 +291,10 @@
       "PAID": {
         "label": "Payment Confirmed",
         "subtitle": "Transaction approved"
+      },
+      "ON_HOLD": {
+        "label": "On Hold",
+        "subtitle": "Pending manual review"
       },
       "PROCESSING": {
         "label": "Preparing Order",
@@ -317,6 +322,11 @@
     "orderItems": "Order Items",
     "qty": "Qty: {qty} x {price}",
     "shippingTracking": "Shipping & Tracking",
+    "billingDocuments": "Billing Documents",
+    "invoiceAvailableAfterDelivery": "Final invoice will be available after delivery confirmation.",
+    "downloadInvoice": "Download invoice {number}",
+    "downloading": "Downloading...",
+    "invoiceDownloadError": "Unable to download invoice right now.",
     "carrier": "Carrier: {carrier}",
     "trackingNumber": "Tracking Number: {number}",
     "viewCarrierTracking": "View carrier tracking",
@@ -425,6 +435,7 @@
       "PENDING": "Pending",
       "PENDING_PAYMENT": "Payment Pending",
       "PAID": "Paid",
+      "ON_HOLD": "On Hold",
       "CONFIRMED": "Confirmed",
       "PROCESSING": "Processing",
       "SHIPPED": "Shipped",

@@ -3,6 +3,7 @@ import { API_URL } from "../env";
 
 export type BillingDocumentType = "INVOICE" | "QUOTE" | "CREDIT_NOTE";
 export type BillingDocumentStatus = "DRAFT" | "ISSUED" | "SENT" | "PAID" | "VOID";
+export type BillingDocumentSource = "ECOMMERCE" | "MANUAL";
 export type BillingLanguage = "ES" | "EN";
 export type BillingPaymentMethod =
   | "REDSYS"
@@ -29,6 +30,7 @@ export interface BillingDocument {
   id: string;
   type: BillingDocumentType;
   status: BillingDocumentStatus;
+  source: BillingDocumentSource;
   document_number: string | null;
   order_id: string | null;
   customer_id: string | null;
@@ -167,6 +169,9 @@ export async function fetchBillingDocuments(params: {
   from?: string;
   to?: string;
   order_id?: string;
+  source?: BillingDocumentSource;
+  customer_email?: string;
+  customer_name?: string;
 }): Promise<BillingDocumentsResponse> {
   const query = new URLSearchParams();
   if (params.page) query.set("page", String(params.page));
@@ -177,6 +182,9 @@ export async function fetchBillingDocuments(params: {
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   if (params.order_id) query.set("order_id", params.order_id);
+  if (params.source) query.set("source", params.source);
+  if (params.customer_email) query.set("customer_email", params.customer_email);
+  if (params.customer_name) query.set("customer_name", params.customer_name);
   return fetchWithAuth(`/admin/billing/documents?${query.toString()}`);
 }
 

@@ -1,17 +1,27 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../common/prisma.service';
+import { OrderStatus } from '@prisma/client';
 
 describe('AdminService orders behavior', () => {
   const prisma = {
     order: {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
     },
     customer: {
       findUnique: jest.fn(),
     },
     orderItem: {
+      findMany: jest.fn(),
+    },
+    orderAdminNote: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
+    adminAuditLog: {
       findMany: jest.fn(),
     },
   } as unknown as PrismaService;
@@ -51,6 +61,28 @@ describe('AdminService orders behavior', () => {
     );
   });
 
+  it('persists an order admin note', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({ id: 'o1' });
+    (prisma.orderAdminNote.create as jest.Mock).mockResolvedValue({
+      id: 'note-1',
+    });
+
+    const result = await service.addOrderNote('o1', 'packaging delayed', {
+      staffId: 'staff-1',
+      staffEmail: 'ops@example.com',
+    });
+
+    expect(prisma.orderAdminNote.create).toHaveBeenCalledWith({
+      data: {
+        order_id: 'o1',
+        note: 'packaging delayed',
+        author_staff_id: 'staff-1',
+        author_staff_email: 'ops@example.com',
+      },
+    });
+    expect(result.persisted_note_id).toBe('note-1');
+  });
+
   it('bulk updates order status with deduplicated ids', async () => {
     (prisma.order.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
 
@@ -68,5 +100,17 @@ describe('AdminService orders behavior', () => {
       ids: ['o1', 'o2'],
       status: 'PROCESSING',
     });
+  });
+
+  it('prevents releasing hold when order is not ON_HOLD', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'o2',
+      status: OrderStatus.PAID,
+      shipments: [],
+    });
+
+    await expect(
+      service.performOrderAction('o2', { action: 'RELEASE_HOLD' as any }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

@@ -21,6 +21,7 @@ import {
   fetchOrderById,
   fetchOrders,
   fetchOrderTimeline,
+  performOrderAction,
   markOrderDelivered,
   updateOrderShipment,
   fetchBillingDocumentsByOrder,
@@ -38,6 +39,7 @@ import { formatCurrency as formatCurrencyValue } from "@/lib/currency";
 
 const statusColors: Record<string, string> = {
   PENDING_PAYMENT: "bg-blue-100 text-blue-800",
+  ON_HOLD: "bg-amber-100 text-amber-800",
   PROCESSING: "bg-yellow-100 text-yellow-800",
   PAID: "bg-green-100 text-green-800",
   SHIPPED: "bg-purple-100 text-purple-800",
@@ -268,6 +270,30 @@ export default function OrdersPage() {
     }
   };
 
+  const handleOrderAction = async (
+    action: "PUT_ON_HOLD" | "RELEASE_HOLD" | "CANCEL" | "MARK_SHIPPED",
+  ) => {
+    if (!selectedOrderId) return;
+    try {
+      await performOrderAction(selectedOrderId, {
+        action,
+        tracking_number:
+          action === "MARK_SHIPPED"
+            ? shipmentDraft.tracking_number.trim() || undefined
+            : undefined,
+        tracking_url:
+          action === "MARK_SHIPPED"
+            ? shipmentDraft.tracking_url.trim() || undefined
+            : undefined,
+      });
+      toast.success("Order action completed");
+      await refreshOrderDetail(selectedOrderId);
+      await loadOrders(page);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to apply order action");
+    }
+  };
+
   const handleGenerateBillingDoc = async () => {
     if (!selectedOrderId) return;
     setGeneratingBillingDoc(true);
@@ -345,6 +371,7 @@ export default function OrdersPage() {
               <option value="PENDING_PAYMENT">Pending Payment</option>
               <option value="PROCESSING">Processing</option>
               <option value="PAID">Paid</option>
+              <option value="ON_HOLD">On Hold</option>
               <option value="SHIPPED">Shipped</option>
               <option value="DELIVERED">Delivered</option>
               <option value="CANCELLED">Cancelled</option>
@@ -495,6 +522,16 @@ export default function OrdersPage() {
                       <p className="text-sm"><span className="font-medium">Order:</span> {orderDetail.order_number}</p>
                       <p className="text-sm"><span className="font-medium">Email:</span> {orderDetail.email}</p>
                       <p className="text-sm"><span className="font-medium">Status:</span> {orderDetail.status}</p>
+                      {orderDetail.billing_state && (
+                        <p className="text-sm">
+                          <span className="font-medium">Billing:</span>{" "}
+                          {orderDetail.billing_state.has_issued_invoice
+                            ? "Final invoice issued"
+                            : orderDetail.billing_state.has_draft_invoice
+                              ? "Draft exists (internal)"
+                              : "No billing doc yet"}
+                        </p>
+                      )}
                       <p className="text-sm"><span className="font-medium">Total:</span> {formatMoney(Number(orderDetail.total_amount))}</p>
                       <p className="text-sm"><span className="font-medium">Created:</span> {new Date(orderDetail.created_at).toLocaleString()}</p>
 
@@ -740,6 +777,51 @@ export default function OrdersPage() {
                             </button>
                           </div>
                         </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <h4 className="text-sm font-semibold mb-2">Operational actions</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {orderDetail.status !== "ON_HOLD" && orderDetail.status !== "CANCELLED" && orderDetail.status !== "DELIVERED" && (
+                            <button
+                              type="button"
+                              onClick={() => handleOrderAction("PUT_ON_HOLD")}
+                              className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                            >
+                              Put on hold
+                            </button>
+                          )}
+                          {orderDetail.status === "ON_HOLD" && (
+                            <button
+                              type="button"
+                              onClick={() => handleOrderAction("RELEASE_HOLD")}
+                              className="rounded border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                            >
+                              Release hold (to processing)
+                            </button>
+                          )}
+                          {orderDetail.status !== "CANCELLED" && orderDetail.status !== "DELIVERED" && orderDetail.status !== "REFUNDED" && (
+                            <button
+                              type="button"
+                              onClick={() => handleOrderAction("CANCEL")}
+                              className="rounded border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100"
+                            >
+                              Cancel order
+                            </button>
+                          )}
+                          {(orderDetail.status === "PAID" || orderDetail.status === "PROCESSING" || orderDetail.status === "ON_HOLD") && (
+                            <button
+                              type="button"
+                              onClick={() => handleOrderAction("MARK_SHIPPED")}
+                              className="rounded border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                            >
+                              Mark shipped
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-2 text-[11px] text-gray-500">
+                          Final invoice remains customer-visible only when marked delivered.
+                        </p>
                       </div>
 
                       {/* Mark as delivered */}

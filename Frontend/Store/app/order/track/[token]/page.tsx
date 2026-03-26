@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { getOrderByTrackingToken, type Order, type OrderItem } from "@/app/lib/checkout";
+import { downloadInvoicePdf, getOrderByTrackingToken, type Order, type OrderItem } from "@/app/lib/checkout";
 import { formatCurrency } from "@/app/lib/currency";
 import { useOrderTrackingSocket } from "@/app/hooks/useOrderTrackingSocket";
 import {
@@ -21,6 +21,7 @@ import {
 type OrderStatus =
   | "PENDING_PAYMENT"
   | "PAID"
+  | "ON_HOLD"
   | "PROCESSING"
   | "SHIPPED"
   | "DELIVERED"
@@ -38,6 +39,7 @@ type ProgressStepDef = {
 const PROGRESS_STEP_DEFS: ProgressStepDef[] = [
   { key: "PENDING_PAYMENT", Icon: CreditCard },
   { key: "PAID", Icon: CheckCircle2 },
+  { key: "ON_HOLD", Icon: Clock3 },
   { key: "PROCESSING", Icon: Package },
   { key: "SHIPPED", Icon: Truck },
   { key: "DELIVERED", Icon: CheckCircle2 },
@@ -56,6 +58,7 @@ const normalizeStatus = (status: string | undefined): OrderStatus => {
   const validStatuses: OrderStatus[] = [
     "PENDING_PAYMENT",
     "PAID",
+    "ON_HOLD",
     "PROCESSING",
     "SHIPPED",
     "DELIVERED",
@@ -72,6 +75,7 @@ const statusBadgeClass = (status: OrderStatus) => {
   switch (status) {
     case "DELIVERED":
     case "PAID":
+    case "ON_HOLD":
     case "PROCESSING":
     case "SHIPPED":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -101,6 +105,7 @@ export default function OrderTrackingPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
 
   const { connected } = useOrderTrackingSocket({
@@ -153,9 +158,22 @@ export default function OrderTrackingPage() {
     normalizedOrderStatus === "FAILED" || normalizedOrderStatus === "CANCELLED";
   const isOrderPaid =
     normalizedOrderStatus === "PAID" ||
+    normalizedOrderStatus === "ON_HOLD" ||
     normalizedOrderStatus === "PROCESSING" ||
     normalizedOrderStatus === "SHIPPED" ||
     normalizedOrderStatus === "DELIVERED";
+  const availableBillingDocs = order?.billing_documents ?? [];
+
+  const handleDownloadInvoice = async (docId: string) => {
+    try {
+      setDownloadingDoc(docId);
+      await downloadInvoicePdf(docId);
+    } catch {
+      setError(t("invoiceDownloadError"));
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
   const isPaymentPending =
     normalizedOrderStatus === "PENDING_PAYMENT" ||
     paymentStatus === "pending" ||
@@ -260,6 +278,12 @@ export default function OrderTrackingPage() {
                 <p className="text-sm">{t("paymentConfirmedAlert")}</p>
               </div>
             )}
+            {normalizedOrderStatus === "ON_HOLD" && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                <Clock3 className="mt-0.5 h-4 w-4 flex-none" />
+                <p className="text-sm">{t("onHoldAlert")}</p>
+              </div>
+            )}
             {(paymentStatus === "failed" || isOrderFailed) && (
               <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
                 <XCircle className="mt-0.5 h-4 w-4 flex-none" />
@@ -269,9 +293,36 @@ export default function OrderTrackingPage() {
           </div>
         </section>
 
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">{t("billingDocuments")}</h2>
+          {availableBillingDocs.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {availableBillingDocs.map((doc) => (
+                <button
+                  key={doc.id}
+                  onClick={() => handleDownloadInvoice(doc.id)}
+                  disabled={downloadingDoc === doc.id}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <Truck className="h-4 w-4" />
+                  {downloadingDoc === doc.id
+                    ? t("downloading")
+                    : t("downloadInvoice", {
+                        number: doc.document_number ?? doc.id.slice(0, 8),
+                      })}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              {t("invoiceAvailableAfterDelivery")}
+            </div>
+          )}
+        </section>
+
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-bold text-slate-900">{t("orderProgress")}</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-5">
+          <div className="mt-4 grid gap-3 md:grid-cols-6">
             {PROGRESS_STEP_DEFS.map((stepDef, index) => {
               const reached = !isOrderFailed && statusIndex >= index;
               const current = !isOrderFailed && statusIndex === index;

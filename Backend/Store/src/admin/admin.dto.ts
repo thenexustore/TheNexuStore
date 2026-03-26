@@ -14,6 +14,13 @@ import {
 import { Type } from 'class-transformer';
 import { OrderStatus, ShipmentStatus } from '@prisma/client';
 
+export enum AdminOrderAction {
+  PUT_ON_HOLD = 'PUT_ON_HOLD',
+  RELEASE_HOLD = 'RELEASE_HOLD',
+  CANCEL = 'CANCEL',
+  MARK_SHIPPED = 'MARK_SHIPPED',
+}
+
 export class CreateBrandDto {
   @IsString()
   name!: string;
@@ -126,4 +133,23 @@ export class UpdateOrderShipmentDto {
 export class SyncOrderTrackingDto {
   @IsUUID()
   order_id!: string;
+}
+
+export class OrderActionDto {
+  @IsEnum(AdminOrderAction)
+  action!: AdminOrderAction;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  tracking_number?: string;
+
+  @IsOptional()
+  @IsUrl()
+  tracking_url?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }

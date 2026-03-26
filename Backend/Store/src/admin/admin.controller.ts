@@ -15,11 +15,13 @@ import { AdminGuard } from './admin.guard';
 import { Permissions } from '../auth/staff-auth/permissions.decorator';
 import {
   AddOrderNoteDto,
+  AdminOrderAction,
   AdminOrdersQueryDto,
   BulkUpdateOrderStatusDto,
   CreateBrandDto,
   CreateCategoryDto,
   CreateOrderShipmentDto,
+  OrderActionDto,
   UpdateOrderShipmentDto,
 } from './admin.dto';
 import { AuditLogService } from './audit-log.service';
@@ -229,7 +231,11 @@ export class AdminController {
       throw new BadRequestException('Note is required');
     }
 
-    const data = await this.adminService.addOrderNote(id, note);
+    const actor = req.user as any;
+    const data = await this.adminService.addOrderNote(id, note, {
+      staffId: actor?.sub ? String(actor.sub) : null,
+      staffEmail: actor?.email ? String(actor.email) : null,
+    });
 
     await this.auditLogService.logAction({
       actor: req.user as any,
@@ -250,6 +256,58 @@ export class AdminController {
       success: true,
       data,
     };
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('orders/:id/actions')
+  async performOrderAction(
+    @Param('id') id: string,
+    @Body() body: OrderActionDto,
+    @Req() req: Request,
+  ) {
+    const actor = req.user as any;
+    const data = await this.adminService.performOrderAction(id, body, {
+      staffId: actor?.sub ? String(actor.sub) : null,
+      staffEmail: actor?.email ? String(actor.email) : null,
+    });
+
+    await this.auditLogService.logAction({
+      actor,
+      action: `ORDER_ACTION_${body.action}`,
+      resource: 'ORDER',
+      resourceId: id,
+      method: req.method,
+      path: req.originalUrl,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      requestId: (req.requestId ?? req.get('x-request-id')) || undefined,
+      metadata: {
+        action: body.action,
+        status: data.status,
+        shipment_id: (data as any).shipment?.id,
+      },
+    });
+
+    return {
+      success: true,
+      data,
+      message: this.getOrderActionMessage(body.action),
+    };
+  }
+
+  private getOrderActionMessage(action: AdminOrderAction): string {
+    switch (action) {
+      case AdminOrderAction.PUT_ON_HOLD:
+        return 'Order placed on hold';
+      case AdminOrderAction.RELEASE_HOLD:
+        return 'Order moved to processing';
+      case AdminOrderAction.CANCEL:
+        return 'Order cancelled';
+      case AdminOrderAction.MARK_SHIPPED:
+        return 'Order marked as shipped';
+      default:
+        return 'Order action completed';
+    }
   }
 
   @UseGuards(AdminGuard)

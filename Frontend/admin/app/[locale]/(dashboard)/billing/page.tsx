@@ -60,6 +60,7 @@ import {
   type BillingDocument,
   type BillingDocumentType,
   type BillingDocumentStatus,
+  type BillingDocumentSource,
   type BillingPaymentMethod,
   type BillingSettings,
   type BillingNumberAudit,
@@ -427,6 +428,9 @@ export default function BillingPage() {
   const [statusFilter, setStatusFilter] = useState<BillingDocumentStatus | "">(
     "",
   );
+  const [sourceFilter, setSourceFilter] = useState<BillingDocumentSource | "">(
+    "",
+  );
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -633,6 +637,7 @@ export default function BillingPage() {
           limit: 20,
           type: tab === "ALL" ? undefined : tab,
           status: statusFilter || undefined,
+          source: sourceFilter || undefined,
           search: search || undefined,
           from: fromDate || undefined,
           to: toDate || undefined,
@@ -650,13 +655,13 @@ export default function BillingPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tab, statusFilter, search, fromDate, toDate],
+    [tab, statusFilter, sourceFilter, search, fromDate, toDate],
   );
 
   useEffect(() => {
     loadDocs(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, statusFilter]);
+  }, [tab, statusFilter, sourceFilter]);
 
   // Pre-load templates once on mount so openCreateForm can auto-select the default
   useEffect(() => {
@@ -684,6 +689,12 @@ export default function BillingPage() {
       }).catch(() => { /* non-critical — falls back to 21% hardcoded */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    backfillPaidOrderBillingDocs().catch(() => {
+      // non-blocking; listing API also auto-ensures the latest paid order draft
+    });
   }, []);
 
   // ─── Open detail ──────────────────────────────────────────────────────────
@@ -1225,6 +1236,7 @@ export default function BillingPage() {
     setFromDate("");
     setToDate("");
     setStatusFilter("");
+    setSourceFilter("");
     setPage(1);
     setLoading(true);
     try {
@@ -1232,6 +1244,7 @@ export default function BillingPage() {
         page: 1,
         limit: 20,
         type: tab === "ALL" ? undefined : tab,
+        source: sourceFilter || undefined,
       });
       setDocs(res.items);
       setTotal(res.total);
@@ -1511,6 +1524,22 @@ export default function BillingPage() {
           </select>
         </div>
 
+        {/* Source filter */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-zinc-500 font-medium">Origen</label>
+          <select
+            value={sourceFilter}
+            onChange={(e: InputEv) =>
+              setSourceFilter(e.target.value as BillingDocumentSource | "")
+            }
+            className="px-3 py-2 rounded-lg border border-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 bg-white"
+          >
+            <option value="">Todos</option>
+            <option value="ECOMMERCE">Ecommerce</option>
+            <option value="MANUAL">Manual</option>
+          </select>
+        </div>
+
         {/* Date from */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-zinc-500 font-medium">Desde</label>
@@ -1562,7 +1591,7 @@ export default function BillingPage() {
         </button>
 
         {/* Clear all filters */}
-        {(search || fromDate || toDate || statusFilter) && (
+        {(search || fromDate || toDate || statusFilter || sourceFilter) && (
           <button
             onClick={handleClearFilters}
             className="self-end text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1 transition"
@@ -1689,6 +1718,15 @@ export default function BillingPage() {
                               Pedido vinculado
                             </span>
                           )}
+                          <span
+                            className={`inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              doc.source === "MANUAL"
+                                ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200"
+                                : "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                            }`}
+                          >
+                            {doc.source === "MANUAL" ? "Manual" : "Ecommerce"}
+                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-zinc-500 text-xs">
@@ -1716,7 +1754,7 @@ export default function BillingPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {doc.status === "DRAFT" && (
+                          {doc.status === "DRAFT" && !doc.order_id && (
                             <button
                               onClick={() => handleIssue(doc.id)}
                               disabled={issuingId === doc.id}
@@ -1730,7 +1768,7 @@ export default function BillingPage() {
                               )}
                             </button>
                           )}
-                          {doc.type === "QUOTE" && doc.status !== "VOID" && (
+                          {doc.type === "QUOTE" && doc.status !== "VOID" && !doc.order_id && (
                             <button
                               onClick={() => handleConvert(doc.id)}
                               disabled={convertingId === doc.id}
@@ -2206,8 +2244,13 @@ export default function BillingPage() {
 
                 {/* Status-action row */}
                 <div className="flex flex-wrap items-center gap-2 px-6 py-3">
+                  {selectedDoc.order_id && selectedDoc.status === "DRAFT" && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Documento vinculado a pedido: la emisión final solo se realiza al marcar el pedido como entregado.
+                    </div>
+                  )}
                   {/* Emit draft */}
-                  {selectedDoc.status === "DRAFT" && (
+                  {selectedDoc.status === "DRAFT" && !selectedDoc.order_id && (
                     <button
                       onClick={() => handleIssue(selectedDoc.id)}
                       disabled={issuingId === selectedDoc.id || sendingId === selectedDoc.id}
@@ -2222,7 +2265,7 @@ export default function BillingPage() {
                     </button>
                   )}
                   {/* Emit + send in one click (only for INVOICE drafts with customer email) */}
-                  {selectedDoc.status === "DRAFT" && selectedDoc.type === "INVOICE" && selectedDoc.customer_email && (
+                  {selectedDoc.status === "DRAFT" && !selectedDoc.order_id && selectedDoc.type === "INVOICE" && selectedDoc.customer_email && (
                     <button
                       onClick={() => handleIssueAndSend(selectedDoc.id)}
                       disabled={issuingId === selectedDoc.id || sendingId === selectedDoc.id}
@@ -2237,7 +2280,7 @@ export default function BillingPage() {
                     </button>
                   )}
                   {/* Convert quote to invoice */}
-                  {selectedDoc.type === "QUOTE" && selectedDoc.status !== "VOID" && (
+                  {selectedDoc.type === "QUOTE" && selectedDoc.status !== "VOID" && !selectedDoc.order_id && (
                     <button
                       onClick={() => handleConvert(selectedDoc.id)}
                       disabled={convertingId === selectedDoc.id}

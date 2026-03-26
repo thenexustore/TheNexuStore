@@ -549,16 +549,16 @@ export default function Navbar() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 glass text-black shadow-sm">
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#0B123A] via-indigo-600 to-[#0B123A]" />
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 md:min-h-[74px] md:flex-nowrap md:gap-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-1.5 px-3 py-2 sm:gap-3 sm:px-4 md:min-h-[74px] md:flex-nowrap md:gap-4">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="md:hidden cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="cursor-pointer rounded-lg p-1.5 transition-colors hover:bg-gray-100 md:hidden"
           >
             <Menu size={24} />
           </button>
 
           <Link href="/" className="min-w-0 flex-shrink-0">
-            <div className="flex h-11 w-24 items-center justify-center rounded-lg sm:w-32">
+            <div className="flex h-10 w-20 items-center justify-center rounded-lg sm:h-11 sm:w-32">
               <StoreBrandLogo
                 branding={storeBranding}
                 alt="logo"
@@ -819,11 +819,11 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 self-center sm:gap-2 md:gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 self-center sm:gap-2 md:gap-3">
             <Link
               href="/chat"
               onClick={closeMobilePanels}
-              className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
+              className="hidden h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 min-[391px]:flex sm:h-11 sm:w-11"
               title={t("supportChat")}
             >
               <MessageCircle className="w-5 h-5 text-gray-700" />
@@ -833,7 +833,7 @@ export default function Navbar() {
                 <Link
                   href="/login"
                   onClick={closeMobilePanels}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 md:hidden"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 md:hidden"
                   title={t("signIn")}
                 >
                   <User className="h-5 w-5 text-gray-700" />
@@ -913,7 +913,7 @@ export default function Navbar() {
             <Link
               href="/cart"
               onClick={closeMobilePanels}
-              className="relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-slate-100"
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-slate-100 sm:h-11 sm:w-11"
             >
               <ShoppingCart className="h-5 w-5 text-slate-700 sm:h-6 sm:w-6" />
               {displayCartCount > 0 && (

@@ -783,10 +783,10 @@ function ProductCarousel({ title, subtitle, products, config }: { title?: string
           <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{asText(product.brand_name, 'Marca')}</p>
 
           <div className="mt-2 flex items-end gap-2">
-            <span className={`text-lg font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
+            <span className={`whitespace-nowrap text-lg font-extrabold leading-none ${hasDeal ? 'text-rose-600' : 'text-slate-900'}`}>
               {formatCurrency(Number(product.price || 0))}
             </span>
-            {hasDeal ? <span className="pb-0.5 text-xs text-slate-400 line-through">{formatCurrency(Number(product.compare_at_price || 0))}</span> : null}
+            {hasDeal ? <span className="whitespace-nowrap pb-0.5 text-xs text-slate-400 line-through">{formatCurrency(Number(product.compare_at_price || 0))}</span> : null}
           </div>
 
           <div className="mt-1.5">

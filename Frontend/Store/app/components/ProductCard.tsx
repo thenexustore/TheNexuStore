@@ -282,25 +282,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        <div className="flex h-full min-w-0 flex-col space-y-2 sm:space-y-3">
+        <div className="min-w-0 space-y-2 sm:space-y-3">
           <h3 className="line-clamp-2 min-h-[2.8rem] break-words text-sm font-bold leading-tight text-gray-900 sm:min-h-[5rem] sm:text-lg">
             {product.title}
           </h3>
 
-          <div className="min-h-[2.4rem] sm:min-h-[3.75rem]">
-            {shouldShowDescription ? (
-              <p className="line-clamp-2 text-xs leading-snug text-gray-600 sm:text-sm sm:leading-relaxed">
-                {product.short_description}
-              </p>
-            ) : (
-              <p
-                aria-hidden="true"
-                className="invisible line-clamp-2 text-xs leading-snug sm:text-sm sm:leading-relaxed"
-              >
-                Placeholder
-              </p>
-            )}
-          </div>
+          {shouldShowDescription ? (
+            <p className="text-xs leading-snug text-gray-600 break-words sm:text-sm sm:leading-relaxed">
+              {product.short_description}
+            </p>
+          ) : null}
 
           {rating > 0 && reviewCount > 0 && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

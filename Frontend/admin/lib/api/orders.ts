@@ -84,6 +84,8 @@ export interface OrderDetail {
   billing_state?: {
     has_draft_invoice: boolean;
     has_issued_invoice: boolean;
+    delivery_confirmation_required?: boolean;
+    can_issue_via_delivery_confirmation?: boolean;
     latest_document?: {
       id: string;
       status: string;

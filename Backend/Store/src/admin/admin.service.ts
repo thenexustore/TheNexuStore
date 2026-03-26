@@ -429,6 +429,11 @@ export class AdminService {
           has_issued_invoice: order.billing_documents.some((doc) =>
             ['ISSUED', 'SENT', 'PAID'].includes(doc.status),
           ),
+          delivery_confirmation_required:
+            order.status !== OrderStatus.DELIVERED,
+          can_issue_via_delivery_confirmation:
+            order.status === OrderStatus.SHIPPED ||
+            order.status === OrderStatus.PROCESSING,
           latest_document: order.billing_documents[0] ?? null,
         },
         admin_notes: order.admin_notes.map((entry) => ({
@@ -437,6 +442,9 @@ export class AdminService {
           author_staff_email: entry.author_staff_email,
           created_at: entry.created_at,
         })),
+        post_payment_validation: this.extractPostPaymentValidationSummary(
+          order.admin_notes,
+        ),
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -445,6 +453,35 @@ export class AdminService {
       console.error('Get order by ID error:', error);
       throw new Error('Failed to fetch order details');
     }
+  }
+
+  private extractPostPaymentValidationSummary(
+    notes: Array<{ note: string; created_at: Date }>,
+  ): { status: 'PROCESSING' | 'ON_HOLD'; reason: string; created_at: Date } | null {
+    const latestAutoValidation = notes.find((entry) =>
+      entry.note.startsWith('[AUTO_VALIDATION]'),
+    );
+
+    if (!latestAutoValidation) {
+      return null;
+    }
+
+    const status: 'PROCESSING' | 'ON_HOLD' = latestAutoValidation.note.includes(
+      '[ON_HOLD]',
+    )
+      ? 'ON_HOLD'
+      : 'PROCESSING';
+
+    const reason = latestAutoValidation.note
+      .replace('[AUTO_VALIDATION][ON_HOLD]', '')
+      .replace('[AUTO_VALIDATION][PROCESSING]', '')
+      .trim();
+
+    return {
+      status,
+      reason,
+      created_at: latestAutoValidation.created_at,
+    };
   }
 
   async updateOrderStatus(orderId: string, status: string) {

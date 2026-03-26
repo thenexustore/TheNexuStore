@@ -523,14 +523,24 @@ export default function OrdersPage() {
                       <p className="text-sm"><span className="font-medium">Email:</span> {orderDetail.email}</p>
                       <p className="text-sm"><span className="font-medium">Status:</span> {orderDetail.status}</p>
                       {orderDetail.billing_state && (
-                        <p className="text-sm">
-                          <span className="font-medium">Billing:</span>{" "}
-                          {orderDetail.billing_state.has_issued_invoice
-                            ? "Final invoice issued"
-                            : orderDetail.billing_state.has_draft_invoice
-                              ? "Draft exists (internal)"
-                              : "No billing doc yet"}
-                        </p>
+                        <>
+                          <p className="text-sm">
+                            <span className="font-medium">Billing:</span>{" "}
+                            {orderDetail.billing_state.has_issued_invoice
+                              ? "Final invoice issued"
+                              : orderDetail.billing_state.has_draft_invoice
+                                ? "Draft exists (internal)"
+                                : "No billing doc yet"}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            <span className="font-medium">Final issuance path:</span>{" "}
+                            {orderDetail.billing_state.delivery_confirmation_required
+                              ? orderDetail.billing_state.can_issue_via_delivery_confirmation
+                                ? "Use “Mark delivered” to issue/send final invoice."
+                                : "Waiting for shipment progress before delivery confirmation."
+                              : "Delivery already confirmed."}
+                          </p>
+                        </>
                       )}
                       <p className="text-sm"><span className="font-medium">Total:</span> {formatMoney(Number(orderDetail.total_amount))}</p>
                       <p className="text-sm"><span className="font-medium">Created:</span> {new Date(orderDetail.created_at).toLocaleString()}</p>
@@ -825,7 +835,10 @@ export default function OrdersPage() {
                       </div>
 
                       {/* Mark as delivered */}
-                      {orderDetail.status !== "DELIVERED" && orderDetail.status !== "CANCELLED" && (
+                      {orderDetail.status !== "DELIVERED" &&
+                        orderDetail.status !== "CANCELLED" &&
+                        (orderDetail.status === "SHIPPED" ||
+                          orderDetail.status === "PROCESSING") && (
                         <div className="pt-2">
                           <h4 className="text-sm font-semibold mb-2 text-emerald-700">Marcar como entregado</h4>
                           <div className="rounded border border-emerald-200 bg-emerald-50 p-3 space-y-2">
@@ -846,6 +859,14 @@ export default function OrdersPage() {
                           </div>
                         </div>
                       )}
+                      {orderDetail.status !== "DELIVERED" &&
+                        orderDetail.status !== "CANCELLED" &&
+                        orderDetail.status !== "PROCESSING" &&
+                        orderDetail.status !== "SHIPPED" && (
+                          <p className="pt-2 text-[11px] text-gray-500">
+                            “Marcar como entregado” se habilita cuando el pedido está en PROCESSING o SHIPPED.
+                          </p>
+                        )}
 
                       {/* ── Billing documents ───────────────────────────────── */}
                       <div className="pt-2">

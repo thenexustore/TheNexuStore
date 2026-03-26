@@ -297,6 +297,15 @@ export class BillingService {
 
   async createDocument(dto: CreateBillingDocumentDto) {
     const { items, ...docData } = dto;
+    if (
+      docData.status !== undefined &&
+      docData.status !== BillingDocumentStatus.DRAFT
+    ) {
+      throw new BadRequestException(
+        'Manual document creation only supports DRAFT status. Use issue flow to finalize.',
+      );
+    }
+
     const settings = await this.getSettings();
     const defaultTaxRate = Number(settings.default_tax_rate);
 
@@ -669,12 +678,39 @@ export class BillingService {
     id: string,
     dto: UpdateDocumentNumberDto,
     actorId: string,
+    actorRole?: string,
     actorEmail?: string,
   ) {
+    if (actorRole !== 'ADMIN') {
+      throw new BadRequestException(
+        'Manual document number overrides are restricted to ADMIN role',
+      );
+    }
+
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id },
     });
     if (!doc) throw new NotFoundException('Billing document not found');
+
+    if (doc.type !== BillingDocumentType.INVOICE) {
+      throw new BadRequestException(
+        'Only invoice numbers can be manually corrected',
+      );
+    }
+    if (
+      doc.status !== BillingDocumentStatus.ISSUED &&
+      doc.status !== BillingDocumentStatus.SENT &&
+      doc.status !== BillingDocumentStatus.PAID
+    ) {
+      throw new BadRequestException(
+        'Only finalized invoices can be manually corrected',
+      );
+    }
+    if (doc.source !== BillingDocumentSource.MANUAL) {
+      throw new BadRequestException(
+        'Number overrides are only allowed for manual invoices',
+      );
+    }
 
     const oldNumber = doc.document_number;
 

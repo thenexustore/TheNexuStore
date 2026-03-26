@@ -59,6 +59,7 @@ enum CartStatus {
 enum OrderStatus {
   PENDING_PAYMENT
   PAID
+  ON_HOLD
   PROCESSING
   SHIPPED
   DELIVERED
@@ -962,8 +963,23 @@ model Order {
   discounts             OrderDiscount[]
   rmas                  Rma[]
   billing_documents     BillingDocument[]
+  admin_notes           OrderAdminNote[]
 
   @@index([customer_id, created_at(sort: Desc)])
+}
+
+model OrderAdminNote {
+  id                 String   @id @default(uuid())
+  order_id           String
+  note               String
+  author_staff_id    String?
+  author_staff_email String?
+  created_at         DateTime @default(now())
+
+  order              Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id, created_at(sort: Desc)])
+  @@map("order_admin_notes")
 }
 
 model Category {
@@ -1220,6 +1236,11 @@ enum BillingDocumentStatus {
   VOID
 }
 
+enum BillingDocumentSource {
+  ECOMMERCE
+  MANUAL
+}
+
 enum BillingLanguage {
   ES
   EN
@@ -1313,6 +1334,7 @@ model BillingDocument {
   id                  String               @id @default(uuid())
   type                BillingDocumentType
   status              BillingDocumentStatus @default(DRAFT)
+  source              BillingDocumentSource @default(ECOMMERCE)
   document_number     String?              @unique
   series_id           String?
   order_id            String?
@@ -1362,6 +1384,7 @@ model BillingDocument {
   number_audits       BillingNumberAudit[]
 
   @@index([type, status, created_at(sort: Desc)])
+  @@index([source, status, created_at(sort: Desc)])
   @@index([order_id])
   @@index([customer_id])
   @@index([document_number])

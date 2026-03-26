@@ -584,6 +584,19 @@ export class CheckoutService {
             },
           },
         },
+        billing_documents: {
+          where: {
+            type: BillingDocumentType.INVOICE,
+            status: {
+              in: [
+                BillingDocumentStatus.ISSUED,
+                BillingDocumentStatus.SENT,
+                BillingDocumentStatus.PAID,
+              ],
+            },
+          },
+          orderBy: { created_at: 'desc' },
+        },
       },
     });
 
@@ -674,6 +687,19 @@ export class CheckoutService {
               orderBy: { event_time: 'desc' },
             },
           },
+        },
+        billing_documents: {
+          where: {
+            type: BillingDocumentType.INVOICE,
+            status: {
+              in: [
+                BillingDocumentStatus.ISSUED,
+                BillingDocumentStatus.SENT,
+                BillingDocumentStatus.PAID,
+              ],
+            },
+          },
+          orderBy: { created_at: 'desc' },
         },
       },
     });

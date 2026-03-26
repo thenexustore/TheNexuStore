@@ -4,7 +4,7 @@ import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
 import { PaymentsController } from './payments.controller';
 import { CommonModule } from '../../common/common.module';
-import { AuthModule } from 'src/auth/auth.module';
+import { AuthModule } from '../../auth/auth.module';
 import { BillingModule } from '../../admin/billing/billing.module';
 
 @Module({

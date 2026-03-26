@@ -20,7 +20,7 @@ import {
 } from './dto/cart.dto';
 import { AuthGuard } from '../../auth/auth.guard';
 import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
-import { PrismaService } from 'src/common/prisma.service';
+import { PrismaService } from '../../common/prisma.service';
 
 @Controller('cart')
 @UseGuards(OptionalAuthGuard)

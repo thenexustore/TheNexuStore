@@ -169,10 +169,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   const normalizedTitle = normalizeText(product.title);
   const normalizedDescription = normalizeText(product.short_description);
+  const rawShortDescription = (product.short_description || "").trim();
+  const delimiterAfterTitleMatch = rawShortDescription.match(
+    new RegExp(`^\\s*${product.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[:\\-–—|•·]\\s*(.+)$`, "i"),
+  );
+  const displayDescription = delimiterAfterTitleMatch
+    ? delimiterAfterTitleMatch[1].trim()
+    : rawShortDescription;
   const shouldShowDescription =
     normalizedDescription.length > 0 &&
     normalizedDescription !== normalizedTitle &&
-    !normalizedDescription.startsWith(normalizedTitle);
+    displayDescription.length > 0;
 
   return (
     <div
@@ -289,7 +296,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           {shouldShowDescription ? (
             <p className="text-xs leading-snug text-gray-600 break-words sm:text-sm sm:leading-relaxed">
-              {product.short_description}
+              {displayDescription}
             </p>
           ) : null}
 

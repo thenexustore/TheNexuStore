@@ -120,6 +120,8 @@
     "lowStockBadge": "Low stock",
     "adding": "Adding...",
     "buyNow": "Buy Now",
+    "buyNowCompact": "Buy",
+    "addToCartCompact": "Add",
     "inCart": "{count} in cart",
     "review": "review",
     "reviews": "reviews",

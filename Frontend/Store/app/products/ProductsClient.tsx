@@ -51,7 +51,7 @@ function SearchRefinePanel({
       <button
         type="button"
         onClick={() => setIsMobileExpanded((current) => !current)}
-        className="sticky top-[4.5rem] z-20 flex w-full items-center justify-between gap-3 rounded-2xl border-b border-slate-200 bg-white/95 px-4 py-3 text-left backdrop-blur sm:hidden"
+        className="sticky top-[7.75rem] z-20 flex w-full items-center justify-between gap-3 rounded-2xl border-b border-slate-200 bg-white/95 px-4 py-3 text-left backdrop-blur sm:hidden"
         aria-expanded={isMobileExpanded}
       >
         <div className="min-w-0">
@@ -361,7 +361,7 @@ export default function ProductsPage({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5">
                 {productsResponse?.products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

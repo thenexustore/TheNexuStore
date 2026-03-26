@@ -159,6 +159,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
       ? product.thumbnail
       : "/No_Image_Available.png";
 
+  const normalizeText = (value?: string | null) =>
+    (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+  const normalizedTitle = normalizeText(product.title);
+  const normalizedDescription = normalizeText(product.short_description);
+  const shouldShowDescription =
+    normalizedDescription.length > 0 &&
+    normalizedDescription !== normalizedTitle &&
+    !normalizedDescription.startsWith(normalizedTitle);
+
   return (
     <div
       className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm card-hover ${
@@ -267,14 +282,25 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        <div className="min-w-0 space-y-2 sm:space-y-3">
+        <div className="flex h-full min-w-0 flex-col space-y-2 sm:space-y-3">
           <h3 className="line-clamp-2 min-h-[2.8rem] break-words text-sm font-bold leading-tight text-gray-900 sm:min-h-[5rem] sm:text-lg">
             {product.title}
           </h3>
 
-          <p className="line-clamp-2 min-h-[2.4rem] text-xs leading-snug text-gray-600 sm:min-h-[3.75rem] sm:text-sm sm:leading-relaxed">
-            {product.short_description}
-          </p>
+          <div className="min-h-[2.4rem] sm:min-h-[3.75rem]">
+            {shouldShowDescription ? (
+              <p className="line-clamp-2 text-xs leading-snug text-gray-600 sm:text-sm sm:leading-relaxed">
+                {product.short_description}
+              </p>
+            ) : (
+              <p
+                aria-hidden="true"
+                className="invisible line-clamp-2 text-xs leading-snug sm:text-sm sm:leading-relaxed"
+              >
+                Placeholder
+              </p>
+            )}
+          </div>
 
           {rating > 0 && reviewCount > 0 && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -291,7 +317,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
 
-          <div className="flex flex-col gap-0.5">
+          <div className="mt-auto flex flex-col gap-0.5">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span
                 className={`text-xl font-bold sm:text-2xl ${
@@ -326,7 +352,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`focus-ring w-full rounded-xl px-1 py-2 text-[11px] font-bold leading-snug text-white whitespace-normal transition-all duration-200 sm:py-3 sm:text-sm ${
+            className={`focus-ring w-full rounded-xl px-1.5 py-2 text-[11px] font-bold leading-snug text-white transition-all duration-200 sm:py-3 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -357,14 +383,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 {t("adding")}
               </span>
             ) : (
-              t("buyNow")
+              <>
+                <span className="hidden min-[400px]:inline">{t("buyNow")}</span>
+                <span className="min-[400px]:hidden">{t("buyNowCompact")}</span>
+              </>
             )}
           </button>
 
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full rounded-xl bg-gray-400 px-1 py-2 text-[11px] font-semibold leading-snug text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
+              className="w-full rounded-xl bg-gray-400 px-1.5 py-2 text-[11px] font-semibold leading-snug text-white cursor-not-allowed sm:py-3 sm:text-sm"
             >
               {t("outOfStock")}
             </button>
@@ -372,13 +401,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`focus-ring w-full rounded-xl px-1 py-2 text-[11px] font-semibold leading-snug text-white whitespace-normal transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
+              className={`focus-ring w-full rounded-xl px-1.5 py-2 text-[11px] font-semibold leading-snug text-white transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
               }`}
             >
-              {cartLoading ? t("adding") : t("addToCart")}
+              {cartLoading ? (
+                t("adding")
+              ) : (
+                <>
+                  <span className="hidden min-[400px]:inline">{t("addToCart")}</span>
+                  <span className="min-[400px]:hidden">{t("addToCartCompact")}</span>
+                </>
+              )}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-3">

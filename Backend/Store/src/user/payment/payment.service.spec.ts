@@ -163,6 +163,26 @@ describe('PaymentService', () => {
     );
   });
 
+  it('keeps COD orders out of PROCESSING and does not create billing draft on authorization', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'order-cod-1',
+      status: 'PENDING_PAYMENT',
+      total_amount: 42,
+    });
+    (prisma.payment.create as jest.Mock).mockResolvedValue({
+      id: 'payment-cod-1',
+    });
+
+    const result = await service.createPayment({
+      orderId: 'order-cod-1',
+      provider: 'COD',
+    });
+
+    expect(result.provider).toBe('COD');
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(billingService.createDocumentFromOrder).not.toHaveBeenCalled();
+  });
+
   it('captures successful Bizum notifications as paid Redsys payments', async () => {
     const notificationResult = {
       success: true,
@@ -368,6 +388,98 @@ describe('PaymentService', () => {
         order_id: 'order-999',
         note: expect.stringContaining('[AUTO_VALIDATION][ON_HOLD]'),
       }),
+    });
+  });
+
+  it('creates billing draft and transitions COD order to PROCESSING after capture when validation passes', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'order-cod-2',
+      payments: [{ id: 'payment-cod-2', provider: 'COD' }],
+    });
+    (prisma.orderItem.findMany as jest.Mock).mockResolvedValue([
+      {
+        sku_id: 'sku-ok',
+        qty: 1,
+        unit_price: 10,
+        fulfillment_type: 'INTERNAL',
+        sku: { prices: [{ sale_price: 10 }] },
+        supplier_product: null,
+      },
+    ]);
+    (prisma.inventoryLevel.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { qty_on_hand: 5, qty_reserved: 1 },
+    });
+
+    const txCapture = {
+      payment: { update: jest.fn().mockResolvedValue(undefined) },
+      order: { update: jest.fn().mockResolvedValue(undefined) },
+      orderDiscount: { findMany: jest.fn().mockResolvedValue([]) },
+      coupon: { update: jest.fn().mockResolvedValue(undefined) },
+    };
+    const txValidation = {
+      order: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderAdminNote: { create: jest.fn().mockResolvedValue(undefined) },
+    };
+    (prisma.$transaction as jest.Mock)
+      .mockImplementationOnce((fn) => fn(txCapture))
+      .mockImplementationOnce((fn) => fn(txValidation));
+
+    await service.confirmCODDelivery('order-cod-2');
+
+    expect(billingService.createDocumentFromOrder).toHaveBeenCalledWith(
+      'order-cod-2',
+    );
+    expect(txValidation.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-cod-2', status: 'PAID' },
+      data: { status: 'PROCESSING' },
+    });
+  });
+
+  it('creates billing draft and transitions COD order to ON_HOLD after capture when validation fails', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'order-cod-3',
+      payments: [{ id: 'payment-cod-3', provider: 'COD' }],
+    });
+    (prisma.orderItem.findMany as jest.Mock).mockResolvedValue([
+      {
+        sku_id: 'sku-hold',
+        qty: 2,
+        unit_price: 10,
+        fulfillment_type: 'INTERNAL',
+        sku: { prices: [{ sale_price: 12 }] },
+        supplier_product: null,
+      },
+    ]);
+    (prisma.inventoryLevel.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { qty_on_hand: 1, qty_reserved: 0 },
+    });
+
+    const txCapture = {
+      payment: { update: jest.fn().mockResolvedValue(undefined) },
+      order: { update: jest.fn().mockResolvedValue(undefined) },
+      orderDiscount: { findMany: jest.fn().mockResolvedValue([]) },
+      coupon: { update: jest.fn().mockResolvedValue(undefined) },
+    };
+    const txValidation = {
+      order: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderAdminNote: { create: jest.fn().mockResolvedValue(undefined) },
+    };
+    (prisma.$transaction as jest.Mock)
+      .mockImplementationOnce((fn) => fn(txCapture))
+      .mockImplementationOnce((fn) => fn(txValidation));
+
+    await service.confirmCODDelivery('order-cod-3');
+
+    expect(billingService.createDocumentFromOrder).toHaveBeenCalledWith(
+      'order-cod-3',
+    );
+    expect(txValidation.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-cod-3', status: 'PAID' },
+      data: { status: 'ON_HOLD' },
     });
   });
 });

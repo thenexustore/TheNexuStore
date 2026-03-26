@@ -158,36 +158,15 @@ export class PaymentService {
     }
 
     const amount = Number(order.total_amount);
-    const payment = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.payment.create({
-        data: {
-          order_id: orderId,
-          provider: 'COD',
-          status: 'AUTHORIZED',
-          amount,
-          currency: 'EUR',
-          provider_payment_id: `COD_${Date.now()}`,
-        },
-      });
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: 'PROCESSING',
-        },
-      });
-
-      const discounts = await tx.orderDiscount.findMany({
-        where: { order_id: orderId },
-      });
-      for (const discount of discounts) {
-        await tx.coupon.update({
-          where: { id: discount.coupon_id },
-          data: { usage_count: { increment: 1 } },
-        });
-      }
-
-      return created;
+    const payment = await this.prisma.payment.create({
+      data: {
+        order_id: orderId,
+        provider: 'COD',
+        status: 'AUTHORIZED',
+        amount,
+        currency: 'EUR',
+        provider_payment_id: `COD_${Date.now()}`,
+      },
     });
 
     this.logger.log('COD payment transaction completed', 'PaymentService', {
@@ -195,22 +174,12 @@ export class PaymentService {
       paymentId: payment.id,
     });
 
-    // Auto-create a draft billing document for the newly confirmed COD order.
-    // Fire-and-forget — billing errors must not break the payment confirmation.
-    this.billingService.createDocumentFromOrder(orderId).catch((err: unknown) => {
-      this.logger.warn(
-        'Failed to auto-create billing document for COD order',
-        'PaymentService',
-        { orderId, error: err instanceof Error ? err.message : String(err) },
-      );
-    });
-
     return {
       success: true,
       provider: 'COD',
       paymentId: payment.id,
       orderId,
-      message: 'Order confirmed. Payment will be collected on delivery.',
+      message: 'COD payment authorized. Capture pending delivery confirmation.',
     };
   }
 
@@ -520,6 +489,16 @@ export class PaymentService {
           paid_at: new Date(),
         },
       });
+
+      const discounts = await tx.orderDiscount.findMany({
+        where: { order_id: orderId },
+      });
+      for (const discount of discounts) {
+        await tx.coupon.update({
+          where: { id: discount.coupon_id },
+          data: { usage_count: { increment: 1 } },
+        });
+      }
     });
 
     await this.billingService.createDocumentFromOrder(orderId).catch((err: unknown) => {

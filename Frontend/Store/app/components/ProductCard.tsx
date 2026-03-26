@@ -195,8 +195,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       )}
 
-      <Link href={`/products/${product.slug}`} className="block p-4 focus-ring">
-        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gray-50 mb-4">
+      <Link href={`/products/${product.slug}`} className="block p-3 sm:p-4 focus-ring">
+        <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-xl bg-gray-50 sm:mb-4">
           <Image
             src={imageSrc}
             alt={product.title}
@@ -256,7 +256,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         </div>
 
-        <div className="flex justify-between items-center mb-3">
+        <div className="mb-2 flex items-center justify-between sm:mb-3">
           <span className="truncate text-xs font-semibold uppercase text-gray-500 tracking-wide">
             {product.brand_name}
           </span>
@@ -267,12 +267,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        <div className="space-y-3 min-w-0">
-          <h3 className="line-clamp-3 min-h-[4.5rem] sm:min-h-[5rem] break-words text-base font-bold leading-tight text-gray-900 sm:text-lg">
+        <div className="min-w-0 space-y-2 sm:space-y-3">
+          <h3 className="line-clamp-2 min-h-[2.8rem] break-words text-sm font-bold leading-tight text-gray-900 sm:min-h-[5rem] sm:text-lg">
             {product.title}
           </h3>
 
-          <p className="text-sm text-gray-600 line-clamp-3 min-h-[3.75rem] leading-relaxed">
+          <p className="line-clamp-2 min-h-[2.4rem] text-xs leading-snug text-gray-600 sm:min-h-[3.75rem] sm:text-sm sm:leading-relaxed">
             {product.short_description}
           </p>
 
@@ -321,12 +321,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      <div className="mt-auto px-4 pb-4">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="mt-auto px-3 pb-3 sm:px-4 sm:pb-4">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`focus-ring w-full rounded-xl py-2.5 text-xs font-bold leading-tight text-white whitespace-normal transition-all duration-200 sm:py-3 sm:text-sm ${
+            className={`focus-ring w-full rounded-xl px-1 py-2 text-[11px] font-bold leading-snug text-white whitespace-normal transition-all duration-200 sm:py-3 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -364,7 +364,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full rounded-xl bg-gray-400 py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
+              className="w-full rounded-xl bg-gray-400 px-1 py-2 text-[11px] font-semibold leading-snug text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
             >
               {t("outOfStock")}
             </button>
@@ -372,7 +372,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`focus-ring w-full rounded-xl py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
+              className={`focus-ring w-full rounded-xl px-1 py-2 text-[11px] font-semibold leading-snug text-white whitespace-normal transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"

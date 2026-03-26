@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import localFont from "next/font/local";
 import AppProviders from "./providers/AppProviders";
+import { getDefaultSiteMetadata } from "./lib/seo";
 
 const inter = localFont({
   src: [
@@ -28,11 +29,7 @@ export const viewport: Viewport = {
   themeColor: "#0b123a",
 };
 
-export const metadata: Metadata = {
-  other: {
-    google: "notranslate",
-  },
-};
+export const metadata: Metadata = getDefaultSiteMetadata();
 
 export default async function RootLayout({
   children,

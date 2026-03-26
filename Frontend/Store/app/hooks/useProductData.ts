@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   productAPI,
   ProductResponse,
@@ -8,15 +8,19 @@ import {
   FilterOptions,
 } from "../lib/products";
 
-export function useProductData(initialFilters: ProductFilters) {
+export function useProductData(
+  initialFilters: ProductFilters,
+  initialProductsResponse: ProductResponse | null = null,
+) {
   const [productsResponse, setProductsResponse] =
-    useState<ProductResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+    useState<ProductResponse | null>(initialProductsResponse);
+  const [loading, setLoading] = useState(!initialProductsResponse);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ProductFilters>(initialFilters);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
-    null
+    initialProductsResponse?.filters || null,
   );
+  const shouldSkipInitialFetch = useRef(Boolean(initialProductsResponse));
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -34,6 +38,11 @@ export function useProductData(initialFilters: ProductFilters) {
   }, [filters]);
 
   useEffect(() => {
+    if (shouldSkipInitialFetch.current) {
+      shouldSkipInitialFetch.current = false;
+      return;
+    }
+
     fetchProducts();
   }, [fetchProducts]);
 

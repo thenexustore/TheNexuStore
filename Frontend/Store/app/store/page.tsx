@@ -1,7 +1,15 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import HomeRenderer from "./HomeRenderer";
 import HomeDynamicSections from "./HomeDynamicSections";
 import { API_URL } from "../lib/env";
+import {
+  buildHomeMetadata,
+  createOrganizationSchema,
+  createWebsiteSchema,
+  resolveStoreLocale,
+  serializeJsonLd,
+} from "../lib/seo";
 
 const fallbackData = {
   layout: null,
@@ -72,6 +80,20 @@ async function getDynamicSections(forceFresh = false) {
   }
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params?: Promise<{
+    locale?: string;
+  }>;
+}): Promise<Metadata> {
+  const routeParams = (await params) || {};
+  const locale = resolveStoreLocale(routeParams.locale);
+  const indexable = Boolean(routeParams.locale);
+
+  return buildHomeMetadata(locale, indexable);
+}
+
 export default async function StorePage({
   searchParams,
   params,
@@ -88,6 +110,7 @@ export default async function StorePage({
 }) {
   const sp = (await searchParams) || {};
   const routeParams = (await params) || {};
+  const locale = resolveStoreLocale(routeParams.locale);
 
   const data = await getHome({
     previewLayoutId: sp.previewLayoutId,
@@ -173,16 +196,27 @@ export default async function StorePage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-8 pt-8 sm:pb-12 sm:pt-10 lg:pb-16 lg:pt-12">
-      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8 sm:space-y-12 lg:space-y-16">
-        {shouldRenderDynamic ? (
-          <Suspense>
-            <HomeDynamicSections initialSections={initialDynamicSections} />
-          </Suspense>
-        ) : (
-          <HomeRenderer payload={data} />
-        )}
-      </div>
-    </main>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd([
+            createOrganizationSchema(locale),
+            createWebsiteSchema(locale),
+          ]),
+        }}
+      />
+      <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-8 pt-8 sm:pb-12 sm:pt-10 lg:pb-16 lg:pt-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8 sm:space-y-12 lg:space-y-16">
+          {shouldRenderDynamic ? (
+            <Suspense>
+              <HomeDynamicSections initialSections={initialDynamicSections} />
+            </Suspense>
+          ) : (
+            <HomeRenderer payload={data} />
+          )}
+        </div>
+      </main>
+    </>
   );
 }

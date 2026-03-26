@@ -2,15 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import ProductCard from "../components/ProductCard";
-import { FilterOptions, ProductFilters } from "../lib/products";
+import { FilterOptions, ProductFilters, ProductResponse } from "../lib/products";
 import { useProductData } from "../hooks/useProductData";
 import { useURLSync } from "../hooks/useURLSync";
 import { ProductGridSkeleton } from "../components/ProductGridSkeleton";
 import { Pagination } from "../components/Pagination";
 import { SidebarFilters } from "../components/SidebarFilters";
 import { MobileFilters } from "../components/MobileFilters";
+import { buildFiltersFromSearchParams } from "../lib/product-listing";
+import { buildProductsSeoState, resolveStoreLocale } from "../lib/seo";
 
 type SearchSuggestionItem = FilterOptions["categories"][number] &
   Partial<FilterOptions["brands"][number]>;
@@ -131,53 +133,18 @@ function SearchRefinePanel({
   );
 }
 
-function buildFiltersFromSearchParams(
-  searchParams: ReturnType<typeof useSearchParams>,
-): ProductFilters {
-  const sortByParam = searchParams.get("sort_by") as ProductFilters["sort_by"];
-
-  // Fix 4: Guard against NaN values from malformed query params
-  const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
-  const rawMinPrice = parseInt(searchParams.get("min_price") ?? "", 10);
-  const rawMaxPrice = parseInt(searchParams.get("max_price") ?? "", 10);
-
-  const filters: ProductFilters = {
-    page: Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage,
-    limit: 20,
-    search: searchParams.get("search") || undefined,
-    category: searchParams.get("category") || undefined,
-    brand: searchParams.get("brand") || undefined,
-    sort_by: sortByParam || "newest",
-    min_price: Number.isNaN(rawMinPrice) ? undefined : rawMinPrice,
-    max_price: Number.isNaN(rawMaxPrice) ? undefined : rawMaxPrice,
-    in_stock_only: true,
-    // Return undefined instead of false so the param is omitted when inactive
-    featured_only: searchParams.get("featured_only") === "true" ? true : undefined,
-    // Fix 4: Filter out empty strings produced by splitting an empty param
-    attributes: searchParams.get("attributes")
-      ? searchParams.get("attributes")!.split(",").filter((s) => s.length > 0)
-      : undefined,
-  };
-
-  const categoriesParam = searchParams.get("categories");
-  if (categoriesParam) {
-    // Fix 4: Filter out empty strings (e.g. trailing comma: "a,b,")
-    const cats = categoriesParam.split(",").filter((s) => s.length > 0);
-    if (cats.length > 0) {
-      filters.categories = cats;
-    }
-  }
-
-  return filters;
-}
-
-export default function ProductsPage() {
+export default function ProductsPage({
+  initialProductsResponse,
+}: {
+  initialProductsResponse?: ProductResponse | null;
+}) {
   const searchParams = useSearchParams();
   const { updateURL } = useURLSync();
   const t = useTranslations("products");
+  const locale = resolveStoreLocale(useLocale());
 
   const initialFilters = useMemo(
-    () => buildFiltersFromSearchParams(searchParams),
+    () => buildFiltersFromSearchParams(new URLSearchParams(searchParams.toString())),
     [searchParams],
   );
   const activeSearchTerm = initialFilters.search?.trim() ?? "";
@@ -189,11 +156,16 @@ export default function ProductsPage() {
     filters,
     setFilters,
     filterOptions,
-  } = useProductData(initialFilters);
+  } = useProductData(initialFilters, initialProductsResponse ?? null);
 
   useEffect(() => {
     setFilters(initialFilters);
   }, [initialFilters, setFilters]);
+
+  const seoState = useMemo(
+    () => buildProductsSeoState(filters, locale, productsResponse),
+    [filters, locale, productsResponse],
+  );
 
   const handlePageChange = (page: number) => {
     const newFilters = { ...filters, page };
@@ -267,9 +239,11 @@ export default function ProductsPage() {
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 text-black sm:px-6 lg:px-8">
       <div className="mb-6 rounded-2xl border border-[#0B123A]/20 bg-gradient-to-r from-slate-900 via-[#0B123A] to-slate-800 p-5 text-white shadow-sm sm:p-8">
-        <h1 className="break-words text-2xl font-bold sm:text-3xl lg:text-4xl">{t("all")}</h1>
+        <h1 className="break-words text-2xl font-bold sm:text-3xl lg:text-4xl">
+          {seoState.heading}
+        </h1>
         <p className="mt-2 text-sm text-white/70 sm:text-base">
-          {t("found", {count: productsResponse?.total || 0})}
+          {t("found", { count: productsResponse?.total || 0 })}
         </p>
         {activeSearchTerm && (
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">

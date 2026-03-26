@@ -159,6 +159,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
       ? product.thumbnail
       : "/No_Image_Available.png";
 
+  const normalizeText = (value?: string | null) =>
+    (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+  const normalizedTitle = normalizeText(product.title);
+  const normalizedDescription = normalizeText(product.short_description);
+  const shouldShowDescription =
+    normalizedDescription.length > 0 &&
+    normalizedDescription !== normalizedTitle &&
+    !normalizedDescription.startsWith(normalizedTitle);
+
   return (
     <div
       className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm card-hover ${
@@ -195,8 +210,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       )}
 
-      <Link href={`/products/${product.slug}`} className="block p-4 focus-ring">
-        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gray-50 mb-4">
+      <Link href={`/products/${product.slug}`} className="block p-3 sm:p-4 focus-ring">
+        <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-xl bg-gray-50 sm:mb-4">
           <Image
             src={imageSrc}
             alt={product.title}
@@ -256,7 +271,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         </div>
 
-        <div className="flex justify-between items-center mb-3">
+        <div className="mb-2 flex items-center justify-between sm:mb-3">
           <span className="truncate text-xs font-semibold uppercase text-gray-500 tracking-wide">
             {product.brand_name}
           </span>
@@ -267,14 +282,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
         </div>
 
-        <div className="space-y-3 min-w-0">
-          <h3 className="line-clamp-3 min-h-[4.5rem] sm:min-h-[5rem] break-words text-base font-bold leading-tight text-gray-900 sm:text-lg">
+        <div className="min-w-0 space-y-2 sm:space-y-3">
+          <h3 className="break-words text-sm font-bold leading-tight text-gray-900 sm:text-lg">
             {product.title}
           </h3>
 
-          <p className="text-sm text-gray-600 line-clamp-3 min-h-[3.75rem] leading-relaxed">
-            {product.short_description}
-          </p>
+          {shouldShowDescription ? (
+            <p className="text-xs leading-snug text-gray-600 break-words sm:text-sm sm:leading-relaxed">
+              {product.short_description}
+            </p>
+          ) : null}
 
           {rating > 0 && reviewCount > 0 && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -321,12 +338,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      <div className="mt-auto px-4 pb-4">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="mt-auto px-3 pb-3 sm:px-4 sm:pb-4">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
           <button
             onClick={handleBuyNow}
             disabled={isOutOfStock || buyNowLoading || cartLoading}
-            className={`focus-ring w-full rounded-xl py-2.5 text-xs font-bold leading-tight text-white whitespace-normal transition-all duration-200 sm:py-3 sm:text-sm ${
+            className={`focus-ring w-full rounded-xl px-1.5 py-2 text-[11px] font-bold leading-snug text-white transition-all duration-200 sm:py-3 sm:text-sm ${
               isOutOfStock || buyNowLoading || cartLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#0B123A] hover:bg-[#1a245a] active:scale-95"
@@ -357,14 +374,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 {t("adding")}
               </span>
             ) : (
-              t("buyNow")
+              <>
+                <span className="hidden min-[400px]:inline">{t("buyNow")}</span>
+                <span className="min-[400px]:hidden">{t("buyNowCompact")}</span>
+              </>
             )}
           </button>
 
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full rounded-xl bg-gray-400 py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal cursor-not-allowed sm:py-3 sm:text-sm"
+              className="w-full rounded-xl bg-gray-400 px-1.5 py-2 text-[11px] font-semibold leading-snug text-white cursor-not-allowed sm:py-3 sm:text-sm"
             >
               {t("outOfStock")}
             </button>
@@ -372,13 +392,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={cartLoading}
-              className={`focus-ring w-full rounded-xl py-2.5 text-xs font-semibold leading-tight text-white whitespace-normal transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
+              className={`focus-ring w-full rounded-xl px-1.5 py-2 text-[11px] font-semibold leading-snug text-white transition-colors duration-200 active:scale-95 sm:py-3 sm:text-sm ${
                 cartLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-[#0B123A] hover:bg-[#1a245a]"
               }`}
             >
-              {cartLoading ? t("adding") : t("addToCart")}
+              {cartLoading ? (
+                t("adding")
+              ) : (
+                <>
+                  <span className="hidden min-[400px]:inline">{t("addToCart")}</span>
+                  <span className="min-[400px]:hidden">{t("addToCartCompact")}</span>
+                </>
+              )}
             </button>
           ) : (
             <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-3">

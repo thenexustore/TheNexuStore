@@ -562,7 +562,7 @@ export default function ProductDetailsClient({
       {relatedProducts.length > 0 && (
         <div>
           <h2 className="mb-6 text-2xl font-bold lg:text-3xl">{t("relatedProducts")}</h2>
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5 lg:gap-6">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5 lg:gap-6">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} />
             ))}

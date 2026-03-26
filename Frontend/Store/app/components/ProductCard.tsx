@@ -283,7 +283,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         <div className="min-w-0 space-y-2 sm:space-y-3">
-          <h3 className="line-clamp-2 min-h-[2.8rem] break-words text-sm font-bold leading-tight text-gray-900 sm:min-h-[5rem] sm:text-lg">
+          <h3 className="break-words text-sm font-bold leading-tight text-gray-900 sm:text-lg">
             {product.title}
           </h3>
 

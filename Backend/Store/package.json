@@ -25,6 +25,7 @@
     "categories:backfill-level2": "ts-node scripts/backfill-category-level2-parents.ts",
     "categories:audit-report": "ts-node scripts/analyze-taxonomy-audit-report.ts",
     "categories:audit-api": "ts-node scripts/audit-infortisa-api-taxonomy.ts",
+    "billing:backfill-paid-orders": "ts-node scripts/backfill-paid-orders.ts",
     "prisma:generate": "prisma generate",
     "prebuild": "npm run prisma:generate && npm run check:home-controller-duplicates",
     "prestart": "npm run prisma:generate",

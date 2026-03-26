@@ -62,6 +62,14 @@ export class PaymentService {
     private readonly billingService: BillingService,
   ) {}
 
+  private static readonly BLOCKING_SUPPLIER_AVAILABILITY_CODES = new Set([
+    'OUT_OF_STOCK',
+    'NO_STOCK',
+    'UNAVAILABLE',
+    'NOT_AVAILABLE',
+    'SIN_STOCK',
+  ]);
+
   async createPayment(dto: CreatePaymentDto): Promise<PaymentResult> {
     switch (dto.provider) {
       case 'COD':
@@ -150,36 +158,15 @@ export class PaymentService {
     }
 
     const amount = Number(order.total_amount);
-    const payment = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.payment.create({
-        data: {
-          order_id: orderId,
-          provider: 'COD',
-          status: 'AUTHORIZED',
-          amount,
-          currency: 'EUR',
-          provider_payment_id: `COD_${Date.now()}`,
-        },
-      });
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: 'PROCESSING',
-        },
-      });
-
-      const discounts = await tx.orderDiscount.findMany({
-        where: { order_id: orderId },
-      });
-      for (const discount of discounts) {
-        await tx.coupon.update({
-          where: { id: discount.coupon_id },
-          data: { usage_count: { increment: 1 } },
-        });
-      }
-
-      return created;
+    const payment = await this.prisma.payment.create({
+      data: {
+        order_id: orderId,
+        provider: 'COD',
+        status: 'AUTHORIZED',
+        amount,
+        currency: 'EUR',
+        provider_payment_id: `COD_${Date.now()}`,
+      },
     });
 
     this.logger.log('COD payment transaction completed', 'PaymentService', {
@@ -187,22 +174,12 @@ export class PaymentService {
       paymentId: payment.id,
     });
 
-    // Auto-create a draft billing document for the newly confirmed COD order.
-    // Fire-and-forget — billing errors must not break the payment confirmation.
-    this.billingService.createDocumentFromOrder(orderId).catch((err: unknown) => {
-      this.logger.warn(
-        'Failed to auto-create billing document for COD order',
-        'PaymentService',
-        { orderId, error: err instanceof Error ? err.message : String(err) },
-      );
-    });
-
     return {
       success: true,
       provider: 'COD',
       paymentId: payment.id,
       orderId,
-      message: 'Order confirmed. Payment will be collected on delivery.',
+      message: 'COD payment authorized. Capture pending delivery confirmation.',
     };
   }
 
@@ -435,14 +412,21 @@ export class PaymentService {
       );
 
       // Auto-create a draft billing document for the paid order.
-      // Fire-and-forget — billing errors must not block the Redsys webhook response.
-      this.billingService.createDocumentFromOrder(payment.order_id).catch((err: unknown) => {
-        this.logger.warn(
-          'Failed to auto-create billing document for Redsys-paid order',
-          'PaymentService',
-          { orderId: payment.order_id, error: err instanceof Error ? err.message : String(err) },
-        );
-      });
+      // Billing errors must not block the Redsys webhook response.
+      await this.billingService
+        .createDocumentFromOrder(payment.order_id)
+        .catch((err: unknown) => {
+          this.logger.warn(
+            'Failed to auto-create billing document for Redsys-paid order',
+            'PaymentService',
+            {
+              orderId: payment.order_id,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        });
+
+      await this.runPostPaymentOperationalValidation(payment.order_id);
     } else {
       await this.prisma.$transaction(async (tx) => {
         await tx.payment.update({
@@ -505,9 +489,163 @@ export class PaymentService {
           paid_at: new Date(),
         },
       });
+
+      const discounts = await tx.orderDiscount.findMany({
+        where: { order_id: orderId },
+      });
+      for (const discount of discounts) {
+        await tx.coupon.update({
+          where: { id: discount.coupon_id },
+          data: { usage_count: { increment: 1 } },
+        });
+      }
     });
 
+    await this.billingService.createDocumentFromOrder(orderId).catch((err: unknown) => {
+      this.logger.warn(
+        'Failed to auto-create billing document for COD-paid order',
+        'PaymentService',
+        { orderId, error: err instanceof Error ? err.message : String(err) },
+      );
+    });
+
+    await this.runPostPaymentOperationalValidation(orderId);
+
     await this.orderTrackingEvents.notifyByOrderId(orderId, 'payment_captured');
+  }
+
+  private async runPostPaymentOperationalValidation(orderId: string): Promise<void> {
+    const issues = await this.collectPostPaymentValidationIssues(orderId);
+    const targetStatus = issues.length > 0 ? OrderStatus.ON_HOLD : OrderStatus.PROCESSING;
+    const note = issues.length > 0
+      ? `[AUTO_VALIDATION][ON_HOLD] ${issues.join(' | ')}`
+      : '[AUTO_VALIDATION][PROCESSING] Validation passed (stock and pricing checks).';
+
+    const transitionApplied = await this.prisma.$transaction(async (tx) => {
+      const statusUpdate = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          status: OrderStatus.PAID,
+        },
+        data: {
+          status: targetStatus,
+        },
+      });
+
+      if (statusUpdate.count === 0) {
+        return false;
+      }
+
+      await tx.orderAdminNote.create({
+        data: {
+          order_id: orderId,
+          note,
+        },
+      });
+
+      return true;
+    });
+
+    if (!transitionApplied) {
+      this.logger.warn(
+        'Skipped post-payment operational validation transition because order is no longer PAID',
+        'PaymentService',
+        { orderId, targetStatus },
+      );
+      return;
+    }
+
+    await this.orderTrackingEvents.notifyByOrderId(
+      orderId,
+      targetStatus === OrderStatus.ON_HOLD
+        ? 'post_payment_validation_failed'
+        : 'post_payment_validation_passed',
+    );
+  }
+
+  private async collectPostPaymentValidationIssues(orderId: string): Promise<string[]> {
+    const issues: string[] = [];
+    const orderItems = await this.prisma.orderItem.findMany({
+      where: { order_id: orderId },
+      include: {
+        sku: {
+          include: {
+            prices: {
+              select: {
+                sale_price: true,
+              },
+            },
+          },
+        },
+        supplier_product: {
+          include: {
+            stock: {
+              select: {
+                qty_available: true,
+                availability_code: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (const item of orderItems) {
+      const currentSalePrice = item.sku?.prices?.[0]?.sale_price;
+      if (currentSalePrice != null) {
+        const expected = Number(item.unit_price);
+        const current = Number(currentSalePrice);
+        if (Math.abs(current - expected) > 0.009) {
+          issues.push(
+            `Price mismatch for SKU ${item.sku_id}: expected ${expected.toFixed(2)} but current is ${current.toFixed(2)}`,
+          );
+        }
+      }
+
+      if (item.fulfillment_type === 'INTERNAL') {
+        const inventory = await this.prisma.inventoryLevel.aggregate({
+          where: { sku_id: item.sku_id },
+          _sum: {
+            qty_on_hand: true,
+            qty_reserved: true,
+          },
+        });
+
+        const availableQty =
+          (inventory._sum.qty_on_hand || 0) - (inventory._sum.qty_reserved || 0);
+
+        if (availableQty < item.qty) {
+          issues.push(
+            `Insufficient internal stock for SKU ${item.sku_id}: available ${availableQty}, required ${item.qty}`,
+          );
+        }
+        continue;
+      }
+
+      if (item.fulfillment_type === 'SUPPLIER') {
+        const supplierQty = item.supplier_product?.stock?.qty_available;
+        if (supplierQty == null || supplierQty < item.qty) {
+          issues.push(
+            `Insufficient supplier stock for SKU ${item.sku_id}: available ${supplierQty ?? 0}, required ${item.qty}`,
+          );
+        }
+
+        const availabilityCode =
+          item.supplier_product?.stock?.availability_code?.trim().toUpperCase();
+        if (
+          availabilityCode &&
+          PaymentService.BLOCKING_SUPPLIER_AVAILABILITY_CODES.has(
+            availabilityCode,
+          )
+        ) {
+          issues.push(
+            `Supplier availability code ${availabilityCode} blocks fulfillment for SKU ${item.sku_id}`,
+          );
+        }
+      }
+    }
+
+    return issues;
   }
 
   async getPaymentStatus(orderId: string): Promise<{

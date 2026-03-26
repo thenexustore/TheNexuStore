@@ -1,31 +1,36 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
   Param,
+  Post,
   Query,
   Req,
   Res,
   UseGuards,
-  HttpCode,
-  HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PaymentService } from './payment.service';
 import { RedsysNotification } from './redsys.service';
-import { AuthGuard } from '../../auth/auth.guard';
 import { InitiatePaymentDto } from './dto/payment.dto';
 import { CreateRedsysPaymentDto } from './dto/create-redsys-payment.dto';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
+import { AuthGuard } from '../../auth/auth.guard';
+
+const LEGACY_PAYMENT_ROUTE_NOTICE =
+  'Deprecated route. Use /payments/* canonical endpoints.';
 
 @Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post('initiate')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   @UseGuards(AuthGuard, CsrfGuard, RateLimitGuard)
   async initiatePayment(
     @Req() req: Request & { user?: { id?: string } },
@@ -40,6 +45,7 @@ export class PaymentController {
   }
 
   @Post('redsys/create')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   @UseGuards(OptionalAuthGuard, CsrfGuard, RateLimitGuard)
   async createRedsysPayment(
     @Req() req: Request & { user?: { id?: string } },
@@ -67,6 +73,7 @@ export class PaymentController {
   }
 
   @Post('redsys/notification')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   @HttpCode(HttpStatus.OK)
   async handleRedsysNotification(
     @Body() notification: RedsysNotification,
@@ -77,6 +84,7 @@ export class PaymentController {
   }
 
   @Post('redsys/notify')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   @HttpCode(HttpStatus.OK)
   async handleRedsysNotifyAlias(
     @Body() notification: RedsysNotification,
@@ -87,6 +95,7 @@ export class PaymentController {
   }
 
   @Get('redsys/ok')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   async redsysOk(
     @Query('orderRef') orderRef: string | undefined,
     @Query('Ds_Order') dsOrder: string | undefined,
@@ -100,6 +109,7 @@ export class PaymentController {
   }
 
   @Get('redsys/ko')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   async redsysKo(
     @Query('orderRef') orderRef: string | undefined,
     @Query('Ds_Order') dsOrder: string | undefined,
@@ -113,6 +123,7 @@ export class PaymentController {
   }
 
   @Post('cod/confirm/:orderId')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   @UseGuards(AuthGuard, CsrfGuard)
   async confirmCODPayment(@Param('orderId') orderId: string) {
     await this.paymentService.confirmCODDelivery(orderId);
@@ -120,6 +131,7 @@ export class PaymentController {
   }
 
   @Get('status/:orderId')
+  @Header('X-Nexus-Deprecated-Route', LEGACY_PAYMENT_ROUTE_NOTICE)
   @UseGuards(AuthGuard)
   async getPaymentStatus(@Param('orderId') orderId: string) {
     return this.paymentService.getPaymentStatus(orderId);

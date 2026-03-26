@@ -12,6 +12,16 @@ describe('PaymentService', () => {
     order: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    orderItem: {
+      findMany: jest.fn(),
+    },
+    orderAdminNote: {
+      create: jest.fn(),
+    },
+    inventoryLevel: {
+      aggregate: jest.fn(),
     },
     payment: {
       findFirst: jest.fn(),
@@ -153,6 +163,26 @@ describe('PaymentService', () => {
     );
   });
 
+  it('keeps COD orders out of PROCESSING and does not create billing draft on authorization', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'order-cod-1',
+      status: 'PENDING_PAYMENT',
+      total_amount: 42,
+    });
+    (prisma.payment.create as jest.Mock).mockResolvedValue({
+      id: 'payment-cod-1',
+    });
+
+    const result = await service.createPayment({
+      orderId: 'order-cod-1',
+      provider: 'COD',
+    });
+
+    expect(result.provider).toBe('COD');
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(billingService.createDocumentFromOrder).not.toHaveBeenCalled();
+  });
+
   it('captures successful Bizum notifications as paid Redsys payments', async () => {
     const notificationResult = {
       success: true,
@@ -195,6 +225,10 @@ describe('PaymentService', () => {
       },
       order: {
         update: jest.fn().mockResolvedValue(undefined),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderAdminNote: {
+        create: jest.fn().mockResolvedValue(undefined),
       },
       orderDiscount: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -209,6 +243,19 @@ describe('PaymentService', () => {
     );
     (retryService.execute as jest.Mock).mockImplementation((fn) => fn());
     (prisma.payment.findFirst as jest.Mock).mockResolvedValue(paymentRecord);
+    (prisma.orderItem.findMany as jest.Mock).mockResolvedValue([
+      {
+        sku_id: 'sku-1',
+        qty: 1,
+        unit_price: 19.95,
+        fulfillment_type: 'INTERNAL',
+        sku: { prices: [{ sale_price: 19.95 }] },
+        supplier_product: null,
+      },
+    ]);
+    (prisma.inventoryLevel.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { qty_on_hand: 3, qty_reserved: 1 },
+    });
     (prisma.$transaction as jest.Mock).mockImplementation((fn) => fn(tx));
 
     await service.handleRedsysNotification({
@@ -251,6 +298,188 @@ describe('PaymentService', () => {
         status: 'PAID',
         paid_at: expect.any(Date),
       },
+    });
+    expect(billingService.createDocumentFromOrder).toHaveBeenCalledWith(
+      'order-789',
+    );
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-789', status: 'PAID' },
+      data: { status: 'PROCESSING' },
+    });
+  });
+
+  it('moves a paid order to ON_HOLD when post-payment validation fails', async () => {
+    const notificationResult = {
+      success: true,
+      merchantOrderReference: 'merchant-order-999',
+      authCode: '222222',
+      responseCode: '0000',
+      amountInCents: 5000,
+      currency: '978',
+      merchantCode: 'merchant-code',
+      terminal: '1',
+      merchantData: 'payment-999',
+      payMethod: 'CARD',
+      rawParams: {},
+    };
+
+    const paymentRecord = {
+      id: 'payment-999',
+      order_id: 'order-999',
+      amount: 50,
+      currency: 'EUR',
+      status: 'INITIATED',
+      provider_payment_id: 'merchant-order-999',
+      raw_response: null,
+      order: { id: 'order-999' },
+    };
+
+    const tx = {
+      payment: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      order: {
+        update: jest.fn().mockResolvedValue(undefined),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderAdminNote: {
+        create: jest.fn().mockResolvedValue(undefined),
+      },
+      orderDiscount: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      coupon: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    (redsysService.processNotification as jest.Mock).mockResolvedValue(
+      notificationResult,
+    );
+    (retryService.execute as jest.Mock).mockImplementation((fn) => fn());
+    (prisma.payment.findFirst as jest.Mock).mockResolvedValue(paymentRecord);
+    (prisma.orderItem.findMany as jest.Mock).mockResolvedValue([
+      {
+        sku_id: 'sku-2',
+        qty: 2,
+        unit_price: 25,
+        fulfillment_type: 'INTERNAL',
+        sku: { prices: [{ sale_price: 29 }] },
+        supplier_product: null,
+      },
+    ]);
+    (prisma.inventoryLevel.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { qty_on_hand: 1, qty_reserved: 0 },
+    });
+    (prisma.$transaction as jest.Mock).mockImplementation((fn) => fn(tx));
+
+    await service.handleRedsysNotification({
+      Ds_SignatureVersion: 'HMAC_SHA256_V1',
+      Ds_MerchantParameters: 'merchant-params',
+      Ds_Signature: 'signature',
+    });
+
+    expect(tx.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-999', status: 'PAID' },
+      data: { status: 'ON_HOLD' },
+    });
+    expect(tx.orderAdminNote.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        order_id: 'order-999',
+        note: expect.stringContaining('[AUTO_VALIDATION][ON_HOLD]'),
+      }),
+    });
+  });
+
+  it('creates billing draft and transitions COD order to PROCESSING after capture when validation passes', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'order-cod-2',
+      payments: [{ id: 'payment-cod-2', provider: 'COD' }],
+    });
+    (prisma.orderItem.findMany as jest.Mock).mockResolvedValue([
+      {
+        sku_id: 'sku-ok',
+        qty: 1,
+        unit_price: 10,
+        fulfillment_type: 'INTERNAL',
+        sku: { prices: [{ sale_price: 10 }] },
+        supplier_product: null,
+      },
+    ]);
+    (prisma.inventoryLevel.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { qty_on_hand: 5, qty_reserved: 1 },
+    });
+
+    const txCapture = {
+      payment: { update: jest.fn().mockResolvedValue(undefined) },
+      order: { update: jest.fn().mockResolvedValue(undefined) },
+      orderDiscount: { findMany: jest.fn().mockResolvedValue([]) },
+      coupon: { update: jest.fn().mockResolvedValue(undefined) },
+    };
+    const txValidation = {
+      order: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderAdminNote: { create: jest.fn().mockResolvedValue(undefined) },
+    };
+    (prisma.$transaction as jest.Mock)
+      .mockImplementationOnce((fn) => fn(txCapture))
+      .mockImplementationOnce((fn) => fn(txValidation));
+
+    await service.confirmCODDelivery('order-cod-2');
+
+    expect(billingService.createDocumentFromOrder).toHaveBeenCalledWith(
+      'order-cod-2',
+    );
+    expect(txValidation.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-cod-2', status: 'PAID' },
+      data: { status: 'PROCESSING' },
+    });
+  });
+
+  it('creates billing draft and transitions COD order to ON_HOLD after capture when validation fails', async () => {
+    (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+      id: 'order-cod-3',
+      payments: [{ id: 'payment-cod-3', provider: 'COD' }],
+    });
+    (prisma.orderItem.findMany as jest.Mock).mockResolvedValue([
+      {
+        sku_id: 'sku-hold',
+        qty: 2,
+        unit_price: 10,
+        fulfillment_type: 'INTERNAL',
+        sku: { prices: [{ sale_price: 12 }] },
+        supplier_product: null,
+      },
+    ]);
+    (prisma.inventoryLevel.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { qty_on_hand: 1, qty_reserved: 0 },
+    });
+
+    const txCapture = {
+      payment: { update: jest.fn().mockResolvedValue(undefined) },
+      order: { update: jest.fn().mockResolvedValue(undefined) },
+      orderDiscount: { findMany: jest.fn().mockResolvedValue([]) },
+      coupon: { update: jest.fn().mockResolvedValue(undefined) },
+    };
+    const txValidation = {
+      order: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      orderAdminNote: { create: jest.fn().mockResolvedValue(undefined) },
+    };
+    (prisma.$transaction as jest.Mock)
+      .mockImplementationOnce((fn) => fn(txCapture))
+      .mockImplementationOnce((fn) => fn(txValidation));
+
+    await service.confirmCODDelivery('order-cod-3');
+
+    expect(billingService.createDocumentFromOrder).toHaveBeenCalledWith(
+      'order-cod-3',
+    );
+    expect(txValidation.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'order-cod-3', status: 'PAID' },
+      data: { status: 'ON_HOLD' },
     });
   });
 });

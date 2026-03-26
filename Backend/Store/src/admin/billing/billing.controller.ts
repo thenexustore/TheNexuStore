@@ -213,6 +213,7 @@ export class BillingController {
       id,
       dto,
       actor?.sub ?? actor?.id ?? 'unknown',
+      actor?.role,
       actor?.email,
     );
     await this.auditLogService.logAction({

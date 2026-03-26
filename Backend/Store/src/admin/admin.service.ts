@@ -12,6 +12,8 @@ import { PrismaService } from '../common/prisma.service';
 import { CategoriesService } from '../user/categories/categories.service';
 import * as bcrypt from 'bcrypt';
 import { OrderTrackingEventsService } from '../order-tracking/order-tracking-events.service';
+import { canTransitionOrderStatus } from '../orders/order-lifecycle';
+import { AdminOrderAction, OrderActionDto } from './admin.dto';
 
 @Injectable()
 export class AdminService {
@@ -364,6 +366,22 @@ export class AdminService {
               },
             },
           },
+          billing_documents: {
+            where: { status: { not: 'VOID' } },
+            orderBy: { created_at: 'desc' },
+            select: {
+              id: true,
+              status: true,
+              document_number: true,
+              issue_date: true,
+              issued_at: true,
+              source: true,
+            },
+          },
+          admin_notes: {
+            orderBy: { created_at: 'desc' },
+            take: 20,
+          },
         },
       });
 
@@ -404,6 +422,29 @@ export class AdminService {
             redsys_payment_method: redsys?.payMethod ?? null,
           };
         }),
+        billing_state: {
+          has_draft_invoice: order.billing_documents.some(
+            (doc) => doc.status === 'DRAFT',
+          ),
+          has_issued_invoice: order.billing_documents.some((doc) =>
+            ['ISSUED', 'SENT', 'PAID'].includes(doc.status),
+          ),
+          delivery_confirmation_required:
+            order.status !== OrderStatus.DELIVERED,
+          can_issue_via_delivery_confirmation:
+            order.status === OrderStatus.SHIPPED ||
+            order.status === OrderStatus.PROCESSING,
+          latest_document: order.billing_documents[0] ?? null,
+        },
+        admin_notes: order.admin_notes.map((entry) => ({
+          id: entry.id,
+          note: entry.note,
+          author_staff_email: entry.author_staff_email,
+          created_at: entry.created_at,
+        })),
+        post_payment_validation: this.extractPostPaymentValidationSummary(
+          order.admin_notes,
+        ),
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -412,6 +453,35 @@ export class AdminService {
       console.error('Get order by ID error:', error);
       throw new Error('Failed to fetch order details');
     }
+  }
+
+  private extractPostPaymentValidationSummary(
+    notes: Array<{ note: string; created_at: Date }>,
+  ): { status: 'PROCESSING' | 'ON_HOLD'; reason: string; created_at: Date } | null {
+    const latestAutoValidation = notes.find((entry) =>
+      entry.note.startsWith('[AUTO_VALIDATION]'),
+    );
+
+    if (!latestAutoValidation) {
+      return null;
+    }
+
+    const status: 'PROCESSING' | 'ON_HOLD' = latestAutoValidation.note.includes(
+      '[ON_HOLD]',
+    )
+      ? 'ON_HOLD'
+      : 'PROCESSING';
+
+    const reason = latestAutoValidation.note
+      .replace('[AUTO_VALIDATION][ON_HOLD]', '')
+      .replace('[AUTO_VALIDATION][PROCESSING]', '')
+      .trim();
+
+    return {
+      status,
+      reason,
+      created_at: latestAutoValidation.created_at,
+    };
   }
 
   async updateOrderStatus(orderId: string, status: string) {
@@ -720,6 +790,7 @@ export class AdminService {
       default:
         if (
           currentStatus === OrderStatus.PENDING_PAYMENT ||
+          currentStatus === OrderStatus.ON_HOLD ||
           currentStatus === OrderStatus.FAILED ||
           currentStatus === OrderStatus.CANCELLED ||
           currentStatus === OrderStatus.REFUNDED
@@ -779,16 +850,23 @@ export class AdminService {
   }
 
   async getOrderTimeline(orderId: string) {
-    const logs = await this.prisma.adminAuditLog.findMany({
-      where: {
-        resource: 'ORDER',
-        resource_id: orderId,
-      },
-      orderBy: { created_at: 'desc' },
-      take: 50,
-    });
+    const [logs, notes] = await Promise.all([
+      this.prisma.adminAuditLog.findMany({
+        where: {
+          resource: 'ORDER',
+          resource_id: orderId,
+        },
+        orderBy: { created_at: 'desc' },
+        take: 50,
+      }),
+      this.prisma.orderAdminNote.findMany({
+        where: { order_id: orderId },
+        orderBy: { created_at: 'desc' },
+        take: 50,
+      }),
+    ]);
 
-    return logs.map((log) => ({
+    const logEntries = logs.map((log) => ({
       id: log.id,
       action: log.action,
       actorEmail: log.actor_email,
@@ -797,9 +875,27 @@ export class AdminService {
       metadata: log.metadata_json,
       createdAt: log.created_at,
     }));
+
+    const noteEntries = notes.map((note) => ({
+      id: note.id,
+      action: 'ORDER_NOTE',
+      actorEmail: note.author_staff_email,
+      actorRole: null,
+      status: 'SUCCESS',
+      metadata: { note: note.note, persisted: true },
+      createdAt: note.created_at,
+    }));
+
+    return [...logEntries, ...noteEntries].sort(
+      (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+    );
   }
 
-  async addOrderNote(orderId: string, note: string) {
+  async addOrderNote(
+    orderId: string,
+    note: string,
+    actor?: { staffId?: string | null; staffEmail?: string | null },
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
@@ -807,10 +903,150 @@ export class AdminService {
       throw new NotFoundException('Order not found');
     }
 
+    const persisted = await this.prisma.orderAdminNote.create({
+      data: {
+        order_id: orderId,
+        note,
+        author_staff_id: actor?.staffId ?? null,
+        author_staff_email: actor?.staffEmail ?? null,
+      },
+    });
+
     return {
       success: true,
       orderId,
       note,
+      persisted_note_id: persisted.id,
+    };
+  }
+
+  async performOrderAction(
+    orderId: string,
+    input: OrderActionDto,
+    actor?: { staffId?: string | null; staffEmail?: string | null },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        shipments: { orderBy: { created_at: 'desc' }, take: 1 },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    switch (input.action) {
+      case AdminOrderAction.PUT_ON_HOLD:
+        return this.updateOrderStatusWithTransition(
+          order,
+          OrderStatus.ON_HOLD,
+          input.reason,
+          actor,
+        );
+      case AdminOrderAction.RELEASE_HOLD:
+        if (order.status !== OrderStatus.ON_HOLD) {
+          throw new BadRequestException('Only ON_HOLD orders can be released');
+        }
+        return this.updateOrderStatusWithTransition(
+          order,
+          OrderStatus.PROCESSING,
+          input.reason,
+          actor,
+        );
+      case AdminOrderAction.CANCEL:
+        if (
+          order.status === OrderStatus.DELIVERED ||
+          order.status === OrderStatus.REFUNDED
+        ) {
+          throw new BadRequestException(
+            `Cannot cancel order in ${order.status} state`,
+          );
+        }
+        return this.updateOrderStatusWithTransition(
+          order,
+          OrderStatus.CANCELLED,
+          input.reason,
+          actor,
+        );
+      case AdminOrderAction.MARK_SHIPPED:
+        return this.markOrderShipped(order, input, actor);
+      default:
+        throw new BadRequestException('Unsupported order action');
+    }
+  }
+
+  private async markOrderShipped(
+    order: { id: string; status: OrderStatus; shipments: { id: string }[] },
+    input: Pick<OrderActionDto, 'tracking_number' | 'tracking_url' | 'reason'>,
+    actor?: { staffId?: string | null; staffEmail?: string | null },
+  ) {
+    const latestShipment = order.shipments[0];
+    if (!latestShipment) {
+      throw new BadRequestException(
+        'Create a shipment before marking an order as shipped',
+      );
+    }
+
+    const shipment = await this.updateOrderShipment(order.id, latestShipment.id, {
+      status: ShipmentStatus.SHIPPED,
+      tracking_number: input.tracking_number,
+      tracking_url: input.tracking_url,
+    });
+
+    const refreshedOrder = await this.prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+
+    if (!canTransitionOrderStatus(order.status, refreshedOrder.status)) {
+      throw new BadRequestException(
+        `Invalid status transition ${order.status} -> ${refreshedOrder.status}`,
+      );
+    }
+
+    await this.addOrderNote(
+      order.id,
+      input.reason
+        ? `Order marked as shipped. ${input.reason}`
+        : 'Order marked as shipped from admin operations.',
+      actor,
+    );
+
+    return {
+      id: refreshedOrder.id,
+      status: refreshedOrder.status,
+      shipment,
+    };
+  }
+
+  private async updateOrderStatusWithTransition(
+    order: { id: string; status: OrderStatus },
+    targetStatus: OrderStatus,
+    reason?: string,
+    actor?: { staffId?: string | null; staffEmail?: string | null },
+  ) {
+    if (!canTransitionOrderStatus(order.status, targetStatus)) {
+      throw new BadRequestException(
+        `Invalid status transition ${order.status} -> ${targetStatus}`,
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: targetStatus },
+    });
+
+    await this.orderTrackingEvents.notifyByOrderId(
+      order.id,
+      'order_status_updated',
+    );
+
+    if (reason?.trim()) {
+      await this.addOrderNote(order.id, reason.trim(), actor);
+    }
+
+    return {
+      id: updated.id,
+      status: updated.status,
     };
   }
 

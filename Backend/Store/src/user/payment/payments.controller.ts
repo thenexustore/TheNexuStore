@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Req,
@@ -14,13 +15,29 @@ import { Request, Response } from 'express';
 import { PaymentService } from './payment.service';
 import { RedsysNotification } from './redsys.service';
 import { CreateRedsysPaymentDto } from './dto/create-redsys-payment.dto';
+import { InitiatePaymentDto } from './dto/payment.dto';
 import { OptionalAuthGuard } from '../../auth/optional-auth.guard';
+import { AuthGuard } from '../../auth/auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentService: PaymentService) {}
+
+  @Post('initiate')
+  @UseGuards(AuthGuard, CsrfGuard, RateLimitGuard)
+  async initiatePayment(
+    @Req() req: Request & { user?: { id?: string } },
+    @Body() dto: InitiatePaymentDto,
+  ) {
+    return this.paymentService.createPayment({
+      orderId: dto.order_id,
+      provider: dto.provider,
+      returnUrl: dto.return_url,
+      customerId: req.user?.id,
+    });
+  }
 
   @Post('redsys/create')
   @UseGuards(OptionalAuthGuard, CsrfGuard, RateLimitGuard)
@@ -93,5 +110,18 @@ export class PaymentsController {
       orderRef || dsOrder,
     );
     res.redirect(302, redirectUrl);
+  }
+
+  @Post('cod/confirm/:orderId')
+  @UseGuards(AuthGuard, CsrfGuard)
+  async confirmCODPayment(@Param('orderId') orderId: string) {
+    await this.paymentService.confirmCODDelivery(orderId);
+    return { success: true, message: 'COD payment confirmed' };
+  }
+
+  @Get('status/:orderId')
+  @UseGuards(AuthGuard)
+  async getPaymentStatus(@Param('orderId') orderId: string) {
+    return this.paymentService.getPaymentStatus(orderId);
   }
 }

@@ -279,6 +279,7 @@
     "refresh": "Actualizar",
     "paymentPendingAlert": "Retorno bancario recibido. Esperando confirmación segura del servidor Redsys.",
     "paymentConfirmedAlert": "Pago confirmado correctamente.",
+    "onHoldAlert": "Tu pedido está temporalmente en espera mientras validamos los datos de envío.",
     "paymentFailedAlert": "El pago fue rechazado o cancelado. Por favor, reintenta desde soporte.",
     "orderProgress": "Progreso del pedido",
     "current": "Actual",
@@ -290,6 +291,10 @@
       "PAID": {
         "label": "Pago confirmado",
         "subtitle": "Transacción aprobada"
+      },
+      "ON_HOLD": {
+        "label": "En espera",
+        "subtitle": "Pendiente de revisión manual"
       },
       "PROCESSING": {
         "label": "Preparando pedido",
@@ -317,6 +322,11 @@
     "orderItems": "Artículos del pedido",
     "qty": "Cant.: {qty} x {price}",
     "shippingTracking": "Envío y seguimiento",
+    "billingDocuments": "Documentos de facturación",
+    "invoiceAvailableAfterDelivery": "La factura final estará disponible tras la confirmación de entrega.",
+    "downloadInvoice": "Descargar factura {number}",
+    "downloading": "Descargando...",
+    "invoiceDownloadError": "No se puede descargar la factura en este momento.",
     "carrier": "Transportista: {carrier}",
     "trackingNumber": "Número de seguimiento: {number}",
     "viewCarrierTracking": "Ver seguimiento del transportista",
@@ -425,6 +435,7 @@
       "PENDING": "Pendiente",
       "PENDING_PAYMENT": "Pago pendiente",
       "PAID": "Pagado",
+      "ON_HOLD": "En espera",
       "CONFIRMED": "Confirmado",
       "PROCESSING": "En proceso",
       "SHIPPED": "Enviado",

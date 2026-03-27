@@ -196,6 +196,12 @@ const ALL_STATUSES: BillingDocumentStatus[] = [
   "VOID",
 ];
 
+const FINALIZED_INVOICE_STATUSES: BillingDocumentStatus[] = [
+  "ISSUED",
+  "SENT",
+  "PAID",
+];
+
 const PAYMENT_METHODS: BillingPaymentMethod[] = [
   "REDSYS",
   "STRIPE",
@@ -1864,6 +1870,19 @@ export default function BillingPage() {
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          {!doc.document_number &&
+                            doc.type === "INVOICE" &&
+                            FINALIZED_INVOICE_STATUSES.includes(
+                              doc.status as BillingDocumentStatus,
+                            ) && (
+                              <button
+                                onClick={() => openEditNumber(doc)}
+                                className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition"
+                                title="Asignar número"
+                              >
+                                <Hash className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           {(doc.status === "DRAFT" || doc.status === "VOID") && (
                             confirmDeleteId === doc.id ? (
                               <span className="flex items-center gap-1 text-xs">
@@ -2311,7 +2330,11 @@ export default function BillingPage() {
                     </button>
                   )}
                   {/* Edit number */}
-                  {selectedDoc.document_number && (
+                  {(selectedDoc.document_number ||
+                    (selectedDoc.type === "INVOICE" &&
+                      FINALIZED_INVOICE_STATUSES.includes(
+                        selectedDoc.status as BillingDocumentStatus,
+                      ))) && (
                     <button
                       onClick={() => {
                         closeDetail();
@@ -2320,7 +2343,7 @@ export default function BillingPage() {
                       className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition"
                     >
                       <Edit2 className="w-4 h-4" />
-                      Editar nº
+                      {selectedDoc.document_number ? "Editar nº" : "Asignar nº"}
                     </button>
                   )}
                 </div>

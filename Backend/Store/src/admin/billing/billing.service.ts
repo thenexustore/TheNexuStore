@@ -154,6 +154,27 @@ export class BillingService {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 
+  private getAuthoritativeEcommerceTotal(order: any): number {
+    const paidStatuses = new Set([
+      'CAPTURED',
+      'PAID',
+      'SUCCEEDED',
+      'SUCCESS',
+      'COMPLETED',
+      'SETTLED',
+    ]);
+
+    const paidPayment = (order.payments ?? []).find((payment: any) =>
+      paidStatuses.has(String(payment?.status ?? '').toUpperCase()),
+    );
+
+    if (paidPayment?.amount != null) {
+      return this.round2(Number(paidPayment.amount));
+    }
+
+    return this.round2(Number(order.total_amount ?? 0));
+  }
+
   private buildEcommerceInvoiceLineItems(
     order: any,
     shippingLabel = 'Shipping',
@@ -177,7 +198,7 @@ export class BillingService {
     const shippingAmount = this.round2(Number(order.shipping_amount ?? 0));
     const taxAmount = this.round2(Number(order.tax_amount ?? 0));
     const discountAmount = this.round2(Number(order.discount_amount ?? 0));
-    const orderTotal = this.round2(Number(order.total_amount ?? 0));
+    const orderTotal = this.getAuthoritativeEcommerceTotal(order);
 
     const lineItems = order.items.map((item: any, i: number) => {
       const lineSubtotal = this.round2(Number(item.unit_price) * Number(item.qty));

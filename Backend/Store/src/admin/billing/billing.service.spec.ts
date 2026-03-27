@@ -330,6 +330,51 @@ describe('BillingService issuance guards', () => {
     expect(result.billing_document.items.some((item: any) => item.description === 'Shipping')).toBe(true);
   });
 
+  it('uses captured payment amount as authoritative ecommerce total when available', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-payment-total-1',
+      email: 'buyer@nexus.test',
+      currency: 'EUR',
+      customer_id: 'customer-1',
+      subtotal_amount: 100,
+      shipping_amount: 10,
+      tax_amount: 23.1,
+      discount_amount: 5,
+      total_amount: 128.1,
+      billing_address_json: {},
+      items: [
+        {
+          qty: 1,
+          unit_price: 100,
+          title_snapshot: 'GPU',
+          sku_id: 'sku-1',
+          sku: { product: { title: 'GPU' } },
+        },
+      ],
+      customer: { fiscal_profile: null, first_name: 'Ada', last_name: 'Lovelace' },
+      payments: [{ provider: 'REDSYS', status: 'CAPTURED', amount: 130 }],
+    });
+    prisma.billingDocument.findFirst.mockResolvedValue(null);
+    prisma.billingSettings.findFirst.mockResolvedValue({
+      legal_name: 'The Nexus Store S.L.',
+      trade_name: 'The Nexus Store',
+      nif: 'A123',
+      address_real: 'Address',
+      iban_caixabank: null,
+      iban_bbva: null,
+    });
+    prisma.billingDocument.create.mockImplementation(async ({ data }: any) => ({
+      id: 'doc-order-payment-1',
+      ...data,
+      items: data.items?.create ?? [],
+    }));
+
+    const result = await service.createDocumentFromOrder('order-payment-total-1');
+
+    expect(result.created).toBe(true);
+    expect(result.billing_document.total_amount).toBe(130);
+  });
+
   it('re-syncs existing ecommerce draft totals from order source-of-truth before returning', async () => {
     prisma.order.findUnique.mockResolvedValue({
       id: 'order-sync-1',

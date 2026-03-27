@@ -280,6 +280,13 @@ export class AdminService {
           take: limit,
           orderBy: { created_at: 'desc' },
           include: {
+            customer: {
+              select: {
+                email: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
             payments: {
               orderBy: { created_at: 'desc' },
               take: 1,
@@ -304,24 +311,15 @@ export class AdminService {
       }> = [];
 
       for (const order of orders) {
-        let customerEmail = order.email || 'Guest';
-        let customerName = 'Guest';
+        const customerEmail = order.customer?.email || order.email || 'Guest';
+        const customerName = order.customer
+          ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() ||
+            'Guest'
+          : 'Guest';
         const latestPayment = order.payments[0] || null;
         const redsys = this.extractRedsysPayload(
           latestPayment?.raw_response ?? null,
         );
-
-        if (order.customer_id) {
-          const customer = await this.prisma.customer.findUnique({
-            where: { id: order.customer_id },
-            select: { email: true, first_name: true, last_name: true },
-          });
-
-          if (customer) {
-            customerEmail = customer.email;
-            customerName = `${customer.first_name} ${customer.last_name}`;
-          }
-        }
 
         ordersWithCustomerInfo.push({
           id: order.id,

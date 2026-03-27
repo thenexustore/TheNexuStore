@@ -250,6 +250,41 @@ export class BillingService {
     };
   }
 
+  private async syncEcommerceDraftWithOrder(
+    draftDocumentId: string,
+    order: any,
+  ) {
+    const billingTotals = this.buildEcommerceInvoiceLineItems(order);
+
+    const synced = await this.prisma.$transaction(async (tx) => {
+      await tx.billingDocumentItem.deleteMany({
+        where: { document_id: draftDocumentId },
+      });
+
+      if (billingTotals.lineItems.length > 0) {
+        await tx.billingDocumentItem.createMany({
+          data: billingTotals.lineItems.map((item) => ({
+            document_id: draftDocumentId,
+            ...item,
+          })),
+        });
+      }
+
+      return tx.billingDocument.update({
+        where: { id: draftDocumentId },
+        data: {
+          subtotal_amount: billingTotals.subtotalAmount,
+          tax_amount: billingTotals.taxAmount,
+          discount_amount: billingTotals.discountAmount,
+          total_amount: billingTotals.totalAmount,
+        },
+        include: { items: { orderBy: { position: 'asc' } } },
+      });
+    });
+
+    return synced;
+  }
+
   private async warnSuspiciousEcommerceDocumentLinkage(): Promise<void> {
     const suspicious = await this.prisma.billingDocument.findMany({
       where: {
@@ -1016,6 +1051,7 @@ export class BillingService {
     if (existingDoc) {
       let finalDoc = existingDoc;
       if (existingDoc.status === BillingDocumentStatus.DRAFT) {
+        finalDoc = await this.syncEcommerceDraftWithOrder(existingDoc.id, order);
         // Issue the draft (assigns number + issue_date)
         finalDoc = await this.issueDocumentFromDelivery(existingDoc.id, 'system');
         // Send email (transitions ISSUED → SENT)
@@ -1202,7 +1238,16 @@ export class BillingService {
       orderBy: { created_at: 'desc' },
       include: { items: true },
     });
-    if (existing) return { billing_document: existing, created: false };
+    if (existing) {
+      if (existing.status === BillingDocumentStatus.DRAFT) {
+        const syncedDraft = await this.syncEcommerceDraftWithOrder(
+          existing.id,
+          order,
+        );
+        return { billing_document: syncedDraft, created: false };
+      }
+      return { billing_document: existing, created: false };
+    }
 
     const settings = await this.getSettings();
     const customer = order.customer;

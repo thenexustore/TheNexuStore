@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   FileText,
@@ -423,6 +424,7 @@ function BillingPreview({ data }: { data: BillingPreviewData }) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
+  const searchParams = useSearchParams();
   // List state
   const [tab, setTab] = useState<BillingDocumentType | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<BillingDocumentStatus | "">(
@@ -448,6 +450,7 @@ export default function BillingPage() {
 
   // Create form modal
   const [showCreate, setShowCreate] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const [createType, setCreateType] = useState<BillingDocumentType>("INVOICE");
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<CreateFormState>({
@@ -840,6 +843,36 @@ export default function BillingPage() {
     });
     setItemSearches([{ query: "", results: [], open: false, loading: false }]);
     if (templates.length === 0) loadTemplates();
+    setEditingDraftId(null);
+    setShowCreate(true);
+  };
+
+  const openDraftEditForm = (doc: BillingDocumentWithAudits) => {
+    if (doc.status !== "DRAFT") return;
+    setCreateType(doc.type);
+    setEditingDraftId(doc.id);
+    setCreateForm({
+      notes: doc.notes ?? "",
+      payment_method: doc.payment_method ?? "",
+      language: doc.language,
+      issue_date: doc.issue_date ? doc.issue_date.split("T")[0] : "",
+      due_date: doc.due_date ? doc.due_date.split("T")[0] : "",
+      customer_name: doc.customer_name ?? "",
+      customer_email: doc.customer_email ?? "",
+      customer_tax_id: doc.customer_tax_id ?? "",
+      customer_address: doc.customer_address ?? "",
+      items: (doc.items?.length
+        ? doc.items
+        : [{ description: "", qty: 1, unit_price: 0, tax_rate: settings?.default_tax_rate ?? 0.21 }]
+      ).map((item) => ({
+        description: item.description ?? "",
+        qty: String(item.qty ?? 1),
+        unit_price: String(item.unit_price ?? 0),
+        tax_rate: String(item.tax_rate ?? settings?.default_tax_rate ?? 0.21),
+      })),
+      template_id: doc.template_id ?? "",
+    });
+    setItemSearches((doc.items?.length ? doc.items : [{ description: "" }]).map(() => ({ query: "", results: [], open: false, loading: false })));
     setShowCreate(true);
   };
 
@@ -854,7 +887,7 @@ export default function BillingPage() {
     }
     setCreating(true);
     try {
-      await createBillingDocument({
+      const payload = {
         type: createType,
         language: createForm.language,
         payment_method: createForm.payment_method || undefined,
@@ -873,16 +906,24 @@ export default function BillingPage() {
           tax_rate: i.tax_rate !== "" ? Number(i.tax_rate) : (settings?.default_tax_rate ?? 0.21),
           position: idx,
         })),
-      });
+      };
+      if (editingDraftId) {
+        await updateBillingDocument(editingDraftId, payload);
+      } else {
+        await createBillingDocument(payload);
+      }
       toast.success(
-        createType === "INVOICE"
-          ? "Factura creada en borrador"
-          : createType === "QUOTE"
-          ? "Presupuesto creado"
-          : "Nota de crédito creada",
+        editingDraftId
+          ? "Borrador actualizado"
+          : createType === "INVOICE"
+            ? "Factura creada en borrador"
+            : createType === "QUOTE"
+              ? "Presupuesto creado"
+              : "Nota de crédito creada",
       );
       setShowCreate(false);
       setShowCreatePreview(false);
+      setEditingDraftId(null);
       await loadDocs(1);
     } catch (err: unknown) {
       toast.error(
@@ -892,6 +933,23 @@ export default function BillingPage() {
       setCreating(false);
     }
   };
+
+  useEffect(() => {
+    const draftId = searchParams.get("editDraft");
+    if (!draftId) return;
+    void (async () => {
+      try {
+        const doc = await fetchBillingDocumentById(draftId);
+        if (doc.status === "DRAFT") {
+          openDraftEditForm(doc);
+        } else {
+          toast.error("Solo los borradores se pueden editar");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "No se pudo abrir el borrador");
+      }
+    })();
+  }, [searchParams]);
 
   // ─── Settings ──────────────────────────────────────────────────────────────
 
@@ -1754,6 +1812,15 @@ export default function BillingPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          {doc.status === "DRAFT" && (
+                            <button
+                              onClick={() => openDraftEditForm(doc as BillingDocumentWithAudits)}
+                              className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition"
+                              title="Editar borrador"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {doc.status === "DRAFT" && !doc.order_id && (
                             <button
                               onClick={() => handleIssue(doc.id)}
@@ -1915,13 +1982,23 @@ export default function BillingPage() {
                 <div className="flex flex-wrap gap-2 px-6 py-4 bg-zinc-50 border-b border-zinc-100">
                   {(() => {
                     const StatusIcon = STATUS_ICONS[selectedDoc.status as BillingDocumentStatus] ?? FileClock;
+                    const displayStatusLabel =
+                      selectedDoc.order_id && selectedDoc.status === "PAID"
+                        ? "Documento enviado"
+                        : STATUS_LABELS[selectedDoc.status as BillingDocumentStatus];
                     return (
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${STATUS_COLORS[selectedDoc.status as BillingDocumentStatus]}`}>
                         <StatusIcon className="w-3.5 h-3.5" />
-                        {STATUS_LABELS[selectedDoc.status as BillingDocumentStatus]}
+                        {displayStatusLabel}
                       </span>
                     );
                   })()}
+                  {selectedDoc.order_id && selectedDoc.status === "PAID" && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Pago capturado (pedido)
+                    </span>
+                  )}
                   {selectedDoc.payment_method && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200">
                       <CreditCard className="w-3.5 h-3.5" />
@@ -1936,7 +2013,9 @@ export default function BillingPage() {
 
                 {/* Status lifecycle stepper */}
                 {(() => {
-                  const STEPS: BillingDocumentStatus[] = ["DRAFT", "ISSUED", "SENT", "PAID"];
+                  const STEPS: BillingDocumentStatus[] = selectedDoc.order_id
+                    ? ["DRAFT", "ISSUED", "SENT"]
+                    : ["DRAFT", "ISSUED", "SENT", "PAID"];
                   const isVoid = selectedDoc.status === "VOID";
                   const currentIdx = isVoid ? -1 : STEPS.indexOf(selectedDoc.status as BillingDocumentStatus);
                   return (
@@ -2244,6 +2323,15 @@ export default function BillingPage() {
 
                 {/* Status-action row */}
                 <div className="flex flex-wrap items-center gap-2 px-6 py-3">
+                  {selectedDoc.status === "DRAFT" && (
+                    <button
+                      onClick={() => openDraftEditForm(selectedDoc)}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Editar borrador
+                    </button>
+                  )}
                   {selectedDoc.order_id && selectedDoc.status === "DRAFT" && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                       Documento vinculado a pedido: la emisión final solo se realiza al marcar el pedido como entregado.

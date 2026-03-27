@@ -119,6 +119,8 @@ export default function OrdersPage() {
   const [downloadingBillingDocId, setDownloadingBillingDocId] = useState<string | null>(null);
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
+  const isEn = adminSettings.adminLanguage === "en";
+  const t = (en: string, es: string) => (isEn ? en : es);
 
   const formatMoney = (amount: number) =>
     formatCurrencyValue(Number(amount || 0), adminSettings.dateFormat, adminSettings.defaultCurrency);
@@ -340,9 +342,9 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Orders Management</h1>
+        <h1 className="text-2xl font-bold">{t("Orders Management", "Gestión de pedidos")}</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Track order lifecycle, customer info and post-sales operations.
+          {t("Track order lifecycle, customer info and post-sales operations.", "Sigue el ciclo de vida del pedido, datos del cliente y operaciones postventa.")}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           Auto-refresh cada {adminSettings.ordersRefreshSeconds}s · {adminSettings.ordersPageSize} filas por página
@@ -542,6 +544,20 @@ export default function OrdersPage() {
                           </p>
                         </>
                       )}
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs">
+                        <p className="font-semibold text-indigo-800 mb-1">{t("Next step", "Siguiente paso")}</p>
+                        <p className="text-indigo-700">
+                          {orderDetail.status === "PAID" && (!orderDetail.shipments || orderDetail.shipments.length === 0)
+                            ? t("Create shipment to continue fulfillment.", "Crear envío para continuar la preparación.")
+                            : orderDetail.status === "PROCESSING" && (orderDetail.shipments?.length ?? 0) > 0
+                              ? t("Mark the order as shipped.", "Marcar el pedido como enviado.")
+                              : orderDetail.status === "SHIPPED"
+                                ? t("Mark the order as delivered.", "Marcar el pedido como entregado.")
+                                : orderDetail.status === "ON_HOLD"
+                                  ? t("Review hold reason and release when safe.", "Revisar motivo de bloqueo y liberar cuando sea seguro.")
+                                  : t("Review timeline and keep advancing the workflow.", "Revisar timeline y avanzar el flujo operativo.")}
+                        </p>
+                      </div>
                       <p className="text-sm"><span className="font-medium">Total:</span> {formatMoney(Number(orderDetail.total_amount))}</p>
                       <p className="text-sm"><span className="font-medium">Created:</span> {new Date(orderDetail.created_at).toLocaleString()}</p>
 
@@ -553,7 +569,7 @@ export default function OrdersPage() {
                               <p className="font-medium">{item.sku?.product?.title || "Product"}</p>
                               <p>SKU: {item.sku?.sku_code || "-"}</p>
                               <p>Qty: {item.qty}</p>
-                              <p>Unit: {formatMoney(Number(item.unit_price_snapshot || 0))}</p>
+                              <p>{t("Unit:", "Unidad:")} {formatMoney(Number((item.unit_price ?? item.unit_price_snapshot) || 0))}</p>
                             </div>
                           ))}
                         </div>
@@ -912,12 +928,20 @@ export default function OrdersPage() {
                                       {doc.status === "DRAFT" ? "Borrador" :
                                        doc.status === "ISSUED" ? "Emitida" :
                                        doc.status === "SENT" ? "Enviada" :
-                                       doc.status === "PAID" ? "Cobrada" :
+                                       doc.status === "PAID" ? t("Payment captured", "Pago capturado") :
                                        doc.status === "VOID" ? "Anulada" : doc.status}
                                     </span>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                  {doc.status === "DRAFT" && (
+                                    <Link
+                                      href={`/billing?editDraft=${doc.id}`}
+                                      className="text-[11px] font-medium text-indigo-600 hover:underline"
+                                    >
+                                      {t("Edit draft", "Editar borrador")}
+                                    </Link>
+                                  )}
                                   <span className="text-zinc-500 font-medium tabular-nums">
                                     {Number(doc.total_amount ?? 0).toLocaleString("es-ES", { style: "currency", currency: doc.currency ?? "EUR" })}
                                   </span>

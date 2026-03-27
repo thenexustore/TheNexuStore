@@ -8,11 +8,19 @@ describe('BillingService issuance guards', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
     },
     order: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
+    },
+    shipment: {
+      findFirst: jest.fn(),
+      update: jest.fn(),
+      create: jest.fn(),
     },
     billingNumberAudit: {
       create: jest.fn(),
@@ -248,5 +256,137 @@ describe('BillingService issuance guards', () => {
     expect(firstRun.skipped).toBe(1);
     expect(secondRun.created).toBe(0);
     expect(secondRun.skipped).toBe(1);
+  });
+
+  it('does not auto-create drafts while listing billing documents', async () => {
+    prisma.billingDocument.findMany.mockResolvedValue([]);
+    prisma.billingDocument.count.mockResolvedValue(0);
+    prisma.billingDocument.findFirst.mockResolvedValue(null);
+    const createSpy = jest
+      .spyOn(service, 'createDocumentFromOrder')
+      .mockResolvedValue({ created: true, billing_document: { id: 'doc' } } as any);
+
+    const result = await service.listDocuments({
+      page: 1,
+      limit: 20,
+    } as any);
+
+    expect(result.items).toEqual([]);
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('creates order-linked draft totals from order source-of-truth amounts exactly', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-amount-1',
+      email: 'buyer@nexus.test',
+      currency: 'EUR',
+      customer_id: 'customer-1',
+      subtotal_amount: 100,
+      shipping_amount: 10,
+      tax_amount: 23.1,
+      discount_amount: 5,
+      total_amount: 128.1,
+      billing_address_json: {},
+      items: [
+        {
+          qty: 1,
+          unit_price: 100,
+          title_snapshot: 'GPU',
+          sku_id: 'sku-1',
+          sku: { product: { title: 'GPU' } },
+        },
+      ],
+      customer: { fiscal_profile: null, first_name: 'Ada', last_name: 'Lovelace' },
+      payments: [{ provider: 'REDSYS' }],
+    });
+    prisma.billingDocument.findFirst.mockResolvedValue(null);
+    prisma.billingSettings.findFirst.mockResolvedValue({
+      legal_name: 'The Nexus Store S.L.',
+      trade_name: 'The Nexus Store',
+      nif: 'A123',
+      address_real: 'Address',
+      iban_caixabank: null,
+      iban_bbva: null,
+    });
+    prisma.billingDocument.create.mockImplementation(async ({ data }: any) => ({
+      id: 'doc-order-1',
+      ...data,
+      items: data.items?.create ?? [],
+    }));
+
+    const result = await service.createDocumentFromOrder('order-amount-1');
+
+    expect(result.created).toBe(true);
+    expect(result.billing_document.total_amount).toBe(128.1);
+    expect(result.billing_document.subtotal_amount).toBe(110);
+    expect(result.billing_document.tax_amount).toBe(23.1);
+    expect(result.billing_document.discount_amount).toBe(5);
+    expect(result.billing_document.items.some((item: any) => item.description === 'Shipping')).toBe(true);
+  });
+
+  it('keeps delivered-confirmation generated invoice total equal to order total', async () => {
+    jest
+      .spyOn(service as any, 'issueDocumentFromDelivery')
+      .mockResolvedValue({ id: 'doc-delivery-1', status: BillingDocumentStatus.ISSUED });
+    jest.spyOn(service, 'sendDocument').mockResolvedValue({ id: 'doc-delivery-1' } as any);
+
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-delivery-1',
+      status: OrderStatus.SHIPPED,
+      email: 'buyer@nexus.test',
+      currency: 'EUR',
+      customer_id: 'customer-1',
+      subtotal_amount: 80,
+      shipping_amount: 5,
+      tax_amount: 17.85,
+      discount_amount: 0,
+      total_amount: 102.85,
+      billing_address_json: {},
+      items: [
+        {
+          qty: 1,
+          unit_price: 80,
+          title_snapshot: 'CPU',
+          sku_id: 'sku-2',
+          sku: { product: { title: 'CPU' } },
+        },
+      ],
+      customer: { fiscal_profile: null, first_name: 'Grace', last_name: 'Hopper' },
+      payments: [{ provider: 'REDSYS' }],
+    });
+    prisma.order.update.mockResolvedValue({ id: 'order-delivery-1', status: OrderStatus.DELIVERED });
+    prisma.billingDocument.findFirst.mockResolvedValue(null);
+    prisma.billingSettings.findFirst.mockResolvedValue({
+      legal_name: 'The Nexus Store S.L.',
+      trade_name: 'The Nexus Store',
+      nif: 'A123',
+      address_real: 'Address',
+      iban_caixabank: null,
+      iban_bbva: null,
+    });
+    prisma.billingDocument.create.mockImplementation(async ({ data }: any) => ({
+      id: 'doc-delivery-1',
+      ...data,
+      items: data.items?.create ?? [],
+    }));
+    prisma.billingDocument.findUnique.mockResolvedValue({
+      id: 'doc-delivery-1',
+      total_amount: 102.85,
+      items: [],
+    });
+
+    const response = await service.markOrderDelivered('order-delivery-1', {});
+
+    expect(prisma.billingDocument.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal_amount: 85,
+          tax_amount: 17.85,
+          discount_amount: 0,
+          total_amount: 102.85,
+        }),
+      }),
+    );
+    expect(response.order_status).toBe(OrderStatus.DELIVERED);
   });
 });

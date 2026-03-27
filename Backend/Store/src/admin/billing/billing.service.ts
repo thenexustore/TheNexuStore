@@ -706,12 +706,6 @@ export class BillingService {
         'Only finalized invoices can be manually corrected',
       );
     }
-    if (doc.source !== BillingDocumentSource.MANUAL) {
-      throw new BadRequestException(
-        'Number overrides are only allowed for manual invoices',
-      );
-    }
-
     const oldNumber = doc.document_number;
 
     if (dto.new_number !== oldNumber) {

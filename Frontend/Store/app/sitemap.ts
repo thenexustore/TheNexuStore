@@ -1,35 +1,69 @@
 import type { MetadataRoute } from "next";
 import { fetchAllProductsForSitemap, fetchProductsServer } from "./lib/storefront-server";
-import { absoluteUrl, buildLocalizedPath } from "./lib/seo";
+import {
+  absoluteUrl,
+  buildLocalizedPath,
+  buildRouteWithQuery,
+  buildSitemapLanguageAlternates,
+  type StoreLocale,
+} from "./lib/seo";
 
 export const revalidate = 900;
 
+function createSitemapEntry({
+  locale,
+  routePath,
+  query,
+  lastModified = new Date(),
+  changeFrequency,
+  priority,
+}: {
+  locale: StoreLocale;
+  routePath: string;
+  query?: string;
+  lastModified?: Date;
+  changeFrequency: "daily" | "weekly";
+  priority: number;
+}): MetadataRoute.Sitemap[number] {
+  const localizedRoute = buildLocalizedPath(locale, buildRouteWithQuery(routePath, query));
+
+  return {
+    url: absoluteUrl(localizedRoute),
+    lastModified,
+    changeFrequency,
+    priority,
+    alternates: {
+      languages: buildSitemapLanguageAlternates(routePath, query),
+    },
+  };
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
-    {
-      url: absoluteUrl(buildLocalizedPath("es", "/store")),
-      lastModified: new Date(),
+    createSitemapEntry({
+      locale: "es",
+      routePath: "/store",
       changeFrequency: "daily",
       priority: 1,
-    },
-    {
-      url: absoluteUrl(buildLocalizedPath("en", "/store")),
-      lastModified: new Date(),
+    }),
+    createSitemapEntry({
+      locale: "en",
+      routePath: "/store",
       changeFrequency: "daily",
       priority: 0.9,
-    },
-    {
-      url: absoluteUrl(buildLocalizedPath("es", "/products")),
-      lastModified: new Date(),
+    }),
+    createSitemapEntry({
+      locale: "es",
+      routePath: "/products",
       changeFrequency: "daily",
       priority: 0.85,
-    },
-    {
-      url: absoluteUrl(buildLocalizedPath("en", "/products")),
-      lastModified: new Date(),
+    }),
+    createSitemapEntry({
+      locale: "en",
+      routePath: "/products",
       changeFrequency: "daily",
       priority: 0.8,
-    },
+    }),
   ];
 
   try {
@@ -47,42 +81,52 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ).catch(() => null),
     ]);
     const productEntries = products.flatMap((product) => [
-      {
-        url: absoluteUrl(buildLocalizedPath("es", `/products/${product.slug}`)),
-        changeFrequency: "weekly" as const,
+      createSitemapEntry({
+        locale: "es",
+        routePath: `/products/${product.slug}`,
+        changeFrequency: "weekly",
         priority: 0.7,
-      },
-      {
-        url: absoluteUrl(buildLocalizedPath("en", `/products/${product.slug}`)),
-        changeFrequency: "weekly" as const,
+      }),
+      createSitemapEntry({
+        locale: "en",
+        routePath: `/products/${product.slug}`,
+        changeFrequency: "weekly",
         priority: 0.65,
-      },
+      }),
     ]);
     const categoryEntries =
       catalogIndex?.filters?.categories.flatMap((category) => [
-        {
-          url: absoluteUrl(buildLocalizedPath("es", `/products?category=${category.slug}`)),
-          changeFrequency: "weekly" as const,
+        createSitemapEntry({
+          locale: "es",
+          routePath: "/products",
+          query: new URLSearchParams({ category: category.slug }).toString(),
+          changeFrequency: "weekly",
           priority: 0.72,
-        },
-        {
-          url: absoluteUrl(buildLocalizedPath("en", `/products?category=${category.slug}`)),
-          changeFrequency: "weekly" as const,
+        }),
+        createSitemapEntry({
+          locale: "en",
+          routePath: "/products",
+          query: new URLSearchParams({ category: category.slug }).toString(),
+          changeFrequency: "weekly",
           priority: 0.67,
-        },
+        }),
       ]) ?? [];
     const brandEntries =
       catalogIndex?.filters?.brands.flatMap((brand) => [
-        {
-          url: absoluteUrl(buildLocalizedPath("es", `/products?brand=${brand.slug}`)),
-          changeFrequency: "weekly" as const,
+        createSitemapEntry({
+          locale: "es",
+          routePath: "/products",
+          query: new URLSearchParams({ brand: brand.slug }).toString(),
+          changeFrequency: "weekly",
           priority: 0.66,
-        },
-        {
-          url: absoluteUrl(buildLocalizedPath("en", `/products?brand=${brand.slug}`)),
-          changeFrequency: "weekly" as const,
+        }),
+        createSitemapEntry({
+          locale: "en",
+          routePath: "/products",
+          query: new URLSearchParams({ brand: brand.slug }).toString(),
+          changeFrequency: "weekly",
           priority: 0.61,
-        },
+        }),
       ]) ?? [];
 
     return [...staticEntries, ...categoryEntries, ...brandEntries, ...productEntries];

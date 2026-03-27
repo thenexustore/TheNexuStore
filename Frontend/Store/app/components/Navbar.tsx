@@ -557,7 +557,7 @@ export default function Navbar() {
             <Menu size={24} />
           </button>
 
-          <Link href="/" className="min-w-0 flex-shrink-0">
+          <Link href="/store" className="min-w-0 flex-shrink-0">
             <div className="flex h-10 w-20 items-center justify-center rounded-lg sm:h-11 sm:w-32">
               <StoreBrandLogo
                 branding={storeBranding}

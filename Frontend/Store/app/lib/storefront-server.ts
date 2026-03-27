@@ -1,6 +1,30 @@
 import type { Product, ProductDetail, ProductFilters, ProductResponse } from "./products";
 import { API_URL } from "./env";
 
+export type FooterSettings = {
+  logoUrl: string;
+  logoAlt: string;
+  newsletterEnabled: boolean;
+  newsletterTitle: string;
+  newsletterText: string;
+  newsletterPlaceholder: string;
+  newsletterButtonText: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactWhatsapp: string;
+  contactAddress: string;
+  contactHours: string;
+  contactMapsUrl: string;
+  legalLinks: Array<{ label: string; url: string }>;
+  paymentsEnabled: boolean;
+  paymentMethods: Array<{ label: string; iconUrl: string }>;
+  socialEnabled: boolean;
+  socialLinks: Array<{ platform: string; label: string; url: string }>;
+  trustEnabled: boolean;
+  trustItems: Array<{ icon: string; text: string }>;
+  copyrightText: string;
+};
+
 type ApiEnvelope<T> = {
   success: boolean;
   data?: T;
@@ -166,4 +190,10 @@ export async function fetchAllProductsForSitemap(): Promise<Product[]> {
       : [];
 
   return [firstPage, ...pages].flatMap((page) => page.products ?? []);
+}
+
+export async function fetchFooterSettingsServer(
+  init?: FetchStorefrontOptions,
+): Promise<FooterSettings> {
+  return fetchStorefrontApi<FooterSettings>("/footer/settings", init);
 }

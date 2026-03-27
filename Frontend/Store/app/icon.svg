@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TheNexuStore icon">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111A47" />
+      <stop offset="1" stop-color="#0B123A" />
+    </linearGradient>
+    <linearGradient id="xBlue" x1="30" y1="14" x2="50" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B82F6" />
+      <stop offset="0.55" stop-color="#1D4ED8" />
+      <stop offset="1" stop-color="#1E3A8A" />
+    </linearGradient>
+    <linearGradient id="xDark" x1="16" y1="16" x2="34" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FAFC" />
+      <stop offset="1" stop-color="#CBD5E1" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)" />
+  <rect x="5.5" y="5.5" width="53" height="53" rx="14.5" fill="none" stroke="rgba(255,255,255,0.08)" />
+  <path d="M17 18h9.5L34 28.5 24.5 46H15l10.6-17.5z" fill="url(#xDark)" />
+  <path d="M39.5 18H49L38.8 35 49.2 46h-9.4L34 37.9z" fill="url(#xBlue)" />
+  <path d="M28.2 18H38l-6.1 9.3-4.8-6.8z" fill="url(#xBlue)" opacity="0.95" />
+  <path d="M32.3 36.5 37.8 46H28l-4.9-7.1z" fill="url(#xDark)" opacity="0.92" />
+</svg>

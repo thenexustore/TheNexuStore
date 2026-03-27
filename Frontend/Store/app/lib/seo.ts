@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { Product, ProductDetail, ProductFilters, ProductResponse } from "./products";
+import type { FooterSettings } from "./storefront-server";
 import { SITE_URL } from "./env";
 
 export type StoreLocale = "es" | "en";
@@ -8,6 +9,20 @@ export const DEFAULT_STORE_LOCALE: StoreLocale = "es";
 export const SUPPORTED_STORE_LOCALES: readonly StoreLocale[] = ["es", "en"];
 export const STORE_SITE_NAME = "TheNexuStore";
 export const DEFAULT_OG_IMAGE_PATH = "/logo.png";
+export const DEFAULT_SITE_ICON_PATH = "/icon.svg";
+export const TARGET_SEO_MARKETS = ["ES", "GB", "US", "IN"] as const;
+
+const REGIONAL_HREFLANG_LOCALES: ReadonlyArray<{
+  code: string;
+  locale: StoreLocale;
+}> = [
+  { code: "es", locale: "es" },
+  { code: "es-ES", locale: "es" },
+  { code: "en", locale: "en" },
+  { code: "en-US", locale: "en" },
+  { code: "en-GB", locale: "en" },
+  { code: "en-IN", locale: "en" },
+];
 
 const SEO_COPY: Record<
   StoreLocale,
@@ -85,6 +100,10 @@ function isAbsoluteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
+function isNonEmptyString(value?: string | null): value is string {
+  return Boolean(value && value.trim());
+}
+
 function normalizePath(pathname: string): string {
   if (!pathname.trim()) return "/";
   const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
@@ -98,6 +117,10 @@ function normalizeQuery(query?: string): string {
 
 export function resolveStoreLocale(locale?: string | null): StoreLocale {
   return locale === "en" ? "en" : DEFAULT_STORE_LOCALE;
+}
+
+export function getHtmlLanguageTag(locale: StoreLocale): string {
+  return locale === "es" ? "es-ES" : "en";
 }
 
 export function absoluteUrl(pathname: string = "/"): string {
@@ -117,6 +140,31 @@ export function buildRouteWithQuery(routePath: string, query?: string): string {
   return `${normalizePath(routePath)}${normalizeQuery(query)}`;
 }
 
+export function buildLanguageAlternates(
+  routePath: string,
+  query?: string,
+): NonNullable<NonNullable<Metadata["alternates"]>["languages"]> {
+  const localizedRoute = buildRouteWithQuery(routePath, query);
+  const languages = REGIONAL_HREFLANG_LOCALES.reduce<Record<string, string>>((acc, item) => {
+    acc[item.code] = buildLocalizedPath(item.locale, localizedRoute);
+    return acc;
+  }, {});
+
+  languages["x-default"] = buildLocalizedPath(DEFAULT_STORE_LOCALE, localizedRoute);
+  return languages;
+}
+
+export function buildSitemapLanguageAlternates(
+  routePath: string,
+  query?: string,
+): Record<string, string> {
+  const localizedRoute = buildRouteWithQuery(routePath, query);
+  return REGIONAL_HREFLANG_LOCALES.reduce<Record<string, string>>((acc, item) => {
+    acc[item.code] = absoluteUrl(buildLocalizedPath(item.locale, localizedRoute));
+    return acc;
+  }, {});
+}
+
 export function buildLocaleAlternates(
   routePath: string,
   locale: StoreLocale,
@@ -126,11 +174,7 @@ export function buildLocaleAlternates(
 
   return {
     canonical: buildLocalizedPath(locale, localizedRoute),
-    languages: {
-      es: buildLocalizedPath("es", localizedRoute),
-      en: buildLocalizedPath("en", localizedRoute),
-      "x-default": buildLocalizedPath(DEFAULT_STORE_LOCALE, localizedRoute),
-    },
+    languages: buildLanguageAlternates(routePath, query),
   };
 }
 
@@ -171,6 +215,68 @@ export function serializeJsonLd(value: unknown): string {
 
 function getCopy(locale: StoreLocale) {
   return SEO_COPY[locale];
+}
+
+function getOpenGraphLocale(locale: StoreLocale): string {
+  return locale === "es" ? "es_ES" : "en_US";
+}
+
+function getOpenGraphAlternateLocales(locale: StoreLocale): string[] {
+  return locale === "es" ? ["en_US", "en_GB", "en_IN"] : ["es_ES"];
+}
+
+function getOrganizationSchemaId(): string {
+  return absoluteUrl("/#organization");
+}
+
+function getWebsiteSchemaId(): string {
+  return absoluteUrl("/#website");
+}
+
+function getBusinessLogoUrl(businessProfile?: FooterSettings | null): string {
+  return absoluteUrl(
+    isNonEmptyString(businessProfile?.logoUrl)
+      ? businessProfile.logoUrl
+      : DEFAULT_OG_IMAGE_PATH,
+  );
+}
+
+function getBusinessAddress(businessProfile?: FooterSettings | null) {
+  if (!isNonEmptyString(businessProfile?.contactAddress)) {
+    return undefined;
+  }
+
+  return {
+    "@type": "PostalAddress",
+    streetAddress: businessProfile.contactAddress,
+    addressCountry: "ES",
+  };
+}
+
+function getBusinessSocialLinks(businessProfile?: FooterSettings | null): string[] {
+  return (businessProfile?.socialLinks ?? [])
+    .map((item) => item.url?.trim())
+    .filter((value): value is string => Boolean(value && isAbsoluteUrl(value)));
+}
+
+function getBusinessContactPoints(businessProfile?: FooterSettings | null) {
+  const email = businessProfile?.contactEmail?.trim();
+  const phone = businessProfile?.contactPhone?.trim();
+
+  if (!email && !phone) {
+    return undefined;
+  }
+
+  return [
+    {
+      "@type": "ContactPoint",
+      contactType: "customer service",
+      email: email || undefined,
+      telephone: phone || undefined,
+      availableLanguage: SUPPORTED_STORE_LOCALES,
+      areaServed: [...TARGET_SEO_MARKETS],
+    },
+  ];
 }
 
 function toImageObject(image: string | { url: string; alt?: string }) {
@@ -237,8 +343,8 @@ export function buildPageMetadata({
       description,
       url: absoluteUrl(buildLocalizedPath(locale, routeWithQuery)),
       siteName: STORE_SITE_NAME,
-      locale: locale === "es" ? "es_ES" : "en_US",
-      alternateLocale: locale === "es" ? ["en_US"] : ["es_ES"],
+      locale: getOpenGraphLocale(locale),
+      alternateLocale: getOpenGraphAlternateLocales(locale),
       type: "website",
       images: imageObjects,
     },
@@ -320,14 +426,29 @@ function mapSchemaAvailability(stockStatus?: string): string {
   }
 }
 
-export function createOrganizationSchema(locale: StoreLocale) {
+export function createOrganizationSchema(
+  locale: StoreLocale,
+  businessProfile?: FooterSettings | null,
+) {
+  const socialLinks = getBusinessSocialLinks(businessProfile);
+  const address = getBusinessAddress(businessProfile);
+  const contactPoints = getBusinessContactPoints(businessProfile);
+
   return {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": "OnlineStore",
+    "@id": getOrganizationSchemaId(),
     name: STORE_SITE_NAME,
     url: absoluteUrl(buildLocalizedPath(locale, "/store")),
-    logo: absoluteUrl(DEFAULT_OG_IMAGE_PATH),
-    sameAs: [],
+    logo: getBusinessLogoUrl(businessProfile),
+    image: getBusinessLogoUrl(businessProfile),
+    email: businessProfile?.contactEmail?.trim() || undefined,
+    telephone: businessProfile?.contactPhone?.trim() || undefined,
+    address,
+    sameAs: socialLinks,
+    contactPoint: contactPoints,
+    areaServed: [...TARGET_SEO_MARKETS],
+    availableLanguage: SUPPORTED_STORE_LOCALES,
   };
 }
 
@@ -335,9 +456,13 @@ export function createWebsiteSchema(locale: StoreLocale) {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": getWebsiteSchemaId(),
     name: STORE_SITE_NAME,
     url: absoluteUrl(buildLocalizedPath(locale, "/store")),
-    inLanguage: locale,
+    inLanguage: getHtmlLanguageTag(locale),
+    publisher: {
+      "@id": getOrganizationSchemaId(),
+    },
     potentialAction: {
       "@type": "SearchAction",
       target: absoluteUrl(buildLocalizedPath(locale, "/products?search={search_term_string}")),
@@ -366,6 +491,7 @@ export function createProductSchema(product: ProductDetail, locale: StoreLocale)
       name: product.brand?.name ?? product.brand_name,
     },
     category: product.main_category?.name ?? product.category_name,
+    inLanguage: getHtmlLanguageTag(locale),
     url: canonicalUrl,
     mainEntityOfPage: canonicalUrl,
     offers:
@@ -377,6 +503,9 @@ export function createProductSchema(product: ProductDetail, locale: StoreLocale)
             availability: mapSchemaAvailability(product.stock_status),
             url: canonicalUrl,
             itemCondition: "https://schema.org/NewCondition",
+            seller: {
+              "@id": getOrganizationSchemaId(),
+            },
           }
         : undefined,
     aggregateRating:
@@ -473,10 +602,12 @@ export function createCollectionPageSchema({
     name,
     description,
     url: absoluteUrl(localizedPath),
+    inLanguage: getHtmlLanguageTag(locale),
     isPartOf: {
-      "@type": "WebSite",
-      name: STORE_SITE_NAME,
-      url: absoluteUrl(buildLocalizedPath(locale, "/store")),
+      "@id": getWebsiteSchemaId(),
+    },
+    about: {
+      "@id": getOrganizationSchemaId(),
     },
     mainEntity: {
       "@type": "ItemList",
@@ -487,6 +618,52 @@ export function createCollectionPageSchema({
         name: product.title,
       })),
     },
+  };
+}
+
+export function createCollectionBreadcrumbSchema({
+  locale,
+  name,
+  routePath,
+  query,
+}: {
+  locale: StoreLocale;
+  name: string;
+  routePath: string;
+  query?: string;
+}) {
+  const productsTitle = getCopy(locale).productsTitle;
+  const collectionUrl = absoluteUrl(
+    buildLocalizedPath(locale, buildRouteWithQuery(routePath, query)),
+  );
+  const items = [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: locale === "es" ? "Inicio" : "Home",
+      item: absoluteUrl(buildLocalizedPath(locale, "/store")),
+    },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: productsTitle,
+      item: absoluteUrl(buildLocalizedPath(locale, "/products")),
+    },
+  ];
+
+  if (query && name.trim() && name.trim() !== productsTitle) {
+    items.push({
+      "@type": "ListItem",
+      position: 3,
+      name,
+      item: collectionUrl,
+    });
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items,
   };
 }
 
@@ -532,10 +709,11 @@ export function getDefaultSiteMetadata(): Metadata {
     publisher: STORE_SITE_NAME,
     category: "technology",
     referrer: "origin-when-cross-origin",
+    manifest: "/manifest.webmanifest",
     icons: {
-      icon: DEFAULT_OG_IMAGE_PATH,
-      shortcut: DEFAULT_OG_IMAGE_PATH,
-      apple: DEFAULT_OG_IMAGE_PATH,
+      icon: [{ url: DEFAULT_SITE_ICON_PATH, type: "image/svg+xml" }],
+      shortcut: [{ url: DEFAULT_SITE_ICON_PATH, type: "image/svg+xml" }],
+      apple: [{ url: DEFAULT_OG_IMAGE_PATH, type: "image/png" }],
     },
     openGraph: {
       title: STORE_SITE_NAME,

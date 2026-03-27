@@ -9,6 +9,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import XIcon from "@mui/icons-material/X";
 import { type ComponentType, type FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import {
   ArrowUp,
   Truck,
@@ -228,14 +229,16 @@ export default function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 items-start">
             {/* Brand + Newsletter */}
             <div className="lg:col-span-2">
-              <img
-                src={effectiveLogoSrc}
-                alt={config.logoAlt}
-                className="mb-5 block h-9 w-auto max-w-full"
-                onError={() => {
-                  if (!footerLogoFallback) setFooterLogoFallback(true);
-                }}
-              />
+              <Link href="/store" className="inline-flex">
+                <img
+                  src={effectiveLogoSrc}
+                  alt={config.logoAlt}
+                  className="mb-5 block h-9 w-auto max-w-full"
+                  onError={() => {
+                    if (!footerLogoFallback) setFooterLogoFallback(true);
+                  }}
+                />
+              </Link>
 
               {config.newsletterEnabled && (
                 <>

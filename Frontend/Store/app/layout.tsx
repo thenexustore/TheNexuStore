@@ -1,9 +1,15 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import localFont from "next/font/local";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import AppProviders from "./providers/AppProviders";
-import { getDefaultSiteMetadata } from "./lib/seo";
+import {
+  DEFAULT_STORE_LOCALE,
+  getDefaultSiteMetadata,
+  getHtmlLanguageTag,
+  resolveStoreLocale,
+} from "./lib/seo";
 
 const inter = localFont({
   src: [
@@ -36,13 +42,21 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const locale = cookieStore.get("NEXT_LOCALE")?.value || "es";
+  const requestLocale = await getLocale().catch(() => DEFAULT_STORE_LOCALE);
+  const locale = resolveStoreLocale(requestLocale);
+  const messages = await getMessages({ locale });
 
   return (
-    <html lang={locale} translate="no" className={`notranslate ${inter.variable}`} suppressHydrationWarning>
+    <html
+      lang={getHtmlLanguageTag(locale)}
+      translate="no"
+      className={`notranslate ${inter.variable}`}
+      suppressHydrationWarning
+    >
       <body translate="no" className="antialiased">
-        <AppProviders>{children}</AppProviders>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <AppProviders>{children}</AppProviders>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

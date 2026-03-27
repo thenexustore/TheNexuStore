@@ -3,13 +3,16 @@ import { notFound } from "next/navigation";
 import ProductDetailsClient from "./ProductDetailsClient";
 import {
   buildProductMetadata,
+  createOrganizationSchema,
   createProductBreadcrumbSchema,
   createProductSchema,
+  createWebsiteSchema,
   resolveStoreLocale,
   serializeJsonLd,
   type StoreLocale,
 } from "@/app/lib/seo";
 import {
+  fetchFooterSettingsServer,
   fetchProductBySlugServer,
   fetchRelatedProductsServer,
 } from "@/app/lib/storefront-server";
@@ -80,13 +83,20 @@ export default async function ProductPage({
 }) {
   const { slug, locale: routeLocale } = await params;
   const { locale } = resolveMetadataLocale(routeLocale);
-  const data = await getProductPageData(slug).catch(() => null);
+  const [data, footerSettings] = await Promise.all([
+    getProductPageData(slug).catch(() => null),
+    fetchFooterSettingsServer({
+      next: { revalidate: 900 },
+    }).catch(() => null),
+  ]);
 
   if (!data) {
     notFound();
   }
 
   const schemas = [
+    createOrganizationSchema(locale, footerSettings),
+    createWebsiteSchema(locale),
     createProductSchema(data.product, locale),
     createProductBreadcrumbSchema(data.product, locale),
   ];

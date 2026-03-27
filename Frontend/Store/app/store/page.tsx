@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import HomeRenderer from "./HomeRenderer";
 import HomeDynamicSections from "./HomeDynamicSections";
 import { API_URL } from "../lib/env";
+import { fetchFooterSettingsServer } from "../lib/storefront-server";
 import {
   buildHomeMetadata,
   createOrganizationSchema,
@@ -112,10 +113,15 @@ export default async function StorePage({
   const routeParams = (await params) || {};
   const locale = resolveStoreLocale(routeParams.locale);
 
-  const data = await getHome({
-    previewLayoutId: sp.previewLayoutId,
-    locale: routeParams.locale,
-  });
+  const [data, footerSettings] = await Promise.all([
+    getHome({
+      previewLayoutId: sp.previewLayoutId,
+      locale: routeParams.locale,
+    }),
+    fetchFooterSettingsServer({
+      next: { revalidate: 900 },
+    }).catch(() => null),
+  ]);
 
   const forceDynamic = sp.forceDynamic === "1";
   // Source-of-truth rules for homepage rendering:
@@ -201,7 +207,7 @@ export default async function StorePage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: serializeJsonLd([
-            createOrganizationSchema(locale),
+            createOrganizationSchema(locale, footerSettings),
             createWebsiteSchema(locale),
           ]),
         }}

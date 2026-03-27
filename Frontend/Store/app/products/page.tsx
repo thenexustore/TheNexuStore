@@ -2,11 +2,14 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import ProductsClient from "./ProductsClient";
 import { buildFiltersFromSearchParams } from "../lib/product-listing";
-import { fetchProductsServer } from "../lib/storefront-server";
+import { fetchFooterSettingsServer, fetchProductsServer } from "../lib/storefront-server";
 import {
   buildPageMetadata,
   buildProductsSeoState,
+  createCollectionBreadcrumbSchema,
   createCollectionPageSchema,
+  createOrganizationSchema,
+  createWebsiteSchema,
   resolveStoreLocale,
   serializeJsonLd,
   type StoreLocale,
@@ -32,15 +35,21 @@ async function getProductsPageContext({
   const locale = resolveStoreLocale(routeParams.locale);
   const indexable = Boolean(routeParams.locale);
   const filters = buildFiltersFromSearchParams(queryParams);
-  const productsResponse = await fetchProductsServer(filters, {
-    next: { revalidate },
-  }).catch(() => null);
+  const [productsResponse, footerSettings] = await Promise.all([
+    fetchProductsServer(filters, {
+      next: { revalidate },
+    }).catch(() => null),
+    fetchFooterSettingsServer({
+      next: { revalidate: 900 },
+    }).catch(() => null),
+  ]);
   const seoState = buildProductsSeoState(filters, locale, productsResponse);
 
   return {
     locale,
     filters,
     productsResponse,
+    footerSettings,
     seoState,
     indexable: seoState.indexable && indexable,
   };
@@ -84,8 +93,18 @@ export default async function ProductsPage({
   params?: ProductsPageParams;
   searchParams?: ProductsSearchParams;
 }) {
-  const { locale, productsResponse, seoState, indexable } =
+  const { locale, productsResponse, footerSettings, seoState, indexable } =
     await getProductsPageContext({ params, searchParams });
+  const schemas: unknown[] = [
+    createOrganizationSchema(locale, footerSettings),
+    createWebsiteSchema(locale),
+    createCollectionBreadcrumbSchema({
+      locale,
+      name: seoState.heading,
+      routePath: "/products",
+      query: indexable ? seoState.canonicalQuery : undefined,
+    }),
+  ];
   const collectionSchema =
     productsResponse && productsResponse.products.length > 0
       ? createCollectionPageSchema({
@@ -98,14 +117,16 @@ export default async function ProductsPage({
         })
       : null;
 
+  if (collectionSchema) {
+    schemas.push(collectionSchema);
+  }
+
   return (
     <>
-      {collectionSchema ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionSchema) }}
-        />
-      ) : null}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(schemas) }}
+      />
       <Suspense fallback={<div className="p-8">Loading products...</div>}>
         <ProductsClient initialProductsResponse={productsResponse} />
       </Suspense>

@@ -41,6 +41,7 @@ export interface BillingDocument {
   payment_method: BillingPaymentMethod | null;
   pdf_url: string | null;
   source_document_id: string | null;
+  template_id?: string | null;
   company_legal_name: string | null;
   company_trade_name: string | null;
   company_nif: string | null;

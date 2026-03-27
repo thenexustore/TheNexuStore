@@ -60,6 +60,7 @@ export interface OrderDetail {
   items: Array<{
     id: string;
     qty: number;
+    unit_price: number;
     unit_price_snapshot?: number | null;
     sku?: {
       sku_code: string;

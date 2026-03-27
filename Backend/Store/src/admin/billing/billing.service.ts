@@ -150,6 +150,131 @@ export class BillingService {
     return dt;
   }
 
+  private round2(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private buildEcommerceInvoiceLineItems(
+    order: any,
+    shippingLabel = 'Shipping',
+  ): {
+    lineItems: Array<{
+      description: string;
+      qty: number;
+      unit_price: number;
+      tax_rate: number;
+      line_subtotal: number;
+      tax_amount: number;
+      line_total: number;
+      position: number;
+    }>;
+    subtotalAmount: number;
+    taxAmount: number;
+    discountAmount: number;
+    totalAmount: number;
+  } {
+    const orderSubtotal = this.round2(Number(order.subtotal_amount ?? 0));
+    const shippingAmount = this.round2(Number(order.shipping_amount ?? 0));
+    const taxAmount = this.round2(Number(order.tax_amount ?? 0));
+    const discountAmount = this.round2(Number(order.discount_amount ?? 0));
+    const orderTotal = this.round2(Number(order.total_amount ?? 0));
+
+    const lineItems = order.items.map((item: any, i: number) => {
+      const lineSubtotal = this.round2(Number(item.unit_price) * Number(item.qty));
+      return {
+        description:
+          item.title_snapshot || item.sku?.product?.title || item.sku_id,
+        qty: item.qty,
+        unit_price: Number(item.unit_price),
+        tax_rate: 0,
+        line_subtotal: lineSubtotal,
+        tax_amount: 0,
+        line_total: lineSubtotal,
+        position: i,
+      };
+    });
+
+    const itemsSubtotal = this.round2(
+      lineItems.reduce((sum, item) => sum + item.line_subtotal, 0),
+    );
+    const productDelta = this.round2(orderSubtotal - itemsSubtotal);
+    if (Math.abs(productDelta) >= 0.01) {
+      lineItems.push({
+        description: 'Order pricing adjustment',
+        qty: 1,
+        unit_price: productDelta,
+        tax_rate: 0,
+        line_subtotal: productDelta,
+        tax_amount: 0,
+        line_total: productDelta,
+        position: lineItems.length,
+      });
+    }
+
+    if (Math.abs(shippingAmount) >= 0.01) {
+      lineItems.push({
+        description: shippingLabel,
+        qty: 1,
+        unit_price: shippingAmount,
+        tax_rate: 0,
+        line_subtotal: shippingAmount,
+        tax_amount: 0,
+        line_total: shippingAmount,
+        position: lineItems.length,
+      });
+    }
+
+    let subtotalAmount = this.round2(orderSubtotal + shippingAmount);
+    const expectedFromTotals = this.round2(subtotalAmount + taxAmount - discountAmount);
+    const reconciliationDelta = this.round2(orderTotal - expectedFromTotals);
+    if (Math.abs(reconciliationDelta) >= 0.01) {
+      lineItems.push({
+        description: 'Order total reconciliation',
+        qty: 1,
+        unit_price: reconciliationDelta,
+        tax_rate: 0,
+        line_subtotal: reconciliationDelta,
+        tax_amount: 0,
+        line_total: reconciliationDelta,
+        position: lineItems.length,
+      });
+      subtotalAmount = this.round2(subtotalAmount + reconciliationDelta);
+    }
+
+    return {
+      lineItems,
+      subtotalAmount,
+      taxAmount,
+      discountAmount,
+      totalAmount: orderTotal,
+    };
+  }
+
+  private async warnSuspiciousEcommerceDocumentLinkage(): Promise<void> {
+    const suspicious = await this.prisma.billingDocument.findMany({
+      where: {
+        source: BillingDocumentSource.ECOMMERCE,
+        OR: [{ order_id: null }, { order: null }],
+      },
+      select: {
+        id: true,
+        status: true,
+        document_number: true,
+        order_id: true,
+      },
+      take: 10,
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!suspicious.length) return;
+
+    this.logger.warn(
+      `Suspicious ecommerce billing docs without valid linked order detected: ${suspicious
+        .map((doc) => `${doc.id}(${doc.document_number ?? 'draft'})`)
+        .join(', ')}`,
+    );
+  }
+
   // ─── Documents ────────────────────────────────────────────────────────────────
 
   async listDocuments(query: BillingDocumentsQueryDto) {
@@ -168,7 +293,7 @@ export class BillingService {
     } = query;
     const skip = (page - 1) * limit;
 
-    await this.ensureLatestPaidOrderHasDraft();
+    await this.warnSuspiciousEcommerceDocumentLinkage();
 
     const dateRange =
       from || to
@@ -239,47 +364,6 @@ export class BillingService {
     };
   }
 
-  private async ensureLatestPaidOrderHasDraft(): Promise<void> {
-    const latestPaidOrder = await this.prisma.order.findFirst({
-      where: {
-        status: {
-          in: [
-            OrderStatus.PAID,
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPED,
-            OrderStatus.DELIVERED,
-          ],
-        },
-      },
-      orderBy: [{ paid_at: 'desc' }, { created_at: 'desc' }],
-      select: { id: true, order_number: true },
-    });
-
-    if (!latestPaidOrder) return;
-
-    const existing = await this.prisma.billingDocument.findFirst({
-      where: {
-        order_id: latestPaidOrder.id,
-        type: BillingDocumentType.INVOICE,
-        status: { not: BillingDocumentStatus.VOID },
-      },
-      select: { id: true },
-    });
-
-    if (existing) return;
-
-    try {
-      await this.createDocumentFromOrder(latestPaidOrder.id);
-      this.logger.log(
-        `Auto-created billing draft for latest paid order ${latestPaidOrder.order_number ?? latestPaidOrder.id}`,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `Could not auto-create draft for latest paid order ${latestPaidOrder.id}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
-
   async getDocumentById(id: string) {
     const doc = await this.prisma.billingDocument.findUnique({
       where: { id },
@@ -292,6 +376,9 @@ export class BillingService {
       },
     });
     if (!doc) throw new NotFoundException('Billing document not found');
+    if (doc.source === BillingDocumentSource.ECOMMERCE && !doc.order_id) {
+      this.logger.warn(`Ecommerce document ${doc.id} is missing order linkage`);
+    }
     return doc;
   }
 
@@ -1014,27 +1101,7 @@ export class BillingService {
       }
     }
 
-    const lineItems = order.items.map((item, i) => {
-      const taxRate = Number(settings.default_tax_rate);
-      const lineSubtotal = Number(item.unit_price) * item.qty;
-      const taxAmountLine = lineSubtotal * taxRate;
-      const lineTotal = lineSubtotal + taxAmountLine;
-      return {
-        description:
-          item.title_snapshot || item.sku?.product?.title || item.sku_id,
-        qty: item.qty,
-        unit_price: item.unit_price,
-        tax_rate: taxRate,
-        line_subtotal: lineSubtotal,
-        tax_amount: taxAmountLine,
-        line_total: lineTotal,
-        position: i,
-      };
-    });
-
-    const subtotal = lineItems.reduce((s, i) => s + i.line_subtotal, 0);
-    const taxTotal = lineItems.reduce((s, i) => s + i.tax_amount, 0);
-    const total = lineItems.reduce((s, i) => s + i.line_total, 0);
+    const billingTotals = this.buildEcommerceInvoiceLineItems(order);
 
     const billingDoc = await this.prisma.billingDocument.create({
       data: {
@@ -1056,11 +1123,11 @@ export class BillingService {
         customer_tax_id: customerTaxId,
         customer_email: customerEmail,
         customer_address: customerAddress,
-        subtotal_amount: subtotal,
-        tax_amount: taxTotal,
-        discount_amount: Number(order.discount_amount),
-        total_amount: Math.max(0, total - Number(order.discount_amount)),
-        items: { create: lineItems },
+        subtotal_amount: billingTotals.subtotalAmount,
+        tax_amount: billingTotals.taxAmount,
+        discount_amount: billingTotals.discountAmount,
+        total_amount: billingTotals.totalAmount,
+        items: { create: billingTotals.lineItems },
       },
       include: { items: true },
     });
@@ -1191,27 +1258,7 @@ export class BillingService {
       }
     }
 
-    const taxRate = Number(settings.default_tax_rate);
-    const lineItems = order.items.map((item, i) => {
-      const lineSubtotal = Number(item.unit_price) * item.qty;
-      const taxAmountLine = lineSubtotal * taxRate;
-      const lineTotal = lineSubtotal + taxAmountLine;
-      return {
-        description:
-          item.title_snapshot || item.sku?.product?.title || item.sku_id,
-        qty: item.qty,
-        unit_price: item.unit_price,
-        tax_rate: taxRate,
-        line_subtotal: lineSubtotal,
-        tax_amount: taxAmountLine,
-        line_total: lineTotal,
-        position: i,
-      };
-    });
-
-    const subtotal = lineItems.reduce((s, i) => s + i.line_subtotal, 0);
-    const taxTotal = lineItems.reduce((s, i) => s + i.tax_amount, 0);
-    const total = lineItems.reduce((s, i) => s + i.line_total, 0);
+    const billingTotals = this.buildEcommerceInvoiceLineItems(order);
 
     const billingDoc = await this.prisma.billingDocument.create({
       data: {
@@ -1233,11 +1280,11 @@ export class BillingService {
         customer_tax_id: customerTaxId,
         customer_email: customerEmail,
         customer_address: customerAddress,
-        subtotal_amount: subtotal,
-        tax_amount: taxTotal,
-        discount_amount: Number(order.discount_amount),
-        total_amount: Math.max(0, total - Number(order.discount_amount)),
-        items: { create: lineItems },
+        subtotal_amount: billingTotals.subtotalAmount,
+        tax_amount: billingTotals.taxAmount,
+        discount_amount: billingTotals.discountAmount,
+        total_amount: billingTotals.totalAmount,
+        items: { create: billingTotals.lineItems },
       },
       include: { items: true },
     });

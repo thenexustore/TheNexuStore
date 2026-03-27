@@ -29,6 +29,10 @@ describe('BillingService issuance guards', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
     },
+    billingDocumentItem: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
     billingSeries: {
       findUnique: jest.fn(),
       create: jest.fn(),
@@ -46,6 +50,8 @@ describe('BillingService issuance guards', () => {
     prisma.$transaction.mockImplementation(async (cb: any) =>
       cb({
         billingSeries: prisma.billingSeries,
+        billingDocument: prisma.billingDocument,
+        billingDocumentItem: prisma.billingDocumentItem,
       }),
     );
     service = new BillingService(prisma, mailService);
@@ -324,6 +330,65 @@ describe('BillingService issuance guards', () => {
     expect(result.billing_document.items.some((item: any) => item.description === 'Shipping')).toBe(true);
   });
 
+  it('re-syncs existing ecommerce draft totals from order source-of-truth before returning', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-sync-1',
+      email: 'buyer@nexus.test',
+      currency: 'EUR',
+      customer_id: 'customer-1',
+      subtotal_amount: 100,
+      shipping_amount: 0,
+      tax_amount: 21,
+      discount_amount: 0,
+      total_amount: 121,
+      billing_address_json: {},
+      items: [
+        {
+          qty: 1,
+          unit_price: 100,
+          title_snapshot: 'GPU',
+          sku_id: 'sku-1',
+          sku: { product: { title: 'GPU' } },
+        },
+      ],
+      customer: { fiscal_profile: null, first_name: 'Ada', last_name: 'Lovelace' },
+      payments: [{ provider: 'REDSYS' }],
+    });
+    prisma.billingDocument.findFirst.mockResolvedValue({
+      id: 'doc-existing-draft',
+      status: BillingDocumentStatus.DRAFT,
+      items: [],
+    });
+    prisma.billingDocumentItem.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.billingDocumentItem.createMany.mockResolvedValue({ count: 1 });
+    prisma.billingDocument.update.mockResolvedValue({
+      id: 'doc-existing-draft',
+      subtotal_amount: 100,
+      tax_amount: 21,
+      discount_amount: 0,
+      total_amount: 121,
+      items: [{ description: 'GPU' }],
+    });
+
+    const result = await service.createDocumentFromOrder('order-sync-1');
+
+    expect(result.created).toBe(false);
+    expect(prisma.billingDocumentItem.deleteMany).toHaveBeenCalledWith({
+      where: { document_id: 'doc-existing-draft' },
+    });
+    expect(prisma.billingDocument.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'doc-existing-draft' },
+        data: expect.objectContaining({
+          subtotal_amount: 100,
+          tax_amount: 21,
+          discount_amount: 0,
+          total_amount: 121,
+        }),
+      }),
+    );
+  });
+
   it('keeps delivered-confirmation generated invoice total equal to order total', async () => {
     jest
       .spyOn(service as any, 'issueDocumentFromDelivery')
@@ -384,6 +449,78 @@ describe('BillingService issuance guards', () => {
           tax_amount: 17.85,
           discount_amount: 0,
           total_amount: 102.85,
+        }),
+      }),
+    );
+    expect(response.order_status).toBe(OrderStatus.DELIVERED);
+  });
+
+  it('re-syncs existing ecommerce draft totals before delivery issuance', async () => {
+    jest
+      .spyOn(service as any, 'issueDocumentFromDelivery')
+      .mockResolvedValue({ id: 'doc-existing-delivery', status: BillingDocumentStatus.ISSUED });
+    jest.spyOn(service, 'sendDocument').mockResolvedValue({ id: 'doc-existing-delivery' } as any);
+
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-delivery-sync',
+      status: OrderStatus.SHIPPED,
+      email: 'buyer@nexus.test',
+      currency: 'EUR',
+      customer_id: 'customer-1',
+      subtotal_amount: 95,
+      shipping_amount: 5,
+      tax_amount: 21,
+      discount_amount: 0,
+      total_amount: 121,
+      billing_address_json: {},
+      items: [
+        {
+          qty: 1,
+          unit_price: 95,
+          title_snapshot: 'CPU',
+          sku_id: 'sku-2',
+          sku: { product: { title: 'CPU' } },
+        },
+      ],
+      customer: { fiscal_profile: null, first_name: 'Grace', last_name: 'Hopper' },
+      payments: [{ provider: 'REDSYS' }],
+    });
+    prisma.order.update.mockResolvedValue({ id: 'order-delivery-sync', status: OrderStatus.DELIVERED });
+    prisma.billingDocument.findFirst.mockResolvedValue({
+      id: 'doc-existing-delivery',
+      status: BillingDocumentStatus.DRAFT,
+      created_at: new Date(),
+    });
+    prisma.billingDocumentItem.deleteMany.mockResolvedValue({ count: 2 });
+    prisma.billingDocumentItem.createMany.mockResolvedValue({ count: 2 });
+    prisma.billingDocument.update.mockResolvedValue({
+      id: 'doc-existing-delivery',
+      subtotal_amount: 100,
+      tax_amount: 21,
+      discount_amount: 0,
+      total_amount: 121,
+      items: [],
+    });
+    prisma.billingDocument.findUnique.mockResolvedValue({
+      id: 'doc-existing-delivery',
+      status: BillingDocumentStatus.SENT,
+      total_amount: 121,
+      items: [],
+    });
+
+    const response = await service.markOrderDelivered('order-delivery-sync', {});
+
+    expect(prisma.billingDocumentItem.deleteMany).toHaveBeenCalledWith({
+      where: { document_id: 'doc-existing-delivery' },
+    });
+    expect(prisma.billingDocument.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'doc-existing-delivery' },
+        data: expect.objectContaining({
+          subtotal_amount: 100,
+          tax_amount: 21,
+          discount_amount: 0,
+          total_amount: 121,
         }),
       }),
     );

@@ -8,22 +8,54 @@ export function adminLogout() {
 
 export async function fetchWithAuth<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: (RequestInit & { timeoutMs?: number }) = {}
 ): Promise<T> {
+  const { timeoutMs, signal, ...requestOptions } = options;
   const token = localStorage.getItem("admin_token");
 
   if (!token) {
     throw new Error("No authentication token");
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeout = timeoutMs && timeoutMs > 0
+    ? globalThis.setTimeout(() => controller.abort("timeout"), timeoutMs)
+    : null;
+
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+    } else {
+      signal.addEventListener("abort", () => controller.abort(signal.reason), {
+        once: true,
+      });
+    }
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      ...requestOptions,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...requestOptions.headers,
+      },
+    });
+  } catch (error: any) {
+    if (controller.signal.aborted || error?.name === "AbortError") {
+      if (timeoutMs && timeoutMs > 0) {
+        throw new Error(`Request timeout after ${timeoutMs}ms`);
+      }
+      throw new Error("Request was aborted");
+    }
+    throw error;
+  } finally {
+    if (timeout) {
+      globalThis.clearTimeout(timeout);
+    }
+  }
 
   if (response.status === 401) {
     adminLogout();

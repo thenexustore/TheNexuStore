@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import {
   Search,
@@ -84,6 +84,19 @@ const SHIPMENT_STATUS_LABELS: Record<string, { en: string; es: string }> = {
   EXCEPTION: { en: "Exception", es: "Incidencia" },
 };
 
+const TIMELINE_ACTION_LABELS: Record<string, { en: string; es: string }> = {
+  ORDER_CREATED: { en: "Order created", es: "Pedido creado" },
+  ORDER_PAID: { en: "Payment captured", es: "Pago capturado" },
+  ORDER_STATUS_UPDATED: { en: "Order status updated", es: "Estado del pedido actualizado" },
+  ORDER_NOTE_ADDED: { en: "Internal note added", es: "Nota interna añadida" },
+  ORDER_SHIPMENT_CREATED: { en: "Shipment created", es: "Envío creado" },
+  ORDER_SHIPMENT_UPDATED: { en: "Shipment updated", es: "Envío actualizado" },
+  ORDER_MARKED_DELIVERED: { en: "Order marked as delivered", es: "Pedido marcado como entregado" },
+  ORDER_CANCELLED: { en: "Order cancelled", es: "Pedido cancelado" },
+  ORDER_ON_HOLD: { en: "Order put on hold", es: "Pedido puesto en espera" },
+  ORDER_RELEASED: { en: "Order hold released", es: "Espera del pedido liberada" },
+};
+
 type ShipmentDraft = {
   carrier: string;
   service_level: string;
@@ -115,6 +128,7 @@ export default function OrdersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -140,29 +154,54 @@ export default function OrdersPage() {
 
   useEffect(() => subscribeAdminSettings(setAdminSettings), []);
   const isEn = adminSettings.adminLanguage === "en";
-  const t = (en: string, es: string) => (isEn ? en : es);
+  const t = useCallback((en: string, es: string) => (isEn ? en : es), [isEn]);
   const orderStatusLabel = (statusValue: string) =>
     (ORDER_STATUS_LABELS[statusValue]?.[isEn ? "en" : "es"] ??
       statusValue.replaceAll("_", " "));
   const shipmentStatusLabel = (statusValue: string) =>
     (SHIPMENT_STATUS_LABELS[statusValue]?.[isEn ? "en" : "es"] ?? statusValue);
+  const timelineActionLabel = (actionValue: string) =>
+    (TIMELINE_ACTION_LABELS[actionValue]?.[isEn ? "en" : "es"] ??
+      actionValue.replaceAll("_", " "));
 
   const formatMoney = (amount: number) =>
     formatCurrencyValue(Number(amount || 0), adminSettings.dateFormat, adminSettings.defaultCurrency);
 
   const formatDate = (date: string) => new Date(date).toLocaleString(adminSettings.dateFormat);
 
+  const ordersAbortControllerRef = useRef<AbortController | null>(null);
+
   const loadOrders = useCallback(async (targetPage = page) => {
+    ordersAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    ordersAbortControllerRef.current = abortController;
+
     try {
       setLoading(true);
-      const data = await fetchOrders(targetPage, adminSettings.ordersPageSize, status, search);
+      setOrdersError(null);
+      const data = await fetchOrders(
+        targetPage,
+        adminSettings.ordersPageSize,
+        status,
+        search,
+        { signal: abortController.signal, timeoutMs: 15000 },
+      );
       setOrders(data.orders || []);
       setTotalPages(data.totalPages || 1);
       setPage(targetPage);
     } catch (error: any) {
-      toast.error(error.message || t("Failed to load orders", "No se pudieron cargar los pedidos"));
+      if (abortController.signal.aborted) {
+        return;
+      }
+      const message = error.message || t("Failed to load orders", "No se pudieron cargar los pedidos");
+      setOrders([]);
+      setOrdersError(message);
+      toast.error(message);
     } finally {
-      setLoading(false);
+      if (ordersAbortControllerRef.current === abortController) {
+        setLoading(false);
+        ordersAbortControllerRef.current = null;
+      }
     }
   }, [adminSettings.ordersPageSize, page, search, status, t]);
 
@@ -364,6 +403,12 @@ export default function OrdersPage() {
     return () => window.clearInterval(timer);
   }, [adminSettings.ordersRefreshSeconds, loadOrders, page]);
 
+  useEffect(() => {
+    return () => {
+      ordersAbortControllerRef.current?.abort();
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -422,6 +467,17 @@ export default function OrdersPage() {
         {loading ? (
           <div className="py-16 flex items-center justify-center text-sm text-gray-500">
             {t("Loading orders...", "Cargando pedidos...")}
+          </div>
+        ) : ordersError ? (
+          <div className="py-16 flex flex-col items-center justify-center text-sm text-gray-600 gap-3">
+            <p>{ordersError}</p>
+            <button
+              type="button"
+              onClick={() => loadOrders(page)}
+              className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
+            >
+              {t("Retry", "Reintentar")}
+            </button>
           </div>
         ) : orders.length === 0 ? (
           <div className="py-16 flex items-center justify-center text-sm text-gray-500">
@@ -732,7 +788,7 @@ export default function OrdersPage() {
                                         {shipment.tracking_events.map((event) => (
                                           <div key={event.id} className="rounded border p-2">
                                             <div className="flex items-center justify-between gap-2">
-                                              <span className="font-medium">{event.status}</span>
+                                              <span className="font-medium">{shipmentStatusLabel(event.status)}</span>
                                               <span className="text-[11px] text-gray-500">
                                                 {new Date(event.event_time).toLocaleString()}
                                               </span>
@@ -907,7 +963,10 @@ export default function OrdersPage() {
                         orderDetail.status !== "PROCESSING" &&
                         orderDetail.status !== "SHIPPED" && (
                           <p className="pt-2 text-[11px] text-gray-500">
-                            {t("“Mark as delivered” becomes available when order is PROCESSING or SHIPPED.", "“Marcar como entregado” se habilita cuando el pedido está en PROCESSING o SHIPPED.")}
+                            {t(
+                              "“Mark as delivered” becomes available when order is Processing or Shipped.",
+                              "“Marcar como entregado” se habilita cuando el pedido está en Procesando o Enviado.",
+                            )}
                           </p>
                         )}
 
@@ -970,7 +1029,7 @@ export default function OrdersPage() {
                                     </Link>
                                   )}
                                   <span className="text-zinc-500 font-medium tabular-nums">
-                                    {Number(doc.total_amount ?? 0).toLocaleString("es-ES", { style: "currency", currency: doc.currency ?? "EUR" })}
+                                    {formatMoney(Number(doc.total_amount ?? 0))}
                                   </span>
                                   <button
                                     type="button"
@@ -1041,7 +1100,7 @@ export default function OrdersPage() {
                       timeline.map((entry) => (
                         <div key={entry.id} className="border rounded p-3 bg-gray-50">
                           <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-gray-800">{entry.action}</p>
+                            <p className="text-xs font-semibold text-gray-800">{timelineActionLabel(entry.action)}</p>
                             <p className="text-xs text-gray-500">{new Date(entry.createdAt).toLocaleString()}</p>
                           </div>
                           <p className="text-xs text-gray-500 mt-1">{entry.actorEmail || t("Unknown actor", "Actor desconocido")}</p>

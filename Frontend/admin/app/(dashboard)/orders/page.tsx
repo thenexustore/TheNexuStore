@@ -952,11 +952,11 @@ export default function OrdersPage() {
                                       doc.status === "DRAFT" ? "bg-zinc-100 text-zinc-600" :
                                       "bg-red-100 text-red-600"
                                     }`}>
-                                      {doc.status === "DRAFT" ? "Borrador" :
-                                       doc.status === "ISSUED" ? "Emitida" :
-                                       doc.status === "SENT" ? "Enviada" :
+                                      {doc.status === "DRAFT" ? t("Draft", "Borrador") :
+                                       doc.status === "ISSUED" ? t("Issued", "Emitida") :
+                                       doc.status === "SENT" ? t("Sent", "Enviada") :
                                        doc.status === "PAID" ? t("Payment captured", "Pago capturado") :
-                                       doc.status === "VOID" ? "Anulada" : doc.status}
+                                       doc.status === "VOID" ? t("Voided", "Anulada") : doc.status}
                                     </span>
                                   </div>
                                 </div>

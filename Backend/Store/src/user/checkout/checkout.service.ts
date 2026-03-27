@@ -320,19 +320,6 @@ export class CheckoutService {
       total,
     });
 
-    // For COD orders the payment is confirmed immediately at checkout (order → PROCESSING).
-    // Auto-create a draft billing document so it appears in the billing tab straight away.
-    // Fire-and-forget — billing errors must not break the checkout response.
-    if (paymentMethod === 'COD') {
-      this.billingService.createDocumentFromOrder(result.order.id).catch((err: unknown) => {
-        this.logger.warn(
-          'Failed to auto-create billing document for COD checkout order',
-          'CheckoutService',
-          { orderId: result.order.id, error: err instanceof Error ? err.message : String(err) },
-        );
-      });
-    }
-
     return {
       order: {
         id: result.order.id,
@@ -387,25 +374,6 @@ export class CheckoutService {
           } as Prisma.InputJsonValue,
         },
       });
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: 'PROCESSING' },
-      });
-
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { discounts: true },
-      });
-
-      if (order && order.discounts.length > 0) {
-        for (const discount of order.discounts) {
-          await tx.coupon.update({
-            where: { id: discount.coupon_id },
-            data: { usage_count: { increment: 1 } },
-          });
-        }
-      }
 
       return paymentIntent;
     }

@@ -179,6 +179,41 @@ describe('BillingService issuance guards', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('allows admin number override for ecommerce invoices', async () => {
+    prisma.billingDocument.findUnique
+      .mockResolvedValueOnce({
+        id: 'doc-ecom-1',
+        type: BillingDocumentType.INVOICE,
+        status: BillingDocumentStatus.ISSUED,
+        source: 'ECOMMERCE',
+        document_number: 'INV_2026_0000100',
+      })
+      .mockResolvedValueOnce(null);
+    prisma.billingDocument.update.mockResolvedValue({
+      id: 'doc-ecom-1',
+      document_number: 'INV_2026_A-77',
+    });
+
+    const updated = await service.updateDocumentNumber(
+      'doc-ecom-1',
+      { new_number: 'INV_2026_A-77', reason: 'Corrección de serie' },
+      'admin-1',
+      'ADMIN',
+      'admin@nexus.test',
+    );
+
+    expect(updated.document_number).toBe('INV_2026_A-77');
+    expect(prisma.billingNumberAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          document_id: 'doc-ecom-1',
+          old_number: 'INV_2026_0000100',
+          new_number: 'INV_2026_A-77',
+        }),
+      }),
+    );
+  });
+
   it('backfills a historical paid order without a draft', async () => {
     prisma.order.findMany.mockResolvedValue([
       { id: 'order-h-1', order_number: 'ORD-H-1' },

@@ -293,7 +293,6 @@ export class BillingService {
     } = query;
     const skip = (page - 1) * limit;
 
-    await this.ensureLatestPaidOrderHasDraft();
     await this.warnSuspiciousEcommerceDocumentLinkage();
 
     const dateRange =
@@ -363,47 +362,6 @@ export class BillingService {
       limit,
       pages: Math.ceil(total / limit),
     };
-  }
-
-  private async ensureLatestPaidOrderHasDraft(): Promise<void> {
-    const latestPaidOrder = await this.prisma.order.findFirst({
-      where: {
-        status: {
-          in: [
-            OrderStatus.PAID,
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPED,
-            OrderStatus.DELIVERED,
-          ],
-        },
-      },
-      orderBy: [{ paid_at: 'desc' }, { created_at: 'desc' }],
-      select: { id: true, order_number: true },
-    });
-
-    if (!latestPaidOrder) return;
-
-    const existing = await this.prisma.billingDocument.findFirst({
-      where: {
-        order_id: latestPaidOrder.id,
-        type: BillingDocumentType.INVOICE,
-        status: { not: BillingDocumentStatus.VOID },
-      },
-      select: { id: true },
-    });
-
-    if (existing) return;
-
-    try {
-      await this.createDocumentFromOrder(latestPaidOrder.id);
-      this.logger.log(
-        `Auto-created billing draft for latest paid order ${latestPaidOrder.order_number ?? latestPaidOrder.id}`,
-      );
-    } catch (err) {
-      this.logger.warn(
-        `Could not auto-create draft for latest paid order ${latestPaidOrder.id}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
   }
 
   async getDocumentById(id: string) {

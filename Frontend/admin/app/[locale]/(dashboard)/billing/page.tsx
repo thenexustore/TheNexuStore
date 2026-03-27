@@ -694,12 +694,6 @@ export default function BillingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    backfillPaidOrderBillingDocs().catch(() => {
-      // non-blocking; listing API also auto-ensures the latest paid order draft
-    });
-  }, []);
-
   // ─── Open detail ──────────────────────────────────────────────────────────
 
   const openDetail = async (id: string) => {
@@ -1812,6 +1806,18 @@ export default function BillingPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          <button
+                            onClick={() => handleDownloadPdf(doc.id)}
+                            disabled={downloadingPdfId === doc.id}
+                            className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 disabled:opacity-40 transition"
+                            title="Descargar PDF"
+                          >
+                            {downloadingPdfId === doc.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </button>
                           {doc.status === "DRAFT" && (
                             <button
                               onClick={() => openDraftEditForm(doc as BillingDocumentWithAudits)}
@@ -2276,21 +2282,19 @@ export default function BillingPage() {
                     <Eye className="w-4 h-4" />
                     Vista previa
                   </button>
-                  {/* PDF download — non-DRAFT */}
-                  {selectedDoc.status !== "DRAFT" && (
-                    <button
-                      onClick={() => handleDownloadPdf(selectedDoc.id)}
-                      disabled={downloadingPdfId === selectedDoc.id}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition"
-                    >
-                      {downloadingPdfId === selectedDoc.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                      PDF
-                    </button>
-                  )}
+                  {/* PDF download — available for drafts and finalized docs */}
+                  <button
+                    onClick={() => handleDownloadPdf(selectedDoc.id)}
+                    disabled={downloadingPdfId === selectedDoc.id}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-300 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition"
+                  >
+                    {downloadingPdfId === selectedDoc.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    PDF
+                  </button>
                   {/* Send by email */}
                   {selectedDoc.status !== "DRAFT" && selectedDoc.status !== "VOID" && selectedDoc.customer_email && (
                     <button

@@ -154,6 +154,27 @@ export class BillingService {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 
+  private getAuthoritativeEcommerceTotal(order: any): number {
+    const paidStatuses = new Set([
+      'CAPTURED',
+      'PAID',
+      'SUCCEEDED',
+      'SUCCESS',
+      'COMPLETED',
+      'SETTLED',
+    ]);
+
+    const paidPayment = (order.payments ?? []).find((payment: any) =>
+      paidStatuses.has(String(payment?.status ?? '').toUpperCase()),
+    );
+
+    if (paidPayment?.amount != null) {
+      return this.round2(Number(paidPayment.amount));
+    }
+
+    return this.round2(Number(order.total_amount ?? 0));
+  }
+
   private buildEcommerceInvoiceLineItems(
     order: any,
     shippingLabel = 'Shipping',
@@ -177,7 +198,7 @@ export class BillingService {
     const shippingAmount = this.round2(Number(order.shipping_amount ?? 0));
     const taxAmount = this.round2(Number(order.tax_amount ?? 0));
     const discountAmount = this.round2(Number(order.discount_amount ?? 0));
-    const orderTotal = this.round2(Number(order.total_amount ?? 0));
+    const orderTotal = this.getAuthoritativeEcommerceTotal(order);
 
     const lineItems = order.items.map((item: any, i: number) => {
       const lineSubtotal = this.round2(Number(item.unit_price) * Number(item.qty));
@@ -248,6 +269,41 @@ export class BillingService {
       discountAmount,
       totalAmount: orderTotal,
     };
+  }
+
+  private async syncEcommerceDraftWithOrder(
+    draftDocumentId: string,
+    order: any,
+  ) {
+    const billingTotals = this.buildEcommerceInvoiceLineItems(order);
+
+    const synced = await this.prisma.$transaction(async (tx) => {
+      await tx.billingDocumentItem.deleteMany({
+        where: { document_id: draftDocumentId },
+      });
+
+      if (billingTotals.lineItems.length > 0) {
+        await tx.billingDocumentItem.createMany({
+          data: billingTotals.lineItems.map((item) => ({
+            document_id: draftDocumentId,
+            ...item,
+          })),
+        });
+      }
+
+      return tx.billingDocument.update({
+        where: { id: draftDocumentId },
+        data: {
+          subtotal_amount: billingTotals.subtotalAmount,
+          tax_amount: billingTotals.taxAmount,
+          discount_amount: billingTotals.discountAmount,
+          total_amount: billingTotals.totalAmount,
+        },
+        include: { items: { orderBy: { position: 'asc' } } },
+      });
+    });
+
+    return synced;
   }
 
   private async warnSuspiciousEcommerceDocumentLinkage(): Promise<void> {
@@ -1016,6 +1072,7 @@ export class BillingService {
     if (existingDoc) {
       let finalDoc = existingDoc;
       if (existingDoc.status === BillingDocumentStatus.DRAFT) {
+        finalDoc = await this.syncEcommerceDraftWithOrder(existingDoc.id, order);
         // Issue the draft (assigns number + issue_date)
         finalDoc = await this.issueDocumentFromDelivery(existingDoc.id, 'system');
         // Send email (transitions ISSUED → SENT)
@@ -1202,7 +1259,16 @@ export class BillingService {
       orderBy: { created_at: 'desc' },
       include: { items: true },
     });
-    if (existing) return { billing_document: existing, created: false };
+    if (existing) {
+      if (existing.status === BillingDocumentStatus.DRAFT) {
+        const syncedDraft = await this.syncEcommerceDraftWithOrder(
+          existing.id,
+          order,
+        );
+        return { billing_document: syncedDraft, created: false };
+      }
+      return { billing_document: existing, created: false };
+    }
 
     const settings = await this.getSettings();
     const customer = order.customer;

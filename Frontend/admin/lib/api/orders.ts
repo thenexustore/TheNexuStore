@@ -113,7 +113,8 @@ export async function fetchOrders(
   page: number = 1,
   limit: number = 10,
   status?: string,
-  search?: string
+  search?: string,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<OrdersResponse> {
   const params: Record<string, string> = {
     page: page.toString(),
@@ -124,7 +125,7 @@ export async function fetchOrders(
   if (search) params.search = search;
 
   const queryString = `?${new URLSearchParams(params).toString()}`;
-  return fetchWithAuth(`/admin/orders${queryString}`);
+  return fetchWithAuth(`/admin/orders${queryString}`, options);
 }
 
 export async function fetchOrderById(orderId: string): Promise<OrderDetail> {

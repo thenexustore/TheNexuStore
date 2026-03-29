@@ -331,8 +331,23 @@ export class HomepageSectionsService {
       return config;
     }
 
+    const sourceRaw = String(config.source || '').toLowerCase();
+    const modeRaw = String(config.mode || '').toLowerCase();
+    const normalizedSource =
+      sourceRaw === 'manual' ||
+      sourceRaw === 'curated' ||
+      modeRaw === 'manual' ||
+      modeRaw === 'curated'
+        ? 'manual'
+        : 'query';
+
+    const idsFromQuery = Array.isArray(config.query?.ids)
+      ? config.query.ids
+      : [];
     const next: Record<string, any> = {
       ...config,
+      source: normalizedSource,
+      ids: Array.isArray(config.ids) ? config.ids : idsFromQuery,
       carousel_enabled: Boolean(config.carousel_enabled ?? true),
       carousel_autoplay: Boolean(config.carousel_autoplay ?? true),
       carousel_interval_ms: this.clampNumber(
@@ -367,6 +382,38 @@ export class HomepageSectionsService {
     }
 
     return next;
+  }
+
+  private isManualSelection(config: Record<string, any>) {
+    const source = String(config.source || '').toLowerCase();
+    const mode = String(config.mode || '').toLowerCase();
+    return (
+      source === 'manual' ||
+      source === 'curated' ||
+      mode === 'manual' ||
+      mode === 'curated'
+    );
+  }
+
+  private extractManualIds(config: Record<string, any>): string[] {
+    const candidates = [
+      ...(Array.isArray(config.ids) ? config.ids : []),
+      ...(Array.isArray(config.query?.ids) ? config.query.ids : []),
+      ...(Array.isArray(config.items) ? config.items : []),
+    ];
+
+    return [...new Set(
+      candidates
+        .map((entry: any) => {
+          if (typeof entry === 'string') return entry.trim();
+          if (entry && typeof entry === 'object') {
+            const id = entry.id || entry.product_id || entry.productId;
+            return String(id || '').trim();
+          }
+          return '';
+        })
+        .filter(Boolean),
+    )];
   }
 
   private shouldBackfillLegacyConfig(
@@ -1013,13 +1060,13 @@ export class HomepageSectionsService {
       case HomepageSectionType.PRODUCT_CAROUSEL:
       case HomepageSectionType.NEW_ARRIVALS:
       case HomepageSectionType.FEATURED_PICKS:
-        if (source === 'manual') {
-          return this.getManualProducts(config.ids || []);
+        if (this.isManualSelection(config)) {
+          return this.getManualProducts(this.extractManualIds(config));
         }
         return this.executeProductsQuery(config, type);
       case HomepageSectionType.TOP_CATEGORIES_GRID:
-        if (source === 'manual') {
-          const ids = config.ids || [];
+        if (this.isManualSelection(config)) {
+          const ids = this.extractManualIds(config);
           const order = new Map(
             ids.map((id: string, index: number) => [id, index]),
           );
@@ -1039,8 +1086,8 @@ export class HomepageSectionsService {
           take: config.query?.limit || config.limit || 10,
         });
       case HomepageSectionType.BRANDS_STRIP:
-        if (source === 'manual') {
-          const ids = config.ids || [];
+        if (this.isManualSelection(config)) {
+          const ids = this.extractManualIds(config);
           const order = new Map(
             ids.map((id: string, index: number) => [id, index]),
           );

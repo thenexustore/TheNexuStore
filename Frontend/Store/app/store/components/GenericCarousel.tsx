@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { API_URL } from "../../lib/env";
 import { Product } from "../../lib/products";
+import { formatCurrency } from "../../lib/currency";
 
 export type GenericCarouselType = "products" | "categories" | "brands";
 export type GenericCarouselFilterType =
@@ -33,6 +34,39 @@ interface CarouselCategory {
   id: string;
   name: string;
   slug: string;
+}
+
+function normalizeProduct(input: unknown): Product | null {
+  const raw = (input && typeof input === "object" ? input : null) as Record<string, unknown> | null;
+  if (!raw) return null;
+  const nested =
+    raw.product && typeof raw.product === "object"
+      ? (raw.product as Record<string, unknown>)
+      : raw;
+
+  const id = String(nested.id || raw.id || "").trim();
+  const slug = String(nested.slug || raw.slug || "").trim();
+  const title = String(nested.title || nested.name || raw.title || "").trim();
+  if (!id || !slug || !title) return null;
+
+  return {
+    id,
+    slug,
+    title,
+    brand_name: String(nested.brand_name || nested.brandName || (nested.brand as Record<string, unknown> | undefined)?.name || ""),
+    brand_slug: String(nested.brand_slug || (nested.brand as Record<string, unknown> | undefined)?.slug || ""),
+    category_name: String(nested.category_name || ""),
+    category_slug: String(nested.category_slug || ""),
+    sku_code: String(nested.sku_code || ""),
+    price: Number(nested.price || 0),
+    compare_at_price: nested.compare_at_price ? Number(nested.compare_at_price) : undefined,
+    discount_percentage: nested.discount_percentage ? Number(nested.discount_percentage) : undefined,
+    stock_quantity: Number(nested.stock_quantity || 0),
+    stock_status: String(nested.stock_status || "IN_STOCK"),
+    thumbnail: String(nested.thumbnail || nested.image_url || nested.image || "/No_Image_Available.png"),
+    rating_count: Number(nested.rating_count || 0),
+    is_featured: Boolean(nested.is_featured),
+  };
 }
 
 interface GenericCarouselProps {
@@ -188,15 +222,20 @@ export default function GenericCarousel({
     () => (items.length ? items : remoteItems).slice(0, maxItems),
     [items, remoteItems, maxItems],
   );
+  const productList = useMemo(
+    () => (type === "products" ? list.map((item) => normalizeProduct(item)).filter((item): item is Product => Boolean(item)) : []),
+    [list, type],
+  );
 
   useEffect(() => {
     setPage(0);
   }, [type, filterType, filterId, maxItems, items.length]);
 
   const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(list.length / Math.max(1, perView))),
-    [list.length, perView],
+    () => Math.max(1, Math.ceil((type === "products" ? productList.length : list.length) / Math.max(1, perView))),
+    [list.length, perView, productList.length, type],
   );
+  const activePage = Math.min(page, Math.max(0, pageCount - 1));
 
   const scrollToPage = useCallback(
     (nextPage: number) => {
@@ -220,24 +259,22 @@ export default function GenericCarousel({
       const width = node.clientWidth;
       if (!width) return;
       const pageWidth = width + currentGap;
-      // React bails out of re-render if value hasn't changed, but the explicit guard
-      // avoids the setter call overhead on every scroll event.
       const next = Math.round(node.scrollLeft / pageWidth);
-      if (next !== page) setPage(next);
+      const bounded = Math.min(Math.max(0, next), Math.max(0, pageCount - 1));
+      setPage((prev) => (prev === bounded ? prev : bounded));
     };
 
     node.addEventListener("scroll", onScroll, { passive: true });
     return () => node.removeEventListener("scroll", onScroll);
-    // Only re-register when the gap changes (breakpoint change), not on every page update.
-  }, [currentGap]);
+  }, [currentGap, pageCount]);
 
   useEffect(() => {
     if (!autoplay || pageCount <= 1 || isHovering) return;
     const interval = window.setInterval(() => {
-      scrollToPage(page + 1);
+      scrollToPage(activePage + 1);
     }, Math.max(2000, Number(autoplayIntervalMs || 4500)));
     return () => window.clearInterval(interval);
-  }, [autoplay, autoplayIntervalMs, isHovering, page, pageCount, scrollToPage]);
+  }, [autoplay, autoplayIntervalMs, isHovering, activePage, pageCount, scrollToPage]);
 
   return (
     <section className="w-full px-4 sm:px-6 lg:px-8">
@@ -247,15 +284,15 @@ export default function GenericCarousel({
         {pageCount > 1 ? (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => scrollToPage(page - 1)}
-              className="rounded-lg border bg-white p-2"
+              onClick={() => scrollToPage(activePage - 1)}
+              className="rounded-lg border border-slate-200 bg-white p-2 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20"
               aria-label="Anterior"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
-              onClick={() => scrollToPage(page + 1)}
-              className="rounded-lg border bg-white p-2"
+              onClick={() => scrollToPage(activePage + 1)}
+              className="rounded-lg border border-slate-200 bg-white p-2 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20"
               aria-label="Siguiente"
             >
               <ChevronRight className="h-4 w-4" />
@@ -268,7 +305,7 @@ export default function GenericCarousel({
         <div className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">
           Cargando sección…
         </div>
-      ) : !list.length ? (
+      ) : !(type === "products" ? productList.length : list.length) ? (
         <div className="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">
           No hay elementos para mostrar en este carrusel.
         </div>
@@ -281,13 +318,12 @@ export default function GenericCarousel({
             onMouseLeave={() => setIsHovering(false)}
           >
             {type === "products"
-              ? list.map((item) => {
-                  const product = item as Product;
+              ? productList.map((product) => {
                   return (
                     <Link
                       key={product.id}
                       href={`/products/${product.slug}`}
-                      className="snap-start rounded-xl border bg-white p-3"
+                      className="snap-start rounded-xl border border-slate-200/80 bg-white p-3.5 transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20"
                       style={{
                         flexBasis: `calc((100% - ${(perView - 1) * currentGap}px) / ${perView})`,
                         flexShrink: 0,
@@ -301,8 +337,18 @@ export default function GenericCarousel({
                           className="object-contain"
                         />
                       </div>
-                      <p className="line-clamp-2 text-sm font-semibold">{product.title}</p>
-                      <p className="text-xs text-slate-500">{product.brand_name}</p>
+                      <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-800">{product.title}</p>
+                      <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{product.brand_name}</p>
+                      <div className="mt-2.5 flex flex-wrap items-end gap-x-2 gap-y-1">
+                        <span className={`text-base font-extrabold leading-none ${(product.compare_at_price || 0) > product.price ? "text-red-600" : "text-slate-900"}`}>
+                          {formatCurrency(product.price)}
+                        </span>
+                        {product.compare_at_price && product.compare_at_price > product.price ? (
+                          <span className="text-xs font-medium text-slate-500 line-through">
+                            {formatCurrency(product.compare_at_price)}
+                          </span>
+                        ) : null}
+                      </div>
                     </Link>
                   );
                 })
@@ -364,8 +410,8 @@ export default function GenericCarousel({
                 <button
                   key={index}
                   onClick={() => scrollToPage(index)}
-                  className={`h-2.5 rounded-full transition-all ${
-                    page === index ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"
+                    className={`h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 ${
+                    activePage === index ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300 hover:bg-slate-400"
                   }`}
                   aria-label={`Ir a página ${index + 1}`}
                 />

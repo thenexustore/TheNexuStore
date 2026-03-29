@@ -7,6 +7,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Product } from "../lib/products";
+import { API_URL } from "../lib/env";
 
 interface CarouselConfig {
   enabled?: boolean;
@@ -22,6 +23,20 @@ interface Props {
   loading: boolean;
   emptyMessage: string;
   carouselConfig?: CarouselConfig;
+}
+
+function toApiImage(url?: string) {
+  const raw = String(url || "").trim();
+  if (!raw) return "/No_Image_Available.png";
+  if (
+    raw.startsWith("http") ||
+    raw.startsWith("data:") ||
+    raw.startsWith("blob:") ||
+    raw.startsWith("/")
+  ) {
+    return raw;
+  }
+  return `${API_URL}/${raw.replace(/^\/+/, "")}`;
 }
 
 export default function HomeProductSection({
@@ -87,6 +102,7 @@ export default function HomeProductSection({
     if (!carouselEnabled) return 1;
     return Math.max(1, Math.ceil(products.length / Math.max(1, itemsPerView)));
   }, [carouselEnabled, itemsPerView, products.length]);
+  const activePage = Math.min(currentPage, Math.max(0, pageCount - 1));
 
   const scrollToPage = useCallback((page: number) => {
     if (!scrollRef.current) return;
@@ -101,10 +117,10 @@ export default function HomeProductSection({
   useEffect(() => {
     if (!carouselEnabled || !autoplay || pageCount <= 1 || isHovering || isInteracting || isFocusWithin || !isPageVisible) return;
     const timer = setInterval(() => {
-      scrollToPage(currentPage + 1);
+      scrollToPage(activePage + 1);
     }, autoplayIntervalMs);
     return () => clearInterval(timer);
-  }, [autoplay, autoplayIntervalMs, carouselEnabled, currentPage, isHovering, isInteracting, isFocusWithin, isPageVisible, pageCount, scrollToPage]);
+  }, [autoplay, autoplayIntervalMs, carouselEnabled, activePage, isHovering, isInteracting, isFocusWithin, isPageVisible, pageCount, scrollToPage]);
 
   useEffect(() => {
     if (!carouselEnabled || !scrollRef.current) return;
@@ -112,14 +128,13 @@ export default function HomeProductSection({
     const onScroll = () => {
       const pageWidth = el.clientWidth + currentGap;
       if (!pageWidth) return;
-      // The explicit !== guard avoids the setter call overhead on every scroll event.
       const next = Math.round(el.scrollLeft / pageWidth);
-      if (next !== currentPage) setCurrentPage(next);
+      const bounded = Math.min(Math.max(0, next), Math.max(0, pageCount - 1));
+      setCurrentPage((prev) => (prev === bounded ? prev : bounded));
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-    // Only re-register when gap or enabled state changes, not on every page update.
-  }, [carouselEnabled, currentGap]);
+  }, [carouselEnabled, currentGap, pageCount]);
 
   const card = (product: Product) => {
     const hasDeal =
@@ -130,11 +145,11 @@ export default function HomeProductSection({
       <Link
         key={product.id}
         href={`/products/${product.slug}`}
-        className="group flex h-full min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-3 transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
+        className="group flex h-full min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-3.5 transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20"
       >
         <div className="relative mb-3 aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100">
           <Image
-            src={product.thumbnail || "/No_Image_Available.png"}
+            src={toApiImage(product.thumbnail)}
             alt={product.title}
             fill
             className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
@@ -147,15 +162,15 @@ export default function HomeProductSection({
           ) : null}
         </div>
 
-        <p className="line-clamp-3 min-h-[4.5rem] break-words text-sm font-medium text-slate-800">{product.title}</p>
-        <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{product.brand_name}</p>
+        <p className="line-clamp-3 min-h-[3.75rem] break-words text-sm font-semibold leading-5 text-slate-800">{product.title}</p>
+        <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{product.brand_name}</p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className={`text-base font-bold ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
+        <div className="mt-2.5 flex flex-wrap items-end gap-x-2 gap-y-1">
+          <span className={`text-lg font-extrabold leading-none ${hasDeal ? "text-red-600" : "text-slate-900"}`}>
             {formatCurrency(product.price)}
           </span>
           {hasDeal && product.compare_at_price ? (
-            <span className="text-xs text-slate-500 line-through">
+            <span className="text-xs font-medium text-slate-500 line-through">
               {formatCurrency(product.compare_at_price)}
             </span>
           ) : null}
@@ -174,10 +189,10 @@ export default function HomeProductSection({
         </div>
         {carouselEnabled && pageCount > 1 ? (
           <div className="flex items-center gap-2">
-            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage - 1); }} aria-label={t("dynamic.carouselPrev")}>
+            <button className="rounded-lg border border-slate-200 bg-white p-2 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20" onClick={() => { setIsInteracting(true); scrollToPage(activePage - 1); }} aria-label={t("dynamic.carouselPrev")}>
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button className="rounded-lg border bg-white p-2" onClick={() => { setIsInteracting(true); scrollToPage(currentPage + 1); }} aria-label={t("dynamic.carouselNext")}>
+            <button className="rounded-lg border border-slate-200 bg-white p-2 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20" onClick={() => { setIsInteracting(true); scrollToPage(activePage + 1); }} aria-label={t("dynamic.carouselNext")}>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -234,7 +249,7 @@ export default function HomeProductSection({
               {Array.from({ length: pageCount }).map((_, idx) => (
                 <button
                   key={idx}
-                  className={`h-2.5 rounded-full transition-all ${idx === currentPage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300"}`}
+                  className={`h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 ${idx === activePage ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300 hover:bg-slate-400"}`}
                   onClick={() => { setIsInteracting(true); scrollToPage(idx); }}
                   aria-label={t("dynamic.carouselGoToPage", { page: idx + 1 })}
                 />
